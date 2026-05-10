@@ -1,5 +1,5 @@
 {
-    "name": "fastleo/fastleo",
+    "name": "camanru/fastleo",
     "description": "Admin panel for laravel",
     "keywords": [
         "laravel",
@@ -10,7 +10,6 @@
     ],
     "type": "library",
     "license": "MIT",
-    "homepage": "https://fastleo.ru",
     "version": "2.4.3",
     "authors": [
         {
