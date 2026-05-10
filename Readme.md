@@ -10,7 +10,7 @@ The Laravel framework is open-sourced software licensed under the [MIT license](
 
 **Install Fastleo**
 
-    composer require fastleo/fastleo
+    composer require camanru/fastleo
     php artisan migrate
     php artisan storage:link
     php artisan vendor:publish --tag=fastleo --force
