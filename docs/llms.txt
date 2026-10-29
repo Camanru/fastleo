@@ -1,0 +1,790 @@
+# Fastleo
+
+> Fastleo — админ-панель для сайтов на Laravel 13. Раздел админки (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.
+
+## Порядок работы
+
+1. Миграция таблицы.
+2. Модель: `$fillable` (или атрибут `#[Fillable([...])]`, как в моделях Laravel 13) со **всеми** полями формы, касты (`array` для JSON-полей, enum-каст для `Enum`, `boolean` для галочек), методы связей.
+3. Ресурс: `php artisan fastleo:make-resource Doctor --generate` собирает поля по таблице, затем их правят: подписи (`$label`, `$singular`, подписи полей) и иконка по умолчанию английские — переведите; `Image` и `Gallery` получают папку методом `directory('doctors')`.
+4. Тест раздела: сначала посмотрите в `composer.json`, Pest у сайта или PHPUnit, и напишите тест тем же инструментом; примеры тестов (вход, создание, права, действия, файлы) — в [тестах разделов](testing.md).
+5. `php artisan fastleo:doctor` — ошибок быть не должно. Исправить по подсказкам, повторить.
+
+Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи»:
+
+```php
+// database/migrations/…_create_doctors_table.php
+Schema::create('doctors', function (Blueprint $table) {
+    $table->id();
+    $table->string('name');
+    $table->string('specialty');
+    $table->string('photo')->nullable();
+    $table->boolean('accepts_appointments')->default(true);
+    $table->timestamps();
+});
+
+// app/Models/Doctor.php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Doctor extends Model
+{
+    protected $fillable = ['name', 'specialty', 'photo', 'accepts_appointments'];
+
+    protected function casts(): array
+    {
+        return ['accepts_appointments' => 'boolean'];
+    }
+}
+
+// app/Fastleo/DoctorResource.php (адрес раздела — /fastleo/doctors)
+namespace App\Fastleo;
+
+use App\Models\Doctor;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+final class DoctorResource extends Resource
+{
+    protected static string $model = Doctor::class;
+
+    protected static ?string $label = 'Врачи';
+
+    protected static ?string $singular = 'Врач';
+
+    public function fields(): array
+    {
+        return [
+            Text::make('name', 'Имя')->required()->searchable()->sortable(),
+            Text::make('specialty', 'Специальность')->required(),
+            Image::make('photo', 'Фото')->directory('doctors'),
+            Toggle::make('accepts_appointments', 'Запись открыта'),
+        ];
+    }
+}
+
+// tests/Feature/DoctorsAdminTest.php — PHPUnit (стандарт нового Laravel; у сайта с Pest — тот же код в виде it(...))
+namespace Tests\Feature;
+
+use App\Models\Doctor;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class DoctorsAdminTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_admin_manages_doctors(): void
+    {
+        $admin = User::factory()->create();
+        $admin->forceFill(['fastleo_admin' => true])->save();
+        $this->actingAs($admin, 'fastleo');
+
+        $this->get(route('fastleo.resources.index', 'doctors'))->assertOk();
+        $this->get(route('fastleo.resources.create', 'doctors'))->assertOk();
+        $this->post(route('fastleo.resources.store', 'doctors'), ['name' => 'Иванов', 'specialty' => 'Терапевт'])->assertRedirect();
+
+        $doctor = Doctor::where('name', 'Иванов')->firstOrFail();
+        $this->get(route('fastleo.resources.edit', ['doctors', $doctor->id]))->assertOk();
+    }
+}
+```
+
+## Правила
+
+- Раздел — один класс в `app/Fastleo` (`fastleo.resources.path`). Своих контроллеров, маршрутов и форм для CRUD не пишут.
+- В форме и при записи участвуют только поля из `fields()`: новая колонка в таблице сама не появляется.
+- Каждое поле, которое пишется из формы, должно быть в `$fillable` модели. `fastleo_admin` в `$fillable` не добавляют никогда.
+- Запись идёт через Eloquent (`fill()->save()`), поэтому работают касты, мутаторы и observers модели. Свою логику сайта вешают на observers, а не на пакет.
+- Права задаёт Policy модели; нет Policy — доступ полный. Раздел только для просмотра: `protected static bool $readonly = true`.
+- Поле выбирают по [таблице полей](fields/README.md#типы): у каждого поля есть страница с колонкой, правилами и примером.
+- Файлы и картинки хранятся путём относительно диска (`uploads/doctors/ivanov.jpg`), галерея — JSON-массивом (нужен каст `array`).
+- Пароли и секреты не показывают полями (кроме `Password`, который хеширует значение).
+- «Галочка» (да/нет) — `Toggle`; `Checkbox` нужен, когда флажок стоит в строке с текстом.
+- Для тестов имена маршрутов: `fastleo.resources.index`, `.create`, `.store`, `.show`, `.edit`, `.update`, `.destroy` (адрес раздела — первым параметром, ключ записи — вторым: `route('fastleo.resources.edit', ['doctors', $id])`). Вход в тесте — `actingAs($admin, 'fastleo')`, администратор — пользователь с `fastleo_admin = true`.
+- Внешние ключи: миграция таблицы, на которую ссылаются (рубрики), должна выполняться раньше (метка времени меньше), чем миграция таблицы со ссылкой (новости).
+- После каждой правки — `fastleo:doctor`; перед сдачей работы — тест раздела.
+
+## Поля
+
+### Text — строка (колонка `string`)
+
+Однострочный текст.
+
+```php
+use Fastleo\Fields\Text;
+
+Text::make('title', 'Заголовок')->required()->searchable()->sortable();
+Text::make('code', 'Код')->maxLength(20)->placeholder('например, news');
+```
+
+| Метод | Что делает |
+|---|---|
+| `maxLength(20)` | Наибольшая длина (по умолчанию 255, как у `$table->string()`); браузер не даст ввести больше |
+
+Детали: docs/fields/text.md
+
+### Textarea — многострочный текст (колонка `text`)
+
+Многострочный текст без оформления. Переносы строк сохраняются.
+
+```php
+use Fastleo\Fields\Textarea;
+
+Textarea::make('excerpt', 'Анонс')->rows(4)->maxLength(500);
+```
+
+| Метод | Что делает |
+|---|---|
+| `rows(8)` | Высота поля в строках (по умолчанию 5) |
+| `maxLength(500)` | Наибольшая длина (по умолчанию без ограничения) |
+
+Детали: docs/fields/textarea.md
+
+### Number — целое или дробное число (колонка `integer`, `decimal`)
+
+Число: целое или дробное.
+
+```php
+use Fastleo\Fields\Number;
+
+Number::make('quantity', 'Количество')->integer()->min(1);
+Number::make('price', 'Цена, ₽')->min(0)->step(0.01);
+```
+
+| Метод | Что делает |
+|---|---|
+| `integer()` | Только целые числа; значение сохраняется как `int` |
+| `min(0)` | Наименьшее значение |
+| `max(100)` | Наибольшее значение |
+| `step(0.01)` | Шаг стрелок в поле (по умолчанию 1 для целых, любой для дробных) |
+
+Детали: docs/fields/number.md
+
+### Checkbox — галочка да/нет (колонка `boolean`)
+
+Галочка «да/нет».
+
+```php
+use Fastleo\Fields\Checkbox;
+
+Checkbox::make('is_featured', 'Показывать на главной');
+```
+
+Детали: docs/fields/checkbox.md
+
+### Toggle — переключатель вкл/выкл (колонка `boolean`)
+
+Переключатель «вкл/выкл». Работает как [Checkbox](fields/checkbox.md), выглядит как тумблер.
+
+```php
+use Fastleo\Fields\Toggle;
+
+Toggle::make('is_active', 'Показывать на сайте')->default(true);
+```
+
+Детали: docs/fields/toggle.md
+
+### Select — выбор из списка (один или несколько) (колонка `string` / `json`)
+
+Выбор из списка: один вариант или несколько.
+
+```php
+use Fastleo\Fields\Select;
+
+// Массив «значение => подпись»
+Select::make('status', 'Статус')->options([
+    'draft' => 'Черновик',
+    'published' => 'Опубликовано',
+])->required();
+
+// PHP backed enum (enum X: string или int): подписи из метода label(), если он есть, иначе имена вариантов
+Select::make('status', 'Статус')->options(ArticleStatus::class);
+
+// Замыкание — вызывается один раз за запрос (форма, список, проверка)
+Select::make('city', 'Город')->options(fn () => City::query()->orderBy('name')->pluck('name', 'id')->all());
+
+// Несколько вариантов
+Select::make('days', 'Дни приёма')->options([1 => 'Пн', 2 => 'Вт', 3 => 'Ср'])->multiple();
+```
+
+| Метод | Что делает |
+|---|---|
+| `options([...])` | Варианты: массив, класс backed enum или замыкание |
+| `multiple()` | Можно выбрать несколько; ничего не выбрано — сохраняется пустой массив |
+| `placeholder('Выберите')` | Текст пустого варианта (по умолчанию «—») |
+| `dependsOn('brand')` | Зависимый список: замыкание вариантов получает значение поля `brand` ([layout.md](layout.md#зависимые-списки)) |
+
+Детали: docs/fields/select.md
+
+### Date — дата (колонка `date`)
+
+Дата без времени. Вводится календарём браузера.
+
+```php
+use Fastleo\Fields\Date;
+
+Date::make('published_on', 'Дата публикации')->default(fn () => now()->toDateString());
+```
+
+Детали: docs/fields/date.md
+
+### DateTime — дата и время (колонка `dateTime`, `timestamp`)
+
+Дата и время (часы и минуты).
+
+```php
+use Fastleo\Fields\DateTime;
+
+DateTime::make('starts_at', 'Начало')->required();
+DateTime::make('created_at', 'Создано')->onlyInList()->sortable();
+DateTime::make('starts_at', 'Начало')->default(fn () => now()); // покажется в поясе админки
+```
+
+Детали: docs/fields/date-time.md
+
+### Time — время (колонка `time`)
+
+Время без даты: часы и минуты.
+
+```php
+use Fastleo\Fields\Time;
+
+Time::make('opens_at', 'Открытие')->default('09:00');
+```
+
+Детали: docs/fields/time.md
+
+### Email — email (колонка `string`)
+
+Адрес электронной почты. Вариант [Text](fields/text.md): на телефоне открывает клавиатуру с `@`.
+
+```php
+use Fastleo\Fields\Email;
+
+Email::make('email', 'Email')->required()->searchable();
+```
+
+Детали: docs/fields/email.md
+
+### Url — адрес страницы (колонка `string`)
+
+Адрес страницы. Вариант [Text](fields/text.md).
+
+```php
+use Fastleo\Fields\Url;
+
+Url::make('website', 'Сайт')->placeholder('https://');
+```
+
+Детали: docs/fields/url.md
+
+### Tel — телефон (колонка `string`)
+
+Телефон. Вариант [Text](fields/text.md): на телефоне открывает цифровую клавиатуру.
+
+```php
+use Fastleo\Fields\Tel;
+
+Tel::make('phone', 'Телефон')->placeholder('+7 900 000-00-00');
+```
+
+Детали: docs/fields/tel.md
+
+### Color — цвет HEX (колонка `string`)
+
+Цвет в HEX: вводится текстом или выбирается палитрой браузера.
+
+```php
+use Fastleo\Fields\Color;
+
+Color::make('color', 'Цвет метки')->default('#4f46e5');
+```
+
+Детали: docs/fields/color.md
+
+### Hidden — скрытое значение (колонка любая)
+
+Скрытое значение формы: не видно администратору, но отправляется и записывается. В списке и на странице просмотра не показывается.
+
+```php
+use Fastleo\Fields\Hidden;
+
+Hidden::make('type')->default('news');
+```
+
+Детали: docs/fields/hidden.md
+
+### Radio — один вариант кнопками (колонка `string`)
+
+Один вариант из нескольких кнопками-переключателями. Удобно, когда вариантов 2–5 и их надо видеть сразу.
+
+```php
+use Fastleo\Fields\Radio;
+
+Radio::make('layout', 'Вид страницы')
+    ->options(['wide' => 'Широкий', 'narrow' => 'Узкий'])
+    ->default('wide')
+    ->required();
+
+// Варианты из enum или замыкания — как у Select
+Radio::make('status', 'Статус')->options(ArticleStatus::class);
+```
+
+| Метод | Что делает |
+|---|---|
+| `options([...])` | Варианты: массив, класс backed enum или замыкание (как у [Select](fields/select.md)) |
+
+Детали: docs/fields/radio.md
+
+### Range — число ползунком (колонка `integer`)
+
+Число ползунком; текущее значение видно рядом. По умолчанию — целое от 0 до 100 с шагом 1.
+
+```php
+use Fastleo\Fields\Range;
+
+Range::make('discount', 'Скидка, %')->min(0)->max(50)->step(5)->default(0);
+
+// Дробное значение
+Range::make('opacity', 'Прозрачность')->integer(false)->min(0)->max(1)->step(0.1);
+```
+
+| Метод | Что делает |
+|---|---|
+| `min(0)` / `max(100)` | Границы ползунка и проверки (по умолчанию 0 и 100) |
+| `step(5)` | Шаг ползунка |
+| `integer(false)` | Разрешить дробные значения |
+
+Детали: docs/fields/range.md
+
+### Enum — варианты из PHP enum (колонка `string` / `integer`)
+
+Список вариантов из PHP backed enum (`enum Status: string` или `int`). Подпись варианта — метод `label()` enum, если он есть, иначе имя случая.
+
+```php
+use Fastleo\Fields\Enum;
+
+Enum::make('status', 'Статус')->enum(ArticleStatus::class)->required()->sortable();
+
+// Несколько значений
+Enum::make('channels', 'Каналы')->enum(Channel::class)->multiple();
+```
+
+| Метод | Что делает |
+|---|---|
+| `enum(Status::class)` | Enum вариантов (обязательно; не enum — ошибка описания) |
+| `multiple()` | Можно выбрать несколько |
+| `placeholder('Выберите')` | Текст пустого варианта |
+
+Детали: docs/fields/enum.md
+
+### Password — пароль (хеш, пустое — не менять) (колонка `string`)
+
+Пароль. Поле в форме всегда пустое — хеш никогда не попадает на страницу. В модель пишется хеш `Hash::make()`.
+
+```php
+use Fastleo\Fields\Password;
+
+Password::make('password', 'Пароль')->required()->confirmed();
+```
+
+| Метод | Что делает |
+|---|---|
+| `confirmed()` | Второе поле «Повторите пароль» (`password_confirmation`), значения должны совпасть |
+| `required()` | Обязателен только при создании записи |
+
+Детали: docs/fields/password.md
+
+### Secret — токен, ключ API (не показывается, пустое — не менять) (колонка `text` + каст `encrypted`)
+
+Секрет: токен бота, ключ API, пароль от чужого сервиса — то, что нужно хранить как есть (а не хешем, как [Password](fields/password.md)), но нельзя показывать. Поле в форме всегда пустое: сохранённое значение никогда не попадает на страницу.
+
+```php
+use Fastleo\Fields\Secret;
+
+Secret::make('api_key', 'Ключ API')->required();
+```
+
+| Метод | Что делает |
+|---|---|
+| `required()` | Обязателен только при создании записи |
+
+Детали: docs/fields/secret.md
+
+### Slug — адрес записи из заголовка (колонка `string`, уникальный)
+
+Адрес записи для сайта: `o-kompanii`. Латиница в нижнем регистре, цифры и дефис.
+
+```php
+use Fastleo\Fields\Slug;
+
+Slug::make('slug', 'Адрес')->from('title');
+```
+
+| Метод | Что делает |
+|---|---|
+| `from('title')` | Поле, из которого строится адрес |
+| `unique(false)` | Не проверять уникальность (например, адрес уникален только внутри родителя — задайте своё правило через `rules()`) |
+| `maxLength(100)` | Наибольшая длина |
+
+Детали: docs/fields/slug.md
+
+### Tags — метки свободным вводом (колонка `json` + каст `array`)
+
+Метки свободным вводом: Enter или запятая добавляет метку, × убирает, Backspace в пустом вводе убирает последнюю. Можно вставить сразу «акция, новинка».
+
+```php
+use Fastleo\Fields\Tags;
+
+Tags::make('keywords', 'Ключевые слова')
+    ->suggestions(['акция', 'новинка', 'обзор'])
+    ->maxTagLength(30);
+```
+
+| Метод | Что делает |
+|---|---|
+| `suggestions([...])` | Подсказки при вводе (можно ввести и другие) |
+| `maxTagLength(30)` | Наибольшая длина одной метки |
+
+Детали: docs/fields/tags.md
+
+### Code — код, HTML-вставка без чистки (колонка `text`)
+
+Код или HTML-вставка: счётчик, виджет, код в `<head>`. Моноширинный шрифт, Tab вставляет отступ (Esc, затем Tab — перейти к следующему полю).
+
+```php
+use Fastleo\Fields\Code;
+
+Code::make('head_code', 'Код в <head>')->rows(10)->help('Вставляется на страницу без изменений');
+```
+
+| Метод | Что делает |
+|---|---|
+| `rows(10)` | Высота поля в строках (по умолчанию 10) |
+| `maxLength(5000)` | Наибольшая длина |
+
+Детали: docs/fields/code.md
+
+### Markdown — текст в Markdown с просмотром (колонка `text`)
+
+Текст в разметке Markdown с вкладками «Текст» и «Просмотр».
+
+```php
+use Fastleo\Fields\Markdown;
+
+Markdown::make('body', 'Текст статьи')->rows(15);
+```
+
+| Метод | Что делает |
+|---|---|
+| `rows(15)` | Высота поля в строках (по умолчанию 12) |
+| `maxLength(20000)` | Наибольшая длина |
+
+Детали: docs/fields/markdown.md
+
+### RichText — визуальный редактор, HTML чистится (колонка `longText`)
+
+Текст с оформлением в визуальном редакторе [HugeRTE](https://github.com/hugerte/hugerte) (MIT-форк TinyMCE 6): заголовки, жирный и курсив, выравнивание, списки, ссылки, картинки из [файлового менеджера](files.md), таблицы, цитаты, видео. Редактор на русском, в тёмной теме — тёмный. Ctrl/Cmd+S внутри редактора сохраняет запись.
+
+```php
+use Fastleo\Fields\RichText;
+
+RichText::make('content', 'Текст')->height(500);
+```
+
+| Что | Теги |
+|---|---|
+| Текст | `p`, `br`, `h2`, `h3`, `h4`, `strong`, `b`, `em`, `i`, `u`, `s`, `sub`, `sup`, `blockquote`, `hr`, `pre`, `code` |
+| Списки | `ul`, `ol` (`start`), `li` |
+| Ссылки | `a` (`href` — http, https, mailto, tel или адрес на сайте; `title`, `target`), всем ссылкам добавляется `rel="noopener"` |
+| Картинки | `img` (`src` — http, https или адрес на сайте; `alt`, `title`, `width`, `height`, `loading`), `figure`, `figcaption` |
+| Таблицы | `table`, `caption`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` (`colspan`, `rowspan`) |
+| Видео | `iframe` только с плеерами по https: `www.youtube.com/embed/`, `www.youtube-nocookie.com/embed/`, `rutube.ru/play/embed/`, `vk.com/video_ext.php`, `vkvideo.ru/video_ext.php` |
+| Оформление | из атрибута `style` — только `text-align` (у абзацев, заголовков, цитат, пунктов, ячеек) |
+
+Детали: docs/fields/rich-text.md
+
+### Image — картинка из файлового менеджера (колонка `string`)
+
+Одна картинка из [файлового менеджера](files.md): фото врача, обложка статьи. В форме — превью и кнопки «Загрузить», «Выбрать из файлов», «Убрать». В списке — миниатюра, на просмотре — крупная миниатюра со ссылкой на файл.
+
+```php
+use Fastleo\Fields\Image;
+
+Image::make('photo', 'Фото')
+    ->directory('doctors')
+    ->crop('3:4')
+    ->required();
+```
+
+| Метод | Что делает |
+|---|---|
+| `directory('doctors')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Выбрать можно файл из любой папки. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `extensions(['jpg', 'png'])` | Только эти форматы (из разрешённых картинок) |
+| `crop('3:4')` | Кнопка «Обрезать» с рамкой в пропорции `ширина:высота` (`'1:1'`, `'16:9'`) |
+| `variants('card')` | WebP-варианты для сайта размеров из `fastleo.images.presets`, вывод — `<x-fastleo::picture>` ([files.md](files.md#картинки-для-сайта-варианты-и-x-fastleopicture)) |
+
+Детали: docs/fields/image.md
+
+### File — файл из файлового менеджера (колонка `string`)
+
+Один файл из [файлового менеджера](files.md): прайс, договор, презентация. В форме — имя файла со ссылкой и кнопки «Загрузить», «Выбрать из файлов», «Убрать». В списке и на просмотре — ссылка на файл (для картинки — миниатюра).
+
+```php
+use Fastleo\Fields\File;
+
+File::make('price', 'Прайс')
+    ->extensions(['pdf', 'xlsx'])
+    ->directory('prices');
+```
+
+| Метод | Что делает |
+|---|---|
+| `extensions(['pdf', 'xlsx'])` | Какие форматы принимает поле (из разрешённых в конфиге) |
+| `directory('prices')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+
+Детали: docs/fields/file.md
+
+### Gallery — несколько картинок с порядком (колонка `json` + каст `array`)
+
+Несколько картинок из [файлового менеджера](files.md) с ручным порядком: фото клиники, галерея работ. В форме — плитки миниатюр (порядок — перетаскиванием, × — убрать), «Загрузить» (несколько сразу) и «Выбрать из файлов» (в окне можно отметить несколько и нажать «Выбрать»).
+
+```php
+use Fastleo\Fields\Gallery;
+
+Gallery::make('photos', 'Фото клиники')
+    ->directory('clinic')
+    ->max(20);
+```
+
+| Метод | Что делает |
+|---|---|
+| `max(20)` | Наибольшее число картинок (без `max()` — 100) |
+| `directory('clinic')` | Папка внутри корня загрузок для загруженных в поле файлов. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `extensions(['jpg', 'webp'])` | Только эти форматы (из разрешённых картинок) |
+| `variants('photo')` | WebP-варианты для сайта размеров из `fastleo.images.presets` ([files.md](files.md#картинки-для-сайта-варианты-и-x-fastleopicture)) |
+
+Детали: docs/fields/gallery.md
+
+### BelongsTo — связь с записью другой таблицы (колонка `foreignId`)
+
+Связь «принадлежит»: запись ссылается на запись другой таблицы — статья на категорию, врач на клинику.
+
+```php
+use Fastleo\Fields\BelongsTo;
+
+BelongsTo::make('category_id', 'Категория')->required();
+```
+
+| Метод | Что делает |
+|---|---|
+| `titleColumn('short_name')` | Колонка связанной модели с подписью |
+| `relation('writer')` | Метод связи, если он называется не как колонка без `_id` |
+| `query(fn (Builder $query) => ...)` | Ограничить варианты (и то, что можно сохранить) |
+| `dependsOn('region_id', fn (Builder $query, mixed $region) => ...)` | Зависимый список: варианты по значению другого поля формы ([layout.md](layout.md#зависимые-списки)) |
+
+Детали: docs/fields/belongs-to.md
+
+### BelongsToMany — связь многие ко многим (колонка промежуточная таблица)
+
+Связь «многие ко многим» через промежуточную таблицу: статья ↔ темы, врач ↔ услуги. Выбор нескольких записей с поиском.
+
+```php
+use Fastleo\Fields\BelongsToMany;
+
+BelongsToMany::make('topics', 'Темы');
+```
+
+Детали: docs/fields/belongs-to-many.md
+
+### HasMany — вложенные записи блоками (колонка таблица блоков)
+
+Список вложенных записей прямо в форме родителя: цены услуг, пункты меню, полезные ссылки. Блоки можно добавлять и удалять, а с `orderColumn()` — ещё и перетаскивать.
+
+```php
+use Fastleo\Fields\HasMany;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Text;
+use Fastleo\Layout\Grid;
+
+HasMany::make('prices', 'Цены')
+    ->fields([
+        Grid::make(2, [
+            Text::make('title', 'Услуга')->required(),
+            Number::make('price', 'Цена')->min(0),
+        ]),
+    ])
+    ->orderColumn('sort')
+    ->max(50);
+```
+
+| Метод | Что делает |
+|---|---|
+| `fields([...])` | Поля и раскладка блока (`Grid`, `Section`) |
+| `orderColumn('sort')` | Колонка порядка, перетаскивание блоков |
+| `min(1)` / `max(20)` | Наименьшее и наибольшее число блоков (без `max()` — 200) |
+
+Детали: docs/fields/has-many.md
+
+### HasOne — одна вложенная запись (колонка таблица блока)
+
+Одна вложенная запись в форме родителя: «Баннер», «Реквизиты», «Карточка на главной».
+
+```php
+use Fastleo\Fields\HasOne;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Fields\Url;
+
+HasOne::make('banner', 'Баннер')->fields([
+    Text::make('title', 'Текст баннера'),
+    Url::make('link', 'Ссылка'),
+    Toggle::make('is_active', 'Показывать'),
+]);
+```
+
+Детали: docs/fields/has-one.md
+
+### Repeater — повторяющаяся группа полей (колонка `json` + каст `array`)
+
+Повторяющаяся группа полей в одной JSON-колонке: вопросы и ответы, этапы работ, преимущества, строки прайса — когда отдельная таблица не нужна. Элементы добавляются кнопкой, удаляются корзиной и перетаскиваются за ручку.
+
+```php
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Repeater;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Layout\Grid;
+
+Repeater::make('faq', 'Вопросы и ответы')
+    ->fields([
+        Grid::make(2, [
+            Text::make('question', 'Вопрос')->required(),
+            Image::make('icon', 'Иконка')->directory('faq'),
+        ]),
+        Textarea::make('answer', 'Ответ'),
+    ])
+    ->max(20);
+```
+
+| Метод | Что делает |
+|---|---|
+| `fields([...])` | Подполя и раскладка (`Grid`, `Section`) элемента |
+| `min(1)` | Не меньше стольких элементов (с `min` ≥ 1 поле обязательное) |
+| `max(20)` | Не больше стольких элементов (по умолчанию 100) |
+
+Детали: docs/fields/repeater.md
+
+### KeyValue — пары «название — значение» (колонка `json` + каст `array`)
+
+Пары «название — значение» в одной JSON-колонке: характеристики товара, параметры, свойства. Строки добавляются, удаляются и перетаскиваются.
+
+```php
+use Fastleo\Fields\KeyValue;
+
+KeyValue::make('specs', 'Характеристики')
+    ->keyLabel('Параметр')
+    ->valueLabel('Значение');
+```
+
+| Метод | Что делает |
+|---|---|
+| `keyLabel('Параметр')` | Подпись столбца названий (по умолчанию «Название») |
+| `valueLabel('Значение')` | Подпись столбца значений (по умолчанию «Значение») |
+| `max(30)` | Не больше стольких строк |
+
+Детали: docs/fields/key-value.md
+
+### Seo — заголовок, описание, картинка и запрет индексации (колонка `json` + каст `array`)
+
+Всё для поисковиков и соцсетей в одном блоке формы: заголовок, описание, картинка для превью ссылки и запрет индексации. Хранится одним объектом в JSON-колонке.
+
+```php
+use Fastleo\Fields\Seo;
+
+Seo::make('seo');                                    // подпись «SEO», картинки в uploads/seo
+Seo::make('seo', 'Для поисковиков')->directory('articles');
+```
+
+| Подполе | Проверка | Подсказка |
+|---|---|---|
+| Заголовок | строка до 255 символов | Лучше до 60; пусто — возьмётся название записи |
+| Описание | строка до 500 символов | Лучше до 160; пусто — возьмётся начало текста записи |
+| Картинка для соцсетей | как у [Image](fields/image.md): путь внутри диска загрузок | Пусто — картинка из `<x-fastleo::seo :image>` (например, обложка записи); без неё превью без картинки |
+| Не показывать в поиске | галочка | Тег `noindex` и исключение из карты сайта |
+
+Детали: docs/fields/seo.md
+
+### Blocks — конструктор из блоков разных типов (колонка `json` + каст `array`)
+
+Поле `Blocks` собирает страницу из блоков разных типов: текст, картинка, галерея, цитата, кнопка… Админ добавляет блоки из меню «Добавить блок», заполняет, сворачивает, перетаскивает и удаляет. Сайт выводит блоки по порядку своими шаблонами.
+
+```php
+use Fastleo\Fields\Block;
+use Fastleo\Fields\Blocks;
+use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+
+Blocks::make('content', 'Содержимое')->blocks([
+    Block::make('text', 'Текст')->icon('text')->fields([
+        RichText::make('body', 'Текст')->required(),
+    ]),
+    Block::make('image', 'Картинка')->icon('image')->fields([
+        Image::make('src', 'Картинка')->directory('pages')->variants('card')->required(),
+        Text::make('caption', 'Подпись'),
+    ]),
+    Block::make('gallery', 'Галерея')->icon('images')->fields([
+        Gallery::make('photos', 'Фотографии')->directory('pages')->variants('card'),
+    ]),
+    Block::make('quote', 'Цитата')->icon('quote')->fields([
+        Textarea::make('text', 'Цитата')->required(),
+        Text::make('author', 'Автор'),
+    ]),
+]),
+```
+
+| Метод | Что делает |
+|---|---|
+| `blocks([...])` | Типы блоков (`Block::make()`) |
+| `min(1)` | Не меньше стольких блоков (с `min` ≥ 1 поле обязательное) |
+| `max(30)` | Не больше стольких блоков (по умолчанию 100) |
+
+Детали: docs/blocks.md
+
+## Документация
+
+- [Действия над записями](actions.md) — Действие — кнопка, которая что-то делает с одной записью или с несколькими выбранными: «Опубликовать», «Отправить письмо», «Пересчитать цены».
+- [Журнал изменений](activity.md) — Журнал записывает, **кто, когда и что изменил в админке**: «было → стало» по каждому полю, копию удалённой записи. Из журнала можно вернуть прежние значения или…
+- [Вход, профиль и восстановление пароля](auth.md) — Вход в админку — отдельный guard `fastleo` поверх таблицы пользователей сайта. Доступ решает метод `canAccessFastleo()` модели (см.…
+- [Права доступа](authorization.md) — Кто входит в админку, решает `canAccessFastleo()` модели пользователя ([installation.md](installation.md)). Что администратор может делать в разделе, решают…
+- [Конструктор страниц (Blocks)](blocks.md) — Поле `Blocks` собирает страницу из блоков разных типов: текст, картинка, галерея, цитата, кнопка… Админ добавляет блоки из меню «Добавить блок», заполняет,…
+- [Работа с Claude](claude.md) — Fastleo сделан так, чтобы раздел админки описывался одним классом, а Claude (или другой ИИ-агент) мог собрать его сам: миграцию, модель, ресурс и тест — и…
+- [Настройки](configuration.md) — Файл `config/fastleo.php` появляется после `php artisan fastleo:install` (или `php artisan vendor:publish --tag=fastleo-config`). Без него действуют значения по…
+- [Дашборд](dashboard.md) — Главная страница админки — сетка виджетов: числа, графики, последние записи, плитки разделов, состояние сервера. Без настройки показываются **плитки…
+- [Файлы](files.md) — В админке есть файловый менеджер: пункт меню «Файлы» (`/fastleo/files`). Он работает с одной папкой на диске Laravel Storage — по умолчанию…
+- [Экспорт и импорт](import-export.md) — Раздел можно выгрузить в Excel (xlsx) или CSV и загрузить записи обратно из такого файла. Работают те же поля, что и в форме: выгружаются значения полей, а…
+- [Установка и обновление](installation.md) — | Что | Версия | |---|---| | PHP | 8.4 или новее | | Laravel | 13 | | База данных | MySQL 8, PostgreSQL 16+ или SQLite | | PHP-расширение GD | с поддержкой WebP…
+- [Раскладка формы](layout.md) — Поля в `fields()` можно группировать: вкладки, секции, колонки, боковая панель. Раскладка влияет только на форму — список и запись в базу от неё не зависят.
+- [Список записей](list.md) — Список раздела строится из тех же полей, что и форма. Столбец — каждое поле, видимое в списке.
+- [Уведомления: колокольчик, Telegram и Max](notifications.md) — Колокольчик в шапке админки показывает уведомления администратору: новая заявка, импорт завершён, что-то сломалось. Дополнительно сообщение уходит в чаты…
+- [Свои страницы и журнал ошибок](pages.md) — Страница без модели: отчёт, инструкция для редакторов, панель управления. Класс наследует `Fastleo\Page`, лежит рядом с ресурсами, а шаблон — в…
+- [Публикации в Telegram и Max](publishing.md) — Записи сайта (новости, статьи, акции) можно публиковать в каналы Telegram и Max прямо из админки: боты пакета отправляют пост с текстом, картинками и…
+- [Разделы (ресурсы)](resources.md) — Раздел админки — это класс-ресурс. Он описывает модель, подписи, место в меню и поля. По нему fastleo строит пункт меню, список записей, форму создания и…
+- [Безопасность](security.md) — Админка открыта в интернет, поэтому пакет защищает вход, права, запись данных и файлы сам, без настройки. На этой странице — что именно защищено и что стоит…
+- [SEO и карта сайта](seo.md) — Три части: поле [`Seo`](fields/seo.md) в админке, компонент `<x-fastleo::seo>` в шаблоне сайта и `/sitemap.xml`.
+- [Настройки сайта](settings.md) — Страница настроек — класс с полями, как ресурс, но без модели: телефон, почта для заявок, часы работы, счётчики, соцсети. Администратор правит их в админке, а…
+- [Закрытие сайта](site-closing.md) — Временно закрывает сайт для посетителей — на время обновления, переезда, доработок: вместо страниц сайта посетители видят «Сайт временно не работает» с кодом…
+- [Подключение к SoftNetica](softnetica.md) — SoftNetica — сервис обслуживания сайтов. Клиентам SoftNetica в админке доступна связь с сервисом: сайт сообщает о своём состоянии, а в админке появляются виджет…
+- [Тесты разделов в сайте](testing.md) — Раздел админки — обычные маршруты Laravel, поэтому его тестируют обычными Feature-тестами сайта: войти администратором, открыть страницу, отправить форму,…
+- [Оформление](theming.md) — Внешний вид админки меняется без сборки: название, логотип и основной цвет — в конфиге, остальное — своим CSS-файлом. Стили и скрипты пакета собраны заранее,…
+- [Многоязычные поля](translations.md) — Если сайт на нескольких языках, текстовое поле может хранить значение для каждого языка. Над таким полем — вкладки языков (`RU | EN`), каждая со своим вводом;…
+- [Переход с fastleo 2.x и 3.0](upgrade-from-3.md) — Fastleo 4.0 написан заново. Обратной совместимости со старыми версиями нет: другое имя пакета, другой namespace, раздел админки описывается не свойствами…
+- [Проверка значений](validation.md) — Значения формы проверяются правилами [валидации Laravel](https://laravel.com/docs/13.x/validation). Правила собираются из полей, видимых в форме.

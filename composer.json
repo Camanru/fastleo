@@ -1,0 +1,102 @@
+{
+    "name": "camanru/fastleo",
+    "description": "Admin panel for Laravel sites: each section is described by a single resource class",
+    "keywords": [
+        "laravel",
+        "fastleo",
+        "admin",
+        "admin-panel",
+        "cms"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://softnetica.com/",
+    "authors": [
+        {
+            "name": "Roman Zakharov",
+            "email": "camanru@gmail.com",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.4",
+        "bacon/bacon-qr-code": "^3.1",
+        "intervention/image": "^4",
+        "laravel/framework": "^13.32",
+        "laravel/mcp": "^1.0",
+        "openspout/openspout": "^5.13",
+        "pragmarx/google2fa": "^9.1",
+        "symfony/html-sanitizer": "^8.1"
+    },
+    "require-dev": {
+        "driftingly/rector-laravel": "^2.7",
+        "larastan/larastan": "^3.13",
+        "laravel/pint": "^1.32",
+        "orchestra/testbench": "^11.3",
+        "pestphp/pest": "^5.3",
+        "pestphp/pest-plugin-browser": "^5.1",
+        "pestphp/pest-plugin-laravel": "^5.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0",
+        "rector/rector": "^2.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "Fastleo\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Fastleo\\Tests\\": "tests/",
+            "Workbench\\App\\": "workbench/app/",
+            "Workbench\\Database\\Factories\\": "workbench/database/factories/",
+            "Workbench\\Database\\Seeders\\": "workbench/database/seeders/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Fastleo\\FastleoServiceProvider"
+            ]
+        }
+    },
+    "scripts": {
+        "post-autoload-dump": [
+            "@clear",
+            "@prepare"
+        ],
+        "clear": "@php vendor/bin/testbench package:purge-skeleton --ansi",
+        "prepare": "@php vendor/bin/testbench package:discover --ansi",
+        "build": "@php vendor/bin/testbench workbench:build --ansi",
+        "docs:build": "@php vendor/bin/testbench fastleo:docs-build --ansi",
+        "serve": [
+            "Composer\\Config::disableProcessTimeout",
+            "@build",
+            "@php vendor/bin/testbench serve --ansi"
+        ],
+        "lint": [
+            "@php vendor/bin/pint --test",
+            "@php vendor/bin/rector process --dry-run",
+            "@php vendor/bin/phpstan analyse --memory-limit=1G"
+        ],
+        "test": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser",
+        "test:coverage": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser --coverage --min=95",
+        "test:types": "@php vendor/bin/pest --type-coverage --min=100",
+        "test:browser": "@php vendor/bin/pest --testsuite=Browser",
+        "check": [
+            "@lint",
+            "@test:types",
+            "@test:coverage"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

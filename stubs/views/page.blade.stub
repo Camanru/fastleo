@@ -1,0 +1,5 @@
+<x-fastleo::layouts.app title="{{ label }}">
+    <x-fastleo::card :title="$title" class="max-w-xl">
+        <p class="text-sm text-ink-2">Содержимое страницы «{{ label }}».</p>
+    </x-fastleo::card>
+</x-fastleo::layouts.app>

@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Fields\Email;
+use Fastleo\Fields\Text;
+use Fastleo\Settings;
+use Override;
+
+/**
+ * Страница настроек «{{ label }}»: значения хранятся в `fastleo_settings`, на сайте читаются
+ * `fastleo_setting('ключ.поле')`; ключ страницы — имя класса без «Settings» через дефис (`SiteContactsSettings` → `site-contacts`).
+ */
+final class {{ class }} extends Settings
+{
+    protected static ?string $label = '{{ label }}';
+
+    protected static string $icon = 'settings';
+
+    /**
+     * Поля страницы.
+     */
+    #[Override]
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required(),
+            Email::make('email', 'Почта'),
+        ];
+    }
+}

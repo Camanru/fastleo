@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+/*
+ * Ошибки для разработчика сайта: неверное описание ресурса или поля.
+ */
+
+return [
+    'image_crop_ratio' => 'Image «:field»: пропорция обрезки «:ratio» должна быть в виде ширина:высота, например crop(\'3:4\') или crop(\'16:9\').',
+    'image_preset_missing' => 'Размера картинок «:preset» нет в fastleo.images.presets. Добавьте его: \':preset\' => [\'widths\' => [400, 800], \'ratio\' => \'4:3\'].',
+    'image_preset_invalid' => 'Размер картинок «:preset» в fastleo.images.presets описан неверно: нужны widths — список ширин в пикселях (1–10000) и ratio — null или пропорция вида \'4:3\'.',
+    'files_root' => 'Недопустимый корень файлов «:root» в fastleo.files.root: нужна папка на диске (латиница, цифры, дефис), не пустая и не «fastleo» — там лежат служебные копии.',
+    'field_name' => 'Недопустимое имя поля «:name»: только латиница, цифры и подчёркивание, первым — буква или подчёркивание.',
+    'field_duplicate' => 'Поле «:name» описано в ресурсе дважды.',
+    'visible_when_multiple' => 'Поле «:field»: visibleWhen() смотрит на «:controlling», а у него несколько значений (множественный список, метки, связь). Условие показа работает только с полем одного значения: Select, Radio, Toggle, Enum, BelongsTo.',
+    'nested_controlling' => 'Поле «:field» внутри «:parent»: visibleWhen(\':control\') должен ссылаться на поле того же блока без readonly(), disabled(), hidden(), hideOnCreate() и hideOnEdit(): значения полей вне блока и недоступных админу в блок не приходят, зависимое поле не сохранилось бы.',
+    'nested_visibility' => 'Поле «:field» внутри блоков «:parent»: hideOnCreate(), hideOnEdit() и hidden(fn) там не работают — правила общие для всех блоков. Чтобы скрыть поле для части админов, передайте hidden() логическое значение: hidden(! auth()->user()->isAdmin()).',
+    'json_item_locked' => 'Поле «:field» внутри «:parent» не может быть readonly(), disabled(), hidden(), hideOnCreate() или hideOnEdit(): элементы JSON-поля сохраняются заново из формы, и скрытое значение стёрлось бы. Уберите поле или вынесите его из элементов.',
+    'field_not_fillable' => 'Поле «:field» ресурса :resource не разрешено моделью :model. Добавьте «:field» в $fillable модели или уберите поле из ресурса.',
+    'field_unbound' => 'Поле «:field» (:type) не привязано к модели: используйте его внутри fields() ресурса.',
+    'field_needs_array_cast' => 'Поле «:field» хранит массив: добавьте колонке каст в модели :model, например protected $casts = [\':field\' => \'array\'].',
+    'radio_depends' => 'Radio «:field» не поддерживает dependsOn(). Используйте Select::make()->dependsOn().',
+    'directory_invalid' => 'Поле «:field»: папка «:directory» не подходит. Имя — строчная латиница, цифры и дефис (:example); вложенные папки через «/». Менеджер файлов создаёт папки по тем же правилам.',
+    'radio_multiple' => 'Radio «:field» выбирает один вариант. Для нескольких используйте Select::make()->multiple().',
+    'enum_class' => 'Enum «:field»: :class не является backed enum (enum Name: string или int).',
+    'enum_missing' => 'Enum «:field»: укажите enum вариантов — ->enum(Status::class).',
+    'relation_missing' => 'Поле «:field»: в модели :model нет метода связи :method(), возвращающего :type. Добавьте связь или укажите метод: ->relation(\'имя\').',
+    'relation_foreign_key' => 'Поле «:field»: связь :method() использует колонку «:key». Назовите поле по колонке: BelongsTo::make(\':key\').',
+    'nested_field' => 'Поле «:field» (:type) нельзя использовать внутри блоков «:parent»: там работают простые поля, файлы и RichText (без связей, вложенных блоков и JSON-полей, зависимых списков, Slug, Password и многоязычных полей).',
+    'block_type' => 'Недопустимое имя типа блока «:type»: латиница в нижнем регистре, цифры и подчёркивание, первой — буква, не «type».',
+    'block_duplicate' => 'Тип блока «:type» описан в поле «:field» дважды.',
+    'grid_columns' => 'Grid::make(:columns, ...): колонок должно быть от 1 до 12.',
+    'column_span' => 'columnSpan(:columns): ширина должна быть от 1 до 12 колонок.',
+    'resource_missing' => 'Класс ресурса :class не найден или не наследует Fastleo\Resource. Обновите кеш: php artisan fastleo:cache.',
+    'resource_model' => 'В ресурсе :class не указана модель: protected static string $model = Model::class (наследник Eloquent Model).',
+    'resource_slug' => 'Адрес раздела «:slug» ресурса :class недопустим: только латиница в нижнем регистре, цифры и дефис.',
+    'resource_slug_reserved' => 'Адрес раздела «:slug» ресурса :class занят самой админкой. Задайте другой: protected static ?string $slug = \'...\'.',
+    'resource_column' => 'Колонка «:column» в $sortColumn или $treeColumn ресурса :class недопустима: только латиница, цифры и подчёркивание.',
+    'resource_slug_duplicate' => 'Адрес раздела «:slug» у ресурсов :class и :other совпадает. Задайте одному из них свой $slug.',
+    'filter_unbound' => 'Фильтр «:filter» не привязан к ресурсу: используйте его внутри filters() ресурса.',
+    'filter_duplicate' => 'Фильтр «:filter» описан в ресурсе :resource дважды.',
+    'filter_options' => 'SelectFilter «:filter»: укажите варианты ->options([...]) или добавьте в fields() ресурса поле Select, Enum или Radio с тем же именем.',
+    'filter_belongs_to' => 'BelongsToFilter «:filter»: добавьте в fields() ресурса поле BelongsTo::make(\':filter\') — фильтр берёт из него связь и подписи.',
+    'filter_belongs_to_many' => 'BelongsToManyFilter «:filter»: добавьте в fields() ресурса поле BelongsToMany::make(\':filter\') — фильтр берёт из него связь и подписи.',
+    'action_unbound' => 'Действие :action не привязано к ресурсу: верните его из actions() ресурса.',
+    'publish_post' => 'Замыкание Publish::make() в ресурсе :resource должно вернуть Fastleo\\Publishing\\Post: return Post::make($текст)->images([...])->button(...).',
+    'action_key' => 'Ключ действия «:key» (:action) в ресурсе :resource недопустим или повторяется: только латиница в нижнем регистре, цифры и дефис; встроенные ключи delete, restore, force-delete заняты. Задайте свой: protected ?string $key = \'...\'.',
+    'action_field' => 'Поле «:field» (:type) нельзя использовать в мини-форме действия :action: там работают только простые поля (без связей, вложенных блоков и JSON-полей, зависимых списков, Slug, Password, Gallery, RichText и многоязычных полей).',
+    'field_translatable' => 'Поле «:field» (:type) не может быть многоязычным: translatable() работает у Text, Textarea, Markdown, Code и RichText.',
+    'page_slug' => 'Адрес «:slug» у :class недопустим: только латиница в нижнем регистре, цифры и дефис.',
+    'page_slug_duplicate' => 'Адрес «:slug» у :class и :other совпадает. Задайте одному из них свой $slug.',
+    'settings_field' => 'Поле «:field» (:type) нельзя использовать на странице настроек :settings: связи, Slug, Password, translatable() и зависимые списки там не работают.',
+    'settings_field_locked' => 'Поле «:field» страницы настроек :settings нельзя сделать readonly, disabled или скрытым: значения страницы собираются из формы целиком.',
+];

@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+{{ imports }}
+
+/**
+ * Раздел админки «{{ label }}».
+ */
+final class {{ class }} extends Resource
+{
+    protected static string $model = {{ modelBasename }}::class;
+
+    protected static ?string $label = '{{ label }}';
+
+    protected static ?string $singular = '{{ singular }}';
+
+    protected static string $icon = 'file-text';{{ properties }}
+
+    /**
+     * Поля формы и списка.
+     */
+    public function fields(): array
+    {
+        return [
+{{ fields }}
+        ];
+    }
+}

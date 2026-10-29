@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Actions\Action;
+use Fastleo\Actions\ActionResult;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Действие «{{ label }}»: кнопка у записи и в полосе выбранных записей списка.
+ * Подключается в `actions()` ресурса: `new {{ class }}()`.
+ */
+final class {{ class }} extends Action
+{
+    protected ?string $label = '{{ label }}';
+
+    protected string $icon = 'zap';
+
+    /**
+     * Выполнить действие над записями, на которые у администратора есть право (`$ability`).
+     *
+     * @param  Collection<int, Model>  $records
+     * @param  array<string, mixed>  $data  значения мини-формы из `fields()`
+     */
+    public function handle(Collection $records, array $data): ActionResult
+    {
+        foreach ($records as $record) {
+            // Что сделать с записью: $record->update([...]).
+        }
+
+        return ActionResult::success('Готово: '.$records->count());
+    }
+}

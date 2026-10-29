@@ -1,0 +1,27 @@
+{
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "build": "npm run build:css && npm run build:js && npm run build:cropper && npm run build:hugerte && npm run build:chart",
+        "build:css": "tailwindcss -i resources/css/fastleo.css -o resources/dist/fastleo.css --minify",
+        "build:js": "esbuild resources/js/fastleo.js --bundle --minify --format=iife --target=es2020 --outfile=resources/dist/fastleo.js",
+        "dev": "tailwindcss -i resources/css/fastleo.css -o resources/dist/fastleo.css --watch",
+        "icons": "node scripts/icons.mjs",
+        "build:cropper": "esbuild resources/js/cropper.js --bundle --minify --format=iife --target=es2020 --outfile=resources/dist/cropper.js",
+        "build:hugerte": "node scripts/hugerte-lang.mjs && esbuild resources/js/hugerte.js --bundle --minify --format=iife --target=es2020 --outfile=resources/dist/hugerte.js",
+        "build:chart": "esbuild resources/js/chart.js --bundle --minify --format=iife --target=es2020 --outfile=resources/dist/fastleo-chart.js"
+    },
+    "devDependencies": {
+        "@tailwindcss/cli": "^4.3",
+        "alpinejs": "^3.17",
+        "chart.js": "^4.6.1",
+        "cropperjs": "^1.7.0",
+        "esbuild": "^0.28",
+        "hugerte": "^1.0.15",
+        "lucide-static": "^1.63",
+        "playwright": "^1.64",
+        "sortablejs": "^1.15.7",
+        "tailwindcss": "^4.3",
+        "tinymce-i18n": "^26.10.26"
+    }
+}

@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Fields\Text;
+use Override;
+
+/**
+ * Своё поле «{{ label }}»: строка в колонке `string`. Использование в `fields()` ресурса:
+ * `{{ class }}::make('имя_колонки', 'Подпись')`.
+ *
+ * Для другого хранения возьмите другого родителя (`Number`, `Select`, `Textarea`…) и перепишите шаблон
+ * по образцу шаблона родителя в vendor/camanru/fastleo/resources/views/fields.
+ */
+final class {{ class }} extends Text
+{
+    /**
+     * Шаблон поля в форме.
+     */
+    #[Override]
+    public function view(): string
+    {
+        return '{{ view }}';
+    }
+}

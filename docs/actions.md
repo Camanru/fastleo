@@ -1,0 +1,120 @@
+# Действия над записями
+
+Действие — кнопка, которая что-то делает с одной записью или с несколькими выбранными: «Опубликовать», «Отправить письмо», «Пересчитать цены».
+
+- У одной записи — в меню «…» строки списка и кнопкой на страницах просмотра и редактирования.
+- Для нескольких — галочки слева в списке («выбрать все на странице» — в заголовке), над таблицей появляется полоса «Выбрано: N» с кнопками действий.
+
+## Встроенные действия
+
+Есть в каждом разделе, описывать не нужно:
+
+| Действие | Где | Право |
+|---|---|---|
+| «Удалить» выбранные | список | `delete` |
+| «Восстановить» выбранные | корзина (модель с SoftDeletes) | `restore` |
+| «Удалить навсегда» выбранные | корзина | `forceDelete` |
+
+Готовое действие пакета — `Publish`: «Опубликовать в каналы» Telegram и Max ([публикации](publishing.md#кнопка-в-разделе-сайта)).
+
+Каждая запись удаляется через Eloquent в своей транзакции (observers и SoftDeletes работают). Узел дерева с вложенными записями не удаляется; ошибка одной записи не останавливает остальные — в сообщении: «Удалено: 4. Не выполнено для 1: …».
+
+## Своё действие
+
+Класс-наследник `Fastleo\Actions\Action` (удобно класть в `app/Fastleo/Actions`) и метод `actions()` ресурса. Заготовку класса создаёт `php artisan fastleo:make-action PublishDoctors`:
+
+```php
+namespace App\Fastleo\Actions;
+
+use App\Models\Article;
+use Fastleo\Actions\Action;
+use Fastleo\Actions\ActionResult;
+use Illuminate\Database\Eloquent\Collection;
+
+final class PublishArticles extends Action
+{
+    protected ?string $label = 'Опубликовать';
+    protected string $icon = 'send';
+    protected ?string $confirm = 'Опубликовать статьи на сайте?';
+
+    public function handle(Collection $records, array $data): ActionResult
+    {
+        $records->each(fn (Article $article) => $article->update(['is_published' => true]));
+
+        return ActionResult::success("Опубликовано: {$records->count()}");
+    }
+}
+```
+
+```php
+// app/Fastleo/ArticleResource.php
+public function actions(): array
+{
+    return [new PublishArticles];
+}
+```
+
+`handle()` получает только записи, на которые у администратора есть право (и которые видны в разделе по `query()`), и значения мини-формы.
+
+## Свойства
+
+| Свойство | По умолчанию | Что делает |
+|---|---|---|
+| `$label` | из имени класса | Подпись кнопки |
+| `$icon` | `zap` | [Иконка Lucide](https://lucide.dev/icons) |
+| `$confirm` | `null` | Вопрос перед запуском в своём окне; `null` — без вопроса |
+| `$danger` | `false` | Красная кнопка (для необратимых действий) |
+| `$ability` | `update` | Метод Policy, который проверяется для каждой записи: `delete`, `view` или свой (`publish`) |
+| `$single` | `true` | Кнопка у одной записи |
+| `$bulk` | `true` | Кнопка для выбранных записей |
+| `$mcp` | `true` | Действие можно запустить через [MCP-сервер](claude.md#mcp-сервер) (`run-action`); `false` — только человеком в админке (рассылка, публикация) |
+| `$key` | из имени класса | Часть адреса: `PublishArticles` → `publish-articles` (окончание `Action` отбрасывается). Ключи `delete`, `restore`, `force-delete` заняты |
+
+## Мини-форма
+
+Если действию нужны данные, опишите поля в `fields()` — перед запуском откроется окно с формой. Значения проверяются правилами полей и приходят в `$data` уже обработанными (строки обрезаны, дата — `ГГГГ-ММ-ДД`, галочка — `true`/`false`). При ошибке окно открывается снова с текстом ошибки.
+
+```php
+use Fastleo\Fields\Date;
+use Fastleo\Fields\Toggle;
+
+public function fields(): array
+{
+    return [
+        Date::make('published_on', 'Дата публикации')->required(),
+        Toggle::make('notify', 'Уведомить подписчиков'),
+    ];
+}
+
+public function handle(Collection $records, array $data): ActionResult
+{
+    $records->each->update(['published_on' => $data['published_on']]);
+    // $data['notify'] — true или false
+
+    return ActionResult::success('Дата публикации изменена.');
+}
+```
+
+В мини-форме работают простые поля: текст, число, дата и время, список, галочка, картинка и файл. Связи, вложенные блоки и JSON-поля (`Repeater`, `KeyValue`, `Blocks`), зависимые списки, Slug, Password, Gallery, RichText и многоязычные поля — нет (понятная ошибка при открытии раздела).
+
+## Результат
+
+| Метод | Что видит администратор |
+|---|---|
+| `ActionResult::success('Готово')` | Зелёное сообщение, остаётся на той же странице |
+| `ActionResult::error('Сервис недоступен')` | Красное сообщение |
+| `ActionResult::redirect($url, 'Создано')` | Переход на адрес (с сообщением или без) |
+| `ActionResult::download($response)` | Ответ как есть, например скачивание файла: `response()->streamDownload(...)` |
+
+Если часть выбранных записей пропущена из-за прав, к сообщению добавляется «Пропущено без прав: N». Ошибка базы данных внутри действия показывается понятным текстом.
+
+## Права
+
+Действие проверяет метод Policy из `$ability` для каждой записи ([authorization.md](authorization.md)). Запись без права пропускается; кнопка в меню строки и на странице записи показывается, только если право есть; кнопка в полосе выбранных — если право есть хотя бы на одну запись страницы. В разделе «только просмотр» действия с правом `create`, `update`, `delete`, `restore`, `forceDelete` недоступны — используйте `$ability = 'view'` для действий, которые ничего не меняют в записи (выгрузка, письмо).
+
+Метода из `$ability` нет в Policy — действие запрещено (так работает Laravel). Без Policy у модели — разрешено всем администраторам.
+
+## Ограничения
+
+- Выбрать можно записи текущей страницы (с «Все» — до `fastleo.list.max_all`, 1000).
+- Действие выполняется сразу, в запросе. Долгую работу (рассылку) отправьте в очередь из `handle()`: `SendNewsletter::dispatch($records->modelKeys())`.

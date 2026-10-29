@@ -1,0 +1,74 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ model }};
+{{ userImport }}
+/**
+ * Права администраторов на записи «{{ label }}». Пакет спрашивает эту Policy на каждом действии:
+ * метода нет — действие запрещено. Сейчас везде `true`, как без Policy; уберите лишнее и добавьте условия.
+ */
+final class {{ class }}
+{
+    /** Открыть список. */
+    public function viewAny({{ userType }} $user): bool
+    {
+        return true;
+    }
+
+    /** Открыть запись. */
+    public function view({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Создать запись. */
+    public function create({{ userType }} $user): bool
+    {
+        return true;
+    }
+
+    /** Изменить запись. */
+    public function update({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Удалить запись (в корзину, если у модели SoftDeletes). */
+    public function delete({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Восстановить запись из корзины. */
+    public function restore({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Удалить запись из корзины навсегда. */
+    public function forceDelete({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Менять порядок записей (стрелки, перетаскивание); метода нет — нужен `update`. */
+    public function reorder({{ userType }} $user, {{ modelType }} $record): bool
+    {
+        return true;
+    }
+
+    /** Загружать записи из файла; метода нет — нужен `viewAny`. */
+    public function import({{ userType }} $user): bool
+    {
+        return true;
+    }
+
+    /** Выгружать записи в файл; метода нет — нужен `viewAny`. */
+    public function export({{ userType }} $user): bool
+    {
+        return true;
+    }
+}

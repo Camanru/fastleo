@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Filters\Filter;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Override;
+
+/**
+ * Фильтр «{{ label }}»: поле над списком. Подключается в `filters()` ресурса:
+ * `{{ class }}::make('колонка', 'Подпись')`.
+ */
+final class {{ class }} extends Filter
+{
+    /**
+     * Проверенное значение из адреса или null — фильтр выключен.
+     */
+    #[Override]
+    public function value(mixed $input): ?string
+    {
+        return is_string($input) && $input !== '' && mb_strlen($input) <= 255 ? $input : null;
+    }
+
+    #[Override]
+    public function view(): string
+    {
+        return '{{ view }}';
+    }
+
+    /**
+     * Условие по колонке с именем фильтра.
+     *
+     * @param  Builder<Model>  $query
+     */
+    #[Override]
+    protected function query(Builder $query, mixed $value): void
+    {
+        $query->where($query->qualifyColumn($this->name), $value);
+    }
+}

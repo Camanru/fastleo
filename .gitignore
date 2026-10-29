@@ -1,0 +1,25 @@
+/node_modules
+/vendor
+/.idea
+/composer.lock
+/.phpunit.cache
+/.phpstan.cache
+/coverage
+/tests/Browser/Screenshots
+
+# Локальные инструкции для ИИ-агентов и заметки разработчика — не публикуются
+/AGENTS.md
+/CLAUDE.md
+/CLAUDE.local.md
+/.claude/
+/.ai/
+/.junie/
+/.cursor/
+/.codex/
+/.gemini/
+/.mcp.json
+/boost.json
+/design/
+/memory/
+.DS_Store
+/tests/Browser/Traces

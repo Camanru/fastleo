@@ -1,0 +1,38 @@
+laravel: '@testbench'
+
+providers:
+  - Fastleo\FastleoServiceProvider
+  - Laravel\Mcp\Server\McpServiceProvider
+  - Workbench\App\Providers\WorkbenchServiceProvider
+
+migrations:
+  - workbench/database/migrations
+
+seeders:
+  - Workbench\Database\Seeders\DatabaseSeeder
+
+env:
+  APP_NAME: 'Fastleo Demo'
+  SESSION_DRIVER: file
+  CACHE_STORE: file
+  QUEUE_CONNECTION: sync
+
+workbench:
+  start: '/fastleo'
+  install: true
+  health: false
+  discovers:
+    web: true
+    api: false
+    commands: false
+    components: false
+    factories: true
+    views: true
+  build:
+    - asset-publish
+    - create-sqlite-db
+    - db-wipe
+    - migrate-fresh
+    - storage-link
+  assets:
+    - fastleo-assets

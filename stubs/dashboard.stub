@@ -1,0 +1,30 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Dashboard as FastleoDashboard;
+use Fastleo\Widgets\Sections;
+use Fastleo\Widgets\ServerStatus;
+use Fastleo\Widgets\SoftNetica;
+use Override;
+
+/**
+ * Главная страница админки: пакет находит этот класс сам. Виджеты идут в сетке из четырёх колонок.
+ */
+final class {{ class }} extends FastleoDashboard
+{
+    /**
+     * Виджеты в порядке показа (ширина — `columnSpan()`).
+     */
+    #[Override]
+    public function widgets(): array
+    {
+        return [
+            Sections::make()->columnSpan(4),
+            SoftNetica::make()->columnSpan(2),
+            ServerStatus::make()->columnSpan(4),
+        ];
+    }
+}

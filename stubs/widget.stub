@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Widgets\Widget;
+use Override;
+
+/**
+ * Виджет дашборда «{{ label }}». Подключается в `widgets()` класса `Dashboard`:
+ * `{{ class }}::make('Заголовок')`.
+ */
+final class {{ class }} extends Widget
+{
+    #[Override]
+    public function view(): string
+    {
+        return '{{ view }}';
+    }
+
+    /**
+     * Данные для шаблона: ключи становятся переменными.
+     *
+     * @return array<string, mixed>
+     */
+    #[Override]
+    protected function payload(): array
+    {
+        return ['value' => 0];
+    }
+}

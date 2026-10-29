@@ -1,0 +1,331 @@
+@import "tailwindcss" source(none);
+
+@source "../views";
+@source "../../stubs";
+/* Поля собирают HTML ячеек списка в PHP (галочки, цвет, превью) — классы оттуда тоже нужны. */
+@source "../../src/Fields";
+
+/* Тёмная тема по классу .dark на <html>: его ставит скрипт темы (светлая / тёмная / как в системе). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Компактные строки таблицы: класс fl-compact на <html>; в разметке — compact:… */
+@custom-variant compact (&:where(.fl-compact, .fl-compact *));
+
+/* Свёрнутое меню (полоса 64 px): класс fl-collapsed на <html>; в разметке — lg:collapsed:… */
+@custom-variant collapsed (&:where(.fl-collapsed, .fl-collapsed *));
+
+:root {
+    /* Основной цвет задаёт сайт в config('fastleo.brand.color'); head.blade.php подставляет его сюда.
+       Белый текст на нём должен давать контраст не меньше 4.5:1. */
+    --fastleo-primary: #4f46e5;
+
+    --fl-bg: #fbfaf8;
+    --fl-sidebar: #f3f1ed;
+    --fl-surface: #ffffff;
+    --fl-surface-2: #f8f7f4;
+    --fl-sunken: #efede9;
+    --fl-border: rgb(48 36 20 / 0.09);
+    --fl-border-strong: rgb(48 36 20 / 0.17);
+    --fl-text: #1c1a17;
+    --fl-text-2: #5f5a52;
+    --fl-text-3: #78726a;
+    --fl-hover: rgb(48 36 20 / 0.04);
+    --fl-glass: rgb(251 250 248 / 0.78);
+    --fl-inverse: #1c1a17;
+    --fl-on-inverse: #f6f4f0;
+
+    --fl-success: #16794a;
+    --fl-success-soft: rgb(22 121 74 / 0.11);
+    --fl-warning: #9a5306;
+    --fl-warning-soft: rgb(217 119 6 / 0.14);
+    --fl-danger: #c0302a;
+    --fl-danger-soft: rgb(220 38 38 / 0.1);
+    --fl-info: #1f5fbf;
+    --fl-info-soft: rgb(37 99 235 / 0.1);
+
+    --fl-primary-soft-amount: 11%;
+    --fl-ring-amount: 28%;
+    --fl-primary-text: var(--fastleo-primary);
+
+    --fl-shadow-card: 0 1px 2px rgb(48 36 20 / 0.04);
+    --fl-shadow-pop: 0 1px 2px rgb(48 36 20 / 0.06), 0 10px 30px rgb(48 36 20 / 0.12);
+
+    color-scheme: light;
+}
+
+.dark {
+    --fl-bg: #141311;
+    --fl-sidebar: #0f0e0d;
+    --fl-surface: #1c1b19;
+    --fl-surface-2: #21201d;
+    --fl-sunken: #0c0b0a;
+    --fl-border: rgb(255 240 220 / 0.07);
+    --fl-border-strong: rgb(255 240 220 / 0.13);
+    --fl-text: #eeebe6;
+    --fl-text-2: #aaa49b;
+    --fl-text-3: #8d877e;
+    --fl-hover: rgb(255 240 220 / 0.04);
+    --fl-glass: rgb(20 19 17 / 0.74);
+    --fl-inverse: #eeebe6;
+    --fl-on-inverse: #1c1b19;
+
+    --fl-success: #5bd394;
+    --fl-success-soft: rgb(91 211 148 / 0.12);
+    --fl-warning: #f2b94b;
+    --fl-warning-soft: rgb(242 185 75 / 0.13);
+    --fl-danger: #ff8a80;
+    --fl-danger-soft: rgb(255 138 128 / 0.12);
+    --fl-info: #7fb0ff;
+    --fl-info-soft: rgb(127 176 255 / 0.12);
+
+    --fl-primary-soft-amount: 20%;
+    --fl-ring-amount: 40%;
+    --fl-primary-text: color-mix(in oklab, var(--fastleo-primary) 55%, white);
+
+    --fl-shadow-card: none;
+    --fl-shadow-pop: 0 0 0 1px rgb(255 240 220 / 0.07), 0 14px 36px rgb(0 0 0 / 0.55);
+
+    color-scheme: dark;
+}
+
+@theme inline {
+    --color-primary: var(--fastleo-primary);
+    --color-primary-hover: color-mix(in oklab, var(--fastleo-primary) 85%, black);
+    --color-primary-soft: color-mix(in srgb, var(--fastleo-primary) var(--fl-primary-soft-amount), transparent);
+    --color-primary-text: var(--fl-primary-text);
+    --color-ring: color-mix(in srgb, var(--fastleo-primary) var(--fl-ring-amount), transparent);
+
+    --color-bg: var(--fl-bg);
+    --color-sidebar: var(--fl-sidebar);
+    --color-surface: var(--fl-surface);
+    --color-surface-2: var(--fl-surface-2);
+    --color-sunken: var(--fl-sunken);
+    --color-line: var(--fl-border);
+    --color-line-strong: var(--fl-border-strong);
+    --color-ink: var(--fl-text);
+    --color-ink-2: var(--fl-text-2);
+    --color-ink-3: var(--fl-text-3);
+    --color-hover: var(--fl-hover);
+    --color-glass: var(--fl-glass);
+    --color-inverse: var(--fl-inverse);
+    --color-on-inverse: var(--fl-on-inverse);
+
+    --color-success: var(--fl-success);
+    --color-success-soft: var(--fl-success-soft);
+    --color-warning: var(--fl-warning);
+    --color-warning-soft: var(--fl-warning-soft);
+    --color-danger: var(--fl-danger);
+    --color-danger-soft: var(--fl-danger-soft);
+    --color-danger-solid: #d0342c;
+    --color-info: var(--fl-info);
+    --color-info-soft: var(--fl-info-soft);
+
+    --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable Text", "Segoe UI", system-ui, "Helvetica Neue", sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    --text-xs: 12px;
+    --text-xs--line-height: 1.4;
+    --text-sm: 13px;
+    --text-sm--line-height: 1.45;
+    --text-base: 14px;
+    --text-base--line-height: 1.45;
+    --text-md: 15px;
+    --text-md--line-height: 1.4;
+    --text-lg: 17px;
+    --text-lg--line-height: 1.35;
+    --text-xl: 20px;
+    --text-xl--line-height: 1.25;
+    --text-2xl: 24px;
+    --text-2xl--line-height: 1.2;
+    --text-3xl: 28px;
+    --text-3xl--line-height: 1.1;
+
+    --radius-badge: 6px;
+    --radius-field: 8px;
+    --radius-btn: 9px;
+    --radius-card: 12px;
+    --radius-dialog: 16px;
+
+    --shadow-card: var(--fl-shadow-card);
+    --shadow-pop: var(--fl-shadow-pop);
+
+    --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+    html {
+        font-family: var(--font-sans);
+        -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+        background: var(--color-bg);
+        color: var(--color-ink);
+        font-size: var(--text-base);
+        line-height: var(--text-base--line-height);
+    }
+
+    ::placeholder {
+        color: var(--color-ink-3);
+    }
+
+    :focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px var(--color-ring);
+    }
+
+    /* Нижняя панель «Сохранить» не закрывает поле, к которому переходит фокус. */
+    html {
+        scroll-padding-bottom: 6rem;
+    }
+
+    /* Чекбокс и радио в стиле админки (переключатель Toggle — отдельный, у него поле sr-only). */
+    input[type="checkbox"]:not(.sr-only),
+    input[type="radio"]:not(.sr-only) {
+        appearance: none;
+        display: inline-grid;
+        flex-shrink: 0;
+        place-content: center;
+        width: 16px;
+        height: 16px;
+        border: 1.5px solid var(--color-line-strong);
+        border-radius: 4px;
+        background: var(--color-surface) no-repeat center / 12px;
+        cursor: pointer;
+        transition:
+            background-color 0.15s,
+            border-color 0.15s;
+    }
+
+    input[type="radio"]:not(.sr-only) {
+        width: 18px;
+        height: 18px;
+        border-radius: 9999px;
+    }
+
+    input[type="checkbox"]:not(.sr-only):checked {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    }
+
+    input[type="checkbox"]:not(.sr-only):indeterminate {
+        border-color: var(--color-primary);
+        background-color: var(--color-primary);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 12h12'/%3E%3C/svg%3E");
+    }
+
+    input[type="radio"]:not(.sr-only):checked {
+        border: 5px solid var(--color-primary);
+    }
+
+    input[type="checkbox"]:not(.sr-only):disabled,
+    input[type="radio"]:not(.sr-only):disabled {
+        cursor: not-allowed;
+        opacity: 0.45;
+    }
+
+    html.theme-transition * {
+        transition:
+            background-color 0.2s,
+            border-color 0.2s,
+            color 0.2s !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+    }
+}
+
+/* Список без своей стрелки браузера: стрелка как у combobox. Вне слоёв — чтобы отступ справа не перебивался px-3. */
+select:not([multiple]):not([size]) {
+    appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238d877e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+    background-size: 16px;
+}
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Поле ввода формы: текст, число, дата, список. */
+@utility fastleo-input {
+    @apply min-h-9 w-full rounded-field border border-line-strong bg-surface px-3 py-1.5 text-base font-normal text-ink outline-none transition placeholder:text-ink-3 focus:border-primary focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-ink-3 [&:is(input,textarea):read-only]:bg-surface-2;
+}
+
+/* Поле с ошибкой валидации. */
+@utility fastleo-input-invalid {
+    @apply border-danger shadow-[0_0_0_3px_var(--color-danger-soft)] focus:border-danger focus:shadow-[0_0_0_3px_var(--color-danger-soft)];
+}
+
+/* Карточка содержимого. */
+@utility fastleo-card {
+    @apply rounded-card border border-line bg-surface shadow-card;
+}
+
+/* Текст из Markdown на просмотре записи и во вкладке «Просмотр». */
+.fastleo-prose {
+    @apply max-w-[68ch] text-base leading-relaxed break-words whitespace-normal text-ink;
+
+    & > * + * {
+        @apply mt-3;
+    }
+
+    & h1 {
+        @apply text-xl font-semibold;
+    }
+
+    & h2 {
+        @apply text-lg font-semibold;
+    }
+
+    & h3,
+    & h4 {
+        @apply font-semibold;
+    }
+
+    & ul {
+        @apply list-disc pl-5;
+    }
+
+    & ol {
+        @apply list-decimal pl-5;
+    }
+
+    & a {
+        @apply text-primary-text underline;
+    }
+
+    & blockquote {
+        @apply border-l-4 border-line-strong pl-3 text-ink-2;
+    }
+
+    & code {
+        @apply rounded bg-sunken px-1 font-mono text-xs;
+    }
+
+    & pre {
+        @apply overflow-x-auto rounded-field bg-sunken p-3;
+
+        & code {
+            @apply bg-transparent p-0;
+        }
+    }
+
+    & table {
+        @apply w-full border-collapse text-left;
+
+        & th,
+        & td {
+            @apply border border-line px-2 py-1;
+        }
+    }
+}

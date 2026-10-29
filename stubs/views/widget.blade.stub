@@ -1,0 +1,2 @@
+{{-- Виджет «{{ label }}»: переменные из payload() класса. --}}
+<p class="text-3xl font-[650] tracking-[-0.025em] tabular-nums">{{ $value }}</p>

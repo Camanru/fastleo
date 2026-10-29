@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Page;
+use Illuminate\Http\Request;
+use Override;
+
+/**
+ * Своя страница админки «{{ label }}»: пункт в меню и адрес /fastleo/pages/…
+ */
+final class {{ class }} extends Page
+{
+    protected static ?string $label = '{{ label }}';
+
+    protected static string $icon = 'file-text';
+
+    #[Override]
+    public function view(): string
+    {
+        return '{{ view }}';
+    }
+
+    /**
+     * Данные для шаблона.
+     *
+     * @return array<string, mixed>
+     */
+    #[Override]
+    public function data(Request $request): array
+    {
+        return ['title' => '{{ label }}'];
+    }
+}

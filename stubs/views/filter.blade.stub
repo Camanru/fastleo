@@ -1,0 +1,5 @@
+{{-- Фильтр «{{ label }}»: $filter, $value, $form (id формы списка). --}}
+<label class="flex min-w-0 flex-col gap-1.5 text-sm">
+    <span class="font-medium text-ink-2">{{ $filter->getLabel() }}</span>
+    <input type="search" name="filter[{{ $filter->name }}]" form="{{ $form }}" value="{{ $value }}" class="fastleo-input" x-on:change="$el.form.requestSubmit()">
+</label>
