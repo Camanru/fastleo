@@ -228,6 +228,22 @@ abstract class Action
     }
 
     /**
+     * Показывать кнопку действия у одной записи (страница записи, строка списка); по умолчанию — всегда.
+     * Это только про кнопку: запуск проверяет `allows()`, в массовых действиях кнопка видна всегда.
+     *
+     * ```php
+     * public function visibleFor(Model $record): bool
+     * {
+     *     return $record->status !== 'archived';
+     * }
+     * ```
+     */
+    public function visibleFor(Model $record): bool
+    {
+        return true;
+    }
+
+    /**
      * Мини-форма: поля привязаны к модели раздела, правила и имена — под ключом `data`.
      *
      * @throws LogicException в мини-форме поле, которое там не работает

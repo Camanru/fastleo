@@ -179,6 +179,19 @@ describe('Stat', function (): void {
             ->and(Stat::make('Текст')->value('42 шт.')->resolve()['value'])->toBe('42 шт.');
     });
 
+    it('chooses the link with a closure and drops an unsafe one', function (): void {
+        $count = 0;
+        $stat = Stat::make('Заявки')->value(1)->url(function () use (&$count): string {
+            return $count === 0 ? '/fastleo/leads/create' : '/fastleo/leads';
+        });
+
+        expect($stat->resolve()['url'])->toBe('/fastleo/leads/create');
+        $count = 1;
+        expect($stat->resolve()['url'])->toBe('/fastleo/leads')
+            ->and(Stat::make('a')->url(fn (): string => 'javascript:alert(1)')->resolve()['url'])->toBeNull()
+            ->and(Stat::make('a')->url(fn (): ?string => null)->resolve()['url'])->toBeNull();
+    });
+
     it('clamps the column span', function (): void {
         expect(Stat::make('a')->columnSpan(9)->getSpan())->toBe(4)
             ->and(Stat::make('a')->columnSpan(0)->getSpan())->toBe(1);

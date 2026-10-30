@@ -8,7 +8,7 @@
     $mainItems = array_values(array_filter($items, fn ($item) => ! $item instanceof \Fastleo\Layout\Aside));
     $siteUrl = $editing ? $resource->url($record) : null;
     $canDelete = $editing && \Fastleo\Support\Authorization::allows('delete', $resource, $record);
-    $recordActions = $editing ? array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record)) : [];
+    $recordActions = $editing ? array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record)) : [];
     $titleField = $resource->listFields()[0] ?? null;
     $recordTitle = $editing && $titleField !== null ? trim((string) $titleField->display($titleField->shownRecord($record))) : '';
     $updatedAt = $editing && $record->getAttribute('updated_at') instanceof \Carbon\CarbonInterface ? $record->getAttribute('updated_at') : null;

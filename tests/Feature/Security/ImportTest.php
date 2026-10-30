@@ -10,6 +10,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 
 beforeEach(function (): void {
@@ -95,4 +96,17 @@ it('does not import into a read-only section', function (): void {
     };
 
     expect($resource::isImportable())->toBeFalse();
+});
+
+it('cleans the HTML of a RichText field like the form does', function (): void {
+    $html = '<p onclick="alert(1)">Текст<script>alert(2)</script> <a href="javascript:alert(3)">ссылка</a></p>';
+
+    $this->post(route('fastleo.resources.import', 'articles'), [
+        'file' => UploadedFile::fake()->createWithContent('articles.csv', "Заголовок;Текст\nСтатья;\"".str_replace('"', '""', $html)."\"\n"),
+    ]);
+
+    $body = (string) Article::query()->where('title', 'Статья')->value('body');
+
+    expect($body)->toContain('Текст')->toContain('ссылка')
+        ->not->toContain('script')->not->toContain('onclick')->not->toContain('javascript:');
 });

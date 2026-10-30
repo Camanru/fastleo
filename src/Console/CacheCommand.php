@@ -27,7 +27,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 final class CacheCommand extends Command
 {
     /**
-     * Найти ресурсы, проверить их и записать список в bootstrap/cache/fastleo.php (встроенная страница SoftNetica в кеш не входит: её включает конфиг).
+     * Найти ресурсы, проверить их и записать список в bootstrap/cache/fastleo.php (встроенные страницы SoftNetica и «Закрытие сайта» в кеш не входят: их включает конфиг).
      */
     public function handle(): int
     {
@@ -41,7 +41,7 @@ final class CacheCommand extends Command
         $registry->all();
         $registry->settings();
         $registry->pages();
-        $classes = array_values(array_diff($registry->classes(), ResourceRegistry::SOFTNETICA, $registry->builtIn()));
+        $classes = array_values(array_diff($registry->classes(), ResourceRegistry::RUNTIME, $registry->builtIn()));
         File::put($registry->cachePath(), '<?php return '.var_export($classes, true).';'.PHP_EOL);
         $registry->flush();
 

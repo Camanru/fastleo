@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
+use ReflectionMethod;
 use Throwable;
 
 /**
@@ -267,7 +268,7 @@ final class Doctor
         }
 
         $loaded = require $path;
-        $cached = is_array($loaded) ? array_values(array_filter($loaded, is_string(...))) : [];
+        $cached = is_array($loaded) ? array_values(array_diff(array_filter($loaded, is_string(...)), ResourceRegistry::RUNTIME)) : [];
         $actual = $registry->discover();
 
         if (array_diff($cached, $actual) !== [] || array_diff($actual, $cached) !== []) {
@@ -534,7 +535,11 @@ final class Doctor
             }
         }
 
-        $this->add('warning', $scope, 'rich_text_loss', ['field' => $field->name, 'count' => $affected, 'checked' => count($values), 'lost' => implode('; ', $parts)], 'rich_text_loss_hint');
+        // Поле со своим sanitize() чистит по своим правилам: совет про fastleo.rich_text его не касается.
+        $sanitizer = new ReflectionMethod($field, 'sanitize')->getDeclaringClass()->getName();
+        $hint = $sanitizer === RichText::class ? 'rich_text_loss_hint' : 'rich_text_loss_custom_hint';
+
+        $this->add('warning', $scope, 'rich_text_loss', ['field' => $field->name, 'count' => $affected, 'checked' => count($values), 'lost' => implode('; ', $parts), 'class' => $sanitizer], $hint);
     }
 
     /**

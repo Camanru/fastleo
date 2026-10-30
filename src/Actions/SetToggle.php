@@ -54,6 +54,15 @@ final class SetToggle extends Action
     }
 
     /**
+     * У одной записи кнопка видна, только если меняет значение: у показанной записи — «Скрыть», у скрытой — «Показать».
+     */
+    #[Override]
+    public function visibleFor(Model $record): bool
+    {
+        return (bool) $record->getAttribute($this->field) !== $this->value;
+    }
+
+    /**
      * Иконка кнопки (Lucide); по умолчанию `eye` для «включить» и `eye-off` для «выключить».
      */
     public function icon(string $icon): self

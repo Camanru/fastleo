@@ -2,6 +2,23 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [семантические](https://semver.org/lang/ru/).
 
+## [4.1.1] — 2026-10-30
+
+Правки по опыту обновления первого сайта до 4.1.0.
+
+### Исправлено
+
+- **`isAvailableInMcp()` у ресурса снова статический, как в 4.0.0.** В 4.1.0 он стал методом объекта, и вызов `DoctorResource::isAvailableInMcp()` падал. Теперь работают оба вызова: `DoctorResource::isAvailableInMcp()` и `$resource->isAvailableInMcp()`.
+- **`fastleo:doctor` больше не пишет «Кеш списка разделов не совпадает» при включённом закрытии сайта** (`closing.enabled`): страница «Закрытие сайта», как и страницы SoftNetica, в кеш разделов не попадает.
+- **Подсказка `fastleo:doctor` про потерю разметки RichText у поля со своим `sanitize()`** называет этот метод, а не `fastleo.rich_text`.
+- `SetToggle` у одной записи (страница записи, меню строки списка) показывает только кнопку, которая меняет значение; в полосе выбранных записей видны обе.
+
+### Добавлено
+
+- `Action::visibleFor(Model $record)`: спрятать кнопку действия у одной записи, когда оно ей не нужно.
+- `Stat::url()` принимает замыкание: ссылка выбирается при показе дашборда.
+- В `docs/import-export.md`: импорт очищает HTML поля `RichText` так же, как форма (проверено тестом).
+
 ## [4.1.0] — 2026-10-30
 
 Правки и доработки по опыту первого перехода сайта с 3.0.
@@ -90,5 +107,6 @@ Composer-имя — `camanru/fastleo`, namespace — `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.1.1]: https://github.com/Camanru/fastleo/releases/tag/4.1.1
 [4.1.0]: https://github.com/Camanru/fastleo/releases/tag/4.1.0
 [4.0.0]: https://github.com/Camanru/fastleo/releases/tag/4.0.0

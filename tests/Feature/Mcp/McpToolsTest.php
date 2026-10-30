@@ -15,6 +15,10 @@ use Fastleo\Mcp\Tools\ListResources;
 use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Mcp\Tools\UpdateRecord;
 use Fastleo\Resources\UserResource;
+use Fastleo\Tests\Fixtures\McpPersonal\ClosedResource;
+use Fastleo\Tests\Fixtures\McpPersonal\OpenPhoneResource;
+use Fastleo\Tests\Fixtures\McpPersonal\PhoneFieldResource;
+use Fastleo\Tests\Fixtures\McpPersonal\PlainResource;
 use Fastleo\Tests\Fixtures\McpUsers\OpenUserResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
@@ -431,6 +435,13 @@ describe('sections with personal data', function (): void {
 
     it('lets the site open such a section with $mcpPersonalData = true', function (): void {
         mcp()->tool(DescribeResource::class, ['resource' => 'open-phone'])->assertHasNoErrors();
+    });
+
+    it('answers isAvailableInMcp() statically, as in 4.0.0', function (): void {
+        expect(PlainResource::isAvailableInMcp())->toBeTrue()
+            ->and(OpenPhoneResource::isAvailableInMcp())->toBeTrue()
+            ->and(PhoneFieldResource::isAvailableInMcp())->toBeFalse()
+            ->and(ClosedResource::isAvailableInMcp())->toBeFalse();
     });
 
     it('closes the admins section by default', function (): void {

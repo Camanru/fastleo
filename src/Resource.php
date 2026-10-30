@@ -319,11 +319,18 @@ abstract class Resource
     }
 
     /**
-     * Раздел доступен через MCP-сервер.
+     * Раздел доступен через MCP-сервер. Статический, как в 4.0.0: работают и `DoctorResource::isAvailableInMcp()`,
+     * и `$resource->isAvailableInMcp()`.
      */
-    public function isAvailableInMcp(): bool
+    public static function isAvailableInMcp(): bool
     {
-        return static::$mcp && $this->mcpPersonalField() === null;
+        if (! static::$mcp) {
+            return false;
+        }
+
+        $resource = resolve(static::class);
+
+        return $resource instanceof static && $resource->mcpPersonalField() === null;
     }
 
     /**

@@ -4,7 +4,7 @@
      компонентов: на каждую запись списка их десятки, и страница «Все» на 1000 записей иначе рисуется секундами. --}}
 @php
     $slug = $resource::slug();
-    $rowActions = array_filter($singleActions ?? [], fn ($action) => $actionAllows($action, $record));
+    $rowActions = array_filter($singleActions ?? [], fn ($action) => $actionAllows($action, $record) && $action->visibleFor($record));
     $childCount = $childCount ?? 0;
     $buttonBase = 'inline-flex items-center justify-center whitespace-nowrap transition active:scale-[.98] disabled:pointer-events-none disabled:opacity-50 aria-busy:pointer-events-none ';
     $iconButton = $buttonBase.'size-8 justify-center rounded-[8px] text-ink-2 hover:bg-hover hover:text-ink';

@@ -9,6 +9,7 @@ use Fastleo\Fields\Date;
 use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Enum;
 use Fastleo\Fields\Number;
+use Fastleo\Fields\RichText;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Tags;
 use Fastleo\Fields\Text;
@@ -29,7 +30,7 @@ final class ArticleResource extends Resource
     protected static bool $importable = true;
 
     /**
-     * Поля разных видов значений; email только для чтения, ссылка — только у видео.
+     * Поля разных видов значений (в том числе HTML); email только для чтения, ссылка — только у видео.
      */
     public function fields(): array
     {
@@ -44,6 +45,7 @@ final class ArticleResource extends Resource
             DateTime::make('starts_at', 'На главной с'),
             BelongsToMany::make('topics', 'Темы'),
             Textarea::make('excerpt', 'Анонс'),
+            RichText::make('body', 'Текст'),
             Text::make('author_email', 'Email автора')->readonly(),
             Select::make('type', 'Тип')->options(['text' => 'Текст', 'video' => 'Видео']),
             Url::make('source_url', 'Ссылка на видео')->visibleWhen('type', 'video'),

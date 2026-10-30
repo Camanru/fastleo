@@ -33,6 +33,9 @@ final class ResourceRegistry
     /** Встроенные классы SoftNetica: добавляются при каждом запросе по конфигу, в кеш разделов не входят. */
     public const array SOFTNETICA = [SoftNeticaSettings::class, SoftNeticaPage::class];
 
+    /** Встроенные страницы, которые добавляются при каждом запросе по конфигу (SoftNetica, «Закрытие сайта»): в кеш разделов не входят. */
+    public const array RUNTIME = [...self::SOFTNETICA, ClosingSettings::class];
+
     /** Ключи конфига со встроенными разделами (класс ресурса или `null` — раздела нет). */
     public const array BUILT_IN = ['fastleo.notifications.bots', 'fastleo.publishing.channels', 'fastleo.publishing.publications'];
 
@@ -240,7 +243,7 @@ final class ResourceRegistry
      */
     private function withSoftNetica(array $classes): array
     {
-        $classes = array_values(array_diff($classes, self::SOFTNETICA, [ClosingSettings::class]));
+        $classes = array_values(array_diff($classes, self::RUNTIME));
 
         if (Connection::enabled()) {
             array_push($classes, ...self::SOFTNETICA);

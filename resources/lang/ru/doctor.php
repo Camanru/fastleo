@@ -26,6 +26,7 @@ return [
     'rich_text_config' => 'Настройка fastleo.rich_text недопустима: :message',
     'rich_text_loss' => 'Поле «:field» (RichText): в :count из :checked проверенных записей при сохранении пропадёт разметка — :lost.',
     'rich_text_loss_hint' => 'Если разметка нужна, разрешите её в fastleo.rich_text (tags, attributes, iframe_hosts, styles) до первого сохранения старых записей; если нет — ничего не делайте.',
+    'rich_text_loss_custom_hint' => 'Разметку очищает :class::sanitize(). Если разметка нужна, разрешите её там до первого сохранения старых записей; если нет — ничего не делайте.',
     'quick_toggle_readonly' => 'Поле «:field»: quickToggle() включён, но поле только для чтения или не показывается в форме редактирования (readonly, onlyInList, hideOnEdit) — переключатель в списке не появится.',
     'quick_toggle_readonly_hint' => 'Уберите readonly(), onlyInList(), hideOnEdit() или quickToggle() у этого поля.',
     'set_toggle_readonly' => 'Действие :action (SetToggle): поле «:field» только для чтения (readonly) — действие будет пропускать все записи.',

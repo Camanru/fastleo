@@ -26,7 +26,7 @@ final class Stat extends Widget
 
     private string $icon = 'chart-no-axes-column';
 
-    private ?string $url = null;
+    private Closure|string|null $url = null;
 
     /**
      * Значение или замыкание, которое его считает (вызывается при показе дашборда).
@@ -63,9 +63,16 @@ final class Stat extends Widget
     }
 
     /**
-     * Ссылка с плитки (например, на раздел). Чужие схемы (`javascript:`) не выводятся.
+     * Ссылка с плитки (например, на раздел) или замыкание, которое её выбирает при показе дашборда
+     * (`null` — без ссылки). Чужие схемы (`javascript:`) и чужие хосты (`//host`) не выводятся.
+     *
+     * ```php
+     * ->url(fn () => Lead::exists() ? route('fastleo.resources.index', 'leads') : route('fastleo.resources.create', 'leads'))
+     * ```
+     *
+     * @param  Closure(): ?string|string|null  $url
      */
-    public function url(?string $url): static
+    public function url(Closure|string|null $url): static
     {
         $this->url = $url;
 
@@ -86,13 +93,14 @@ final class Stat extends Widget
     {
         $value = $this->value instanceof Closure ? ($this->value)() : $this->value;
         $description = $this->description instanceof Closure ? ($this->description)() : $this->description;
-        $safe = $this->url !== null && preg_match('~^(https?://|/(?![/\\\\]))~i', $this->url) === 1;
+        $url = $this->url instanceof Closure ? ($this->url)() : $this->url;
+        $safe = is_string($url) && preg_match('~^(https?://|/(?![/\\\\]))~i', $url) === 1;
 
         return [
             'value' => is_int($value) || is_float($value) ? number_format($value, is_float($value) ? 2 : 0, ',', ' ') : $value,
             'description' => $description,
             'icon' => $this->icon,
-            'url' => $safe ? $this->url : null,
+            'url' => $safe ? $url : null,
         ];
     }
 }

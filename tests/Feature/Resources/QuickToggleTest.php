@@ -240,6 +240,20 @@ describe('SetToggle action', function (): void {
         expect(array_keys(Fastleo::resources()->find('articles')?->listActions() ?? []))->toContain('set-is-published-on', 'set-is-published-off');
     });
 
+    it('shows on the page of one record only the button that changes the value', function (): void {
+        $shown = Article::factory()->create(['is_published' => true]);
+        $hidden = Article::factory()->create(['is_published' => false]);
+
+        $this->get(route('fastleo.resources.edit', ['articles', $shown->id]))
+            ->assertOk()
+            ->assertSee('Снять с публикации')
+            ->assertDontSee('Опубликовать');
+        $this->get(route('fastleo.resources.show', ['articles', $hidden->id]))
+            ->assertOk()
+            ->assertSee('Опубликовать')
+            ->assertDontSee('Снять с публикации');
+    });
+
     it('sets the value to the selected records, counts only the changed ones and skips the rest', function (): void {
         [$hidden, $shown, $other] = [
             Article::factory()->create(['is_published' => false]),

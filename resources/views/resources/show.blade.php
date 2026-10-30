@@ -3,7 +3,7 @@
     $slug = $resource::slug();
     $siteUrl = $resource->url($record);
     $trashed = method_exists($record, 'trashed') && $record->trashed();
-    $recordActions = $trashed ? [] : array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record));
+    $recordActions = $trashed ? [] : array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record));
 @endphp
 @php
     $titleField = $resource->listFields()[0] ?? null;

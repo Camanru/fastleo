@@ -2,10 +2,13 @@
 
 declare(strict_types=1);
 
+use Fastleo\Closing\ClosingSettings;
 use Fastleo\Fastleo;
 use Fastleo\Notifications\NotificationBotResource;
+use Fastleo\SoftNetica\SoftNeticaSettings;
 use Fastleo\Support\Assets;
 use Fastleo\Support\SchedulerPulse;
+use Fastleo\Tests\Fixtures\Fields\StrictRichText;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -184,6 +187,15 @@ it('warns about a stale resource cache and accepts a fresh one', function (): vo
     expect(messages('site', 'warning'))->toBe([]);
 });
 
+it('accepts a fresh resource cache when SoftNetica and site closing are on', function (): void {
+    config(['fastleo.softnetica.enabled' => true, 'fastleo.closing.enabled' => true]);
+
+    Artisan::call('fastleo:cache');
+
+    expect(require Fastleo::resources()->cachePath())->not->toContain(ClosingSettings::class, SoftNeticaSettings::class)
+        ->and(messages('site', 'warning'))->toBe([]);
+});
+
 it('compares column length with maxLength where the database reports it', function (): void {
     useFixtureResources('Doctor');
     Schema::table('articles', fn ($table) => $table->string('title', 50)->change());
@@ -315,6 +327,13 @@ describe('markup of the RichText field', function (): void {
             ->toContain('теги div')
             ->toContain('атрибуты class, role, data-lpu')
             ->toContain('iframe с адресов prodoctorov.ru');
+    });
+
+    it('points to the sanitize() method of a field that cleans HTML by its own rules', function (): void {
+        $problems = collect(diagnosed()['problems']);
+
+        expect($problems->firstWhere('scope', 'strict-rich-notes')['hint'])->toBe('Разметку очищает '.StrictRichText::class.'::sanitize(). Если разметка нужна, разрешите её там до первого сохранения старых записей; если нет — ничего не делайте.')
+            ->and($problems->firstWhere('scope', 'rich-notes')['hint'])->toContain('fastleo.rich_text');
     });
 
     it('stays silent when the site allowed that markup', function (): void {
