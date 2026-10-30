@@ -6,6 +6,7 @@ use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Workbench\App\Models\Article;
+use Workbench\App\Models\Category;
 use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
 
@@ -187,6 +188,20 @@ describe('revert', function (): void {
         Topic::query()->whereKey($topic->id)->update(['title' => 'Было']);
 
         $this->post(route('fastleo.activity.revert', $entry->id))->assertSessionHas('fastleo.error', 'Значения уже такие, как были.');
+    });
+
+    it('refuses to return a parent that would make a cycle in the tree', function (): void {
+        $a = Category::factory()->create(['title' => 'А']);
+        $b = Category::factory()->create(['title' => 'Б']);
+        $this->put(route('fastleo.resources.update', ['categories', $b->id]), ['title' => 'Б', 'parent_id' => $a->id])->assertSessionHasNoErrors();
+        $this->put(route('fastleo.resources.update', ['categories', $b->id]), ['title' => 'Б', 'parent_id' => ''])->assertSessionHasNoErrors();
+        $this->put(route('fastleo.resources.update', ['categories', $a->id]), ['title' => 'А', 'parent_id' => $b->id])->assertSessionHasNoErrors();
+        $movedOut = Activity::query()->where('subject_id', (string) $b->id)->where('event', 'updated')->latest('id')->firstOrFail();
+
+        $this->post(route('fastleo.activity.revert', $movedOut->id))->assertSessionHas('fastleo.error', 'Нельзя перенести запись внутрь неё самой.');
+
+        expect($b->refresh()->parent_id)->toBeNull()
+            ->and($a->refresh()->parent_id)->toBe($b->id);
     });
 
     it('says so when the record is gone', function (): void {
@@ -471,6 +486,19 @@ describe('access to the entries', function (): void {
             ->assertSee('data-activity-restricted', false)
             ->assertSee('ВИДНО-СТАРОЕ')
             ->assertSee('Удалённая');
+    });
+
+    it('does not show the history of a record hidden by a global scope of the model', function (): void {
+        useFixtureResources('ActivityTenant');
+        $foreign = Topic::query()->create(['title' => 'Чужая тема']);
+        Activity::query()->create(['resource' => 'topics', 'subject_id' => (string) $foreign->id, 'subject_label' => 'Чужая тема', 'event' => 'updated', 'created_at' => now(), 'changes' => ['title' => ['old' => 'ЧУЖОЕ-СТАРОЕ', 'new' => 'Чужая тема']]]);
+
+        $this->get(route('fastleo.resources.history', ['topics', $foreign->id]))->assertNotFound();
+        $this->get(route('fastleo.activity.index'))
+            ->assertOk()
+            ->assertDontSee('ЧУЖОЕ-СТАРОЕ')
+            ->assertDontSee('Чужая тема')
+            ->assertSee('data-activity-restricted', false);
     });
 
     it('does not print the values of columns that are not fields of the section', function (): void {

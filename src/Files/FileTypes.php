@@ -17,7 +17,9 @@ final class FileTypes
     /** Расширения, которые нельзя разрешить даже в конфиге. */
     public const array FORBIDDEN = [
         'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'pht', 'phtml', 'phar', 'phps', 'inc',
-        'html', 'htm', 'xhtml', 'shtml', 'xml', 'xsl', 'svg', 'svgz', 'js', 'mjs',
+        'html', 'htm', 'xhtml', 'xht', 'shtml', 'xml', 'xsl', 'xslt', 'svg', 'svgz', 'js', 'mjs',
+        // XML-форматы, которые веб-сервер отдаёт как `*+xml`: браузер выполнит в них <script>.
+        'rss', 'atom', 'rdf', 'kml', 'mml', 'xspf',
         'htaccess', 'htpasswd', 'ini', 'user', 'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'exe', 'swf',
     ];
 

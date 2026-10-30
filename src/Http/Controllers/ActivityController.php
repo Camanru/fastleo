@@ -80,8 +80,9 @@ final readonly class ActivityController
         if ($record instanceof Model) {
             Authorization::authorize('view', $resource, $record);
         } else {
-            // Запись есть, но вне выборки `query()` раздела — история ей недоступна, как и сама запись.
-            abort_if($resource->newModel()->newQuery()->withoutGlobalScope(SoftDeletingScope::class)->whereKey($id)->exists(), 404);
+            // Запись есть, но вне выборки `query()` раздела или скрыта глобальным скоупом модели (например, чужой арендатор) —
+            // история ей недоступна, как и сама запись. «Удалённой насовсем» считается только запись, которой нет в таблице.
+            abort_if($resource->newModel()->newQueryWithoutScopes()->whereKey($id)->exists(), 404);
         }
 
         $entries = Activity::query()->where('resource', $resource::slug())->where('subject_id', $id)->latest('id')->paginate(self::PER_PAGE);
@@ -167,7 +168,7 @@ final readonly class ActivityController
 
                 return is_scalar($key) ? (string) $key : '';
             });
-            $existing = $resource->newModel()->newQuery()->withoutGlobalScope(SoftDeletingScope::class)->whereKey($subjects)->pluck($resource->newModel()->getKeyName())->map(fn (mixed $key): string => is_scalar($key) ? (string) $key : '')->flip();
+            $existing = $resource->newModel()->newQueryWithoutScopes()->whereKey($subjects)->pluck($resource->newModel()->getKeyName())->map(fn (mixed $key): string => is_scalar($key) ? (string) $key : '')->flip();
 
             foreach ($entries as $entry) {
                 if ($entry->resource !== $slug || $entry->subject_id === null || ! $existing->has($entry->subject_id)) {

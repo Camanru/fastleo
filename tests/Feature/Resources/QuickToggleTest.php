@@ -220,6 +220,18 @@ describe('SetToggle action', function (): void {
         expect($article->refresh()->is_published)->toBeFalse()->and($article->is_featured)->toBeFalse();
     });
 
+    it('applies the rules of the field and skips the records they reject', function (): void {
+        $draft = Article::factory()->create(['is_featured' => true, 'is_published' => false]);
+        $published = Article::factory()->create(['is_featured' => true, 'is_published' => true]);
+
+        $this->post(route('fastleo.resources.action', ['conditional-articles', 'set-is-published-on']), ['ids' => [$draft->id, $published->id]])
+            ->assertSessionHas('fastleo.success', 'Изменено: 0. Пропущено, значение не прошло проверку поля: 1 (Публиковать нельзя.)');
+        $this->post(route('fastleo.resources.action', ['conditional-articles', 'set-is-published-off']), ['ids' => [$published->id]])
+            ->assertSessionHas('fastleo.success', 'Изменено: 1.');
+
+        expect($draft->refresh()->is_published)->toBeFalse()->and($published->refresh()->is_published)->toBeFalse();
+    });
+
     it('does not count a record whose saving an observer cancelled', function (): void {
         $article = Article::factory()->create(['is_published' => false]);
         Article::updating(fn (): bool => false);

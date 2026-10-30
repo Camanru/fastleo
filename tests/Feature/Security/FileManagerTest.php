@@ -74,14 +74,14 @@ it('refuses to upload outside the uploads root', function (string $folder): void
 })->with(['../..', 'uploads/..', 'uploads/../fastleo', 'uploads//x', 'uploads/./x', 'uploads\\x', 'uploads/.hidden', 'other', "uploads/a\0b"]);
 
 it('refuses executable and active files even when the config allows them', function (string $name): void {
-    config(['fastleo.files.extensions' => ['jpg', 'php', 'html', 'svg', 'js', 'phtml', 'phar', 'htaccess']]);
+    config(['fastleo.files.extensions' => ['jpg', 'php', 'html', 'svg', 'js', 'phtml', 'phar', 'htaccess', 'xht', 'rss', 'atom', 'kml']]);
 
     uploadTo('uploads', [UploadedFile::fake()->createWithContent($name, '<?php echo 1;')])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('files.0');
 
     expect($this->disk->allFiles())->toBe([]);
-})->with(['shell.php', 'page.html', 'icon.svg', 'app.js', 'shell.phtml', 'shell.phar', 'shell.PHP', '.htaccess']);
+})->with(['shell.php', 'page.html', 'icon.svg', 'app.js', 'shell.phtml', 'shell.phar', 'shell.PHP', '.htaccess', 'page.xht', 'feed.rss', 'feed.atom', 'track.kml']);
 
 it('refuses a single file sent without the array, so the allowlist cannot be skipped', function (): void {
     uploadTo('uploads', UploadedFile::fake()->createWithContent('page.html', '<script>alert(1)</script>'))

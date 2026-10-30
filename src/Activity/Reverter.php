@@ -9,6 +9,7 @@ use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
 use Fastleo\Support\OperationCancelled;
+use Fastleo\Support\Tree;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\QueryException;
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\DB;
  * Возвращаются только поля, которые администратор может записывать в разделе сейчас
  * (не readonly, не скрытые, колонки самой модели): откат не обходит описание ресурса.
  * Значения возвращаются как были в базе; правила валидации не повторяются — они прошли при исходном
- * сохранении. Откат — обычное сохранение через Eloquent (observers работают), в журнале он
+ * сохранении; проверяется только, что прежний родитель в дереве не замкнёт ветку в кольцо. Откат — обычное сохранение через Eloquent (observers работают), в журнале он
  * записывается событием `reverted`. Права: `update` для значений, `create` для восстановления из копии,
  * `restore` для записи из корзины.
  */
@@ -88,6 +89,8 @@ final readonly class Reverter
             throw new RevertFailed($this->message('nothing'));
         }
 
+        $this->guardTree($resource, $record, $old);
+
         $record->setRawAttributes([...$record->getAttributes(), ...$old]);
 
         if (! $record->isDirty()) {
@@ -95,6 +98,31 @@ final readonly class Reverter
         }
 
         $this->save(fn (): bool => $record->save(), $record);
+    }
+
+    /**
+     * Прежний родитель в дереве не должен оказаться самой записью или её потомком: за время после изменения
+     * дерево могло перестроиться, и откат замкнул бы ветку в кольцо (такую запись не удалить, меню сайта зациклится).
+     * Та же проверка, что при сохранении формы (`RecordWriter::rules`).
+     *
+     * @param  array<string, mixed>  $old  возвращаемые значения колонок
+     *
+     * @throws RevertFailed откат дал бы цикл
+     */
+    private function guardTree(Resource $resource, Model $record, array $old): void
+    {
+        $tree = $resource::treeColumn();
+        $parent = $tree === null ? null : ($old[$tree] ?? null);
+
+        if ($tree === null || ! is_scalar($parent) || (string) $parent === '') {
+            return;
+        }
+
+        $key = $record->getKey();
+
+        if (Tree::load($resource->newModel()->newQueryWithoutScopes(), $tree, null)->isSelfOrDescendant(is_scalar($key) ? (string) $key : '', (string) $parent)) {
+            throw new RevertFailed(__('fastleo::resources.tree_cycle', [], Fastleo::LOCALE));
+        }
     }
 
     /**

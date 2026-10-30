@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Tests\Fixtures\QuickToggle;
 
 use Closure;
+use Fastleo\Actions\SetToggle;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
@@ -31,6 +32,17 @@ final class ConditionalArticleResource extends Resource
                 ->visibleWhen('is_featured', true)
                 ->rules(['boolean', fn (string $attribute, mixed $value, Closure $fail): mixed => filter_var($value, FILTER_VALIDATE_BOOLEAN) ? $fail('Публиковать нельзя.') : null])
                 ->quickToggle(),
+        ];
+    }
+
+    /**
+     * Массовые «Опубликовать» и «Снять с публикации» — те же правила, что у переключателя.
+     */
+    public function actions(): array
+    {
+        return [
+            SetToggle::make('is_published', 'Опубликовать', true),
+            SetToggle::make('is_published', 'Снять с публикации', false),
         ];
     }
 }

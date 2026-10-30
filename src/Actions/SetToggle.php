@@ -6,8 +6,12 @@ namespace Fastleo\Actions;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Checkbox;
+use Fastleo\Support\OperationCancelled;
+use Fastleo\Support\RecordWriter;
+use Fastleo\Support\ValidationMessages;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Str;
 use LogicException;
 use Override;
@@ -15,7 +19,7 @@ use Override;
 /**
  * Готовое действие «Показать» / «Скрыть»: ставит одно значение галочке (`Checkbox`, `Toggle`) у выбранных или одной записи.
  *
- * Записывает через Eloquent (`save()`: observers и журнал изменений работают), право — `update` по Policy.
+ * Записывает через Eloquent (`save()`: observers и журнал изменений работают) с проверкой правил поля, право — `update` по Policy.
  * Ключ в адресе — `set-{поле}-on` или `set-{поле}-off`, поэтому на одно поле можно повесить оба действия.
  *
  * ```php
@@ -74,37 +78,75 @@ final class SetToggle extends Action
 
     /**
      * Поставить значение; записи, у которых оно уже такое, не трогаются и не считаются.
-     * Запись, где форма не дала бы менять поле (`readonly()`, скрыто для администратора, `visibleWhen()` не выполнено), пропускается.
+     * Запись, где форма не дала бы менять поле (`readonly()`, скрыто для администратора, `visibleWhen()` не выполнено),
+     * пропускается; значение проверяется правилами поля и пишется через `RecordWriter`, как у быстрого переключателя.
      *
      * @param  Collection<int, Model>  $records
      * @param  array<string, mixed>  $data
      *
      * @throws LogicException в ресурсе нет такой галочки
+     * @throws QueryException ошибка базы данных
      */
     #[Override]
     public function handle(Collection $records, array $data): ActionResult
     {
         $field = $this->checkbox();
+        $resource = $this->resource();
         $changed = 0;
         $locked = 0;
+        $rejected = 0;
+        $reason = '';
 
         foreach ($records as $record) {
-            if (! in_array($field, $this->resource()->writableFields($record), true) || ! $field->isConditionMet($record)) {
+            if (! in_array($field, $resource->writableFields($record), true) || ! $field->isConditionMet($record)) {
                 $locked++;
 
                 continue;
             }
 
-            $record->setAttribute($this->field, $this->value);
+            if ((bool) $record->getAttribute($this->field) === $this->value) {
+                continue;
+            }
 
-            if ($record->isDirty($this->field) && $record->save()) {
+            // Правило условия показа (`visibleWhen`) ищет управляющее поле среди данных: берём его из записи, как форма.
+            $input = [$field->name => $this->value];
+            $controlling = $field->getVisibleWhen()['field'] ?? null;
+
+            if ($controlling !== null) {
+                $input[$controlling] = $resource->controllingValue($controlling, $record, null);
+            }
+
+            $validator = validator($input, RecordWriter::rules($resource, $record, [$field]), ValidationMessages::all(), $resource->validationAttributes($record));
+
+            if ($validator->fails()) {
+                $rejected++;
+                $reason = $reason !== '' ? $reason : $validator->errors()->first();
+
+                continue;
+            }
+
+            try {
+                RecordWriter::write($resource, $record, [$field], [$field->name => $validator->validated()[$field->name] ?? $this->value]);
+            } catch (OperationCancelled) {
+                continue;
+            }
+
+            if ($record->wasChanged($this->field)) {
                 $changed++;
             }
         }
 
         $message = __('fastleo::actions.changed', ['count' => $changed], Fastleo::LOCALE);
 
-        return ActionResult::success($locked > 0 ? $message.' '.__('fastleo::actions.locked', ['count' => $locked], Fastleo::LOCALE) : $message);
+        if ($locked > 0) {
+            $message .= ' '.__('fastleo::actions.locked', ['count' => $locked], Fastleo::LOCALE);
+        }
+
+        if ($rejected > 0) {
+            $message .= ' '.__('fastleo::actions.rejected', ['count' => $rejected, 'reason' => $reason], Fastleo::LOCALE);
+        }
+
+        return ActionResult::success($message);
     }
 
     /**

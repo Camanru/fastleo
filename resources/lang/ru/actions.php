@@ -20,6 +20,7 @@ return [
     'restored' => 'Восстановлено: :count.',
     'changed' => 'Изменено: :count.',
     'locked' => 'Пропущено, поле недоступно для изменения: :count.',
+    'rejected' => 'Пропущено, значение не прошло проверку поля: :count (:reason)',
     'failed' => 'Не выполнено для :count: :reason',
     'skipped' => 'Пропущено без прав: :count.',
     'invalid_selection' => 'Выберите записи (не больше :max).',
