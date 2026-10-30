@@ -174,6 +174,10 @@ final class ResourceInspector
             $details['extensions'] = $field->acceptedExtensions();
         }
 
+        if ($field->hasEmptyValue()) {
+            $details['empty_value'] = $field->getEmptyValue();
+        }
+
         if ($field instanceof Select) {
             $options = $this->attempt(fn (): array => $field->getOptions());
             $details['options'] = is_array($options) && count($options) <= self::MAX_OPTIONS ? $options : null;

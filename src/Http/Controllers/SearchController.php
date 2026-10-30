@@ -9,7 +9,6 @@ use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\Menu;
 use Fastleo\Support\ResourceQuery;
-use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -112,14 +111,11 @@ final class SearchController
     }
 
     /**
-     * Название записи: значение первого столбца списка (текстом, до 100 символов), иначе ключ.
+     * Название записи: `Resource::title()` (до 100 символов), иначе ключ.
      */
     private function title(Resource $resource, Model $record): string
     {
-        $field = $resource->listFields()[0] ?? null;
-        $value = $field?->display($record);
-        $text = $value instanceof Htmlable ? strip_tags($value->toHtml()) : (string) $value;
-        $text = trim((string) preg_replace('/\s+/u', ' ', html_entity_decode($text)));
+        $text = $resource->title($record);
 
         if ($text === '') {
             $key = $record->getKey();

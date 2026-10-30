@@ -13,6 +13,7 @@ use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\FormSchema;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -196,6 +197,34 @@ abstract class Resource
     public static function badge(): ?int
     {
         return null;
+    }
+
+    /**
+     * Название записи: заголовок формы и просмотра, хлебные крошки, подпись ветки дерева и результат поиска ⌘K.
+     * По умолчанию — значение первого столбца списка (текстом, без тегов; у многоязычного поля — первый язык),
+     * поэтому первым в `fields()` ставят поле с названием, а не `Select` или `Image`. Другое название — переопределить:
+     *
+     * ```php
+     * public function title(Model $record): string
+     * {
+     *     return $record->name;
+     * }
+     * ```
+     *
+     * Варианты `BelongsTo` (`titleColumn()`) и журнал изменений берут название сами и от этого метода не зависят.
+     */
+    public function title(Model $record): string
+    {
+        $field = $this->listFields()[0] ?? null;
+
+        if (! $field instanceof Field) {
+            return '';
+        }
+
+        $value = $field->display($field->shownRecord($record));
+        $text = $value instanceof Htmlable ? strip_tags($value->toHtml()) : (string) $value;
+
+        return trim((string) preg_replace('/\s+/u', ' ', html_entity_decode($text)));
     }
 
     /**

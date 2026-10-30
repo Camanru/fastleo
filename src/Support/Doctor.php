@@ -36,6 +36,8 @@ use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\Html\HtmlLoss;
 use Fastleo\Support\Html\RichTextSettings;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Migrations\MigrationRepositoryInterface;
+use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -59,8 +61,23 @@ use Throwable;
  */
 final class Doctor
 {
-    /** Таблицы, которые создаёт пакет. */
-    private const array TABLES = ['fastleo_imports', 'fastleo_logins', 'fastleo_two_factor', 'fastleo_activity', 'fastleo_settings', 'fastleo_notifications', 'fastleo_notification_bots', 'fastleo_channels', 'fastleo_publications', 'fastleo_publication_deliveries', 'fastleo_dashboard_layouts'];
+    /** Миграции пакета и таблицы, которые они создают (миграция колонки `fastleo_admin` таблиц не создаёт). */
+    public const array MIGRATIONS = [
+        self::ADMIN_MIGRATION => [],
+        '2026_10_29_000000_create_fastleo_imports_table' => ['fastleo_imports'],
+        '2026_10_30_000000_create_fastleo_logins_table' => ['fastleo_logins'],
+        '2026_10_30_000100_create_fastleo_two_factor_table' => ['fastleo_two_factor'],
+        '2026_10_30_000200_create_fastleo_activity_table' => ['fastleo_activity'],
+        '2026_10_30_000300_create_fastleo_settings_table' => ['fastleo_settings'],
+        '2026_10_30_000400_create_fastleo_notifications_table' => ['fastleo_notifications'],
+        '2026_10_31_000000_create_fastleo_notification_bots_table' => ['fastleo_notification_bots'],
+        '2026_10_31_000100_create_fastleo_channels_table' => ['fastleo_channels'],
+        '2026_10_31_000200_create_fastleo_publications_table' => ['fastleo_publications', 'fastleo_publication_deliveries'],
+        '2026_11_01_000000_create_fastleo_dashboard_layouts_table' => ['fastleo_dashboard_layouts'],
+    ];
+
+    /** Миграция колонки `fastleo_admin` в таблице пользователей. */
+    private const string ADMIN_MIGRATION = '2026_10_28_000000_add_fastleo_admin_to_users_table';
 
     /** Сколько записей раздела проверять на потерю разметки в RichText. */
     private const int RICH_TEXT_ROWS = 500;
@@ -196,29 +213,130 @@ final class Doctor
     }
 
     /**
-     * Таблицы пакета и колонка доступа в таблице пользователей.
+     * Таблицы пакета, колонка доступа в таблице пользователей, таблица ссылок сброса пароля и миграции пакета,
+     * на которых упадёт `migrate`.
      */
     private function tables(): void
     {
         try {
-            foreach (self::TABLES as $table) {
-                if (! Schema::hasTable($table)) {
-                    $this->add('error', 'site', 'table_missing_package', ['table' => $table], 'migrate_hint');
+            foreach (self::MIGRATIONS as $tables) {
+                foreach ($tables as $table) {
+                    if (! Schema::hasTable($table)) {
+                        $this->add('error', 'site', 'table_missing_package', ['table' => $table], 'migrate_hint');
+                    }
                 }
             }
 
             $users = UserModel::fastleoClassName();
+            $adminColumn = false;
 
             if ($users !== null) {
                 $table = new $users()->getTable();
+                $adminColumn = Schema::hasTable($table) && Schema::hasColumn($table, 'fastleo_admin');
 
-                if (Schema::hasTable($table) && ! Schema::hasColumn($table, 'fastleo_admin')) {
+                if (Schema::hasTable($table) && ! $adminColumn) {
                     $this->add('error', 'site', 'column_missing_package', ['table' => $table, 'column' => 'fastleo_admin'], 'migrate_hint');
                 }
             }
+
+            $this->migrationConflicts($adminColumn);
+            $this->passwordResetTable();
         } catch (Throwable $e) {
             $this->add('error', 'site', 'database', ['error' => $e->getMessage()], 'database_hint');
         }
+    }
+
+    /**
+     * Миграция пакета не записана в таблице `migrations`, а её таблица или колонка уже есть (старая версия fastleo,
+     * прежняя админка, потерянная запись) — `migrate` упадёт с ошибкой «уже существует». Если раньше неё выполнятся
+     * ещё не выполненные миграции сайта (подготовка по инструкции перехода), они могут убрать помеху — тогда предупреждение.
+     */
+    private function migrationConflicts(bool $adminColumn): void
+    {
+        /** @var MigrationRepositoryInterface $repository */
+        $repository = resolve('migration.repository');
+
+        if (! $repository->repositoryExists()) {
+            return;
+        }
+
+        $ran = $repository->getRan();
+        $pending = null;
+
+        foreach (self::MIGRATIONS as $migration => $tables) {
+            if (in_array($migration, $ran, true)) {
+                continue;
+            }
+
+            $existing = $migration === self::ADMIN_MIGRATION ? ($adminColumn ? ['fastleo_admin'] : []) : array_filter($tables, Schema::hasTable(...));
+
+            if ($existing === []) {
+                continue;
+            }
+
+            $pending ??= $this->pendingSiteMigrations($ran);
+            $before = array_values(array_filter($pending, fn (string $name): bool => strcmp($name, $migration) < 0));
+            $replace = ['migration' => $migration, 'what' => implode(', ', $existing), 'pending' => implode(', ', $before)];
+
+            $before === []
+                ? $this->add('error', 'site', 'migration_conflict', $replace, 'migration_conflict_hint')
+                : $this->add('warning', 'site', 'migration_conflict_pending', $replace, 'migration_conflict_hint');
+        }
+    }
+
+    /**
+     * Невыполненные миграции сайта (не пакета).
+     *
+     * @param  array<array-key, mixed>  $ran
+     * @return list<string>
+     */
+    private function pendingSiteMigrations(array $ran): array
+    {
+        $migrator = resolve(Migrator::class);
+        $names = array_keys($migrator->getMigrationFiles([database_path('migrations'), ...$migrator->paths()]));
+
+        return array_values(array_filter($names, fn (string $name): bool => ! array_key_exists($name, self::MIGRATIONS) && ! in_array($name, $ran, true)));
+    }
+
+    /**
+     * Таблица ссылок сброса пароля брокера `auth.passwords.fastleo`: без неё «Забыли пароль?» падает. На старых сайтах вместо неё
+     * лежит `password_resets` (Laravel 5–9) — её не переименовывают, если ею пользуется сброс пароля самого сайта.
+     */
+    private function passwordResetTable(): void
+    {
+        $broker = config('auth.passwords.'.Fastleo::GUARD);
+
+        if (! is_array($broker) || ($broker['driver'] ?? null) === 'cache') {
+            return;
+        }
+
+        $table = $broker['table'] ?? null;
+
+        if (! is_string($table) || $table === '') {
+            $this->add('error', 'site', 'password_reset_config', hint: 'password_reset_config_hint');
+
+            return;
+        }
+
+        $connection = $broker['connection'] ?? null;
+        $schema = Schema::connection(is_string($connection) ? $connection : null);
+
+        if ($schema->hasTable($table)) {
+            return;
+        }
+
+        $brokers = config('auth.passwords');
+        $shared = is_array($brokers) && array_any($brokers, fn (mixed $other, int|string $name): bool => $name !== Fastleo::GUARD && is_array($other) && ($other['table'] ?? null) === 'password_resets');
+        $provider = config('auth.guards.'.Fastleo::GUARD.'.provider');
+        $replace = ['table' => $table, 'provider' => is_string($provider) ? $provider : 'users'];
+
+        $hint = match (true) {
+            ! $schema->hasTable('password_resets') => 'password_reset_table_hint',
+            $shared => 'password_reset_table_shared_hint',
+            default => 'password_reset_table_legacy_hint',
+        };
+
+        $this->add('error', 'site', 'password_reset_table', $replace, $hint);
     }
 
     /**
@@ -681,7 +799,7 @@ final class Doctor
     {
         $hasDefault = $column['default'] !== null || $column['auto_increment'] === true || array_key_exists($field->name, $model->getAttributes()) || $this->hasFormDefault($field);
 
-        if ($editable && $column['nullable'] === false && ! $hasDefault && $field->isWritable() && $field->isFormField() && ! $field->isRequired() && ! $this->neverEmpty($field)) {
+        if ($editable && $column['nullable'] === false && ! $hasDefault && $field->isWritable() && $field->isFormField() && ! $field->isRequired() && ! $field->hasEmptyValue() && ! $this->neverEmpty($field)) {
             $this->add('warning', $scope, 'not_null', ['field' => $field->name], 'not_null_hint');
         }
 

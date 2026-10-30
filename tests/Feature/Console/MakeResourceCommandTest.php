@@ -108,7 +108,7 @@ it('finds relations, the tree, the manual order and the slug', function (): void
         ->toContain("Slug::make('slug', 'Slug')->from('title')")
         ->not->toContain('$treeColumn')
         ->and(generatedFields($this->sandbox.'/ArticleResource.php', $this->namespace.'\\ArticleResource'))->toMatchArray([
-            'category_id' => 'BelongsTo: nullable|integer|OptionRule',
+            'category_id' => 'BelongsTo: nullable|integer|Fastleo\\Support\\OptionRule',
         ]);
 });
 

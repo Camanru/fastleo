@@ -9,8 +9,7 @@
     $siteUrl = $editing ? $resource->url($record) : null;
     $canDelete = $editing && \Fastleo\Support\Authorization::allows('delete', $resource, $record);
     $recordActions = $editing ? array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record)) : [];
-    $titleField = $resource->listFields()[0] ?? null;
-    $recordTitle = $editing && $titleField !== null ? trim((string) $titleField->display($titleField->shownRecord($record))) : '';
+    $recordTitle = $editing ? $resource->title($record) : '';
     $updatedAt = $editing && $record->getAttribute('updated_at') instanceof \Carbon\CarbonInterface ? $record->getAttribute('updated_at') : null;
 @endphp
 <x-fastleo::layouts.app

@@ -21,6 +21,7 @@ return [
     'field_not_fillable' => 'Поле «:field» ресурса :resource не разрешено моделью :model. Добавьте «:field» в $fillable модели или уберите поле из ресурса.',
     'field_unbound' => 'Поле «:field» (:type) не привязано к модели: используйте его внутри fields() ресурса.',
     'field_needs_array_cast' => 'Поле «:field» хранит массив: добавьте колонке каст в модели :model, например protected $casts = [\':field\' => \'array\'].',
+    'empty_value_unsupported' => 'Поле «:field» (:type): emptyValue() здесь недоступно — у галочки, пароля, файлов, списков и вложенных записей пустое значение имеет свой смысл, а у множественных и многоязычных полей оно не одно.',
     'radio_depends' => 'Radio «:field» не поддерживает dependsOn(). Используйте Select::make()->dependsOn().',
     'directory_invalid' => 'Поле «:field»: папка «:directory» не подходит. Имя — строчная латиница, цифры и дефис (:example); вложенные папки через «/». Менеджер файлов создаёт папки по тем же правилам.',
     'radio_multiple' => 'Radio «:field» выбирает один вариант. Для нескольких используйте Select::make()->multiple().',

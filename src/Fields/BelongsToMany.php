@@ -243,4 +243,13 @@ class BelongsToMany extends Field implements SearchesOptions
 
         return $strings;
     }
+
+    /**
+     * Пустое значение здесь имеет свой смысл (галочка, пароль, файл, список, вложенные записи) — `emptyValue()` недоступен.
+     */
+    #[Override]
+    protected function supportsEmptyValue(): bool
+    {
+        return false;
+    }
 }

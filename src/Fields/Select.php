@@ -11,7 +11,6 @@ use Fastleo\Fields\Contracts\SearchesOptions;
 use Fastleo\Support\OptionRule;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Validation\Rule;
 use InvalidArgumentException;
 use Override;
 use UnitEnum;
@@ -211,11 +210,12 @@ class Select extends Field implements SearchesOptions
             return ['array'];
         }
 
-        return [$this->dependsOn === null ? Rule::in(array_map(strval(...), array_keys($this->getOptions()))) : $this->dependentRule()];
+        return [$this->dependentRule()];
     }
 
     /**
-     * Правила; сохранённое значение зависимого списка проходит проверку, пока зависимость не изменилась.
+     * Правила; сохранённое значение записи проходит проверку, даже если его нет среди вариантов (для зависимого списка —
+     * пока зависимость не изменилась). Новое значение вне вариантов отклоняется.
      *
      * @return array<string, list<mixed>>
      */
@@ -224,7 +224,7 @@ class Select extends Field implements SearchesOptions
     {
         $rules = parent::getRules($record);
 
-        if ($this->dependsOn === null || ! $record instanceof Model || ! $record->exists) {
+        if (! $record instanceof Model || ! $record->exists) {
             return $rules;
         }
 
@@ -236,20 +236,23 @@ class Select extends Field implements SearchesOptions
     }
 
     /**
-     * Сохранённые значения зависимого списка записи: остаются выбранными в форме, даже если сейчас вне вариантов.
+     * Сохранённые значения записи: остаются выбранными в форме и проходят проверку, даже если сейчас вне вариантов
+     * (старые данные, вариант убрали из списка, у зависимого списка поменялась зависимость). Админ их не теряет,
+     * пока сам не выберет другое. У подполей блоков и вложенных записей список пуст: их правила строятся без записи.
      *
      * @return list<string>
      */
     public function savedValues(?Model $record): array
     {
-        if ($this->dependsOn === null || ! $record instanceof Model || ! $record->exists) {
+        // Подполя блоков и вложенных записей проверяются без записи: сохранённое значение там не принимается.
+        if ($this->rulePrefix !== '' || ! $record instanceof Model || ! $record->exists) {
             return [];
         }
 
         $value = $record->getOriginal($this->name);
         $values = array_map(self::scalar(...), is_array($value) ? $value : [$value]);
 
-        return array_values(array_filter($values, fn (mixed $item): bool => is_string($item) && $item !== ''));
+        return array_values(array_filter($values, fn (mixed $item): bool => is_string($item) && $item !== '' && ! $this->isEmptyValue($item)));
     }
 
     /**
@@ -262,7 +265,7 @@ class Select extends Field implements SearchesOptions
             return [];
         }
 
-        return ['*' => ['distinct', $this->dependsOn === null ? Rule::in(array_map(strval(...), array_keys($this->getOptions()))) : $this->dependentRule()]];
+        return ['*' => ['distinct', $this->dependentRule()]];
     }
 
     /**
@@ -311,7 +314,12 @@ class Select extends Field implements SearchesOptions
             return array_map($map, self::splitList($value, ','));
         }
 
-        return $value === null ? null : $map($value);
+        // Подпись пустого варианта (placeholder) — «не выбрано», запишется emptyValue().
+        if ($value === null || ($this->hasEmptyValue() && $this->placeholder !== null && mb_strtolower($value) === mb_strtolower($this->placeholder))) {
+            return null;
+        }
+
+        return $map($value);
     }
 
     /**
@@ -334,10 +342,12 @@ class Select extends Field implements SearchesOptions
 
         return new OptionRule(
             fn (mixed $value, array $data): bool => is_scalar($value) && (
-                array_key_exists((string) $value, $this->getOptions($this->dependencyFrom($data)))
+                (! $this->required && $this->isEmptyValue($value))
+                || array_key_exists((string) $value, $this->getOptions($this->dependencyFrom($data)))
                 || (in_array((string) $value, $saved, true) && $this->dependencyUnchanged($record, $data))
             ),
             'in',
+            $this->dependsOn === null ? 'in:'.implode(',', array_map(fn (int|string $key): string => '"'.$key.'"', array_keys($this->getOptions()))) : null,
         );
     }
 
@@ -354,7 +364,7 @@ class Select extends Field implements SearchesOptions
         foreach ($values as $item) {
             $key = $this->scalar($item);
 
-            if ($key !== null && $key !== '') {
+            if ($key !== null && $key !== '' && ! $this->isEmptyValue($key)) {
                 $labels[] = $options[$key] ?? $key;
             }
         }

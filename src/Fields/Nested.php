@@ -404,4 +404,13 @@ abstract class Nested extends Field
     {
         return false;
     }
+
+    /**
+     * Пустое значение здесь имеет свой смысл (галочка, пароль, файл, список, вложенные записи) — `emptyValue()` недоступен.
+     */
+    #[Override]
+    protected function supportsEmptyValue(): bool
+    {
+        return false;
+    }
 }

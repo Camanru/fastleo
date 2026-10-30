@@ -51,6 +51,17 @@ it('describes fields: rules, relation, files and enum options', function (): voi
         ->and($fields['tags']['multiple'])->toBeTrue();
 });
 
+it('shows what a field writes instead of an empty value', function (): void {
+    useFixtureResources('EmptyValues');
+
+    $fields = collect(inspected('empty-values')['fields'])->keyBy('name');
+
+    expect($fields['type']['empty_value'])->toBe('none')
+        ->and($fields['views']['empty_value'])->toBe(0)
+        ->and($fields['phone'])->not->toHaveKey('empty_value')
+        ->and($fields['type']['rules']['type'])->toContain('in:"news","promo"');
+});
+
 it('lists resources, settings and custom pages without arguments', function (): void {
     $all = inspected();
 

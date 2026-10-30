@@ -109,6 +109,22 @@
 ],
 ```
 
+Свой брокер целиком заменяет брокер пакета: `fastleo.auth.reset_minutes` тогда не действует, срок задаёт `expire`.
+
+**Старый сайт без `password_reset_tokens`.** В проектах на Laravel 5–9 вместо неё лежит `password_resets` (те же колонки `email`, `token`, `created_at`), а в части проектов таблицы нет вовсе. Без таблицы «Забыли пароль?» падает с ошибкой — `php artisan fastleo:doctor` показывает это ошибкой.
+
+- Если `password_resets` пользуется сброс пароля самого сайта (`'table' => 'password_resets'` у брокера `users`), не переименовывайте её — опишите брокер админки на неё же: `'fastleo' => ['provider' => 'users', 'table' => 'password_resets', 'expire' => 60, 'throttle' => 60]` (провайдер — тот же, что у guard `fastleo`, `fastleo.auth.provider`).
+- Если сайт ею не пользуется — переименуйте миграцией (`Schema::rename('password_resets', 'password_reset_tokens')`) или опишите тот же брокер.
+- Если таблицы нет — создайте:
+
+```php
+Schema::create('password_reset_tokens', function (Blueprint $table) {
+    $table->string('email')->primary();
+    $table->string('token');
+    $table->timestamp('created_at')->nullable();
+});
+```
+
 ## Настройки
 
 | Ключ | По умолчанию | Что делает |

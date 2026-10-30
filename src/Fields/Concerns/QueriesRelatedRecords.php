@@ -264,7 +264,7 @@ trait QueriesRelatedRecords
 
         $value = $this->isMultiple() ? $this->hydrate($record) : $record->getOriginal($this->name);
 
-        return array_values(array_map(strval(...), array_filter(is_array($value) ? $value : [$value], fn (mixed $key): bool => is_scalar($key) && $key !== '')));
+        return array_values(array_map(strval(...), array_filter(is_array($value) ? $value : [$value], fn (mixed $key): bool => is_scalar($key) && $key !== '' && ! $this->isEmptyValue($key))));
     }
 
     /**
@@ -329,7 +329,8 @@ trait QueriesRelatedRecords
         // ключу на PostgreSQL — ошибка базы (500), поэтому формат проверяется здесь же.
         $exists = new OptionRule(
             fn (mixed $value, array $data): bool => is_scalar($value) && (
-                (in_array((string) $value, $saved, true) && $this->dependencyUnchanged($record, $data))
+                (! $this->required && $this->isEmptyValue($value))
+                || (in_array((string) $value, $saved, true) && $this->dependencyUnchanged($record, $data))
                 || (RecordKey::strict($this->relatedModel(), (string) $value) !== false && $this->optionExists($value, $data))
             ),
             'exists',

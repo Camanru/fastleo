@@ -24,7 +24,7 @@ return [
     'install_step_user' => 'php artisan fastleo:user admin@site.ru — создаст администратора',
     'install_step_open' => 'Откройте :url',
     'cache_done' => 'Список разделов, настроек и страниц закеширован: :count шт.',
-    'clear_done' => 'Кеш списка разделов удалён.',
+    'clear_done' => 'Кеш списка разделов удалён. Разделы находятся и без него (чуть медленнее); на боевом сайте верните кеш командой fastleo:cache или optimize.',
     'make_name' => 'Имя раздела латиницей, например Doctor',
     'make_name_invalid' => 'Имя «:name» не подходит: латиница и цифры, с заглавной буквы, например Doctor.',
     'make_model_missing' => 'Модель :model не найдена. Укажите её: --model="App\\Models\\Doctor".',

@@ -13,6 +13,7 @@ use Fastleo\Support\FilePathRule;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
 use LogicException;
+use Override;
 
 /**
  * Основа полей с файлами из менеджера (Image, File, Gallery). Значение — путь
@@ -159,5 +160,14 @@ abstract class FileField extends Field
     protected static function path(mixed $value): ?string
     {
         return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Пустое значение здесь имеет свой смысл (галочка, пароль, файл, список, вложенные записи) — `emptyValue()` недоступен.
+     */
+    #[Override]
+    protected function supportsEmptyValue(): bool
+    {
+        return false;
     }
 }

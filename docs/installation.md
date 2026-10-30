@@ -84,7 +84,11 @@ public function canAccessFastleo(): bool
 php artisan migrate
 ```
 
-Миграции пакета добавляют в таблицу пользователей булеву колонку `fastleo_admin` (по умолчанию `false`, с индексом; таблица берётся из модели провайдера guard `fastleo`) и создают таблицы: `fastleo_imports` (отчёты об [импорте](import-export.md#импорт)), `fastleo_logins` (входы и устройства), `fastleo_two_factor` ([2FA](auth.md)), `fastleo_activity` ([журнал изменений](activity.md)), `fastleo_settings` ([настройки сайта](settings.md)), `fastleo_notifications` ([уведомления](notifications.md)), `fastleo_dashboard_layouts` ([раскладка дашборда](dashboard.md#настройка-в-админке) каждого администратора).
+На сайте, где раньше стояла другая админка, `migrate` и «Забыли пароль?» могут упасть из-за старых таблиц и колонок — см. [переезд с другой админки](migrating.md).
+
+Миграции пакета добавляют в таблицу пользователей булеву колонку `fastleo_admin` (по умолчанию `false`, с индексом; таблица берётся из модели провайдера guard `fastleo`) и создают таблицы: `fastleo_imports` (отчёты об [импорте](import-export.md#импорт)), `fastleo_logins` (входы и устройства), `fastleo_two_factor` ([2FA](auth.md)), `fastleo_activity` ([журнал изменений](activity.md)), `fastleo_settings` ([настройки сайта](settings.md)), `fastleo_notifications` ([уведомления](notifications.md)), `fastleo_dashboard_layouts` ([раскладка дашборда](dashboard.md#настройка-в-админке) каждого администратора), `fastleo_notification_bots`, `fastleo_channels`, `fastleo_publications` и `fastleo_publication_deliveries` ([боты уведомлений](notifications.md) и [публикации](publishing.md)).
+
+Для «Забыли пароль?» нужна таблица `password_reset_tokens` — её создаёт стандартная миграция пользователей Laravel 10+. На старом сайте её может не быть ([что делать](auth.md#забыли-пароль)).
 
 Миграции пакета запускаются обычным `php artisan migrate`, публиковать их не нужно.
 

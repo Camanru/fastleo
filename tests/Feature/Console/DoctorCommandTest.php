@@ -7,6 +7,7 @@ use Fastleo\Fastleo;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\SoftNetica\SoftNeticaSettings;
 use Fastleo\Support\Assets;
+use Fastleo\Support\Doctor;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Tests\Fixtures\Fields\StrictRichText;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
@@ -86,6 +87,12 @@ it('warns about a NOT NULL column without required()', function (): void {
     expect(implode("\n", messages('bad-fields', 'warning')))->toContain('Колонка «title» не допускает NULL');
 });
 
+it('does not warn about a NOT NULL column when emptyValue() says what to write instead of null', function (): void {
+    useFixtureResources('DoctorEmptyValue');
+
+    expect(messages('empty-title', 'warning'))->toBe([]);
+});
+
 it('reports a resource whose table does not exist', function (): void {
     useFixtureResources('Doctor');
 
@@ -162,6 +169,72 @@ it('asks to migrate when the admin flag column is missing', function (): void {
     });
 
     expect(implode("\n", messages('site', 'error')))->toContain('нет колонки fastleo_admin');
+});
+
+describe('password reset table', function (): void {
+    it('reports a missing table of the reset broker', function (): void {
+        config(['auth.passwords.fastleo.table' => 'admin_password_resets']);
+
+        expect(diagnosed()['problems'])->toContain([
+            'level' => 'error',
+            'scope' => 'site',
+            'message' => 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.',
+            'hint' => 'Создайте таблицу миграцией сайта (колонки email, token, created_at) — пример в docs/auth.md.',
+        ]);
+    });
+
+    it('does not offer to rename password_resets while the site resets its own passwords there', function (): void {
+        Schema::create('password_resets', function ($table): void {
+            $table->string('email')->index();
+            $table->string('token');
+            $table->timestamp('created_at')->nullable();
+        });
+        config(['auth.passwords.fastleo.table' => 'admin_password_resets', 'auth.passwords.users.table' => 'password_resets']);
+
+        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.')['hint'];
+
+        expect($hint)->toContain('не переименовывайте')->toContain("'table' => 'password_resets'");
+
+        config(['auth.passwords.users.table' => 'password_reset_tokens']);
+        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.')['hint'];
+
+        expect($hint)->toContain("Schema::rename('password_resets', 'admin_password_resets')");
+    })->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'CREATE TABLE в MySQL неявно закрывает транзакцию теста');
+
+    it('skips a broker that keeps tokens in the cache and reports a broker without a table', function (): void {
+        config(['auth.passwords.fastleo' => ['driver' => 'cache', 'provider' => 'users']]);
+
+        expect(diagnosed()['ok'])->toBeTrue();
+
+        config(['auth.passwords.fastleo' => ['provider' => 'users']]);
+
+        expect(implode("\n", messages('site', 'error')))->toContain('не задана таблица (table)');
+    });
+});
+
+describe('package migrations that migrate would fail on', function (): void {
+    it('reports an admin column whose package migration is not recorded', function (): void {
+        DB::table('migrations')->where('migration', '2026_10_28_000000_add_fastleo_admin_to_users_table')->delete();
+
+        expect(implode("\n", messages('site', 'error')))
+            ->toContain('Миграция пакета 2026_10_28_000000_add_fastleo_admin_to_users_table не записана в таблице migrations, а то, что она создаёт, уже есть (fastleo_admin)');
+    });
+
+    it('only warns while an earlier site migration may still clear the way', function (): void {
+        File::ensureDirectoryExists($this->sandbox.'/migrations');
+        file_put_contents($this->sandbox.'/migrations/2026_10_27_000000_prepare_fastleo_4.php', '<?php return new class extends Illuminate\Database\Migrations\Migration {};');
+        $this->app->make('migrator')->path($this->sandbox.'/migrations');
+        DB::table('migrations')->where('migration', '2026_10_30_000300_create_fastleo_settings_table')->delete();
+
+        expect(messages('site', 'error'))->toBe([])
+            ->and(implode("\n", messages('site', 'warning')))->toContain('Раньше неё выполнятся миграции сайта (2026_10_27_000000_prepare_fastleo_4)');
+    });
+
+    it('lists every migration of the package', function (): void {
+        $files = array_map(fn (string $path): string => basename($path, '.php'), glob(dirname(__DIR__, 3).'/database/migrations/*.php') ?: []);
+
+        expect(array_keys(Doctor::MIGRATIONS))->toEqualCanonicalizing($files);
+    });
 });
 
 it('reports unpublished and outdated assets', function (): void {

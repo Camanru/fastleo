@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use Fastleo\Exports\Exporter;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
 use Workbench\App\Enums\ArticleStatus;
@@ -118,3 +120,57 @@ it('keeps the export link on its own section whatever the query of the list says
         ->assertOk()
         ->assertSee('href="'.route('fastleo.resources.export', ['resource' => 'articles', 'format' => 'xlsx']).'"', false);
 })->with(['another section' => 'topics', 'array' => [['x']]]);
+
+describe('large tables', function (): void {
+    /**
+     * Строки выгрузки запроса csv-файлом без заголовка: первый столбец — ключ.
+     *
+     * @param  Builder<Article>  $query
+     * @return list<int>
+     */
+    function exportedKeys(Builder $query): array
+    {
+        $resource = Fastleo::resources()->find('articles');
+        $response = new Exporter($resource)->download($query, 'csv');
+        ob_start();
+        $response->sendContent();
+        $lines = array_slice(explode("\n", trim((string) ob_get_clean())), 1);
+        $rows = array_map(fn (string $line): array => str_getcsv($line, ';', '"', ''), $lines);
+
+        return array_map(fn (array $row): int => (int) $row[0], $rows);
+    }
+
+    it('keeps the order of the list across chunks of 500 records', function (): void {
+        $now = now()->toDateTimeString();
+        $rows = array_map(fn (int $i): array => ['title' => 'Статья '.$i, 'views' => ($i * 7919) % 1237, 'created_at' => $now, 'updated_at' => $now], range(1, 1201));
+
+        foreach (array_chunk($rows, 300) as $chunk) {
+            Article::query()->insert($chunk);
+        }
+
+        $expected = Article::query()->orderByDesc('views')->orderBy('id')->pluck('id')->all();
+
+        expect(exportedKeys(Article::query()->orderByDesc('views')->orderBy('id')))->toBe($expected)
+            ->and($expected)->toHaveCount(1201);
+    });
+
+    it('writes a record once when the query of the resource multiplies its rows with a join', function (): void {
+        $articles = Article::factory()->count(3)->create();
+
+        foreach ($articles as $article) {
+            $article->links()->createMany([['title' => 'A', 'url' => 'https://a.example'], ['title' => 'B', 'url' => 'https://b.example']]);
+        }
+
+        $keys = exportedKeys(Article::query()->join('article_links', 'article_links.article_id', '=', 'articles.id')->select('articles.*')->orderBy('articles.id'));
+
+        expect($keys)->toBe($articles->pluck('id')->all());
+    });
+
+    it('does not export records the query left out', function (): void {
+        $kept = Article::factory()->create(['views' => 10]);
+        Article::factory()->create(['views' => 1]);
+        Article::factory()->create(['title' => 'Удалённая', 'views' => 10])->delete();
+
+        expect(exportedKeys(Article::query()->where('views', '>', 5)))->toBe([$kept->id]);
+    });
+});

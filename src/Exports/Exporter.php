@@ -20,8 +20,13 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Выгрузка записей раздела в xlsx или csv потоком (без временных файлов): первая строка —
- * подписи столбцов (ключ записи и поля ресурса), дальше записи по 500 за запрос.
+ * Выгрузка записей раздела в xlsx или csv: первая строка — подписи столбцов (ключ записи и поля ресурса),
+ * дальше записи по 500 за запрос. Сначала читаются ключи записей в порядке списка, затем записи порциями
+ * `whereKey()` — без смещения (`OFFSET`), поэтому порция из конца большой таблицы читается так же быстро, как первая.
+ * Время выполнения PHP на выгрузку не ограничивается.
+ *
+ * csv отдаётся клиенту по мере записи, xlsx — после сборки файла целиком (zip собирается в конце), поэтому
+ * для очень больших таблиц csv надёжнее: ответ не ждёт таймаута веб-сервера.
  *
  * Защита от формул: в xlsx текст всегда пишется текстовой ячейкой (`=СУММ(...)` не вычисляется),
  * в csv перед `= + - @`, табуляцией и переводом строки в начале значения ставится `'` (OWASP).
@@ -99,6 +104,10 @@ final readonly class Exporter
         $name = $this->resource::slug().'-'.now()->format('Y-m-d-His').'.'.$format;
 
         return response()->streamDownload(function () use ($query, $format, $fields, $relations): void {
+            if (function_exists('set_time_limit')) {
+                set_time_limit(0);
+            }
+
             $writer = $format === 'csv' ? new CsvWriter(new CsvOptions(FIELD_DELIMITER: ';')) : new XlsxWriter;
             $writer->openToFile('php://output');
             $this->write($writer, $query->with($relations), $fields, $format === 'csv');
@@ -118,15 +127,54 @@ final readonly class Exporter
         $writer->addRow(new Row(array_map(fn (string $header): Cell => new StringCell($header, $bold), $this->headers())));
         $columns = $this->columns($fields);
 
-        foreach ($query->lazy(500) as $record) {
-            $key = $record->getKey();
-            $cells = [SpreadsheetCell::make(is_int($key) || is_string($key) ? $key : null, $csv)];
+        foreach (array_chunk($this->keys($query), 500) as $chunk) {
+            $records = (clone $query)->reorder()->whereKey($chunk)->get()->keyBy(fn (Model $record): string => $this->keyString($record->getKey()));
 
-            foreach ($columns as [, $value]) {
-                $cells[] = SpreadsheetCell::make($value($record), $csv);
+            foreach ($chunk as $chunkKey) {
+                $record = $records->get($this->keyString($chunkKey));
+
+                if (! $record instanceof Model) {
+                    continue;
+                }
+
+                $key = $record->getKey();
+                $cells = [SpreadsheetCell::make(is_int($key) || is_string($key) ? $key : null, $csv)];
+
+                foreach ($columns as [, $value]) {
+                    $cells[] = SpreadsheetCell::make($value($record), $csv);
+                }
+
+                $writer->addRow(new Row($cells));
             }
-
-            $writer->addRow(new Row($cells));
         }
+    }
+
+    /**
+     * Ключи записей запроса в порядке списка (поиск, фильтры, сортировка, корзина), без повторов, если запрос
+     * ресурса соединяет таблицы. Сортировка по столбцу, который запрос ресурса задаёт сам через `select()` с
+     * псевдонимом, здесь не работает: читается только ключ.
+     *
+     * @param  Builder<Model>  $query
+     * @return list<int|string>
+     */
+    private function keys(Builder $query): array
+    {
+        $keys = [];
+
+        foreach ((clone $query)->pluck($query->getModel()->getQualifiedKeyName()) as $key) {
+            if (is_int($key) || is_string($key)) {
+                $keys[$key] = $key;
+            }
+        }
+
+        return array_values($keys);
+    }
+
+    /**
+     * Ключ записи строкой: ключи из `pluck()` и `getKey()` могут отличаться типом (число и строка).
+     */
+    private function keyString(mixed $key): string
+    {
+        return is_scalar($key) ? (string) $key : '';
     }
 }

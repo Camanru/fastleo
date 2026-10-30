@@ -6,8 +6,7 @@
     $recordActions = $trashed ? [] : array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record));
 @endphp
 @php
-    $titleField = $resource->listFields()[0] ?? null;
-    $recordTitle = $titleField !== null ? trim((string) $titleField->display($titleField->shownRecord($record))) : '';
+    $recordTitle = $resource->title($record);
     $updatedAt = $record->getAttribute('updated_at') instanceof \Carbon\CarbonInterface ? $record->getAttribute('updated_at') : null;
     $listUrl = route('fastleo.resources.index', $trashed ? ['resource' => $slug, 'trashed' => 1] : $slug);
 @endphp

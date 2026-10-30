@@ -49,6 +49,11 @@ trait StoresJsonItems
                 throw new LogicException(__('fastleo::exceptions.nested_field', ['field' => $field->name, 'parent' => $this->name, 'type' => class_basename($field)], Fastleo::LOCALE));
             }
 
+            // Подполя JSON не записываются через fill(): значение вместо пустого сюда не доходит.
+            if ($field->hasEmptyValue()) {
+                throw new LogicException(__('fastleo::exceptions.empty_value_unsupported', ['field' => $field->name, 'type' => $field::class], Fastleo::LOCALE));
+            }
+
             // Значение колонки собирается заново из формы: скрытое или нередактируемое подполе стёрлось бы.
             if ($field->hasRecordVisibility() || $field->hasAccessModifier() || ! $field->isWritable() || $field->isHidden()) {
                 throw new LogicException(__('fastleo::exceptions.json_item_locked', ['field' => $field->name, 'parent' => $this->name], Fastleo::LOCALE));

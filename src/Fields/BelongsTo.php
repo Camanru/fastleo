@@ -140,9 +140,22 @@ class BelongsTo extends Field implements SearchesOptions
             return parent::display($record);
         }
 
+        if ($this->isEmptyValue($record->getAttribute($this->name))) {
+            return null;
+        }
+
         $related = $record->getRelationValue($this->getRelationName());
 
         return $related instanceof Model ? $this->titleOf($related) : $this->format($record->getAttribute($this->name));
+    }
+
+    /**
+     * Ключ связанной записи; значение `emptyValue()` — пустая ячейка.
+     */
+    #[Override]
+    public function exportValue(Model $record): string|int|float|null
+    {
+        return $this->isEmptyValue($record->getAttribute($this->name)) ? null : parent::exportValue($record);
     }
 
     #[Override]

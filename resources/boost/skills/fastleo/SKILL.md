@@ -125,10 +125,10 @@ class DoctorsAdminTest extends TestCase
 | «Enum требует каст» | Enum-поле без enum-каста | `'status' => Status::class` в `casts()` |
 | «Связь поля … метод» | `BelongsTo::make('category_id')` без метода `category()` | добавить метод связи или `->relation('имя')` |
 | «пишет в колонку, которой нет» | поле без колонки | миграция или убрать поле |
-| ошибка базы при пустом поле | NOT NULL без значения по умолчанию, поле не `required()` | `required()` или `default()` в миграции |
+| ошибка базы при пустом поле | NOT NULL без значения по умолчанию, поле не `required()` | `required()`, `default()` в миграции или `emptyValue(0)` / `emptyValue('')` у поля |
 | админка без стилей | ассеты не опубликованы | `php artisan vendor:publish --tag=fastleo-assets --force` |
 | картинки не открываются | нет `public/storage` | `php artisan storage:link` |
-| новый раздел не виден | устарел кеш списка разделов | `php artisan fastleo:cache` (или `optimize:clear`) |
+| новый раздел не виден | устарел кеш списка разделов (`bootstrap/cache/fastleo.php`) | `php artisan fastleo:clear` (разделы найдутся без кеша) или `fastleo:cache`, если кеш нужен |
 | 404 по адресу раздела | адрес берётся из имени модели во множественном числе (`Doctor` → `doctors`; у неисчисляемых слов он не меняется: `News` → `news`) | посмотреть адрес в `fastleo:inspect` или задать `protected static ?string $slug = 'doctors'` |
 
 ## Команды
@@ -143,7 +143,7 @@ php artisan fastleo:inspect articles   # один раздел по адресу
 php artisan fastleo:inspect --json     # то же для машины
 ```
 
-В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `quick_toggle: true` у галочки с `quickToggle()`, вложенные `fields` у блоков и повторителей. `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
+В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `empty_value` у поля с `emptyValue()`, `quick_toggle: true` у галочки с `quickToggle()`, вложенные `fields` у блоков и повторителей. `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
 
 Если раздел описан с ошибкой, вместо `fields` будет `error` с текстом — остальные разделы выводятся как обычно.
 
@@ -166,6 +166,8 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | guard `fastleo` не на драйвере `session` | убрать описание guard из `config/auth.php` |
 | модель пользователей не подходит для админки | трейт `HasFastleoAccess` и интерфейс `FastleoUser` |
 | нет таблиц пакета или колонки `fastleo_admin` | `php artisan migrate` |
+| миграция пакета не записана в таблице `migrations`, а её таблица или колонка `fastleo_admin` уже есть — `migrate` упадёт (предупреждение, если раньше выполнятся ещё не выполненные миграции сайта) | убрать старую таблицу/колонку миграцией сайта до миграций пакета ([переход с 3.0](vendor/camanru/fastleo/docs/upgrade-from-3.md#5-миграции-и-перенос-администраторов)) или, если потерялась только запись, добавить её в `migrations` |
+| нет таблицы ссылок сброса пароля (брокер `auth.passwords.fastleo`) или у брокера не задана таблица | создать `password_reset_tokens` или описать брокер на старую `password_resets` ([подробнее](vendor/camanru/fastleo/docs/auth.md#забыли-пароль)) |
 | ассеты не опубликованы | `php artisan vendor:publish --tag=fastleo-assets --force` |
 | список разделов не собирается (повтор адреса, неверный `$sortColumn`…) | исправить ресурс по тексту ошибки |
 | раздел описан с ошибкой (повтор поля, нет модели) | исправить ресурс |
@@ -188,7 +190,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | нет ссылки `public/storage` | `php artisan storage:link` |
 | ассеты устарели | опубликовать заново |
 | кеш `bootstrap/cache/fastleo.php` устарел | `php artisan fastleo:cache` |
-| колонка NOT NULL без значения по умолчанию, а поле не `required()` | `required()` у поля или `default()` в миграции |
+| колонка NOT NULL без значения по умолчанию, а поле не `required()` и без `emptyValue()` | `required()` у поля, `default()` в миграции или `emptyValue()` у поля |
 | больше `fastleo.relations.preload` связанных записей у `BelongsTo`/`BelongsToMany` — форма и фильтр вместо списка показывают поиск по серверу | так и задумано; чтобы вернуть обычный список, поднять `relations.preload` |
 | `maxLength()` больше длины колонки, у `Textarea` — длина не ограничена (только MySQL и PostgreSQL) | уменьшить или задать `maxLength()`, либо увеличить колонку |
 | у `Text` (и `Email`, `Url`) предел длины не менялся (255), а колонка шире — длинные значения поле не пропустит (только MySQL и PostgreSQL) | задать `->maxLength(<длина колонки>)` |
@@ -203,7 +205,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | на боевом сайте планировщик не запускался дольше 10 минут | cron: `* * * * * php artisan schedule:run`; метка запуска хранится в кеше приложения |
 | подключение к SoftNetica: недопустимый адрес (ошибка), нет хостов кабинета, отчёты не доходят дольше 30 минут | исправить `softnetica.url`/`cabinet_hosts`, запустить планировщик |
 
-Проверка NOT NULL пропускает поля, которые заполняются сами: галочки, пароль, адрес `Slug` с `from()` (без `from()` адрес сам не заполнится), Gallery, KeyValue, Seo, поля со значением `default()`, колонки со значением по умолчанию в базе или в `$attributes` модели, а также разделы только для чтения.
+Проверка NOT NULL пропускает поля, которые заполняются сами: галочки, пароль, поля с `emptyValue()`, адрес `Slug` с `from()` (без `from()` адрес сам не заполнится), Gallery, KeyValue, Seo, поля со значением `default()`, колонки со значением по умолчанию в базе или в `$attributes` модели, а также разделы только для чтения.
 
 **`--sanitize-diff`** — вместо обычных проверок обходит **все** записи полей RichText верхнего уровня и сравнивает текст в базе с тем, что сохранит чистка HTML (с учётом `fastleo.rich_text`, `sanitizeUsing()` и своего `sanitize()`). По каждому полю печатает «изменится N из M записей» и первые 50 записей: ключ, кусок текста вокруг первого расхождения «было» и «станет». Сравнение буквальное, поэтому видны не только потерянные теги, но и изменённые атрибуты и сущности (`&l` → `&amp;l`). Ничего не меняет в базе, код выхода `0` (`1` — если настройка `fastleo.rich_text` недопустима). С `--json` отдаёт `{"fields": [{"resource", "field", "checked", "changed", "records": [{"key", "locale", "before", "after"}]}]}`; поля, где ничего не изменится, в список не попадают.
 
@@ -255,7 +257,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 
 Сервер заново читает администратора при каждом вызове: если у него сняли доступ после запуска, инструменты перестают работать сразу. `create-record` требует права на открытие раздела (`viewAny`) и на создание. Пароль с подтверждением (`Password::confirmed()`) достаточно прислать один раз. Если при частичном изменении меняется поле, от которого зависит другое (`dependsOn()`), зависимое поле проверяется с его сохранённым значением.
 
-Правила записи те же, что у формы: значение проверяется правилами поля, пишутся только поля из `fields()`, доступные для изменения (поле `readonly()` или скрытое — ошибка «нельзя записать»), файловые поля принимают пути вида `uploads/…` (формат и расширение проверяются; существует ли файл на диске, не проверяется) — загрузка файлов через MCP недоступна, файл кладут через [файловый менеджер](vendor/camanru/fastleo/docs/files.md). Ошибки проверки приходят по полям.
+Поле очищают значением `null` (пустая строка тоже считается пустой): если у поля задан `emptyValue()`, записывается оно. Правила записи те же, что у формы: значение проверяется правилами поля, пишутся только поля из `fields()`, доступные для изменения (поле `readonly()` или скрытое — ошибка «нельзя записать»), файловые поля принимают пути вида `uploads/…` (формат и расширение проверяются; существует ли файл на диске, не проверяется) — загрузка файлов через MCP недоступна, файл кладут через [файловый менеджер](vendor/camanru/fastleo/docs/files.md). Ошибки проверки приходят по полям.
 
 **Списки при изменении.** Переводы `translatable()` дополняются: присланный язык заменяется, остальные сохраняются. А списки — вложенные записи (HasMany, HasOne), Repeater, Blocks, Gallery, Tags, KeyValue, связи «многие ко многим» и `Select::multiple()` — заменяются целиком: передавайте весь список так, как вернул `get-record` (у вложенных записей — вместе с их `id`). Если в присланном списке нет существующей вложенной записи, а сервер запущен без `--allow-delete`, это ошибка — записи не удаляются.
 
@@ -326,6 +328,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 - [Установка и обновление](vendor/camanru/fastleo/docs/installation.md) — | Что | Версия | |---|---| | PHP | 8.4 или новее | | Laravel | 13 | | База данных | MySQL 8, PostgreSQL 16+ или SQLite | | PHP-расширение GD | с поддержкой WebP…
 - [Раскладка формы](vendor/camanru/fastleo/docs/layout.md) — Поля в `fields()` можно группировать: вкладки, секции, колонки, боковая панель. Раскладка влияет только на форму — список и запись в базу от неё не зависят.
 - [Список записей](vendor/camanru/fastleo/docs/list.md) — Список раздела строится из тех же полей, что и форма. Столбец — каждое поле, видимое в списке.
+- [Переезд с другой админки](vendor/camanru/fastleo/docs/migrating.md) — Памятка для сайта, который уже работает с прежней админкой (MoonShine, самописной или другой) и переходит на fastleo. Разделы описываются классами…
 - [Уведомления: колокольчик, Telegram и Max](vendor/camanru/fastleo/docs/notifications.md) — Колокольчик в шапке админки показывает уведомления администратору: новая заявка, импорт завершён, что-то сломалось. Дополнительно сообщение уходит в чаты…
 - [Свои страницы и журнал ошибок](vendor/camanru/fastleo/docs/pages.md) — Страница без модели: отчёт, инструкция для редакторов, панель управления. Класс наследует `Fastleo\Page`, лежит рядом с ресурсами, а шаблон — в…
 - [Публикации в Telegram и Max](vendor/camanru/fastleo/docs/publishing.md) — Записи сайта (новости, статьи, акции) можно публиковать в каналы Telegram и Max прямо из админки: боты пакета отправляют пост с текстом, картинками и…

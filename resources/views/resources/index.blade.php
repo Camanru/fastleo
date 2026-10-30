@@ -23,7 +23,6 @@
 
         return request()->fullUrlWithQuery(['sort' => $name, 'direction' => $direction, 'page' => null]);
     };
-    $titleField = $fields[0] ?? null;
     // Действия: в полосе выбранных — только те, что разрешены хотя бы для одной записи страницы.
     $actionAllows = function ($action, $record) use (&$memo): bool {
         return $memo['action|'.spl_object_id($action).'|'.$record->getKey()] ??= $action->allows($record);
@@ -185,8 +184,11 @@
     @endif
 
     @if ($branch)
+        @php
+            $branchTitle = $resource->title($branch);
+        @endphp
         <div class="flex flex-wrap items-center gap-2 text-sm">
-            <span class="font-medium">{{ __('fastleo::resources.tree_branch', ['title' => strip_tags((string) (($fields[0] ?? null)?->display($fields[0]->shownRecord($branch)) ?? $branch->getKey()))]) }}</span>
+            <span class="font-medium">{{ __('fastleo::resources.tree_branch', ['title' => $branchTitle !== '' ? $branchTitle : $branch->getKey()]) }}</span>
             <a href="{{ route('fastleo.resources.index', $slug) }}" class="text-primary-text hover:underline">{{ __('fastleo::resources.tree_show_all') }}</a>
         </div>
     @endif

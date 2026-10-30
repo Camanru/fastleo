@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use Closure;
 use Illuminate\Contracts\Validation\DataAwareRule;
 use Illuminate\Contracts\Validation\ValidationRule;
+use Stringable;
 
 /**
  * Правило «значение — один из вариантов поля». Видит все данные формы, поэтому варианты
@@ -16,7 +17,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
  * new OptionRule(fn (mixed $value, array $data): bool => isset($options[$value]), 'in');
  * ```
  */
-final class OptionRule implements DataAwareRule, ValidationRule
+final class OptionRule implements DataAwareRule, Stringable, ValidationRule
 {
     /**
      * Данные формы.
@@ -28,8 +29,17 @@ final class OptionRule implements DataAwareRule, ValidationRule
     /**
      * @param  Closure(mixed, array<array-key, mixed>): bool  $passes  проверка значения
      * @param  string  $message  правило, текст которого показать (`in`, `exists`)
+     * @param  string|null  $description  как правило выглядит в `fastleo:inspect` (`in:"a","b"`); по умолчанию — имя класса
      */
-    public function __construct(private readonly Closure $passes, private readonly string $message) {}
+    public function __construct(private readonly Closure $passes, private readonly string $message, private readonly ?string $description = null) {}
+
+    /**
+     * Описание правила для `fastleo:inspect`.
+     */
+    public function __toString(): string
+    {
+        return $this->description ?? self::class;
+    }
 
     /**
      * Данные формы от валидатора.

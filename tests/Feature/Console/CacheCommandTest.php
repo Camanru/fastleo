@@ -47,7 +47,7 @@ it('does not cache a broken resource description', function (): void {
 it('clears the cache', function (): void {
     File::put(Fastleo::resources()->cachePath(), '<?php return [];');
 
-    $this->artisan('fastleo:clear')->expectsOutputToContain('Кеш списка разделов удалён.')->assertSuccessful();
+    $this->artisan('fastleo:clear')->expectsOutputToContain('Кеш списка разделов удалён')->assertSuccessful();
 
     expect(Fastleo::resources()->cachePath())->not->toBeFile();
 });

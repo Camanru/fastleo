@@ -29,7 +29,7 @@ use Laravel\Mcp\Server\Tool;
  * ```
  */
 #[Name('Fastleo')]
-#[Version('4.3.0')]
+#[Version('4.4.0')]
 #[Instructions('Админка сайта. Начните с list-resources, затем describe-resource: он покажет поля, правила и права. Записи читают list-records и get-record, создают и меняют create-record и update-record (передавайте только нужные поля в values), действия запускает run-action. Удаление включается только при запуске сервера с --allow-delete.')]
 final class FastleoServer extends Server
 {

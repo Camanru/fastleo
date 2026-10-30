@@ -40,6 +40,9 @@ abstract class Field
     /** Значение при создании записи (или замыкание без аргументов). */
     protected mixed $default = null;
 
+    /** Что писать в модель вместо пустого значения (null); null — писать null. */
+    protected string|int|float|bool|null $emptyValue = null;
+
     /** Поле обязательно. */
     protected bool $required = false;
 
@@ -211,6 +214,75 @@ abstract class Field
     public function hasDefault(): bool
     {
         return $this->default !== null;
+    }
+
+    /**
+     * Что записать в модель, когда поле оставили пустым, вместо `null`. Для колонки, где «нет значения» хранится
+     * числом или пустой строкой (`category_id = 0`, NOT NULL-текст):
+     *
+     * ```php
+     * Select::make('category_id', 'Категория')->options($categories)->placeholder('Без категории')->emptyValue(0);
+     * RichText::make('text', 'Текст')->emptyValue('');
+     * ```
+     *
+     * Работает при записи из формы, импорта и MCP. У Select, Radio и BelongsTo сохранённое такое значение в форме, списке
+     * и выгрузке считается пустым; у остальных полей показывается как обычное значение.
+     * `required()` по-прежнему требует ввод. Недоступно полям, где пустое значение имеет свой смысл (галочка, пароль,
+     * файлы, списки и вложенные записи), у `multiple()` и `translatable()` — `LogicException`.
+     *
+     * @throws LogicException
+     */
+    public function emptyValue(string|int|float|bool|null $value): static
+    {
+        $this->emptyValue = $value;
+        $this->assertEmptyValueAllowed();
+
+        return $this;
+    }
+
+    /**
+     * Значение вместо пустого задано `emptyValue()`.
+     */
+    public function hasEmptyValue(): bool
+    {
+        return $this->emptyValue !== null;
+    }
+
+    /**
+     * Значение вместо пустого (`emptyValue()`) или null.
+     */
+    public function getEmptyValue(): string|int|float|bool|null
+    {
+        return $this->emptyValue;
+    }
+
+    /**
+     * Значение поля равно `emptyValue()` — для формы, списка и выгрузки оно пустое.
+     */
+    public function isEmptyValue(mixed $value): bool
+    {
+        return $this->emptyValue !== null && is_scalar($value) && (string) $value === (string) $this->emptyValue;
+    }
+
+    /**
+     * У поля бывает `emptyValue()`: пустое значение одно и записывается одним значением колонки.
+     * Полям, где пустое значение имеет свой смысл, метод возвращает false.
+     */
+    protected function supportsEmptyValue(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Проверка допустимости `emptyValue()` — в самом методе и при записи, чтобы порядок вызовов её не обходил.
+     *
+     * @throws LogicException
+     */
+    protected function assertEmptyValueAllowed(): void
+    {
+        if ($this->emptyValue !== null && (! $this->supportsEmptyValue() || $this->isMultiple() || $this->translatable)) {
+            throw new LogicException(__('fastleo::exceptions.empty_value_unsupported', ['field' => $this->name, 'type' => static::class], Fastleo::LOCALE));
+        }
     }
 
     /**
@@ -1172,13 +1244,15 @@ abstract class Field
      */
     public function fill(Model $record, mixed $value): void
     {
+        $this->assertEmptyValueAllowed();
+
         if ($this->translatable) {
             $this->fillTranslations($record, is_array($value) ? $value : []);
 
             return;
         }
 
-        $record->fill([$this->name => $value]);
+        $record->fill([$this->name => $value ?? $this->emptyValue]);
     }
 
     /**
