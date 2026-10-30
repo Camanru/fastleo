@@ -113,7 +113,7 @@ function createLimitsTable(): void
 {
     $kind = in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true) ? "enum('a', 'b')" : 'varchar(10)';
 
-    DB::statement("create table doctor_limits (id integer primary key, code varchar(20) not null, note varchar(20) not null, amount decimal(5,2) not null, small smallint not null, slug varchar(50) not null, kind {$kind} not null, status varchar(20) null)");
+    DB::statement("create table doctor_limits (id integer primary key, code varchar(20) not null, note varchar(20) not null, amount decimal(5,2) not null, small smallint not null, slug varchar(50) not null, kind {$kind} not null, status varchar(20) null, title varchar(500) null, phone varchar(255) null)");
 }
 
 /**

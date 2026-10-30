@@ -913,11 +913,11 @@ function relativeUrl(url) {
 }
 
 /**
- * Поле RichText: <div x-data="fastleoRichText({ height, picker })"> с <textarea x-ref="text">.
+ * Поле RichText: <div x-data="fastleoRichText({ height, picker, contentCss, contentStyle })"> с <textarea x-ref="text">.
  * HugeRTE грузится отдельным файлом, поэтому редактор запускается, когда он готов.
  * Изменения отмечают форму, Ctrl/Cmd+S сохраняет, картинку и файл выбирают в менеджере.
  */
-Alpine.data('fastleoRichText', ({ height, picker }) => ({
+Alpine.data('fastleoRichText', ({ height, picker, contentCss = [], contentStyle = null }) => ({
     editor: null,
 
     init() {
@@ -965,7 +965,8 @@ Alpine.data('fastleoRichText', ({ height, picker }) => ({
             branding: false,
             promotion: false,
             skin_url: dark ? 'dark' : 'default',
-            content_css: dark ? 'dark' : 'default',
+            content_css: [dark ? 'dark' : 'default', ...contentCss],
+            ...(contentStyle ? { content_style: contentStyle } : {}),
             plugins: 'autolink code fullscreen image link lists media searchreplace table wordcount',
             toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | link image media table blockquote | removeformat code fullscreen',
             toolbar_mode: 'wrap',

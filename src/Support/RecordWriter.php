@@ -95,6 +95,37 @@ final class RecordWriter
     }
 
     /**
+     * Значения по умолчанию (`default()` поля) для полей новой записи, которых нет во вводе: форма их не прислала
+     * (поле скрыто, запрос не из формы, MCP). Без этого `required()` поле со значением по умолчанию не прошло бы проверку.
+     * Присланное значение, в том числе пустое, не трогается. Берутся только простые значения; связи и вложенные записи
+     * отдают объекты — они не данные.
+     *
+     * ```php
+     * $data = RecordWriter::withDefaults($resource->writableFields(null), $request->all());
+     * ```
+     *
+     * @param  list<Field>  $fields
+     * @param  array<array-key, mixed>  $data
+     * @return array<array-key, mixed>
+     */
+    public static function withDefaults(array $fields, array $data): array
+    {
+        foreach ($fields as $field) {
+            if (array_key_exists($field->name, $data)) {
+                continue;
+            }
+
+            $default = $field->formValue(null);
+
+            if ((is_scalar($default) && $default !== '') || (is_array($default) && $default !== [])) {
+                $data[$field->name] = $default;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
      * Ввод формы, в котором управляющие поля (`visibleWhen`, `dependsOn`), недоступные админу
      * для изменения, заменены сохранённым значением (при создании — значением по умолчанию).
      *

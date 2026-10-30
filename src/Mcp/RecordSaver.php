@@ -58,14 +58,7 @@ final class RecordSaver
         }
 
         if (! $existing instanceof Model) {
-            foreach ($fields as $field) {
-                $default = $field->formValue(null);
-
-                // Только простые значения по умолчанию; связи и вложенные записи отдают объекты — они не данные.
-                if (! array_key_exists($field->name, $data) && ((is_scalar($default) && $default !== '') || (is_array($default) && $default !== []))) {
-                    $data[$field->name] = $default;
-                }
-            }
+            $data = RecordWriter::withDefaults($fields, $data);
         }
 
         // Управляющего поля (visibleWhen, dependsOn) нет среди присланных — условие проверяется по значению записи.

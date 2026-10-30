@@ -28,9 +28,6 @@ final class FeedbackResource extends Resource
 
     protected static bool $readonly = true;
 
-    /** В демо раздел открыт ИИ-агенту явно: в нём есть Email, а такие разделы по умолчанию закрыты от MCP. */
-    protected static bool $mcpPersonalData = true;
-
     /**
      * Обращения за последние сутки — счётчик в меню.
      */

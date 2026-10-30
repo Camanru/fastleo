@@ -9,7 +9,7 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Без данных людей и без `$mcp`/`$mcpPersonalData` — открыт агенту.
+ * Без `$mcp` — открыт агенту.
  */
 final class PlainResource extends Resource
 {

@@ -219,8 +219,9 @@ final class ResourceController
         }
 
         $fields = $resource->writableFields($existing);
+        $input = $existing instanceof Model ? $request->all() : RecordWriter::withDefaults($fields, $request->all());
         $validator = validator(
-            RecordWriter::controllingInput($resource, $existing, $request->all()),
+            RecordWriter::controllingInput($resource, $existing, $input),
             RecordWriter::rules($resource, $existing, $fields),
             ValidationMessages::all(),
             $resource->validationAttributes($existing),
@@ -232,7 +233,7 @@ final class ResourceController
         }
 
         try {
-            RecordWriter::write($resource, $record, $fields, RecordWriter::inInputOrder($validator->validated(), $request->all()));
+            RecordWriter::write($resource, $record, $fields, RecordWriter::inInputOrder($validator->validated(), $input));
         } catch (QueryException $exception) {
             return redirect($formUrl)->withInput($request->except($this->secretInputs($resource)))->with('fastleo.error', DatabaseErrors::explain($exception));
         } catch (OperationCancelled) {

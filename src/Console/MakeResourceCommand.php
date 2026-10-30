@@ -277,7 +277,7 @@ final class MakeResourceCommand extends Command
             $code .= '->required()';
         }
 
-        if (in_array($class, ['Gallery', 'RichText'], true)) {
+        if ($class === 'Gallery') {
             $code .= '->hideInList()';
         }
 

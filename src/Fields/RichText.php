@@ -26,6 +26,9 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
  */
 class RichText extends Field
 {
+    /** Длинный текст в списке не показывается столбцом; `showInList()` вернёт начало текста. */
+    protected bool $showInList = false;
+
     /** Высота редактора в пикселях. */
     protected int $height = 400;
 

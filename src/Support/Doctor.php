@@ -27,6 +27,7 @@ use Fastleo\Fields\Slug;
 use Fastleo\Fields\Tags;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
+use Fastleo\Imports\ImportRecords;
 use Fastleo\Messengers\ChatIds;
 use Fastleo\Resource;
 use Fastleo\Settings;
@@ -35,10 +36,13 @@ use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\Html\HtmlLoss;
 use Fastleo\Support\Html\RichTextSettings;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
+use ReflectionClass;
 use ReflectionMethod;
+use ReflectionProperty;
 use Throwable;
 
 /**
@@ -99,12 +103,19 @@ final class Doctor
             }
         }
 
+        $importable = false;
+
         foreach (array_keys($resources) as $slug) {
             $resource = $registry->find($slug);
 
             if ($resource instanceof \Fastleo\Resource) {
                 $this->resource($resource);
+                $importable = $importable || $resource::isImportable();
             }
+        }
+
+        if ($importable) {
+            $this->importTimeout();
         }
 
         foreach (array_keys($settings) as $slug) {
@@ -116,6 +127,21 @@ final class Doctor
         }
 
         return $this->problems;
+    }
+
+    /**
+     * Импорт из файла идёт задачей до часа; если `retry_after` очереди не больше, очередь выдаст ту же задачу второму
+     * обработчику, пока первая работает, и импорт упадёт. Проверяется только при очереди с `retry_after` (database, redis, beanstalkd).
+     */
+    private function importTimeout(): void
+    {
+        $connection = config('queue.default');
+        $retryAfter = is_string($connection) ? config('queue.connections.'.$connection.'.retry_after') : null;
+        $timeout = new ReflectionClass(ImportRecords::class)->getAttributes(Timeout::class)[0]->newInstance()->timeout;
+
+        if (is_numeric($retryAfter) && (int) $retryAfter <= $timeout) {
+            $this->add('warning', 'site', 'queue_retry_after', ['retry_after' => (string) (int) $retryAfter, 'timeout' => (string) $timeout], 'queue_retry_after_hint');
+        }
     }
 
     /**
@@ -553,6 +579,28 @@ final class Doctor
             }
         } catch (Throwable $e) {
             $this->add('error', $scope, 'relation', ['field' => $field->name, 'message' => $e->getMessage()]);
+
+            return;
+        }
+
+        if ($field instanceof BelongsTo || $field instanceof BelongsToMany) {
+            $this->remoteOptions($field, $scope);
+        }
+    }
+
+    /**
+     * Связанных записей больше `fastleo.relations.preload`: вместо списка вариантов форма и фильтр ищут по серверу.
+     */
+    private function remoteOptions(BelongsTo|BelongsToMany $field, string $scope): void
+    {
+        try {
+            $remote = $field->isRemote();
+        } catch (Throwable) {
+            return; // нет таблицы или связь не собирается — это уже показано ошибкой
+        }
+
+        if ($remote) {
+            $this->add('warning', $scope, 'relation_remote', ['field' => $field->name, 'limit' => (string) config()->integer('fastleo.relations.preload', 100)], 'relation_remote_hint');
         }
     }
 
@@ -653,12 +701,17 @@ final class Doctor
     }
 
     /**
-     * Длина текста поля против длины строки в базе: Text — по `maxLength()`, Textarea — по нему же или «без ограничения».
+     * Длина текста поля против длины строки в базе: Text — по `maxLength()` (и обратно: предел не менялся, а колонка шире), Textarea — по нему же или «без ограничения».
      */
     private function textLength(Field $field, int $columnLength, string $scope): void
     {
         if ($field instanceof Text && $field->getMaxLength() > $columnLength) {
             $this->add('warning', $scope, 'max_length', ['field' => $field->name, 'length' => $field->getMaxLength(), 'column' => $columnLength], 'max_length_hint');
+        }
+
+        // Предел 255 по умолчанию не меняли, а колонка шире: длинные значения поле не пропустит. Свой предел класса (32 у Tel) — намеренный.
+        if ($field instanceof Text && $field->getMaxLength() === 255 && $columnLength > 255 && new ReflectionProperty($field, 'maxLength')->getDefaultValue() === 255) {
+            $this->add('warning', $scope, 'max_length_short', ['field' => $field->name, 'length' => $field->getMaxLength(), 'column' => $columnLength], 'max_length_short_hint');
         }
 
         if ($field instanceof Textarea) {

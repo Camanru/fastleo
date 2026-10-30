@@ -459,6 +459,10 @@ return [
     |                или 'https://хост/путь?'.
     | styles       — true: оставлять style целиком (без url(), expression,
     |                position: fixed), а не один text-align.
+    | content_css  — таблицы стилей сайта для области редактирования
+    |                (логотипы, шрифты), списком: ['/css/app.css', 'https://хост/путь.css'].
+    | content_style — свои правила CSS для области редактирования:
+    |                'img { max-height: 4rem; }'.
     |
     */
 
@@ -467,6 +471,8 @@ return [
         'attributes' => [],
         'iframe_hosts' => [],
         'styles' => false,
+        'content_css' => [],
+        'content_style' => null,
     ],
 
 ];

@@ -88,7 +88,7 @@ final class DashboardController
     }
 
     /**
-     * Очистить кеш сайта (`optimize:clear`) и сообщить, сколько места освободилось.
+     * Очистить кеш приложения, шаблонов и список разделов (`CacheCleaner`, без кеша конфигурации и маршрутов) и сообщить, сколько места освободилось.
      */
     public function clearCache(): RedirectResponse
     {

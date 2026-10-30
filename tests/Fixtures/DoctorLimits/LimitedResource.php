@@ -7,6 +7,7 @@ namespace Fastleo\Tests\Fixtures\DoctorLimits;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Slug;
+use Fastleo\Fields\Tel;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
 use Fastleo\Resource;
@@ -34,6 +35,8 @@ final class LimitedResource extends Resource
             Slug::make('slug'),
             Select::make('kind')->options(['a' => 'A', 'z' => 'Z'])->required(),
             Text::make('status')->readonly(),
+            Text::make('title'),
+            Tel::make('phone'),
         ];
     }
 }

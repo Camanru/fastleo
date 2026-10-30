@@ -63,9 +63,6 @@ final class ArticleResource extends Resource
 
     protected static bool $importable = true;
 
-    /** В демо раздел открыт ИИ-агенту явно: в нём есть Email и Tel, а такие разделы по умолчанию закрыты от MCP. */
-    protected static bool $mcpPersonalData = true;
-
     protected static ?string $label = 'Статьи';
 
     protected static ?string $singular = 'Статья';
@@ -109,7 +106,7 @@ final class ArticleResource extends Resource
                     Tags::make('keywords', 'Ключевые слова')->suggestions(['акция', 'новинка', 'обзор'])->hideInList(),
                 ]),
                 Tab::make('Содержание', [
-                    RichText::make('content', 'Текст статьи')->hideInList(),
+                    RichText::make('content', 'Текст статьи'),
                     Markdown::make('body', 'Краткое описание (Markdown)')->hideInList(),
                     Code::make('head_code', 'Код в <head>')->rows(6)->help('Вставляется на страницу статьи без изменений')->hideInList(),
                 ]),

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
+use Workbench\App\Models\Category;
 
 beforeEach(function (): void {
     // Публичная папка и кеш — во временной папке: общий каркас Testbench читают параллельные процессы тестов.
@@ -24,7 +25,7 @@ beforeEach(function (): void {
     File::copyDirectory(Assets::distPath(), $this->sandbox.'/public/vendor/fastleo');
     $this->app->usePublicPath($this->sandbox.'/public');
     $this->app->useBootstrapPath($this->sandbox.'/bootstrap');
-    config(['queue.default' => 'database']);
+    config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 4000]);
 });
 
 afterEach(function (): void {
@@ -187,6 +188,40 @@ it('warns about a stale resource cache and accepts a fresh one', function (): vo
     expect(messages('site', 'warning'))->toBe([]);
 });
 
+it('warns that the queue hands an import to a second worker while the first still runs it', function (): void {
+    $message = 'Очередь выдаёт задачу повторно через 90 с (retry_after), а импорт из файла может идти до 3600 с';
+
+    config(['queue.connections.database.retry_after' => 90]);
+    expect(messages('site', 'warning')[0] ?? '')->toContain($message);
+
+    config(['queue.connections.database.retry_after' => 3600]);
+    expect(messages('site', 'warning')[0] ?? '')->toContain('через 3600 с');
+
+    config(['queue.connections.database.retry_after' => 3601]);
+    expect(messages('site', 'warning'))->toBe([]);
+
+    config(['queue.default' => 'sync', 'queue.connections.database.retry_after' => 90]);
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('retry_after');
+});
+
+it('says when a relation list switches to the search on the server', function (): void {
+    Category::factory()->count(3)->create();
+
+    expect(implode("\n", messages('articles', 'warning')))->not->toContain('relations.preload');
+
+    config(['fastleo.relations.preload' => 2]);
+
+    expect(implode("\n", messages('articles', 'warning')))
+        ->toContain('Поле «category_id»: связанных записей больше 2 (fastleo.relations.preload) — вместо списка вариантов форма и фильтр показывают поиск по серверу');
+});
+
+it('does not check the queue timeout on a site without imports', function (): void {
+    useFixtureResources('Doctor');
+    config(['queue.connections.database.retry_after' => 90]);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('retry_after');
+});
+
 it('accepts a fresh resource cache when SoftNetica and site closing are on', function (): void {
     config(['fastleo.softnetica.enabled' => true, 'fastleo.closing.enabled' => true]);
 
@@ -217,6 +252,14 @@ describe('columns against the rules of the fields', function (): void {
         expect($warnings)->toContain('Поле «code» допускает 100 символов, а колонка в базе — 20')
             ->and($warnings)->toContain('Поле «note» не ограничивает длину текста, а колонка в базе вмещает только 20 символов');
     });
+
+    it('warns when a text field keeps the default limit but the column holds more', function (): void {
+        $warnings = implode("\n", messages('limited', 'warning'));
+
+        expect($warnings)->toContain('Поле «title» не пропускает текст длиннее 255 символов, а колонка в базе вмещает 500.')
+            ->and($warnings)->not->toContain('Поле «code» не пропускает')
+            ->and($warnings)->not->toContain('Поле «phone»');
+    })->skip(fn (): bool => DB::getDriverName() === 'sqlite', 'SQLite не сообщает длину строки');
 
     it('does not compare the length of a field that is never written', function (): void {
         expect(implode("\n", messages('limited', 'warning')))->toContain('Поле «code» допускает 100 символов')
@@ -350,6 +393,60 @@ describe('markup of the RichText field', function (): void {
         config(['fastleo.rich_text.attributes' => ['onclick']]);
 
         expect(implode("\n", messages('site', 'error')))->toContain('Настройка fastleo.rich_text недопустима');
+    });
+
+    it('lists the records the cleaning will change, literally, with a piece of text before and after', function (): void {
+        DB::table('doctor_rich_notes')->insert(['body' => '<p>Скидка &l до <img src="/a.jpg" alt="" decoding="async"></p>']);
+
+        $code = Artisan::call('fastleo:doctor --sanitize-diff --json');
+        $report = collect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['fields']);
+        $notes = $report->firstWhere('resource', 'rich-notes');
+
+        expect($code)->toBe(0)
+            ->and($notes)->toMatchArray(['field' => 'body', 'checked' => 3, 'changed' => 2])
+            ->and($notes['records'])->toHaveCount(2)
+            ->and($notes['records'][0])->toMatchArray(['key' => '1', 'locale' => null])
+            ->and($notes['records'][0]['before'])->toStartWith('<div class="uk-h3"')
+            ->and($notes['records'][1]['key'])->toBe('4')
+            ->and($notes['records'][1]['before'])->toContain('&l до')
+            ->and($notes['records'][1]['after'])->toContain('&amp;l до');
+    });
+
+    it('prints the records of the diff for a person and stays silent about unchanged fields', function (): void {
+        $this->artisan('fastleo:doctor --sanitize-diff')
+            ->expectsOutputToContain('[rich-notes] поле «body»: при сохранении изменится 1 из 2 записей с текстом.')
+            ->expectsOutputToContain('было:')
+            ->expectsOutputToContain('станет:')
+            ->assertSuccessful();
+
+        config([
+            'fastleo.rich_text.tags' => ['div'],
+            'fastleo.rich_text.attributes' => ['class', 'role', 'data-lpu'],
+            'fastleo.rich_text.iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+        ]);
+
+        Artisan::call('fastleo:doctor --sanitize-diff --json');
+        $resources = collect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['fields'])->pluck('resource');
+
+        expect($resources)->not->toContain('rich-notes');
+    });
+
+    it('shows only the first records of a long list but counts them all', function (): void {
+        DB::table('doctor_rich_notes')->insert(array_fill(0, 60, ['body' => '<div class="x">текст</div>']));
+
+        Artisan::call('fastleo:doctor --sanitize-diff --json');
+        $notes = collect(json_decode(Artisan::output(), true, flags: JSON_THROW_ON_ERROR)['fields'])->firstWhere('resource', 'rich-notes');
+
+        expect($notes['changed'])->toBe(61)
+            ->and($notes['records'])->toHaveCount(50);
+    });
+
+    it('fails with the reason when the rich_text setting is not allowed', function (): void {
+        config(['fastleo.rich_text.attributes' => ['onclick']]);
+
+        $this->artisan('fastleo:doctor --sanitize-diff')
+            ->expectsOutputToContain('Настройка fastleo.rich_text недопустима')
+            ->assertFailed();
     });
 });
 

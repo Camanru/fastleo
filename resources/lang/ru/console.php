@@ -40,7 +40,6 @@ return [
     'inspect_not_found' => 'Раздела «:slug» нет. Доступные адреса: :list.',
     'inspect_mcp_open' => 'виден ИИ-агенту',
     'inspect_mcp_closed' => 'закрыт ($mcp = false)',
-    'inspect_mcp_personal' => 'закрыт: поле «:field» — данные людей; открыть: protected static bool $mcpPersonalData = true',
     'inspect_section' => ':label (:slug) — :class',
     'inspect_page' => 'Страница :label (:slug)',
     'make_class_name' => 'Имя класса латиницей, например Report',

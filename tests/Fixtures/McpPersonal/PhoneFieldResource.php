@@ -10,7 +10,7 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Поле типа Tel без `$mcpPersonalData` — раздел закрывается от MCP сам.
+ * Поле типа Tel — раздел остаётся открытым для MCP.
  */
 final class PhoneFieldResource extends Resource
 {

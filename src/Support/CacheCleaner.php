@@ -10,8 +10,10 @@ use Illuminate\Support\Facades\Gate;
 use Symfony\Component\Finder\Finder;
 
 /**
- * Очистка кеша сайта кнопкой на дашборде: `php artisan optimize:clear` (кеш приложения, конфигурации, маршрутов,
- * событий, шаблонов и список разделов fastleo). Размер освобождаемого места считается заранее.
+ * Очистка кеша сайта кнопкой на дашборде: кеш приложения (`cache:clear`), скомпилированные шаблоны (`view:clear`)
+ * и список разделов fastleo (`fastleo:clear`). Кеши конфигурации, маршрутов и событий не трогаются: `optimize:clear`
+ * убрал бы их с боевого сайта до следующего деплоя и замедлил бы его (на сервере без `.env` — ещё и уронил бы).
+ * Размер освобождаемого места считается заранее.
  *
  * Кеш Redis, базы данных и т. п. в размер не входит — считаются только файлы на диске сайта.
  */
@@ -60,7 +62,9 @@ final class CacheCleaner
     {
         $size = self::size();
 
-        Artisan::call('optimize:clear');
+        foreach (['cache:clear', 'view:clear', 'fastleo:clear'] as $command) {
+            Artisan::call($command);
+        }
 
         return $size;
     }
@@ -83,18 +87,13 @@ final class CacheCleaner
     }
 
     /**
-     * Файлы кеша внутри `bootstrap/cache`.
+     * Файл списка разделов в `bootstrap/cache` (остальные кеши этой папки кнопка не трогает).
      *
      * @return list<string>
      */
     private static function files(): array
     {
-        return [
-            app()->getCachedConfigPath(),
-            app()->getCachedRoutesPath(),
-            app()->getCachedEventsPath(),
-            Fastleo::resources()->cachePath(),
-        ];
+        return [Fastleo::resources()->cachePath()];
     }
 
     /**

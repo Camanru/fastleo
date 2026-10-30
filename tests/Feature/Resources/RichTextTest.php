@@ -6,6 +6,10 @@ use Fastleo\Fastleo;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\RichText;
 use Fastleo\Support\Assets;
+use Fastleo\Support\Html\RichTextSettings;
+use Fastleo\Tests\Fixtures\Fields\SiteRichText;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\View;
 use Workbench\App\Models\Article;
 
 beforeEach(function (): void {
@@ -84,8 +88,71 @@ it('shows the beginning of the text without tags in the list', function (): void
         ->and($field->height(100)->getHeight())->toBe(150);
 });
 
+it('does not show the text as a list column unless asked', function (): void {
+    expect(RichText::make('content')->isVisibleInList())->toBeFalse()
+        ->and(RichText::make('content')->showInList()->isVisibleInList())->toBeTrue();
+});
+
 it('can be used inside blocks', function (): void {
     $schema = HasMany::make('links')->fields([RichText::make('title')])->forModel(Article::class)->schema();
 
     expect($schema->field('title'))->toBeInstanceOf(RichText::class);
+});
+
+it('gives the editor the site styles from fastleo.rich_text', function (): void {
+    config()->set('fastleo.rich_text.content_css', ['/css/site.css', 'https://cdn.example.com/site.css']);
+    config()->set('fastleo.rich_text.content_style', 'img { max-height: 4rem; }');
+
+    $this->get(route('fastleo.resources.create', 'articles'))
+        ->assertOk()
+        ->assertSee('contentCss\u0022:[\u0022', false)
+        ->assertSee('site.css\u0022,\u0022https:', false)
+        ->assertSee('cdn.example.com', false)
+        ->assertSee('contentStyle\u0022:\u0022img { max-height: 4rem; }\u0022', false);
+});
+
+it('gives the editor no site styles by default', function (): void {
+    $this->get(route('fastleo.resources.create', 'articles'))
+        ->assertOk()
+        ->assertSee('contentCss\u0022:[],\u0022contentStyle\u0022:null', false);
+});
+
+it('rejects an unsafe editor style setting', function (string $key, mixed $value): void {
+    config()->set('fastleo.rich_text.'.$key, $value);
+
+    expect(RichTextSettings::validate(...))->toThrow(LogicException::class, 'fastleo.rich_text.'.$key);
+})->with([
+    'protocol-relative address' => ['content_css', ['//evil.example.com/a.css']],
+    'plain http address' => ['content_css', ['http://example.com/a.css']],
+    'relative address' => ['content_css', ['css/a.css']],
+    'address with a quote' => ['content_css', ['/a.css"onload=x']],
+    'backslash address' => ['content_css', ['/\\evil.example.com/a.css']],
+    'not a string address' => ['content_css', [123]],
+    'closing tag in style' => ['content_style', 'a{}</style><script>x</script>'],
+    'array as style' => ['content_style', ['a{}']],
+]);
+
+it('takes the template of a subclass from the site folder and falls back to the package one', function (): void {
+    $dir = sys_get_temp_dir().'/fastleo-view-'.getmypid().'-'.uniqid();
+    File::ensureDirectoryExists($dir.'/fastleo/fields');
+    View::getFinder()->prependLocation($dir);
+
+    try {
+        expect(new SiteRichText('content')->view())->toBe('fastleo::fields.rich-text');
+
+        File::put($dir.'/fastleo/fields/site-rich-text.blade.php', 'site template');
+
+        $field = new SiteRichText('content');
+
+        expect($field->view())->toBe('fastleo.fields.site-rich-text')
+            ->and(view($field->view())->render())->toBe('site template');
+
+        // Шаблон сайта с именем поля пакета (своё поле `RichText`, сделанное make-field) поле пакета не подменяет.
+        File::put($dir.'/fastleo/fields/rich-text.blade.php', 'site rich text');
+
+        expect(RichText::make('content')->view())->toBe('fastleo::fields.rich-text')
+            ->and((new class('content') extends RichText {})->view())->toBe('fastleo::fields.rich-text');
+    } finally {
+        File::deleteDirectory($dir);
+    }
 });

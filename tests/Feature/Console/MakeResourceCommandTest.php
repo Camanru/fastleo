@@ -119,7 +119,8 @@ it('recognises pictures, files, a gallery and rich text by the column name', fun
         ->toContain("Image::make('cover', 'Cover')")
         ->toContain("File::make('attachment', 'Attachment')")
         ->toContain("Gallery::make('gallery', 'Gallery')->hideInList()")
-        ->toContain("RichText::make('content', 'Content')->hideInList()")
+        ->toContain("RichText::make('content', 'Content')")
+        ->not->toContain("RichText::make('content', 'Content')->hideInList()")
         ->toContain("Textarea::make('head_code', 'Head code')")
         ->and(generatedFields($this->sandbox.'/ArticleResource.php', $this->namespace.'\\ArticleResource'))->toMatchArray([
             'cover' => 'Image: nullable|string|FilePathRule',

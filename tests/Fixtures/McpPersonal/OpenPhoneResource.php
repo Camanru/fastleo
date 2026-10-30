@@ -10,15 +10,13 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Телефон есть, но сайт открыл раздел агенту явно.
+ * Телефон есть, раздел открыт агенту (данные людей сами раздел не закрывают).
  */
 final class OpenPhoneResource extends Resource
 {
     protected static string $model = Category::class;
 
     protected static ?string $slug = 'open-phone';
-
-    protected static bool $mcpPersonalData = true;
 
     public function fields(): array
     {

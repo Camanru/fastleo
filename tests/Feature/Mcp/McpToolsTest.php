@@ -16,7 +16,6 @@ use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Mcp\Tools\UpdateRecord;
 use Fastleo\Resources\UserResource;
 use Fastleo\Tests\Fixtures\McpPersonal\ClosedResource;
-use Fastleo\Tests\Fixtures\McpPersonal\OpenPhoneResource;
 use Fastleo\Tests\Fixtures\McpPersonal\PhoneFieldResource;
 use Fastleo\Tests\Fixtures\McpPersonal\PlainResource;
 use Fastleo\Tests\Fixtures\McpUsers\OpenUserResource;
@@ -417,30 +416,29 @@ it('removes nested records missing from the list only with --allow-delete', func
     expect($article->links()->pluck('title')->all())->toBe(['First']);
 });
 
-describe('sections with personal data', function (): void {
+describe('closing sections from the agent', function (): void {
     beforeEach(fn () => useFixtureResources('McpPersonal'));
 
-    it('closes sections with e-mail or phone fields by field type, by name, in repeaters and in blocks', function (): void {
+    it('keeps sections with e-mail and phone fields open and hides only those closed with $mcp = false', function (): void {
         $sections = mcp()->tool(ListResources::class)->assertHasNoErrors();
 
-        $sections->assertSee(['"resource":"plain"', '"resource":"open-phone"'])
-            ->assertDontSee(['"resource":"phone-field"', '"resource":"email-column"', '"resource":"nested-phone"', '"resource":"block-phone"', '"resource":"closed"']);
+        $sections->assertSee(['"resource":"plain"', '"resource":"open-phone"', '"resource":"phone-field"', '"resource":"email-column"', '"resource":"nested-phone"', '"resource":"block-phone"'])
+            ->assertDontSee('"resource":"closed"');
     });
 
-    it('does not open a closed section to any tool', function (string $slug): void {
-        mcp()->tool(DescribeResource::class, ['resource' => $slug])->assertHasErrors(['Раздела «'.$slug.'» нет']);
-        mcp()->tool(ListRecords::class, ['resource' => $slug])->assertHasErrors(['Раздела «'.$slug.'» нет']);
-        mcp()->tool(CreateRecord::class, ['resource' => $slug, 'values' => ['title' => 'x']])->assertHasErrors(['Раздела «'.$slug.'» нет']);
-    })->with(['phone-field', 'email-column', 'nested-phone', 'block-phone', 'closed']);
+    it('does not open a closed section to any tool', function (): void {
+        mcp()->tool(DescribeResource::class, ['resource' => 'closed'])->assertHasErrors(['Раздела «closed» нет']);
+        mcp()->tool(ListRecords::class, ['resource' => 'closed'])->assertHasErrors(['Раздела «closed» нет']);
+        mcp()->tool(CreateRecord::class, ['resource' => 'closed', 'values' => ['title' => 'x']])->assertHasErrors(['Раздела «closed» нет']);
+    });
 
-    it('lets the site open such a section with $mcpPersonalData = true', function (): void {
-        mcp()->tool(DescribeResource::class, ['resource' => 'open-phone'])->assertHasNoErrors();
+    it('opens a section with a phone field to the tools', function (): void {
+        mcp()->tool(DescribeResource::class, ['resource' => 'phone-field'])->assertHasNoErrors();
     });
 
     it('answers isAvailableInMcp() statically, as in 4.0.0', function (): void {
         expect(PlainResource::isAvailableInMcp())->toBeTrue()
-            ->and(OpenPhoneResource::isAvailableInMcp())->toBeTrue()
-            ->and(PhoneFieldResource::isAvailableInMcp())->toBeFalse()
+            ->and(PhoneFieldResource::isAvailableInMcp())->toBeTrue()
             ->and(ClosedResource::isAvailableInMcp())->toBeFalse();
     });
 

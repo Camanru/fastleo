@@ -69,13 +69,11 @@ it('prints readable tables without --json', function (): void {
 it('says whether the section is visible to an AI agent and why not', function (): void {
     useFixtureResources('McpPersonal');
 
-    expect(inspected('plain'))->toMatchArray(['mcp' => true, 'mcp_personal_field' => null])
-        ->and(inspected('phone-field'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => 'contact'])
-        ->and(inspected('nested-phone'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => 'contacts.number'])
-        ->and(inspected('closed'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => null])
-        ->and(inspected('open-phone'))->toMatchArray(['mcp' => true, 'mcp_personal_field' => null]);
+    expect(inspected('plain'))->toMatchArray(['mcp' => true])
+        ->and(inspected('phone-field'))->toMatchArray(['mcp' => true])
+        ->and(inspected('closed'))->toMatchArray(['mcp' => false])
+        ->and(inspected('closed'))->not->toHaveKey('mcp_personal_field');
 
-    $this->artisan('fastleo:inspect phone-field')->expectsOutputToContain('закрыт: поле «contact» — данные людей')->assertSuccessful();
     $this->artisan('fastleo:inspect closed')->expectsOutputToContain('закрыт ($mcp = false)')->assertSuccessful();
 });
 

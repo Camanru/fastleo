@@ -7,7 +7,7 @@ declare(strict_types=1);
  */
 
 return [
-    'rich_text_config' => 'Настройка fastleo.rich_text.:key: значение «:value» недопустимо. Теги и атрибуты — строчная латиница (атрибуты — с дефисом, без on*, x-*, hx-*, v-*, ng-*, srcdoc и style), нельзя script, style, form и другие опасные теги; iframe_hosts — начало адреса вида https://хост/путь/ или https://хост/путь?; style включается ключом styles => true.',
+    'rich_text_config' => 'Настройка fastleo.rich_text.:key: значение «:value» недопустимо. Теги и атрибуты — строчная латиница (атрибуты — с дефисом, без on*, x-*, hx-*, v-*, ng-*, srcdoc и style), нельзя script, style, form и другие опасные теги; iframe_hosts — начало адреса вида https://хост/путь/ или https://хост/путь?; style включается ключом styles => true; content_css — адреса /путь.css или https://хост/путь.css; content_style — строка CSS без «</».',
     'image_crop_ratio' => 'Image «:field»: пропорция обрезки «:ratio» должна быть в виде ширина:высота, например crop(\'3:4\') или crop(\'16:9\').',
     'image_preset_missing' => 'Размера картинок «:preset» нет в fastleo.images.presets. Добавьте его: \':preset\' => [\'widths\' => [400, 800], \'ratio\' => \'4:3\'].',
     'image_preset_invalid' => 'Размер картинок «:preset» в fastleo.images.presets описан неверно: нужны widths — список ширин в пикселях (1–10000) и ratio — null или пропорция вида \'4:3\'.',

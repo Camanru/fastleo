@@ -126,6 +126,25 @@ php artisan fastleo:user admin@site.ru --name="Иван" --password="длинн�
 
 Интерфейс админки всегда на русском, даже если у сайта другая локаль.
 
+## Очередь на хостинге с одним cron
+
+Обычный хостинг не даёт держать `queue:work` постоянно, но cron там есть (он нужен и для `schedule:run`). Тогда очередь разбирает сам планировщик — в `routes/console.php`:
+
+```php
+use Illuminate\Support\Facades\Schedule;
+
+Schedule::command('queue:work --stop-when-empty --max-time=3600 --tries=1 --timeout=3600')
+    ->everyMinute()
+    ->withoutOverlapping(65)
+    ->runInBackground();
+```
+
+- `--stop-when-empty` — обработчик берёт накопившиеся задачи и завершается, следующий запуск будет через минуту; `--max-time=3600` — не дольше часа, даже если задачи всё идут;
+- `withoutOverlapping(65)` — пока предыдущий обработчик работает, второй не стартует (65 минут — чуть дольше самого долгого импорта);
+- `runInBackground()` — минутная задача не задерживает остальные задачи планировщика.
+
+Драйвер очереди — `database` (`QUEUE_CONNECTION=database`, таблица `jobs`: `php artisan make:queue-table && php artisan migrate`). **`retry_after` соединения должен быть больше самой долгой задачи.** Импорт из файла идёт до часа (`3600` с), а у соединения `database` по умолчанию `retry_after` — 90 с: через полторы минуты очередь решит, что обработчик завис, выдаст ту же задачу второй раз, и долгий импорт упадёт. Поставьте в `config/queue.php` (или `DB_QUEUE_RETRY_AFTER` в `.env`; у redis — `REDIS_QUEUE_RETRY_AFTER`) значение больше `3600`, например `3700`. `fastleo:doctor` предупреждает, если на сайте есть импорт, а `retry_after` не больше часа.
+
 ## Обновление
 
 ```bash

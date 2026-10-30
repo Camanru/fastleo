@@ -19,6 +19,8 @@ use LogicException;
  *     'attributes' => ['class', 'role', 'align', 'data-lpu'],
  *     'iframe_hosts' => ['https://prodoctorov.ru/'],
  *     'styles' => true,
+ *     'content_css' => ['/css/app.css'],
+ *     'content_style' => 'img { max-height: 4rem; }',
  * ],
  * ```
  */
@@ -76,6 +78,38 @@ final class RichTextSettings
     }
 
     /**
+     * Таблицы стилей сайта для области редактирования: `/css/app.css` или `https://хост/путь.css`.
+     *
+     * @return list<string>
+     *
+     * @throws LogicException недопустимая настройка
+     */
+    public static function contentCss(): array
+    {
+        return self::list('content_css', fn (string $url): bool => preg_match('#^(/(?![/\\\\])|https://[a-z0-9][a-z0-9.-]*\.[a-z]{2,}(:\d+)?/)[^\s"\'<>\\\\]*$#i', $url) === 1);
+    }
+
+    /**
+     * Свои правила CSS для области редактирования: `img { max-height: 4rem; }`; `null` — не задано.
+     *
+     * @throws LogicException недопустимая настройка
+     */
+    public static function contentStyle(): ?string
+    {
+        $style = config('fastleo.rich_text.content_style');
+
+        if ($style === null || $style === '') {
+            return null;
+        }
+
+        if (! is_string($style) || preg_match('#</#', $style) === 1) {
+            throw new LogicException(trans()->string('fastleo::exceptions.rich_text_config', ['key' => 'content_style', 'value' => is_scalar($style) ? (string) $style : gettype($style)], Fastleo::LOCALE));
+        }
+
+        return $style;
+    }
+
+    /**
      * Проверить все настройки сразу.
      *
      * @throws LogicException недопустимая настройка
@@ -85,6 +119,8 @@ final class RichTextSettings
         self::tags();
         self::attributes();
         self::iframeHosts();
+        self::contentCss();
+        self::contentStyle();
     }
 
     /**

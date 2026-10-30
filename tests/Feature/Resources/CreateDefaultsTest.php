@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Fields\Number;
 use Fastleo\Support\ModelDefaults;
+use Fastleo\Support\RecordWriter;
 use Fastleo\Tests\Fixtures\Models\DefaultedThing;
 
 beforeEach(function (): void {
@@ -49,6 +51,28 @@ it('saves what the admin entered, not the defaults', function (): void {
         ->assertRedirect();
 
     expect(DefaultedThing::query()->firstOrFail())->title->toBe('Своё')->is_active->toBeFalse();
+});
+
+it('fills a field the request did not send with its default() and keeps what was sent, even if empty', function (): void {
+    $this->post(route('fastleo.resources.store', 'defaulted'), ['is_active' => '1', 'title' => 'Своё', 'sort' => '5', 'kind' => 'k'])
+        ->assertRedirect();
+
+    expect(DefaultedThing::query()->firstOrFail())->is_hidden->toBeTrue();
+
+    $this->post(route('fastleo.resources.store', 'defaulted'), ['is_active' => '1', 'is_hidden' => '0', 'title' => 'Ещё', 'sort' => '5', 'kind' => 'k'])
+        ->assertRedirect();
+
+    expect(DefaultedThing::query()->where('title', 'Ещё')->firstOrFail())->is_hidden->toBeFalse();
+});
+
+it('lets a required field with a default() pass the check when the request did not send it', function (): void {
+    $fields = [Number::make('sort')->integer()->required()->default(0)];
+    $rules = RecordWriter::rules(Fastleo::resources()->find('defaulted'), null, $fields);
+
+    expect(validator([], $rules)->fails())->toBeTrue()
+        ->and(validator(RecordWriter::withDefaults($fields, []), $rules)->passes())->toBeTrue()
+        ->and(RecordWriter::withDefaults($fields, ['sort' => '']))->toBe(['sort' => ''])
+        ->and(RecordWriter::withDefaults([Number::make('other')->integer()], []))->toBe([]);
 });
 
 it('leaves a field empty when the column default does not fit the cast of the model, and the form still opens', function (): void {

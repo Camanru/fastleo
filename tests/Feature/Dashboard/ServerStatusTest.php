@@ -236,6 +236,23 @@ describe('clearing the cache', function (): void {
             ->and(file_exists(Fastleo::resources()->cachePath()))->toBeFalse();
     });
 
+    it('leaves the cache of config, routes and events alone', function (): void {
+        $kept = [app()->getCachedConfigPath(), app()->getCachedRoutesPath(), app()->getCachedEventsPath()];
+
+        foreach ($kept as $path) {
+            File::ensureDirectoryExists(dirname($path));
+            file_put_contents($path, '<?php return [];');
+        }
+
+        file_put_contents($this->sandbox.'/views/a.php', str_repeat('x', 100));
+
+        $this->post(route('fastleo.dashboard.clear-cache'))->assertRedirect(route('fastleo.dashboard'));
+
+        expect(array_map(file_exists(...), $kept))->toBe([true, true, true])
+            ->and(file_exists($this->sandbox.'/views/a.php'))->toBeFalse()
+            ->and(CacheCleaner::size())->toBe(0);
+    });
+
     it('can be closed with the clearFastleoCache gate', function (): void {
         file_put_contents($this->sandbox.'/views/a.php', 'x');
         Gate::define('clearFastleoCache', fn (User $user): bool => false);

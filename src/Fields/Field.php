@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use LogicException;
+use ReflectionClass;
 
 /**
  * Поле ресурса: как значение показывается в форме, проверяется, пишется в модель и выводится в списке.
@@ -981,26 +982,41 @@ abstract class Field
     }
 
     /**
-     * Blade-шаблон поля в форме: по типу поля, а у наследника без своего шаблона — шаблон ближайшего родителя
-     * (`SiteRichText extends RichText` берёт шаблон `rich-text`).
+     * Blade-шаблон поля в форме. Для класса поля и его родителей по очереди: у класса сайта — шаблон
+     * `resources/views/fastleo/fields/{тип}.blade.php` (сюда пишет `fastleo:make-field`), у класса пакета — шаблон
+     * пакета `fastleo::fields.{тип}`; первый найденный берётся. Поэтому `SiteRichText extends RichText` без своего
+     * шаблона берёт шаблон `rich-text`, а с файлом `fastleo/fields/site-rich-text.blade.php` — свой. Шаблон сайта
+     * с тем же именем, что у поля пакета (`fastleo/fields/image.blade.php` своего поля `Image`), поле пакета не трогает;
+     * заменить шаблон поля пакета на всём сайте — `resources/views/vendor/fastleo/fields/{тип}.blade.php`.
+     *
+     * Свой шаблон поля со скриптами подключает их сам: дополнить шаблон пакета — `@include('fastleo::fields.rich-text')`
+     * (у File — `fastleo::fields.file`), заменить целиком — скопировать из шаблона пакета блок `@pushOnce`
+     * (`fastleo-hugerte` у RichText, `fastleo-cropper` у File с обрезкой).
      */
     public function view(): string
     {
-        $own = 'fastleo::fields.'.$this->type();
-
-        if (view()->exists($own)) {
-            return $own;
-        }
-
-        foreach (class_parents($this) as $parent) {
-            $view = 'fastleo::fields.'.Str::kebab(class_basename($parent));
+        foreach ([static::class, ...class_parents($this)] as $class) {
+            $type = Str::kebab(class_basename($class));
+            $view = ($this->isPackageClass($class) ? 'fastleo::fields.' : 'fastleo.fields.').$type;
 
             if (view()->exists($view)) {
                 return $view;
             }
         }
 
-        return $own;
+        return 'fastleo::fields.'.$this->type();
+    }
+
+    /**
+     * Класс объявлен в самом пакете (файл внутри его `src`), а не на сайте.
+     *
+     * @param  class-string  $class
+     */
+    private function isPackageClass(string $class): bool
+    {
+        $file = new ReflectionClass($class)->getFileName();
+
+        return is_string($file) && str_starts_with($file, dirname(__DIR__).DIRECTORY_SEPARATOR);
     }
 
     /**

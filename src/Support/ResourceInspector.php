@@ -68,7 +68,6 @@ final class ResourceInspector
                 'importable' => $resource::isImportable(),
                 'import_key' => $resource::importKey(),
                 'mcp' => $resource->isAvailableInMcp(),
-                'mcp_personal_field' => $resource->mcpPersonalField(),
                 'fields' => $this->fields($resource->schema()->fields()),
                 'filters' => array_values(array_map($this->filter(...), $resource->listFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
