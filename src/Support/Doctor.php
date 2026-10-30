@@ -56,7 +56,7 @@ use Throwable;
 final class Doctor
 {
     /** Таблицы, которые создаёт пакет. */
-    private const array TABLES = ['fastleo_imports', 'fastleo_logins', 'fastleo_two_factor', 'fastleo_activity', 'fastleo_settings', 'fastleo_notifications', 'fastleo_notification_bots', 'fastleo_channels', 'fastleo_publications', 'fastleo_publication_deliveries'];
+    private const array TABLES = ['fastleo_imports', 'fastleo_logins', 'fastleo_two_factor', 'fastleo_activity', 'fastleo_settings', 'fastleo_notifications', 'fastleo_notification_bots', 'fastleo_channels', 'fastleo_publications', 'fastleo_publication_deliveries', 'fastleo_dashboard_layouts'];
 
     /** Сколько записей раздела проверять на потерю разметки в RichText. */
     private const int RICH_TEXT_ROWS = 500;

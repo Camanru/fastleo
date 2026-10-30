@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Fastleo\Widgets\DashboardLayout;
 use Illuminate\Support\Facades\Artisan;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Feedback;
@@ -34,4 +35,40 @@ it('asks before clearing the cache and cancels without clearing', function (): v
         ->click('#fastleo-confirm button[value=cancel]')
         ->assertScript("document.getElementById('fastleo-confirm').open", false)
         ->assertNoJavaScriptErrors();
+});
+
+it('customizes the layout: wider, hidden, saved per administrator and reset', function (): void {
+    $first = '.fastleo-dashboard > [data-widget]:nth-child(1)';
+    $second = '.fastleo-dashboard > [data-widget]:nth-child(2)';
+
+    $page = signInAndVisit(route('fastleo.dashboard'));
+
+    $page->assertMissing('[data-widget-bar]:not([style*="display: none"])')
+        ->click('[data-dashboard-edit]')
+        ->assertVisible($first.' [data-widget-bar]')
+        ->assertAttribute($first, 'data-cols', '1')
+        ->click($first.' [data-resize="cols-plus"]')
+        ->assertAttribute($first, 'data-cols', '2')
+        ->click($first.' [data-resize="rows-plus"]')
+        ->assertAttribute($first, 'data-rows', '2')
+        ->assertScript("document.querySelector('{$first} [data-resize=\"cols-minus\"]').disabled", false)
+        ->click($second.' [data-toggle-hidden]')
+        ->assertAttribute($second, 'data-hidden', 'true')
+        ->click('[data-dashboard-save]')
+        ->waitForEvent('networkidle')
+        ->assertAttribute($first, 'data-cols', '2')
+        ->assertAttribute($first, 'data-rows', '2')
+        ->assertScript("getComputedStyle(document.querySelector('{$second}')).display !== 'none' && document.querySelector('{$second}').dataset.hidden !== 'true'", false)
+        ->assertNoJavaScriptErrors();
+
+    expect(DashboardLayout::query()->count())->toBe(1);
+
+    $page->click('[data-dashboard-edit]')
+        ->click('[data-dashboard-toolbar] form button')
+        ->click('#fastleo-confirm [data-confirm-primary]')
+        ->waitForEvent('networkidle')
+        ->assertAttribute($first, 'data-cols', '1')
+        ->assertNoJavaScriptErrors();
+
+    expect(DashboardLayout::query()->count())->toBe(0);
 });

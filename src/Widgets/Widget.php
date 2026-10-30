@@ -7,6 +7,7 @@ namespace Fastleo\Widgets;
 use Closure;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Auth\Authenticatable;
+use InvalidArgumentException;
 use Throwable;
 
 /**
@@ -17,13 +18,22 @@ use Throwable;
  * (исключение попадает в лог).
  *
  * ```php
- * Stat::make('Заявки')->value(fn () => Lead::count())->columnSpan(2)->visible(fn ($user) => $user->is_owner);
+ * Stat::make('Заявки')->value(fn () => Lead::count())->columnSpan(2)->rowSpan(2)->visible(fn ($user) => $user->is_owner);
  * ```
+ *
+ * Размер задаёт сайт (`columnSpan()` — ширина, `rowSpan()` — высота), администратор может поменять его, порядок
+ * и скрыть виджет кнопкой «Настроить» на дашборде. Настройки администратора хранятся по ключу виджета (`key()`).
  */
 abstract class Widget
 {
     /** Ширина в колонках сетки (1–4). */
     protected int $span = 1;
+
+    /** Высота в строках сетки (1–4). */
+    protected int $rows = 1;
+
+    /** Постоянный ключ виджета; без него ключ строится из класса и заголовка. */
+    protected ?string $key = null;
 
     /** @var bool|Closure(?Authenticatable): bool */
     protected bool|Closure $visible = true;
@@ -44,6 +54,39 @@ abstract class Widget
     public function columnSpan(int $span): static
     {
         $this->span = max(1, min(4, $span));
+
+        return $this;
+    }
+
+    /**
+     * Высота в строках сетки: 1 — одна строка, 4 — четыре. Строка не ниже содержимого; на телефоне виджеты идут в столбик
+     * и высота не учитывается.
+     */
+    public function rowSpan(int $rows): static
+    {
+        $this->rows = max(1, min(4, $rows));
+
+        return $this;
+    }
+
+    /**
+     * Постоянный ключ виджета: по нему хранятся настройки администратора (порядок, размер, скрытие). Латиница в нижнем регистре,
+     * цифры и дефис, до 100 знаков. Без ключа он строится из класса и заголовка, и при смене заголовка настройки этого
+     * виджета сбрасываются к значениям из кода.
+     *
+     * ```php
+     * Stat::make('Заявки')->key('leads-today');
+     * ```
+     *
+     * @throws InvalidArgumentException недопустимый ключ
+     */
+    public function key(string $key): static
+    {
+        if (preg_match('/^[a-z0-9-]{1,100}$/', $key) !== 1) {
+            throw new InvalidArgumentException('Ключ виджета — латиница в нижнем регистре, цифры и дефис, до 100 знаков: '.$key);
+        }
+
+        $this->key = $key;
 
         return $this;
     }
@@ -74,6 +117,22 @@ abstract class Widget
     public function getSpan(): int
     {
         return $this->span;
+    }
+
+    /**
+     * Высота в строках.
+     */
+    public function getRows(): int
+    {
+        return $this->rows;
+    }
+
+    /**
+     * Заданный ключ (`key()`) или `null`.
+     */
+    public function getKey(): ?string
+    {
+        return $this->key;
     }
 
     /**

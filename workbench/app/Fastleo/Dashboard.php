@@ -17,7 +17,7 @@ use Workbench\App\Models\Article;
 use Workbench\App\Models\Feedback;
 
 /**
- * Демо-дашборд: числа, графики, последние обращения, плитки разделов и состояние сервера.
+ * Демо-дашборд: плитки друг под другом рядом с графиком (ширина и высота), графики, последние обращения, плитки разделов и состояние сервера.
  */
 final class Dashboard extends BaseDashboard
 {
@@ -33,12 +33,12 @@ final class Dashboard extends BaseDashboard
                 ->description(fn (): string => 'всего '.Article::query()->count())
                 ->icon('newspaper')
                 ->url(route('fastleo.resources.index', 'articles')),
+            Chart::make('Статьи по дням')->line()->label('Статей')->data(fn (): array => Chart::countByDay(Article::query()))->columnSpan(3)->rowSpan(2),
             Stat::make('Обращения')
                 ->value(fn (): int => Feedback::query()->count())
                 ->description(fn (): string => 'за неделю: '.Feedback::query()->where('created_at', '>=', now()->subWeek())->count())
                 ->icon('inbox')
                 ->url(route('fastleo.resources.index', 'feedback')),
-            Chart::make('Статьи по дням')->line()->label('Статей')->data(fn (): array => Chart::countByDay(Article::query()))->columnSpan(2),
             Chart::make('Статьи по статусам')->bar()->data(fn (): array => collect(ArticleStatus::cases())
                 ->mapWithKeys(fn (ArticleStatus $status): array => [$status->label() => Article::query()->where('status', $status)->count()])
                 ->all())->columnSpan(2),

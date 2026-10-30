@@ -1621,6 +1621,95 @@ Alpine.data('fastleoBlocks', ({ min, max, sortable }) => ({
 }));
 
 /**
+ * Дашборд: режим «Настроить» — порядок перетаскиванием, ширина и высота виджетов (1–4), скрытие.
+ * <div x-data="fastleoDashboard({ url })">: url — адрес сохранения раскладки (PUT); сетка — x-ref="grid", карточки —
+ * [data-widget] с data-key, data-cols, data-rows, data-hidden. Размеры меняются на странице сразу (CSS по data-атрибутам),
+ * на сервер уходят по «Сохранить»; «Отмена» перезагружает страницу.
+ */
+Alpine.data('fastleoDashboard', ({ url }) => ({
+    editing: false,
+    saving: false,
+    failed: false,
+    sortable: null,
+
+    init() {
+        this.sortable = Sortable.create(this.$refs.grid, {
+            handle: '[data-drag]',
+            animation: 150,
+            disabled: true,
+        });
+
+        this.cards().forEach((card) => this.refresh(card));
+    },
+
+    cards() {
+        return [...this.$refs.grid.querySelectorAll(':scope > [data-widget]')];
+    },
+
+    start() {
+        this.editing = true;
+        this.sortable.option('disabled', false);
+    },
+
+    cancel() {
+        window.location.reload();
+    },
+
+    resize(button, axis, step) {
+        const card = button.closest('[data-widget]');
+
+        card.dataset[axis] = String(Math.max(1, Math.min(4, Number(card.dataset[axis]) + step)));
+        this.refresh(card);
+    },
+
+    toggleHidden(button) {
+        const card = button.closest('[data-widget]');
+
+        card.dataset.hidden = card.dataset.hidden === 'true' ? 'false' : 'true';
+    },
+
+    // Числа размера и недоступные крайние кнопки (1 и 4).
+    refresh(card) {
+        ['cols', 'rows'].forEach((axis) => {
+            const value = Number(card.dataset[axis]);
+
+            card.querySelector(`[data-size="${axis}"]`).textContent = value;
+            card.querySelector(`[data-resize="${axis}-minus"]`).disabled = value <= 1;
+            card.querySelector(`[data-resize="${axis}-plus"]`).disabled = value >= 4;
+        });
+    },
+
+    async save() {
+        this.saving = true;
+        this.failed = false;
+
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': csrfToken() },
+                body: JSON.stringify({
+                    widgets: this.cards().map((card) => ({
+                        key: card.dataset.key,
+                        cols: Number(card.dataset.cols),
+                        rows: Number(card.dataset.rows),
+                        hidden: card.dataset.hidden === 'true',
+                    })),
+                }),
+            });
+
+            if (!response.ok) {
+                throw new Error(String(response.status));
+            }
+
+            window.location.reload();
+        } catch {
+            this.failed = true;
+            this.saving = false;
+        }
+    },
+}));
+
+/**
  * Список раздела: сворачивание веток дерева (localStorage) и перетаскивание строк ручного порядка.
  * <div x-data="fastleoList({ key, url, tree })">: строки — <tr data-record data-parent data-ancestors>.
  * Строку можно бросить только среди соседей (тот же родитель); сервер получает before/after.

@@ -54,6 +54,8 @@ Route::group([
         Route::post('logout', [AuthController::class, 'destroy'])->name('logout');
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::post('clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
+        Route::put('dashboard/layout', [DashboardController::class, 'saveLayout'])->name('dashboard.layout.save');
+        Route::delete('dashboard/layout', [DashboardController::class, 'resetLayout'])->name('dashboard.layout.reset');
         Route::post('markdown', MarkdownPreviewController::class)->name('markdown');
 
         $slugPattern = '[a-z0-9]+(?:-[a-z0-9]+)*';

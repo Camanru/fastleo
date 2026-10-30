@@ -16,7 +16,7 @@ use Override;
 final class {{ class }} extends FastleoDashboard
 {
     /**
-     * Виджеты в порядке показа (ширина — `columnSpan()`).
+     * Виджеты в порядке показа (ширина — `columnSpan()`, высота — `rowSpan()`).
      */
     #[Override]
     public function widgets(): array
