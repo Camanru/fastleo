@@ -1,21 +1,25 @@
 {{-- Дашборд: приветствие и сетка виджетов. $widgets — список [widget, key, cols, rows, hidden, data]. --}}
 <x-fastleo::layouts.app :title="__('fastleo::dashboard.title')" :description="__('fastleo::dashboard.welcome', ['name' => auth()->user()?->getAttribute('name')])">
 
+    <x-slot:actions></x-slot:actions>
+
     <x-fastleo::flash />
 
     <div x-data="fastleoDashboard({ url: @js(route('fastleo.dashboard.layout.save')) })">
-        <div class="mb-3 flex flex-wrap items-center justify-end gap-2">
-            <x-fastleo::button variant="ghost" size="sm" icon="layout-grid" x-show="! editing" x-on:click="start()" data-dashboard-edit>{{ __('fastleo::dashboard.customize') }}</x-fastleo::button>
+        <template x-teleport="#fastleo-page-actions">
+            <div class="flex flex-wrap items-center gap-2">
+                <x-fastleo::button variant="ghost" icon="layout-grid" x-show="! editing" x-on:click="start()" data-dashboard-edit>{{ __('fastleo::dashboard.customize') }}</x-fastleo::button>
 
-            <div x-show="editing" x-cloak class="flex flex-wrap items-center gap-2" data-dashboard-toolbar>
-                <p class="text-sm text-danger" role="alert" x-show="failed" x-cloak>{{ __('fastleo::dashboard.layout_failed') }}</p>
-                <x-fastleo::action-form :action="route('fastleo.dashboard.layout.reset')" method="DELETE" :confirm="__('fastleo::dashboard.layout_reset_confirm')" :button="__('fastleo::dashboard.layout_reset')" :danger="false">
-                    <x-fastleo::button variant="ghost" size="sm" icon="rotate-ccw" type="submit">{{ __('fastleo::dashboard.layout_reset') }}</x-fastleo::button>
-                </x-fastleo::action-form>
-                <x-fastleo::button size="sm" x-on:click="cancel()" data-dashboard-cancel>{{ __('fastleo::dashboard.layout_cancel') }}</x-fastleo::button>
-                <x-fastleo::button variant="primary" size="sm" icon="check" x-on:click="save()" x-bind:aria-busy="saving" data-dashboard-save>{{ __('fastleo::dashboard.layout_save') }}</x-fastleo::button>
+                <div x-show="editing" x-cloak class="flex flex-wrap items-center gap-2" data-dashboard-toolbar>
+                    <p class="text-sm text-danger" role="alert" x-show="failed" x-cloak>{{ __('fastleo::dashboard.layout_failed') }}</p>
+                    <x-fastleo::action-form :action="route('fastleo.dashboard.layout.reset')" method="DELETE" :confirm="__('fastleo::dashboard.layout_reset_confirm')" :button="__('fastleo::dashboard.layout_reset')" :danger="false">
+                        <x-fastleo::button variant="ghost" icon="rotate-ccw" type="submit">{{ __('fastleo::dashboard.layout_reset') }}</x-fastleo::button>
+                    </x-fastleo::action-form>
+                    <x-fastleo::button x-on:click="cancel()" data-dashboard-cancel>{{ __('fastleo::dashboard.layout_cancel') }}</x-fastleo::button>
+                    <x-fastleo::button variant="primary" icon="check" x-on:click="save()" x-bind:aria-busy="saving" data-dashboard-save>{{ __('fastleo::dashboard.layout_save') }}</x-fastleo::button>
+                </div>
             </div>
-        </div>
+        </template>
 
         <div class="fastleo-dashboard" x-ref="grid" x-bind:data-editing="editing ? '' : null" data-dashboard>
             @foreach ($widgets as $item)

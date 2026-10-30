@@ -26,32 +26,33 @@
             {{ __('fastleo::resources.dirty') }}
         </span>
     </x-slot:badge>
-    <div class="flex flex-wrap items-center gap-2" x-data="fastleoActions({ open: @js($recordActions !== [] ? session('fastleo.action') : null), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
-        @if ($recordActions !== [])
-            @include('fastleo::actions.forms', ['actions' => $recordActions])
-        @endif
-        <div class="flex-1"></div>
-        @include('fastleo::actions.buttons')
-        @if ($editing && $resource::logsActivity() && \Fastleo\Activity\ActivityRecorder::isEnabled() && \Fastleo\Support\Authorization::allows('viewAny', $resource))
-            <x-fastleo::button variant="ghost" icon="history" :href="route('fastleo.resources.history', [$slug, $record->getKey()])">{{ __('fastleo::activity.history') }}</x-fastleo::button>
-        @endif
-        @if ($siteUrl)
-            <x-fastleo::button variant="ghost" icon="external-link" :href="$siteUrl" target="_blank" rel="noopener">
-                {{ __('fastleo::resources.open_on_site') }}
-            </x-fastleo::button>
-        @endif
-        @if ($canDelete)
-            <x-fastleo::action-form
-                :action="route('fastleo.resources.destroy', [$slug, $record->getKey()])"
-                method="DELETE"
-                :confirm="__($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')"
-            >
-                <x-fastleo::button type="submit" variant="danger-soft" icon="trash-2">
-                    {{ __('fastleo::resources.delete') }}
+    <x-slot:actions>
+        <div class="flex flex-wrap items-center gap-2" x-data="fastleoActions({ open: @js($recordActions !== [] ? session('fastleo.action') : null), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
+            @if ($recordActions !== [])
+                @include('fastleo::actions.forms', ['actions' => $recordActions])
+            @endif
+            @include('fastleo::actions.buttons')
+            @if ($editing && $resource::logsActivity() && \Fastleo\Activity\ActivityRecorder::isEnabled() && \Fastleo\Support\Authorization::allows('viewAny', $resource))
+                <x-fastleo::button variant="ghost" icon="history" :href="route('fastleo.resources.history', [$slug, $record->getKey()])">{{ __('fastleo::activity.history') }}</x-fastleo::button>
+            @endif
+            @if ($siteUrl)
+                <x-fastleo::button variant="ghost" icon="external-link" :href="$siteUrl" target="_blank" rel="noopener">
+                    {{ __('fastleo::resources.open_on_site') }}
                 </x-fastleo::button>
-            </x-fastleo::action-form>
-        @endif
-    </div>
+            @endif
+            @if ($canDelete)
+                <x-fastleo::action-form
+                    :action="route('fastleo.resources.destroy', [$slug, $record->getKey()])"
+                    method="DELETE"
+                    :confirm="__($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')"
+                >
+                    <x-fastleo::button type="submit" variant="danger-soft" icon="trash-2">
+                        {{ __('fastleo::resources.delete') }}
+                    </x-fastleo::button>
+                </x-fastleo::action-form>
+            @endif
+        </div>
+    </x-slot:actions>
 
     <x-fastleo::flash />
 

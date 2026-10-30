@@ -13,6 +13,7 @@
     ];
 @endphp
 <x-dynamic-component :component="$picker ? 'fastleo::layouts.frame' : 'fastleo::layouts.app'" :title="__('fastleo::files.title')">
+    <x-slot:actions></x-slot:actions>
     <div
         x-data="fastleoFiles"
         data-folder="{{ $folder }}"
@@ -31,8 +32,9 @@
         @drop.prevent="drop($event)"
         data-files
     >
-        <div class="flex flex-wrap items-center gap-2">
-            <nav aria-label="{{ __('fastleo::files.title') }}" @class(['flex min-w-0 flex-1 flex-wrap items-center gap-1 text-sm', 'invisible' => count($breadcrumbs) < 2 && ! $picker])>
+        {{-- Вне окна выбора кнопки уходят в шапку страницы (x-teleport), а строка остаётся только для крошек вложенной папки. --}}
+        <div @class(['flex flex-wrap items-center gap-2', 'hidden' => count($breadcrumbs) < 2 && ! $picker])>
+            <nav aria-label="{{ __('fastleo::files.title') }}" class="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-sm">
                 @foreach ($breadcrumbs as $crumb)
                     @if (! $loop->first)
                         <x-fastleo::icon name="chevron-right" class="size-4 shrink-0 text-ink-3" />
@@ -45,25 +47,29 @@
                 @endforeach
             </nav>
 
-            <label class="relative w-full sm:w-56">
-                <span class="sr-only">{{ __('fastleo::files.filter') }}</span>
-                <x-fastleo::icon name="search" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
-                <input type="search" x-model="query" placeholder="{{ __('fastleo::files.filter') }}" class="fastleo-input pl-9" data-files-filter>
-            </label>
+            @unless ($picker)<template x-teleport="#fastleo-page-actions">@endunless
+            <div class="flex flex-wrap items-center gap-2" data-files-toolbar>
+                <label class="relative w-full sm:w-56">
+                    <span class="sr-only">{{ __('fastleo::files.filter') }}</span>
+                    <x-fastleo::icon name="search" class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-3" />
+                    <input type="search" x-model="query" placeholder="{{ __('fastleo::files.filter') }}" class="fastleo-input pl-9" data-files-filter>
+                </label>
 
-            <x-fastleo::button icon="folder-plus" @click="folderOpen = ! folderOpen; $nextTick(() => $refs.folderName?.focus())">{{ __('fastleo::files.new_folder') }}</x-fastleo::button>
+                <x-fastleo::button icon="folder-plus" @click="folderOpen = ! folderOpen; $nextTick(() => $refs.folderName?.focus())">{{ __('fastleo::files.new_folder') }}</x-fastleo::button>
 
-            <label class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-btn bg-primary px-3.5 text-base font-[550] whitespace-nowrap text-white shadow-[inset_0_1px_0_rgb(255_255_255/.16),0_1px_2px_rgb(0_0_0/.12)] hover:bg-primary-hover focus-within:shadow-[0_0_0_3px_var(--color-ring)]" :class="uploading && 'opacity-60 pointer-events-none'">
-                <x-fastleo::icon name="upload" class="size-4 shrink-0" />
-                <span x-text="uploading ? @js(__('fastleo::files.uploading')) : @js(__('fastleo::files.upload'))">{{ __('fastleo::files.upload') }}</span>
-                <input type="file" multiple class="sr-only" @change="upload($event.target.files); $event.target.value = ''" data-files-input>
-            </label>
+                <label class="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-btn bg-primary px-3.5 text-base font-[550] whitespace-nowrap text-white shadow-[inset_0_1px_0_rgb(255_255_255/.16),0_1px_2px_rgb(0_0_0/.12)] hover:bg-primary-hover focus-within:shadow-[0_0_0_3px_var(--color-ring)]" :class="uploading && 'opacity-60 pointer-events-none'">
+                    <x-fastleo::icon name="upload" class="size-4 shrink-0" />
+                    <span x-text="uploading ? @js(__('fastleo::files.uploading')) : @js(__('fastleo::files.upload'))">{{ __('fastleo::files.upload') }}</span>
+                    <input type="file" multiple class="sr-only" @change="upload($event.target.files); $event.target.value = ''" data-files-input>
+                </label>
 
-            @unless ($picker)
-                <x-fastleo::button variant="danger" icon="trash-2" x-cloak x-show="selected.length > 0" @click="removeSelected()" data-files-delete>
-                    {{ __('fastleo::files.delete_selected') }} (<span x-text="selected.length"></span>)
-                </x-fastleo::button>
-            @endunless
+                @unless ($picker)
+                    <x-fastleo::button variant="danger" icon="trash-2" x-cloak x-show="selected.length > 0" @click="removeSelected()" data-files-delete>
+                        {{ __('fastleo::files.delete_selected') }} (<span x-text="selected.length"></span>)
+                    </x-fastleo::button>
+                @endunless
+            </div>
+            @unless ($picker)</template>@endunless
         </div>
 
         @unless ($picker)

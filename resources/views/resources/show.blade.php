@@ -18,26 +18,27 @@
     :back="['url' => $listUrl, 'label' => $resource::label()]"
     :crumbs="array_values(array_filter([$resource::group() !== null ? ['label' => $resource::group()] : null, ['label' => $resource::label(), 'url' => $listUrl], ['label' => $recordTitle !== '' ? $recordTitle : __('fastleo::resources.show_title', ['name' => $resource::singular()])]]))"
 >
-    <div class="flex flex-wrap items-center gap-2" x-data="fastleoActions({ open: @js($recordActions !== [] ? session('fastleo.action') : null), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
-        @if ($recordActions !== [])
-            @include('fastleo::actions.forms', ['actions' => $recordActions])
-        @endif
-        <div class="flex-1"></div>
-        @include('fastleo::actions.buttons')
-        @if ($resource::logsActivity() && \Fastleo\Activity\ActivityRecorder::isEnabled() && \Fastleo\Support\Authorization::allows('viewAny', $resource))
-            <x-fastleo::button variant="ghost" icon="history" :href="route('fastleo.resources.history', [$slug, $record->getKey()])">{{ __('fastleo::activity.history') }}</x-fastleo::button>
-        @endif
-        @if ($siteUrl)
-            <x-fastleo::button variant="ghost" icon="external-link" :href="$siteUrl" target="_blank" rel="noopener">
-                {{ __('fastleo::resources.open_on_site') }}
-            </x-fastleo::button>
-        @endif
-        @if (! $trashed && \Fastleo\Support\Authorization::allows('update', $resource, $record))
-            <x-fastleo::button variant="primary" icon="pencil" :href="route('fastleo.resources.edit', [$slug, $record->getKey()])">
-                {{ __('fastleo::resources.edit') }}
-            </x-fastleo::button>
-        @endif
-    </div>
+    <x-slot:actions>
+        <div class="flex flex-wrap items-center gap-2" x-data="fastleoActions({ open: @js($recordActions !== [] ? session('fastleo.action') : null), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
+            @if ($recordActions !== [])
+                @include('fastleo::actions.forms', ['actions' => $recordActions])
+            @endif
+            @include('fastleo::actions.buttons')
+            @if ($resource::logsActivity() && \Fastleo\Activity\ActivityRecorder::isEnabled() && \Fastleo\Support\Authorization::allows('viewAny', $resource))
+                <x-fastleo::button variant="ghost" icon="history" :href="route('fastleo.resources.history', [$slug, $record->getKey()])">{{ __('fastleo::activity.history') }}</x-fastleo::button>
+            @endif
+            @if ($siteUrl)
+                <x-fastleo::button variant="ghost" icon="external-link" :href="$siteUrl" target="_blank" rel="noopener">
+                    {{ __('fastleo::resources.open_on_site') }}
+                </x-fastleo::button>
+            @endif
+            @if (! $trashed && \Fastleo\Support\Authorization::allows('update', $resource, $record))
+                <x-fastleo::button variant="primary" icon="pencil" :href="route('fastleo.resources.edit', [$slug, $record->getKey()])">
+                    {{ __('fastleo::resources.edit') }}
+                </x-fastleo::button>
+            @endif
+        </div>
+    </x-slot:actions>
 
     <x-fastleo::flash />
 

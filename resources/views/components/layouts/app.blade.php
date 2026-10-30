@@ -1,7 +1,7 @@
 @props(['title' => null, 'description' => null, 'count' => null, 'heading' => null, 'back' => null, 'crumbs' => null])
 {{-- Страницы админки после входа: боковое меню, шапка, заголовок страницы, содержимое.
      title — название страницы (вкладка браузера, крошки), heading — заголовок на странице, если он другой (название записи); description и count — пояснение и счётчик рядом с ним; back — ['url' => …, 'label' => …], ссылка «назад» над заголовком;
-     crumbs — хлебные крошки [['label' => …, 'url' => …|null], …] (по умолчанию группа меню и title); слоты actions — кнопки справа, badge — бейдж у заголовка. --}}
+     crumbs — хлебные крошки [['label' => …, 'url' => …|null], …] (по умолчанию группа меню и title); слоты actions — кнопки справа на одной линии с заголовком (или x-teleport="#fastleo-page-actions" из содержимого страницы), badge — бейдж у заголовка. --}}
 @php
     $menuGroups = \Fastleo\Support\Menu::groups();
     $crumb = null;
@@ -113,7 +113,7 @@
                         maxlength="100"
                         autocomplete="off"
                         placeholder="{{ __('fastleo::search.placeholder') }}"
-                        class="h-12 min-w-0 flex-1 bg-transparent text-md outline-none"
+                        class="h-12 min-w-0 flex-1 bg-transparent text-md outline-none focus-visible:shadow-none"
                         @input="input()"
                         @keydown.down.prevent="move(1)"
                         @keydown.up.prevent="move(-1)"
@@ -243,14 +243,15 @@
                         {{ __('fastleo::closing.banner') }}
                     </a>
                 @endif
-                <div @class(['flex-wrap items-end justify-between gap-4', 'flex' => $count !== null || isset($actions) || $back !== null, 'hidden lg:flex' => $count === null && ! isset($actions) && $back === null])>
-                    <div class="flex min-w-0 flex-col gap-1">
-                        @if ($back !== null)
-                            <a href="{{ $back['url'] }}" class="mb-1 inline-flex w-fit items-center gap-1 text-sm text-ink-2 hover:text-ink" data-back>
-                                <x-fastleo::icon name="chevron-left" class="size-3.5" />
-                                {{ $back['label'] }}
-                            </a>
-                        @endif
+                <div @class(['flex-col gap-1', 'flex' => $count !== null || isset($actions) || $back !== null, 'hidden lg:flex' => $count === null && ! isset($actions) && $back === null]) data-page-header>
+                    @if ($back !== null)
+                        <a href="{{ $back['url'] }}" class="mb-1 inline-flex w-fit items-center gap-1 text-sm text-ink-2 hover:text-ink" data-back>
+                            <x-fastleo::icon name="chevron-left" class="size-3.5" />
+                            {{ $back['label'] }}
+                        </a>
+                    @endif
+                    {{-- Заголовок и кнопки страницы — на одной линии; кнопки могут прийти и через x-teleport="#fastleo-page-actions". --}}
+                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                         <div class="flex min-w-0 flex-wrap items-center gap-2.5">
                             <h1 class="hidden truncate text-2xl font-[650] tracking-[-0.022em] lg:block">{{ $heading ?? $title }}</h1>
                             @isset($badge)
@@ -260,13 +261,11 @@
                                 <span class="rounded-full bg-sunken px-2 py-px text-sm font-semibold text-ink-2 tabular-nums" data-count>{{ $count }}</span>
                             @endif
                         </div>
-                        @if ($description)
-                            <p class="hidden text-base text-ink-2 lg:block">{{ $description }}</p>
-                        @endif
+                        <div id="fastleo-page-actions" class="flex flex-wrap items-center gap-2 empty:hidden">@isset($actions){{ $actions }}@endisset</div>
                     </div>
-                    @isset($actions)
-                        <div class="flex flex-wrap items-center gap-2">{{ $actions }}</div>
-                    @endisset
+                    @if ($description)
+                        <p class="hidden text-base text-ink-2 lg:block">{{ $description }}</p>
+                    @endif
                 </div>
 
                 {{ $slot }}

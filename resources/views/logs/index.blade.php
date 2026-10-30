@@ -1,5 +1,15 @@
 {{-- Журнал ошибок. $files, $file, $level, $search, $before, $size, $result. --}}
 <x-fastleo::layouts.app :title="__('fastleo::logs.title')">
+    @if ($file !== null)
+        <x-slot:actions>
+            <span class="text-sm text-ink-2">{{ __('fastleo::logs.size', ['size' => \Fastleo\Support\CacheCleaner::format($size)]) }}</span>
+            <x-fastleo::action-form :action="route('fastleo.logs.clear')" :confirm="__('fastleo::logs.clear_confirm', ['name' => $file, 'size' => \Fastleo\Support\CacheCleaner::format($size)])" :button="__('fastleo::logs.clear')">
+                <input type="hidden" name="file" value="{{ $file }}">
+                <x-fastleo::button type="submit" variant="danger-soft" icon="trash-2" data-logs-clear>{{ __('fastleo::logs.clear') }}</x-fastleo::button>
+            </x-fastleo::action-form>
+        </x-slot:actions>
+    @endif
+
     <x-fastleo::flash />
 
     @if ($file === null)
@@ -31,14 +41,7 @@
                 <input type="search" name="q" value="{{ $search }}" maxlength="100" class="fastleo-input min-w-44">
             </label>
             <x-fastleo::button type="submit" variant="primary">{{ __('fastleo::logs.apply') }}</x-fastleo::button>
-            <span class="text-sm text-ink-2">{{ __('fastleo::logs.size', ['size' => \Fastleo\Support\CacheCleaner::format($size)]) }}</span>
-            <div class="flex-1"></div>
         </form>
-
-        <x-fastleo::action-form :action="route('fastleo.logs.clear')" :confirm="__('fastleo::logs.clear_confirm', ['name' => $file, 'size' => \Fastleo\Support\CacheCleaner::format($size)])" :button="__('fastleo::logs.clear')">
-            <input type="hidden" name="file" value="{{ $file }}">
-            <x-fastleo::button type="submit" variant="danger-soft" icon="trash-2" data-logs-clear>{{ __('fastleo::logs.clear') }}</x-fastleo::button>
-        </x-fastleo::action-form>
 
         @if ($result['entries'] === [])
             <p class="text-sm text-ink-2" data-logs-empty>{{ $result['next'] !== null ? __('fastleo::logs.scan_limit') : __('fastleo::logs.empty') }}</p>
