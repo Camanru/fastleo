@@ -9,6 +9,7 @@ use Fastleo\Fields\Password;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
+use Fastleo\Support\ModelDefaults;
 use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\RecordKey;
 use Fastleo\Support\RecordWriter;
@@ -67,8 +68,8 @@ final class ResourceController
         $resource = $this->resource($resource);
         Authorization::authorize('create', $resource);
 
-        // «+» в дереве: родитель новой записи подставляется из ?parent=, если такая запись видна в разделе.
-        $defaults = [];
+        // Значения по умолчанию из модели и колонок базы; «+» в дереве: родитель новой записи подставляется из ?parent=, если такая запись видна в разделе.
+        $defaults = ModelDefaults::for($resource);
         $tree = $resource::treeColumn();
         $parent = $request->query('parent');
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Resources\UserResource;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\ServiceProvider;
 use Workbench\App\Fastleo\ArticleResource;
@@ -54,4 +55,14 @@ it('clears the cache', function (): void {
 it('runs with optimize and optimize:clear', function (): void {
     expect(ServiceProvider::$optimizeCommands)->toContain('fastleo:cache')
         ->and(ServiceProvider::$optimizeClearCommands)->toContain('fastleo:clear');
+});
+
+it('forgets the cached settings when the lists are cached or cleared', function (): void {
+    Cache::forever('fastleo.settings', ['contacts' => '{"phone":"+7 000"}']);
+    $this->artisan('fastleo:cache')->assertSuccessful();
+    expect(Cache::has('fastleo.settings'))->toBeFalse();
+
+    Cache::forever('fastleo.settings', ['contacts' => '{"phone":"+7 000"}']);
+    $this->artisan('fastleo:clear')->assertSuccessful();
+    expect(Cache::has('fastleo.settings'))->toBeFalse();
 });

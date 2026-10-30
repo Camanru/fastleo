@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use Fastleo\Actions\Action;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
+use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\FileField;
 use Fastleo\Fields\Nested;
@@ -66,6 +67,8 @@ final class ResourceInspector
                 'exportable' => $resource::isExportable(),
                 'importable' => $resource::isImportable(),
                 'import_key' => $resource::importKey(),
+                'mcp' => $resource->isAvailableInMcp(),
+                'mcp_personal_field' => $resource->mcpPersonalField(),
                 'fields' => $this->fields($resource->schema()->fields()),
                 'filters' => array_values(array_map($this->filter(...), $resource->listFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
@@ -161,6 +164,10 @@ final class ResourceInspector
         if ($field instanceof Nested) {
             $details['related_model'] = $this->attempt(fn (): string => $field->relationInstance()->getRelated()::class);
             $details['fields'] = $this->fields($field->schema()->fields());
+        }
+
+        if ($field instanceof Checkbox && $field->isQuickToggle()) {
+            $details['quick_toggle'] = true;
         }
 
         if ($field instanceof FileField) {

@@ -293,3 +293,67 @@ it('warns that a robots.txt file hides the route of the package', function (): v
     File::delete($this->sandbox.'/public/robots.txt');
     expect(collect(diagnosed()['problems'])->pluck('message'))->not->toContain($message);
 });
+
+describe('markup of the RichText field', function (): void {
+    beforeEach(function (): void {
+        Schema::create('doctor_rich_notes', function ($table): void {
+            $table->id();
+            $table->longText('body')->nullable();
+        });
+        DB::table('doctor_rich_notes')->insert([
+            ['body' => '<div class="uk-h3" role="note" data-lpu="1"><p>Текст</p></div><iframe src="https://prodoctorov.ru/widget/1/"></iframe>'],
+            ['body' => '<p>Чистый текст</p>'],
+            ['body' => null],
+        ]);
+        useFixtureResources('DoctorRichText');
+    });
+
+    it('warns that saving an old record will remove tags, attributes and players the site did not allow', function (): void {
+        $warnings = implode("\n", messages('rich-notes', 'warning'));
+
+        expect($warnings)->toContain('Поле «body» (RichText): в 1 из 2 проверенных записей при сохранении пропадёт разметка')
+            ->toContain('теги div')
+            ->toContain('атрибуты class, role, data-lpu')
+            ->toContain('iframe с адресов prodoctorov.ru');
+    });
+
+    it('stays silent when the site allowed that markup', function (): void {
+        config([
+            'fastleo.rich_text.tags' => ['div'],
+            'fastleo.rich_text.attributes' => ['class', 'role', 'data-lpu'],
+            'fastleo.rich_text.iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+        ]);
+
+        expect(messages('rich-notes', 'warning'))->toBe([]);
+    });
+
+    it('reports a rich_text setting that allows something dangerous', function (): void {
+        config(['fastleo.rich_text.attributes' => ['onclick']]);
+
+        expect(implode("\n", messages('site', 'error')))->toContain('Настройка fastleo.rich_text недопустима');
+    });
+});
+
+describe('quick toggle and SetToggle', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('QuickToggle');
+    });
+
+    it('warns about quickToggle() on a read-only field or on a field outside the edit form', function (): void {
+        $text = 'Поле «is_published»: quickToggle() включён, но поле только для чтения или не показывается в форме редактирования (readonly, onlyInList, hideOnEdit) — переключатель в списке не появится.';
+
+        expect(messages('frozen-articles', 'warning'))->toContain($text)
+            ->and(messages('listonly-articles', 'warning'))->toContain($text)
+            ->and(messages('articles', 'warning'))->toBe([]);
+    });
+
+    it('warns about a SetToggle action on a read-only field', function (): void {
+        expect(messages('frozen-articles', 'warning'))->toContain('Действие set-is-published-on (SetToggle): поле «is_published» только для чтения (readonly) — действие будет пропускать все записи.')
+            ->and(messages('articles', 'warning'))->toBe([]);
+    });
+
+    it('reports a SetToggle action aimed at a field that is not a checkbox', function (): void {
+        expect(messages('broken-toggle', 'error'))->toContain('Действие set-title-on (SetToggle): в ресурсе нет поля-галочки «title» (Checkbox или Toggle) — запуск действия упадёт.')
+            ->and(messages('articles', 'error'))->toBe([]);
+    });
+});

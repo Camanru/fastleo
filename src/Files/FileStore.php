@@ -7,8 +7,10 @@ namespace Fastleo\Files;
 use Fastleo\Fastleo;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Intervention\Image\Exceptions\ImageException;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
@@ -56,6 +58,25 @@ final class FileStore
     }
 
     /**
+     * Путь или имя скрыты настройкой `fastleo.files.hidden`: менеджер не показывает их и не удаляет по отдельности.
+     * Проверяется каждая часть пути: всё внутри скрытой папки тоже скрыто. Часть сравнивается целиком, `*` заменяет любые символы: `thumbs`, `*.bak`.
+     *
+     * ```php
+     * FileStore::isHidden('uploads/thumbs/a.jpg'); // true при 'hidden' => ['thumbs']
+     * ```
+     */
+    public static function isHidden(string $path): bool
+    {
+        $patterns = array_values(array_filter(Arr::wrap(config('fastleo.files.hidden', [])), is_string(...)));
+
+        if ($patterns === []) {
+            return false;
+        }
+
+        return array_any(explode('/', $path), fn (string $segment): bool => $segment !== '' && Str::is($patterns, $segment));
+    }
+
+    /**
      * Содержимое папки: вложенные папки и файлы по имени.
      *
      * @return array{folders: list<array{name: string, path: string}>, files: list<array{name: string, path: string, url: string, size: int, image: bool}>}
@@ -69,7 +90,7 @@ final class FileStore
             $path = $entry->path();
             $name = basename($path);
 
-            if (str_starts_with($name, '.')) {
+            if (str_starts_with($name, '.') || self::isHidden($name)) {
                 continue;
             }
 

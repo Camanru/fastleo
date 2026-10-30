@@ -2,6 +2,28 @@
 
 Формат — [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/), версии — [семантические](https://semver.org/lang/ru/).
 
+## [4.1.0] — 2026-10-30
+
+Правки и доработки по опыту первого перехода сайта с 3.0.
+
+### Изменено
+
+- **MCP-сервер не видит разделы с данными людей.** Раздел с полем `Email` или `Tel` или полем со словом `email`, `phone`, `tel` в имени (`client_phone`, `phone2`, `phoneNumber`; в том числе внутри `HasMany`, `Repeater`, `Blocks`) закрыт, пока в ресурсе нет `protected static bool $mcpPersonalData = true;`. «Администраторы» закрыты всегда (откроет наследник `UserResource` с `$mcp = true` и `$mcpPersonalData = true`). `$mcp` остаётся `bool`, как в 4.0.0; `isAvailableInMcp()` стал методом объекта (раньше статическим); `fastleo:inspect` показывает, виден ли раздел агенту и почему закрыт.
+- **Форма создания берёт значения по умолчанию из модели и базы:** `default()` поля, затем `$attributes` модели, затем DEFAULT колонки. `Toggle` без `default()` при колонке `default(true)` в новой записи включён.
+- **График `Chart::countByDay` считает дни в часовом поясе админки** (`fastleo.timezone`).
+- **Виджет «Проверки сайта» в админке показывает тексты как есть**; адреса, почта и пути скрываются только в отчёте для SoftNetica.
+- **`php artisan optimize` и `optimize:clear` сбрасывают кеш настроек сайта.**
+- Наследник готового поля (`SiteRichText extends RichText`) берёт шаблон ближайшего родителя без переопределения `view()` и `type()`.
+
+### Добавлено
+
+- **Быстрый переключатель `Toggle::make('menu')->quickToggle()`:** значок в списке (таблица и карточки на телефоне) становится кнопкой, клик меняет галочку без открытия формы и без перезагрузки. Проверки как у формы: Policy `update`, поле не `readonly()` и не скрыто, правила поля; запись через Eloquent (observers, журнал изменений). Маршрут `fastleo.resources.toggle`; `fastleo:doctor` предупреждает про `quickToggle()` у поля `readonly()`; `fastleo:inspect` показывает `quick_toggle`.
+- **Действие `Fastleo\Actions\SetToggle`:** готовые «Показать» / «Скрыть» для выбранных записей (`SetToggle::make('menu', 'Показать на сайте', true)->icon('eye')`); `fastleo:doctor` ловит поле, которого нет в ресурсе или которое не галочка.
+- **`files.hidden` в `config/fastleo.php`:** имена папок и файлов (можно с `*`), которых файловый менеджер не показывает, не открывает и не удаляет по отдельности (как и всё внутри скрытой папки) — например, старые `thumbs` от fastleo 3.
+- **`rich_text` в `config/fastleo.php`:** дополнительные теги, атрибуты (`class`, `role`, `data-lpu`…), адреса плееров для `iframe` и `style` целиком (без `url()`, `expression`, `position: fixed`). `script`, `on*`, `srcdoc`, `javascript:` разрешить нельзя.
+- **`fastleo:doctor` проверяет настройку `rich_text` и предупреждает, у скольких записей RichText (первые 500 в разделе) при сохранении пропадут теги, атрибуты и плееры.**
+- В документе о переходе: «это не обновление, а другая админка», адрес `pages` занят (`$slug`), SEO-колонки, порядок действий с RichText.
+
 ## [4.0.0] — 2026-10-30
 
 Пакет написан заново. Совместимости с 2.x и 3.0 нет: как перейти — [docs/upgrade-from-3.md](docs/upgrade-from-3.md).
@@ -68,4 +90,5 @@ Composer-имя — `camanru/fastleo`, namespace — `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.1.0]: https://github.com/Camanru/fastleo/releases/tag/4.1.0
 [4.0.0]: https://github.com/Camanru/fastleo/releases/tag/4.0.0

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Activity\Activity;
 use Fastleo\Activity\ActivityRecorder;
+use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
 use Fastleo\Mcp\Tools\CreateRecord;
 use Fastleo\Mcp\Tools\DeleteRecord;
@@ -13,6 +14,8 @@ use Fastleo\Mcp\Tools\ListRecords;
 use Fastleo\Mcp\Tools\ListResources;
 use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Mcp\Tools\UpdateRecord;
+use Fastleo\Resources\UserResource;
+use Fastleo\Tests\Fixtures\McpUsers\OpenUserResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Support\Facades\Gate;
@@ -29,6 +32,15 @@ use Workbench\App\Models\User;
 function mcp(?User $user = null): PendingTestResponse
 {
     return FastleoServer::actingAs($user ?? admin(), 'fastleo');
+}
+
+/**
+ * Сайт открыл раздел «Администраторы» агенту.
+ */
+function openAdminsToAgent(): void
+{
+    config(['fastleo.users.resource' => OpenUserResource::class]);
+    Fastleo::resources()->flush();
 }
 
 it('lists the sections the admin may open', function (): void {
@@ -93,6 +105,8 @@ it('does not give out a record that does not exist or is bad id', function (): v
 });
 
 it('never reveals passwords of the admin section', function (): void {
+    openAdminsToAgent();
+
     $other = admin(['email' => 'second@example.com']);
 
     mcp()->tool(GetRecord::class, ['resource' => 'users', 'id' => (string) $other->id])
@@ -125,6 +139,8 @@ it('refuses values for fields that are not writable', function (): void {
 });
 
 it('does not let the agent grant admin access through the users section', function (): void {
+    openAdminsToAgent();
+
     $admin = admin();
     $before = User::query()->count();
 
@@ -151,6 +167,8 @@ it('asks for the right to open the section before creating a record in it', func
 });
 
 it('creates an admin when the agent sends the password once', function (): void {
+    openAdminsToAgent();
+
     mcp()->tool(CreateRecord::class, ['resource' => 'users', 'values' => ['name' => 'Борис', 'email' => 'boris@example.com', 'password' => 'secret-password-1', 'fastleo_admin' => true]])
         ->assertHasNoErrors();
 
@@ -393,4 +411,32 @@ it('removes nested records missing from the list only with --allow-delete', func
         ->assertHasNoErrors();
 
     expect($article->links()->pluck('title')->all())->toBe(['First']);
+});
+
+describe('sections with personal data', function (): void {
+    beforeEach(fn () => useFixtureResources('McpPersonal'));
+
+    it('closes sections with e-mail or phone fields by field type, by name, in repeaters and in blocks', function (): void {
+        $sections = mcp()->tool(ListResources::class)->assertHasNoErrors();
+
+        $sections->assertSee(['"resource":"plain"', '"resource":"open-phone"'])
+            ->assertDontSee(['"resource":"phone-field"', '"resource":"email-column"', '"resource":"nested-phone"', '"resource":"block-phone"', '"resource":"closed"']);
+    });
+
+    it('does not open a closed section to any tool', function (string $slug): void {
+        mcp()->tool(DescribeResource::class, ['resource' => $slug])->assertHasErrors(['Раздела «'.$slug.'» нет']);
+        mcp()->tool(ListRecords::class, ['resource' => $slug])->assertHasErrors(['Раздела «'.$slug.'» нет']);
+        mcp()->tool(CreateRecord::class, ['resource' => $slug, 'values' => ['title' => 'x']])->assertHasErrors(['Раздела «'.$slug.'» нет']);
+    })->with(['phone-field', 'email-column', 'nested-phone', 'block-phone', 'closed']);
+
+    it('lets the site open such a section with $mcpPersonalData = true', function (): void {
+        mcp()->tool(DescribeResource::class, ['resource' => 'open-phone'])->assertHasNoErrors();
+    });
+
+    it('closes the admins section by default', function (): void {
+        config(['fastleo.users.resource' => UserResource::class]);
+        Fastleo::resources()->flush();
+
+        mcp()->tool(ListResources::class)->assertSee('"resource":"plain"')->assertDontSee('"resource":"users"');
+    });
 });

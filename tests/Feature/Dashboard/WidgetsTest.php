@@ -130,6 +130,28 @@ describe('Chart::countByDay', function (): void {
         Date::setTestNow();
     });
 
+    it('counts days in the timezone of the admin panel', function (): void {
+        config(['app.timezone' => 'UTC', 'fastleo.timezone' => 'Europe/Moscow']);
+        Date::setTestNow('2026-10-29 12:00:00');
+        // Москва — UTC+3: 23:30 UTC уже следующие сутки, 20:59 UTC ещё те же, 21:00 UTC — следующие.
+        Article::factory()->create(['created_at' => '2026-10-27 23:30:00']);
+        Article::factory()->create(['created_at' => '2026-10-28 20:59:00']);
+        Article::factory()->create(['created_at' => '2026-10-28 21:00:00']);
+        Article::factory()->create(['created_at' => '2026-10-26 20:59:00']);
+
+        expect(Chart::countByDay(Article::query(), 'created_at', 4))->toBe(['26.10' => 1, '27.10' => 0, '28.10' => 2, '29.10' => 1]);
+        Date::setTestNow();
+    });
+
+    it('groups by the dates of the site when both timezones match', function (): void {
+        config(['app.timezone' => 'UTC', 'fastleo.timezone' => 'UTC']);
+        Date::setTestNow('2026-10-29 12:00:00');
+        Article::factory()->create(['created_at' => '2026-10-28 23:30:00']);
+
+        expect(Chart::countByDay(Article::query(), 'created_at', 2))->toBe(['28.10' => 1, '29.10' => 0]);
+        Date::setTestNow();
+    });
+
     it('accepts a model class and respects the scope of the query', function (): void {
         Article::factory()->count(2)->create(['is_published' => true]);
         Article::factory()->create(['is_published' => false]);

@@ -13,6 +13,7 @@ use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\FormSchema;
+use Fastleo\Support\PersonalData;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -118,6 +119,12 @@ abstract class Resource
 
     /** Раздел доступен ИИ-агентам через MCP-сервер (`fastleo:mcp`); `false` — сервер его не видит. */
     protected static bool $mcp = true;
+
+    /**
+     * Открыть через MCP раздел с данными людей (поля `Email`, `Tel`, колонки `email`, `phone`…). По умолчанию такой
+     * раздел сервер не видит, даже если `$mcp = true`; `true` — разрешить явно.
+     */
+    protected static bool $mcpPersonalData = false;
 
     /** Поля, разложенные из fields() (считаются один раз на объект). */
     private ?FormSchema $schema = null;
@@ -314,9 +321,18 @@ abstract class Resource
     /**
      * Раздел доступен через MCP-сервер.
      */
-    public static function isAvailableInMcp(): bool
+    public function isAvailableInMcp(): bool
     {
-        return static::$mcp;
+        return static::$mcp && $this->mcpPersonalField() === null;
+    }
+
+    /**
+     * Поле с данными людей, из-за которого раздел закрыт от MCP-сервера (`phone`, `blocks.email`); null — таких полей
+     * нет, раздел закрыт или открыт явно (`$mcp`, `$mcpPersonalData`).
+     */
+    public function mcpPersonalField(): ?string
+    {
+        return static::$mcp && ! static::$mcpPersonalData ? PersonalData::find($this->schema()->fields()) : null;
     }
 
     /**

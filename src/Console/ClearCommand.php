@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Console;
 
 use Fastleo\Fastleo;
+use Fastleo\Support\SettingsStore;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -32,6 +33,8 @@ final class ClearCommand extends Command
 
         File::delete(Fastleo::resources()->cachePath());
         Fastleo::resources()->flush();
+
+        SettingsStore::forgetCached();
 
         $this->components->info(__('fastleo::console.clear_done'));
 

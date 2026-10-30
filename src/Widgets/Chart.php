@@ -6,6 +6,7 @@ namespace Fastleo\Widgets;
 
 use Carbon\CarbonImmutable;
 use Closure;
+use Fastleo\Fastleo;
 use Fastleo\Support\SqlExpression;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -78,7 +79,9 @@ final class Chart extends Widget
 
     /**
      * Сколько записей создавалось в каждый из последних дней: «дд.мм» → число, дни без записей — нули.
-     * Группировка идёт средствами базы (`date()`), записи не загружаются.
+     * Группировка идёт средствами базы, записи не загружаются. Дни считаются в поясе админки (`fastleo.timezone`);
+     * если он отличается от пояса сайта, база группирует по часам, а в дни их складывает PHP (поэтому в поясах со
+     * сдвигом в полчаса запись у границы суток может попасть в соседний день).
      *
      * ```php
      * Chart::countByDay(Lead::query(), 'created_at', 14); // последние 14 дней
@@ -99,23 +102,49 @@ final class Chart extends Widget
 
         $days = max(1, min(self::MAX_POINTS, $days));
         $query = is_string($query) ? $query::query() : clone $query;
-        $start = CarbonImmutable::today()->subDays($days - 1);
         $wrapped = $query->getQuery()->getGrammar()->wrap($column);
+        $siteZone = Fastleo::appTimezone();
+        $hour = Fastleo::timezone() === $siteZone ? null : self::hourExpression($query->getModel()->getConnection()->getDriverName(), $wrapped);
+        $zone = $hour === null ? $siteZone : Fastleo::timezone();
 
-        $base = $query->where($column, '>=', $start)->toBase();
-        $counts = $base
-            ->select([new SqlExpression('date('.$wrapped.') as day'), new SqlExpression('count(*) as total')])
+        $today = CarbonImmutable::now($zone)->startOfDay();
+        $start = $today->subDays($days - 1);
+
+        $counts = $query->where($column, '>=', $start->setTimezone($siteZone))->toBase()
+            ->select([new SqlExpression(($hour ?? 'date('.$wrapped.')').' as day'), new SqlExpression('count(*) as total')])
             ->groupBy('day')
             ->pluck('total', 'day');
 
+        $perDay = [];
+
+        foreach ($counts as $bucket => $total) {
+            $day = $hour === null ? (string) $bucket : CarbonImmutable::createFromFormat('!Y-m-d H', (string) $bucket, $siteZone)?->setTimezone($zone)->toDateString();
+
+            if ($day !== null) {
+                $perDay[$day] = ($perDay[$day] ?? 0) + (is_numeric($total) ? (int) $total : 0);
+            }
+        }
+
         $result = [];
 
-        for ($day = $start; $day->lte(CarbonImmutable::today()); $day = $day->addDay()) {
-            $total = $counts[$day->toDateString()] ?? 0;
-            $result[$day->format('d.m')] = is_numeric($total) ? (int) $total : 0;
+        for ($day = $start; $day->lte($today); $day = $day->addDay()) {
+            $result[$day->format('d.m')] = $perDay[$day->toDateString()] ?? 0;
         }
 
         return $result;
+    }
+
+    /**
+     * Выражение «год-месяц-день час» для группировки по часам; null — драйвер не поддерживается (группировка по дням).
+     */
+    private static function hourExpression(string $driver, string $wrapped): ?string
+    {
+        return match ($driver) {
+            'sqlite' => "strftime('%Y-%m-%d %H', ".$wrapped.')',
+            'mysql', 'mariadb' => 'date_format('.$wrapped.", '%Y-%m-%d %H')",
+            'pgsql' => 'to_char('.$wrapped.", 'YYYY-MM-DD HH24')",
+            default => null,
+        };
     }
 
     #[Override]

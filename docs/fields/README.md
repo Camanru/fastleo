@@ -63,7 +63,7 @@ Text::make('title', 'Заголовок')->required()->searchable()->sortable();
 | `label('Заголовок')` | Подпись поля в форме, списке и текстах ошибок |
 | `help('Текст')` | Подсказка под полем |
 | `placeholder('Текст')` | Подсказка внутри пустого поля |
-| `default($value)` | Значение при создании записи; можно замыкание: `default(fn () => now())` — даты приводятся к формату поля сами |
+| `default($value)` | Значение при создании записи; можно замыкание: `default(fn () => now())` — даты приводятся к формату поля сами. Без `default()` форма создания берёт значение из `$attributes` модели, затем из DEFAULT колонки в базе (`->default(true)` в миграции включает галочку в новой записи); выражения вроде `CURRENT_TIMESTAMP` не берутся |
 | `translatable()` | Значение на нескольких языках — вкладки языков у поля; у Text, Textarea, Markdown, Code, RichText — [translations.md](../translations.md) |
 | `exportable(false)` | Не выгружать поле в Excel/CSV и не загружать из файла — [import-export.md](../import-export.md) |
 | `required()` | Обязательное поле (без него поле `nullable`). У `Checkbox`/`Toggle` не требует отметки — для «согласия» используйте `rules(['accepted'])` |

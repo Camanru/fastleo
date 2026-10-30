@@ -185,3 +185,11 @@ it('reads a sub field named like a method of the model', function (): void {
     expect(JsonItem::from(['question' => 'Когда?'])->getAttribute('from'))->toBeNull()
         ->and($field->display($page))->not->toBeNull();
 });
+
+describe('an untouched toggle in a new item', function (): void {
+    it('is stored as false and not as an empty value', function (): void {
+        $this->post(route('fastleo.resources.store', 'site-pages'), pageData(['faq' => [['question' => 'Как записаться?', 'answer' => 'По телефону', 'open' => '0']]]))->assertRedirect();
+
+        expect(Page::query()->firstOrFail()->faq)->toBeStoredJson([['question' => 'Как записаться?', 'answer' => 'По телефону', 'open' => false]]);
+    });
+});

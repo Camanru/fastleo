@@ -205,6 +205,14 @@ abstract class Field
     }
 
     /**
+     * Значение по умолчанию задано методом `default()`.
+     */
+    public function hasDefault(): bool
+    {
+        return $this->default !== null;
+    }
+
+    /**
      * Сделать поле обязательным (или снять обязательность).
      *
      * ```php
@@ -734,7 +742,23 @@ abstract class Field
             return false;
         }
 
+        return $this->isConditionMet($record);
+    }
+
+    /**
+     * Условие `visibleWhen()` выполнено для записи (условия нет — выполнено). Форма не записывает поле с невыполненным условием.
+     */
+    public function isConditionMet(Model $record): bool
+    {
         return $this->visibleWhen === null || in_array(self::conditionValue($record->getAttribute($this->visibleWhen['field'])), $this->visibleWhen['values'], true);
+    }
+
+    /**
+     * Поле есть в форме редактирования (не `onlyInList()` и не `hideOnEdit()`); `hidden()` здесь не учитывается.
+     */
+    public function showsInEditForm(): bool
+    {
+        return $this->showInForm && $this->showOnEdit;
     }
 
     /**
@@ -957,11 +981,26 @@ abstract class Field
     }
 
     /**
-     * Blade-шаблон поля в форме.
+     * Blade-шаблон поля в форме: по типу поля, а у наследника без своего шаблона — шаблон ближайшего родителя
+     * (`SiteRichText extends RichText` берёт шаблон `rich-text`).
      */
     public function view(): string
     {
-        return 'fastleo::fields.'.$this->type();
+        $own = 'fastleo::fields.'.$this->type();
+
+        if (view()->exists($own)) {
+            return $own;
+        }
+
+        foreach (class_parents($this) as $parent) {
+            $view = 'fastleo::fields.'.Str::kebab(class_basename($parent));
+
+            if (view()->exists($view)) {
+                return $view;
+            }
+        }
+
+        return $own;
     }
 
     /**

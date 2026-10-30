@@ -23,6 +23,35 @@ use Override;
  */
 class Checkbox extends Field
 {
+    /** Значок в списке — кнопка: клик меняет значение без открытия формы. */
+    protected bool $quickToggle = false;
+
+    /**
+     * Переключать значение прямо в списке одним кликом, без открытия формы.
+     *
+     * Сервер проверяет то же, что при сохранении формы: право `update` на запись, что поле видно
+     * и не `readonly()`, правила поля; запись идёт через Eloquent (observers, журнал изменений).
+     * Без права на запись и в разделе `$readonly` значок остаётся обычным.
+     *
+     * ```php
+     * Toggle::make('menu', 'Показывать на сайте')->default(true)->quickToggle();
+     * ```
+     */
+    public function quickToggle(bool $quickToggle = true): static
+    {
+        $this->quickToggle = $quickToggle;
+
+        return $this;
+    }
+
+    /**
+     * Включён быстрый переключатель в списке.
+     */
+    public function isQuickToggle(): bool
+    {
+        return $this->quickToggle;
+    }
+
     /**
      * `true`/`false`; снятая галочка (нет значения) — `false`.
      */
@@ -66,17 +95,33 @@ class Checkbox extends Field
     }
 
     /**
+     * Быстрый переключатель можно показать для записи: поле включено, видно в форме записи, не `readonly()`, условие `visibleWhen()` выполнено.
+     * Право `update` на запись проверяет вызывающий.
+     */
+    public function quickToggleFor(Model $record): bool
+    {
+        return $this->quickToggle && $this->isWritable() && $this->isVisibleInForm($record) && $this->isConditionMet($record);
+    }
+
+    /**
      * Значок «да» (галочка) или «нет» (крестик) с подписью.
      */
-    #[Override]
-    protected function format(mixed $value): string|Htmlable|null
+    public function badge(bool $yes): HtmlString
     {
-        $yes = (bool) $value;
         $icon = Icons::render($yes ? 'check' : 'x', new ComponentAttributeBag([
             'class' => 'size-[15px] shrink-0',
         ]));
         $label = e(__($yes ? 'fastleo::resources.yes' : 'fastleo::resources.no', [], Fastleo::LOCALE));
 
         return new HtmlString('<span class="inline-flex items-center gap-1.5 '.($yes ? '' : 'text-ink-2').'">'.$icon->toHtml().$label.'</span>');
+    }
+
+    /**
+     * Значение в списке и на просмотре — значок с подписью.
+     */
+    #[Override]
+    protected function format(mixed $value): string|Htmlable|null
+    {
+        return $this->badge((bool) $value);
     }
 }

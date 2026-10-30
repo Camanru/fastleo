@@ -26,11 +26,24 @@ RichText::make('content', 'Текст')->height(500);
 | Картинки | `img` (`src` — http, https или адрес на сайте; `alt`, `title`, `width`, `height`, `loading`), `figure`, `figcaption` |
 | Таблицы | `table`, `caption`, `thead`, `tbody`, `tfoot`, `tr`, `th`, `td` (`colspan`, `rowspan`) |
 | Видео | `iframe` только с плеерами по https: `www.youtube.com/embed/`, `www.youtube-nocookie.com/embed/`, `rutube.ru/play/embed/`, `vk.com/video_ext.php`, `vkvideo.ru/video_ext.php` |
-| Оформление | из атрибута `style` — только `text-align` (у абзацев, заголовков, цитат, пунктов, ячеек) |
+| Оформление | из атрибута `style` — только `text-align` (у абзацев, заголовков, цитат, пунктов, ячеек); всё `style` целиком — настройкой `rich_text.styles` |
 
-Удаляется вместе с содержимым: `script`, `style`, `form` и поля ввода, `object`, `embed`, `svg`, `math`, `meta`, `link`. Все обработчики (`onclick`, `onerror`), адреса `javascript:` и `data:`, цвета и шрифты снимаются. Прочие теги (`div`, `span`, `h1`, `h5`) убираются, а текст внутри остаётся. Пустой текст (`<p><br></p>`, `<p>&nbsp;</p>`) сохраняется как `NULL`, а у поля с `required()` не проходит проверку. Видео (`iframe`) не получает атрибут `allow`: полный экран работает через `allowfullscreen`, а камера, микрофон и геопозиция плееру недоступны. После ошибки проверки в редактор возвращается уже очищенный HTML.
+Удаляется вместе с содержимым: `script`, `style`, `form` и поля ввода, `object`, `embed`, `svg`, `math`, `meta`, `link`. Все обработчики (`onclick`, `onerror`), адреса `javascript:` и `data:`, цвета и шрифты снимаются (если сайт не включил `rich_text.styles`). Прочие теги (`div`, `span`, `h1`, `h5`) убираются, а текст внутри остаётся — кроме тех, что сайт разрешил в `rich_text.tags` (такой тег без текста, например `<div data-lpu="1"></div>`, не считается пустым текстом). Пустой текст (`<p><br></p>`, `<p>&nbsp;</p>`) сохраняется как `NULL`, а у поля с `required()` не проходит проверку. Видео (`iframe`) не получает атрибут `allow`: полный экран работает через `allowfullscreen`, а камера, микрофон и геопозиция плееру недоступны. После ошибки проверки в редактор возвращается уже очищенный HTML.
 
-**Свой профиль** — если сайту нужны дополнительные теги:
+**Свои теги и атрибуты на весь сайт** — ключ `rich_text` в `config/fastleo.php` (подробнее — [конфигурация](../configuration.md#чистка-html-редактора)):
+
+```php
+'rich_text' => [
+    'tags' => ['div', 'span'],
+    'attributes' => ['class', 'role', 'align', 'data-lpu'],
+    'iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+    'styles' => true,
+],
+```
+
+Скрипты, обработчики `on*`, директивы JS-фреймворков (`x-init`, `hx-get`, `v-html`, `ng-click`), `srcdoc` и `javascript:` разрешить нельзя: такая настройка вызывает ошибку, `php artisan fastleo:doctor` её показывает. **Перед первым сохранением старых записей запустите `fastleo:doctor`:** он найдёт записи, у которых чистка вырежет теги, атрибуты и плееры (например, `class` и виджет с чужого сайта), и подскажет, что разрешить.
+
+**Свой профиль у одного поля** — если нужны дополнительные теги только ему:
 
 ```php
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;

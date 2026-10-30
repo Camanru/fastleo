@@ -87,13 +87,15 @@ final class HealthChecks
     }
 
     /**
-     * Только свои проверки сайта: выполняются сразу, сбой замыкания не роняет остальные.
+     * Только свои проверки сайта: выполняются сразу, сбой замыкания не роняет остальные. Для отчёта в SoftNetica
+     * тексты очищаются от адресов, почты, путей и ключей (`HealthText`); для виджета в самой админке (`$mask = false`)
+     * остаются как есть — там адрес сайта и есть смысл проверки.
      *
      * @return list<Check>
      */
-    public function custom(): array
+    public function custom(bool $mask = true): array
     {
-        return array_values(array_map(fn (array $custom): array => $this->run($custom['name'], $custom['label'], $custom['check']), $this->custom));
+        return array_values(array_map(fn (array $custom): array => $this->run($custom['name'], $custom['label'], $custom['check'], $mask), $this->custom));
     }
 
     /**
@@ -102,36 +104,37 @@ final class HealthChecks
      * @param  Closure(): mixed  $check
      * @return Check
      */
-    private function run(string $name, string $label, Closure $check): array
+    private function run(string $name, string $label, Closure $check, bool $mask): array
     {
         try {
             $result = $check();
         } catch (Throwable $exception) {
             report($exception);
 
-            return $this->format($name, $label, 'failed', __('fastleo::softnetica.check_crashed', [], Fastleo::LOCALE), null);
+            return $this->format($name, $label, 'failed', __('fastleo::softnetica.check_crashed', [], Fastleo::LOCALE), null, $mask);
         }
 
         if (! $result instanceof HealthResult) {
-            return $this->format($name, $label, 'failed', __('fastleo::softnetica.check_invalid', [], Fastleo::LOCALE), null);
+            return $this->format($name, $label, 'failed', __('fastleo::softnetica.check_invalid', [], Fastleo::LOCALE), null, $mask);
         }
 
         $text = $result->message;
 
-        return $this->format($name, $label, $result->status, $text, $text !== null && mb_strlen($text) > 200 ? $text : null);
+        return $this->format($name, $label, $result->status, $text, $text !== null && mb_strlen($text) > 200 ? $text : null, $mask);
     }
 
     /**
-     * Одна проверка в формате панели: тексты очищены и обрезаны, пустые поля не отправляются.
+     * Одна проверка в формате панели: тексты обрезаны (при `$mask` — ещё и очищены), пустые поля не отправляются.
      *
      * @return Check
      */
-    private function format(string $name, string $label, string $status, ?string $summary, ?string $message): array
+    private function format(string $name, string $label, string $status, ?string $summary, ?string $message, bool $mask = true): array
     {
-        $check = ['name' => $name, 'label' => HealthText::clean($label, 100), 'status' => $status];
+        $clean = fn (string $text, int $limit): string => $mask ? HealthText::clean($text, $limit) : mb_substr(trim($text), 0, $limit);
+        $check = ['name' => $name, 'label' => $clean($label, 100), 'status' => $status];
 
-        $summaryText = $summary === null ? '' : HealthText::clean($summary, 200);
-        $messageText = $message === null ? '' : HealthText::clean($message, 500);
+        $summaryText = $summary === null ? '' : $clean($summary, 200);
+        $messageText = $message === null ? '' : $clean($message, 500);
 
         if ($summaryText !== '') {
             $check['summary'] = $summaryText;

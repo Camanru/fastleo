@@ -10,6 +10,7 @@ use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Хранилище значений страниц настроек: одна строка таблицы `fastleo_settings` на страницу, значения — JSON-объект.
@@ -77,6 +78,19 @@ final class SettingsStore
     public function flush(): void
     {
         Cache::forget(self::CACHE_KEY);
+    }
+
+    /**
+     * Забыть кеш при `optimize` и `optimize:clear` (после деплоя, сидера или правки таблицы руками). Если хранилище
+     * кеша недоступно (сборка образа без базы), молча пропускает: сброс не должен ронять `optimize`.
+     */
+    public static function forgetCached(): void
+    {
+        try {
+            Cache::forget(self::CACHE_KEY);
+        } catch (Throwable) {
+            // кеша нет — забывать нечего
+        }
     }
 
     /**

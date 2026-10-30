@@ -26,6 +26,9 @@ final class PromoArticleResource extends Resource
 
     protected static ?string $slug = 'promo-articles';
 
+    /** Тест MCP работает с разделом, где есть телефон, — раздел открыт явно. */
+    protected static bool $mcpPersonalData = true;
+
     /**
      * Поля с условиями и зависимостями.
      */

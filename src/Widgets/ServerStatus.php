@@ -69,6 +69,6 @@ final class ServerStatus extends Widget
                 'status' => $status,
                 'hint' => $check['message'] ?? null,
             ];
-        }, resolve(HealthChecks::class)->custom());
+        }, resolve(HealthChecks::class)->custom(mask: false));
     }
 }

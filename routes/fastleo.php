@@ -23,6 +23,7 @@ use Fastleo\Http\Controllers\ResourceController;
 use Fastleo\Http\Controllers\SearchController;
 use Fastleo\Http\Controllers\SettingsController;
 use Fastleo\Http\Controllers\SoftNeticaController;
+use Fastleo\Http\Controllers\ToggleController;
 use Fastleo\Http\Controllers\TwoFactorChallengeController;
 use Fastleo\Http\Controllers\TwoFactorController;
 use Fastleo\Http\Middleware\SecurityHeaders;
@@ -115,6 +116,7 @@ Route::group([
                 Route::get('filter-options/{filter}', [FilterOptionsController::class, '__invoke'])->where('filter', '[A-Za-z_]\w*')->name('filter-options');
                 Route::post('chats/{field}', [MessengerChatsController::class, '__invoke'])->where('field', '[A-Za-z_]\w*')->middleware('throttle:fastleo-integrations')->name('chats');
                 Route::get('{id}/history', [ActivityController::class, 'history'])->name('history');
+                Route::post('{id}/toggle/{field}', ToggleController::class)->where('field', '[A-Za-z_]\w*')->name('toggle');
                 Route::get('{id}', 'show')->name('show');
                 Route::get('{id}/edit', 'edit')->name('edit');
                 Route::put('{id}', 'update')->name('update');

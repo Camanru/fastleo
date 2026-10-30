@@ -7,6 +7,7 @@ declare(strict_types=1);
  */
 
 return [
+    'rich_text_config' => 'Настройка fastleo.rich_text.:key: значение «:value» недопустимо. Теги и атрибуты — строчная латиница (атрибуты — с дефисом, без on*, x-*, hx-*, v-*, ng-*, srcdoc и style), нельзя script, style, form и другие опасные теги; iframe_hosts — начало адреса вида https://хост/путь/ или https://хост/путь?; style включается ключом styles => true.',
     'image_crop_ratio' => 'Image «:field»: пропорция обрезки «:ratio» должна быть в виде ширина:высота, например crop(\'3:4\') или crop(\'16:9\').',
     'image_preset_missing' => 'Размера картинок «:preset» нет в fastleo.images.presets. Добавьте его: \':preset\' => [\'widths\' => [400, 800], \'ratio\' => \'4:3\'].',
     'image_preset_invalid' => 'Размер картинок «:preset» в fastleo.images.presets описан неверно: нужны widths — список ширин в пикселях (1–10000) и ratio — null или пропорция вида \'4:3\'.',
@@ -45,6 +46,7 @@ return [
     'filter_belongs_to_many' => 'BelongsToManyFilter «:filter»: добавьте в fields() ресурса поле BelongsToMany::make(\':filter\') — фильтр берёт из него связь и подписи.',
     'action_unbound' => 'Действие :action не привязано к ресурсу: верните его из actions() ресурса.',
     'publish_post' => 'Замыкание Publish::make() в ресурсе :resource должно вернуть Fastleo\\Publishing\\Post: return Post::make($текст)->images([...])->button(...).',
+    'set_toggle_field' => 'SetToggle: в ресурсе :resource нет поля «:field» типа Checkbox или Toggle. Укажите имя такого поля из fields().',
     'action_key' => 'Ключ действия «:key» (:action) в ресурсе :resource недопустим или повторяется: только латиница в нижнем регистре, цифры и дефис; встроенные ключи delete, restore, force-delete заняты. Задайте свой: protected ?string $key = \'...\'.',
     'action_field' => 'Поле «:field» (:type) нельзя использовать в мини-форме действия :action: там работают только простые поля (без связей, вложенных блоков и JSON-полей, зависимых списков, Slug, Password, Gallery, RichText и многоязычных полей).',
     'field_translatable' => 'Поле «:field» (:type) не может быть многоязычным: translatable() работает у Text, Textarea, Markdown, Code и RichText.',

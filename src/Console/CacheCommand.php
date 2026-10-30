@@ -6,6 +6,7 @@ namespace Fastleo\Console;
 
 use Fastleo\Fastleo;
 use Fastleo\Support\ResourceRegistry;
+use Fastleo\Support\SettingsStore;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -43,6 +44,8 @@ final class CacheCommand extends Command
         $classes = array_values(array_diff($registry->classes(), ResourceRegistry::SOFTNETICA, $registry->builtIn()));
         File::put($registry->cachePath(), '<?php return '.var_export($classes, true).';'.PHP_EOL);
         $registry->flush();
+
+        SettingsStore::forgetCached();
 
         $this->components->info(__('fastleo::console.cache_done', ['count' => count($classes)]));
 

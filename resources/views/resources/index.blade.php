@@ -293,7 +293,7 @@
                                         @include('fastleo::resources.tree-toggle')
                                         <x-fastleo::icon :name="$childCount > 0 ? 'folder' : 'file-text'" class="mr-1.5 inline size-4 align-middle text-ink-3" />
                                     @endif
-                                    @if ($loop->first && $url)
+                                    @if ($loop->first && $url && ! ($field instanceof \Fastleo\Fields\Checkbox && $field->isQuickToggle()))
                                         <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true])</a>
                                     @else
                                         @include('fastleo::resources.cell', ['inList' => true])
@@ -344,7 +344,7 @@
                             <div class="flex gap-3">
                                 <dt class="w-1/3 shrink-0 text-ink-2">{{ $field->getLabel() }}</dt>
                                 <dd class="min-w-0 flex-1 break-words">
-                                    @if ($loop->first && $url)
+                                    @if ($loop->first && $url && ! ($field instanceof \Fastleo\Fields\Checkbox && $field->isQuickToggle()))
                                         <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true])</a>
                                     @else
                                         @include('fastleo::resources.cell', ['inList' => true])

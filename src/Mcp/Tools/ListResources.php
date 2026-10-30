@@ -38,7 +38,7 @@ final class ListResources extends ResourceTool
         foreach (array_keys(Fastleo::resources()->all()) as $slug) {
             $resource = Fastleo::resources()->find($slug);
 
-            if ($resource instanceof Resource && $resource::isAvailableInMcp() && Authorization::allows('viewAny', $resource)) {
+            if ($resource instanceof Resource && $resource->isAvailableInMcp() && Authorization::allows('viewAny', $resource)) {
                 $sections[] = [
                     'resource' => $resource::slug(),
                     'label' => $resource::label(),

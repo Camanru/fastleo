@@ -46,8 +46,12 @@ final class FilesController
         $folder = PathGuard::inside($request->query('folder'))
             ?? ($current !== null ? dirname($current) : $root);
 
-        if ($folder !== $root && ! FileStore::disk()->directoryExists($folder)) {
+        if ($folder !== $root && (FileStore::isHidden($folder) || ! FileStore::disk()->directoryExists($folder))) {
             $folder = $root;
+        }
+
+        if ($current !== null && FileStore::isHidden($current)) {
+            $current = null;
         }
 
         $picker = $request->query('picker') === 'field' ? 'field' : null;
@@ -241,7 +245,7 @@ final class FilesController
         foreach ((array) $request->input('paths') as $path) {
             $path = PathGuard::entry($path);
 
-            if ($path !== null && FileStore::delete($path)) {
+            if ($path !== null && ! FileStore::isHidden($path) && FileStore::delete($path)) {
                 $deleted++;
             }
         }

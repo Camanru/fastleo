@@ -179,3 +179,11 @@ describe('has one', function (): void {
         $this->get(route('fastleo.resources.edit', ['articles', $article->id]))->assertSee('name="banner[title]"', false)->assertSee('value="Новый"', false);
     });
 });
+
+describe('an untouched toggle in a new nested record', function (): void {
+    it('is stored as false when the form sends it off', function (): void {
+        $this->post(route('fastleo.resources.store', 'articles'), articleData(['banner' => ['title' => 'Скидки', 'link' => '', 'is_active' => '0']]))->assertRedirect();
+
+        expect(Article::query()->firstOrFail()->banner()->sole()->is_active)->toBeFalse();
+    });
+});

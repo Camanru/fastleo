@@ -94,6 +94,7 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 | `fastleo.resources.restore` | POST | восстановить из корзины |
 | `fastleo.resources.force-delete` | DELETE | удалить навсегда |
 | `fastleo.resources.action` | POST | действие: `route(…, ['doctors', 'publish-doctors'])`, в теле `ids` и поля мини-формы под ключом `data` |
+| `fastleo.resources.toggle` | POST | быстрый переключатель поля с `quickToggle()`: `route(…, ['doctors', $id, 'is_active'])`, в теле `value` = `1` или `0` (JSON → `{"value": true}`) |
 | `fastleo.resources.export` | GET | выгрузка xlsx/csv |
 
 Полный список — `php artisan route:list --name=fastleo`.

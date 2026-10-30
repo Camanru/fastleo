@@ -134,6 +134,11 @@ final class InspectCommand extends Command
             }
         }
 
+        if (isset($section['mcp'])) {
+            $personal = $section['mcp_personal_field'] ?? null;
+            $this->components->twoColumnDetail('mcp', $section['mcp'] === true ? __('fastleo::console.inspect_mcp_open') : (is_string($personal) ? __('fastleo::console.inspect_mcp_personal', ['field' => $personal]) : __('fastleo::console.inspect_mcp_closed')));
+        }
+
         $rows = [];
 
         foreach (is_array($section['fields'] ?? null) ? $section['fields'] : [] as $field) {

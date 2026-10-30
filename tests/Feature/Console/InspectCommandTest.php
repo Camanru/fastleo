@@ -66,6 +66,19 @@ it('prints readable tables without --json', function (): void {
         ->assertSuccessful();
 });
 
+it('says whether the section is visible to an AI agent and why not', function (): void {
+    useFixtureResources('McpPersonal');
+
+    expect(inspected('plain'))->toMatchArray(['mcp' => true, 'mcp_personal_field' => null])
+        ->and(inspected('phone-field'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => 'contact'])
+        ->and(inspected('nested-phone'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => 'contacts.number'])
+        ->and(inspected('closed'))->toMatchArray(['mcp' => false, 'mcp_personal_field' => null])
+        ->and(inspected('open-phone'))->toMatchArray(['mcp' => true, 'mcp_personal_field' => null]);
+
+    $this->artisan('fastleo:inspect phone-field')->expectsOutputToContain('закрыт: поле «contact» — данные людей')->assertSuccessful();
+    $this->artisan('fastleo:inspect closed')->expectsOutputToContain('закрыт ($mcp = false)')->assertSuccessful();
+});
+
 it('fails with the list of sections for an unknown slug', function (): void {
     $this->artisan('fastleo:inspect nothing')
         ->expectsOutputToContain('Раздела «nothing» нет. Доступные адреса')

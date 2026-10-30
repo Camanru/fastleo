@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Health\HealthChecks;
 use Fastleo\Health\HealthResult;
 use Fastleo\Support\CacheCleaner;
 use Fastleo\Support\SchedulerPulse;
@@ -175,6 +176,20 @@ describe('site checks', function (): void {
             ->assertSeeInOrder(['Заявки', 'Заявок нет уже 3 дня', 'CRM', 'Норма', 'Отправка', 'не отправляется'])
             ->assertSee('Сломанная')
             ->assertDontSee('секрет');
+    });
+
+    it('shows addresses and emails of a check in the panel itself but hides them in the report to SoftNetica', function (): void {
+        Fastleo::healthCheck('site', 'Сайт https://example.com', fn (): HealthResult => HealthResult::failed('Не открывается https://example.com/price, почта admin@example.com'));
+
+        $this->get(route('fastleo.dashboard'))
+            ->assertOk()
+            ->assertSee('Сайт https://example.com')
+            ->assertSee('Не открывается https://example.com/price, почта admin@example.com');
+
+        $reported = collect(resolve(HealthChecks::class)->collect())->firstWhere('name', 'site');
+
+        expect($reported)->toMatchArray(['label' => 'Сайт [ссылка]'])
+            ->and(json_encode($reported, JSON_UNESCAPED_UNICODE))->not->toContain('example.com');
     });
 
     it('has no section of its own without site checks', function (): void {

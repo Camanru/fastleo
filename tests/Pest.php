@@ -117,6 +117,25 @@ function createLimitsTable(): void
 }
 
 /**
+ * Таблица `defaulted_things` с DEFAULT у колонок (модель `DefaultedThing`): включённый флаг, строка, ноль, выражение для даты.
+ */
+function createDefaultedThingsTable(): void
+{
+    Schema::create('defaulted_things', function (Blueprint $table): void {
+        $table->id();
+        $table->boolean('is_active')->default(true);
+        $table->boolean('is_hidden')->default(false);
+        $table->string('title')->default('Без названия');
+        $table->integer('sort')->default(0);
+        $table->string('kind')->default('column');
+        $table->text('note')->nullable();
+        $table->timestamp('published_at')->useCurrent();
+        $table->string('mood', 10)->default('new'); // в enum модели такого варианта нет
+        $table->string('legacy_at', 20)->default('0000-00-00 00:00:00');
+    });
+}
+
+/**
  * Таблица заметок с секретным полем `pin` (модель `SecretNote`).
  */
 function createSecretNotesTable(): void

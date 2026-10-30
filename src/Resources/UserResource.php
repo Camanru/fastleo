@@ -39,6 +39,9 @@ class UserResource extends Resource
 {
     protected static ?string $slug = 'users';
 
+    /** Администраторы — почта, пароли и доступы: ИИ-агенту раздел не виден. */
+    protected static bool $mcp = false;
+
     protected static string $icon = 'shield-check';
 
     protected static int $position = 100;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Support;
 
 use BackedEnum;
+use Fastleo\Actions\SetToggle;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
@@ -19,6 +20,7 @@ use Fastleo\Fields\Nested;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Password;
 use Fastleo\Fields\Repeater;
+use Fastleo\Fields\RichText;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Seo;
 use Fastleo\Fields\Slug;
@@ -30,9 +32,12 @@ use Fastleo\Resource;
 use Fastleo\Settings;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\SyncState;
+use Fastleo\Support\Html\HtmlLoss;
+use Fastleo\Support\Html\RichTextSettings;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use LogicException;
 use Throwable;
 
 /**
@@ -51,6 +56,9 @@ final class Doctor
 {
     /** Таблицы, которые создаёт пакет. */
     private const array TABLES = ['fastleo_imports', 'fastleo_logins', 'fastleo_two_factor', 'fastleo_activity', 'fastleo_settings', 'fastleo_notifications', 'fastleo_notification_bots', 'fastleo_channels', 'fastleo_publications', 'fastleo_publication_deliveries'];
+
+    /** Сколько записей раздела проверять на потерю разметки в RichText. */
+    private const int RICH_TEXT_ROWS = 500;
 
     /** Типы, у которых значение не может отсутствовать при NOT NULL (пустое значение хранится как `false` или `[]`). */
     private const array NEVER_EMPTY = [Checkbox::class, Gallery::class, KeyValue::class, Seo::class];
@@ -127,6 +135,7 @@ final class Doctor
         $this->tables();
         $this->assets();
         $this->softNetica();
+        $this->richTextSettings();
 
         if (config('queue.default') === 'sync') {
             $this->add('warning', 'site', 'queue_sync', hint: 'queue_sync_hint');
@@ -144,6 +153,18 @@ final class Doctor
 
         if ($disk === 'public' && config('filesystems.disks.public.driver') === 'local' && ! file_exists(public_path('storage'))) {
             $this->add('warning', 'site', 'storage_link', hint: 'storage_link_hint');
+        }
+    }
+
+    /**
+     * Настройка `fastleo.rich_text` допустима.
+     */
+    private function richTextSettings(): void
+    {
+        try {
+            RichTextSettings::validate();
+        } catch (LogicException $e) {
+            $this->add('error', 'site', 'rich_text_config', ['message' => $e->getMessage()]);
         }
     }
 
@@ -284,8 +305,29 @@ final class Doctor
             }
         }
 
+        $this->setToggles($resource, $scope);
         $this->fields($fields, $model, $columns, $scope, ! $resource::isReadonly());
         $this->inputVars($fields, $scope, ! $resource::isReadonly());
+    }
+
+    /**
+     * Готовые действия «Показать» / «Скрыть» (`SetToggle`) должны указывать на поле-галочку ресурса: иначе запуск упадёт.
+     */
+    private function setToggles(Resource $resource, string $scope): void
+    {
+        foreach ($resource->listActions() as $action) {
+            if (! $action instanceof SetToggle) {
+                continue;
+            }
+
+            $field = $resource->schema()->field($action->field());
+
+            if (! $field instanceof Checkbox) {
+                $this->add('error', $scope, 'set_toggle_field', ['field' => $action->field(), 'action' => $action->key()], 'set_toggle_field_hint');
+            } elseif (! $field->isWritable()) {
+                $this->add('warning', $scope, 'set_toggle_readonly', ['field' => $field->name, 'action' => $action->key()], 'set_toggle_readonly_hint');
+            }
+        }
     }
 
     /**
@@ -403,6 +445,10 @@ final class Doctor
                 $this->nested($field, $scope, $editable);
             }
 
+            if ($field instanceof Checkbox && $field->isQuickToggle() && (! $field->isWritable() || ! $field->showsInEditForm())) {
+                $this->add('warning', $scope, 'quick_toggle_readonly', ['field' => $field->name], 'quick_toggle_readonly_hint');
+            }
+
             if (! $field->writesAttribute()) {
                 continue;
             }
@@ -421,10 +467,74 @@ final class Doctor
 
             $this->casts($field, $model, $scope);
 
+            if ($field instanceof RichText && $editable && $field->isWritable()) {
+                $this->richTextLoss($field, $model, $scope);
+            }
+
             if ($column !== null) {
                 $this->column($field, $model, $column, $scope, $editable);
             }
         }
+    }
+
+    /**
+     * Старые записи теряют разметку, когда редактор сохранит их: чистка HTML вырежет теги и атрибуты, которые сайт не разрешил.
+     * Проверяются первые `RICH_TEXT_ROWS` записей; поле с `sanitize()` сайта проверяется по его правилам.
+     */
+    private function richTextLoss(RichText $field, Model $model, string $scope): void
+    {
+        try {
+            $values = $model->newQueryWithoutScopes()->toBase()->whereNotNull($field->name)->limit(self::RICH_TEXT_ROWS)->pluck($field->name);
+        } catch (Throwable) {
+            return;
+        }
+
+        $affected = 0;
+        $lost = ['tags' => [], 'attributes' => [], 'hosts' => []];
+
+        foreach ($values as $value) {
+            $texts = [$value];
+
+            if ($field->isTranslatable() && is_string($value)) {
+                $decoded = json_decode($value, true);
+                $texts = is_array($decoded) ? $decoded : $texts;
+            }
+
+            $found = false;
+
+            foreach ($texts as $text) {
+                if (! is_string($text) || trim($text) === '') {
+                    continue;
+                }
+
+                try {
+                    $loss = HtmlLoss::between($text, $field->sanitize($text));
+                } catch (LogicException) {
+                    return; // неверную настройку fastleo.rich_text doctor уже показал ошибкой
+                }
+
+                foreach ($loss as $kind => $names) {
+                    $lost[$kind] = array_values(array_unique([...$lost[$kind], ...$names]));
+                    $found = $found || $names !== [];
+                }
+            }
+
+            $affected += $found ? 1 : 0;
+        }
+
+        if ($affected === 0) {
+            return;
+        }
+
+        $parts = [];
+
+        foreach (['tags', 'attributes', 'hosts'] as $kind) {
+            if ($lost[$kind] !== []) {
+                $parts[] = trans()->string('fastleo::doctor.rich_text_'.$kind, ['list' => implode(', ', array_slice($lost[$kind], 0, 12))], Fastleo::LOCALE);
+            }
+        }
+
+        $this->add('warning', $scope, 'rich_text_loss', ['field' => $field->name, 'count' => $affected, 'checked' => count($values), 'lost' => implode('; ', $parts)], 'rich_text_loss_hint');
     }
 
     /**

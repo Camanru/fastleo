@@ -143,7 +143,7 @@ php artisan fastleo:inspect articles   # один раздел по адресу
 php artisan fastleo:inspect --json     # то же для машины
 ```
 
-В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, вложенные `fields` у блоков и повторителей. `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
+В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `quick_toggle: true` у галочки с `quickToggle()`, вложенные `fields` у блоков и повторителей. `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
 
 Если раздел описан с ошибкой, вместо `fields` будет `error` с текстом — остальные разделы выводятся как обычно.
 
@@ -175,6 +175,7 @@ php artisan fastleo:doctor --json   # {"ok": false, "errors": 2, "warnings": 1, 
 | JSON-поле (Gallery, Tags, KeyValue, Repeater, Blocks, Seo, `Select::multiple()`, `translatable()`) без каста `array` | добавить каст в модель |
 | `Enum` без enum-каста | добавить каст в модель |
 | колонка `$sortColumn` или `$treeColumn` не найдена | исправить имя или миграцию |
+| `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |
 
 **Предупреждения:**
 
@@ -190,6 +191,10 @@ php artisan fastleo:doctor --json   # {"ok": false, "errors": 2, "warnings": 1, 
 | `min()`/`max()` числа шире колонки (`int`, `decimal`; не SQLite) | уменьшить границы или увеличить колонку |
 | варианты `Select` не входят в enum-колонку MySQL | привести `options()` в соответствие с колонкой |
 | форма раздела может отправить больше полей, чем `max_input_vars` PHP | уменьшить `max()` вложенных полей или увеличить `max_input_vars` (проверка идёт по настройке php-cli) |
+| настройка `fastleo.rich_text` недопустима (ошибка) | убрать из неё `on*`, `srcdoc`, опасные теги, исправить адреса `iframe_hosts` |
+| у записей с RichText при сохранении пропадут теги, атрибуты или плееры | разрешить их в `fastleo.rich_text` до первого сохранения старых записей |
+| у поля с `quickToggle()` стоит `readonly()`, `onlyInList()` или `hideOnEdit()` — переключатель не появится | убрать лишнее у поля или `quickToggle()` |
+| `SetToggle` указывает на поле `readonly()` — действие пропустит все записи | убрать `readonly()` или действие |
 | включён `fastleo.robots`, а в `public` лежит свой `robots.txt` | удалить файл или выключить `fastleo.robots.enabled` |
 | на боевом сайте планировщик не запускался дольше 10 минут | cron: `* * * * * php artisan schedule:run`; метка запуска хранится в кеше приложения |
 | подключение к SoftNetica: недопустимый адрес (ошибка), нет хостов кабинета, отчёты не доходят дольше 30 минут | исправить `softnetica.url`/`cabinet_hosts`, запустить планировщик |
@@ -250,7 +255,7 @@ php artisan fastleo:doctor --json   # {"ok": false, "errors": 2, "warnings": 1, 
 
 **Удаление выключено.** Инструмент `delete-record` и встроенные действия удаления доступны, только если сервер запущен с ключом `--allow-delete` (или `'mcp' => ['allow_delete' => true]` в [конфиге](vendor/camanru/fastleo/docs/configuration.md)). Права на удаление всё равно проверяет Policy; запись с вложенными (дерево) не удаляется.
 
-**Закрыто от агента:** разделы с `protected static bool $mcp = false` (встроенные «Уведомления» и «Каналы» с токенами ботов) и действия с `protected bool $mcp = false` («Отправить тест» и все действия публикаций, которые что-то делают в мессенджерах: отправить, повторить, обновить, удалить из каналов). Черновик публикации агент создать и поправить может, в том числе действием `Publish` ([публикации](vendor/camanru/fastleo/docs/publishing.md#кнопка-в-разделе-сайта)).
+**Закрыто от агента:** разделы с данными людей — по умолчанию сервер не видит раздел, в котором есть поле `Email` или `Tel` или поле со словом `email`, `phone`, `tel`, `telephone`, `cellphone`, `whatsapp`, `viber` в имени (`client_phone`, `phone2`, `phones`, `phoneNumber`, `PHONE`; галочки, файлы и даты по имени не проверяются; заявки, обращения, клиенты, администраторы; поле внутри `HasMany`, `Repeater` и `Blocks` тоже считается). Открыть такой раздел можно только явно: `protected static bool $mcpPersonalData = true;` в ресурсе (для «Администраторов» — в своём наследнике `UserResource` вместе с `$mcp = true`). Закрыть любой другой раздел — `protected static bool $mcp = false;`. Какие разделы видит агент и почему закрыт остальной — в `fastleo:inspect` (строка `mcp`). Всегда закрыты: разделы с `protected static bool $mcp = false` (встроенные «Уведомления» и «Каналы» с токенами ботов) и действия с `protected bool $mcp = false` («Отправить тест» и все действия публикаций, которые что-то делают в мессенджерах: отправить, повторить, обновить, удалить из каналов). Черновик публикации агент создать и поправить может, в том числе действием `Publish` ([публикации](vendor/camanru/fastleo/docs/publishing.md#кнопка-в-разделе-сайта)).
 
 **Чего нет:** загрузки файлов, действий над корзиной, передачи файла, который вернуло действие (экспорт), доступа по сети.
 
@@ -327,5 +332,5 @@ php artisan fastleo:doctor --json   # {"ok": false, "errors": 2, "warnings": 1, 
 - [Тесты разделов в сайте](vendor/camanru/fastleo/docs/testing.md) — Раздел админки — обычные маршруты Laravel, поэтому его тестируют обычными Feature-тестами сайта: войти администратором, открыть страницу, отправить форму,…
 - [Оформление](vendor/camanru/fastleo/docs/theming.md) — Внешний вид админки меняется без сборки: название, логотип и основной цвет — в конфиге, остальное — своим CSS-файлом. Стили и скрипты пакета собраны заранее,…
 - [Многоязычные поля](vendor/camanru/fastleo/docs/translations.md) — Если сайт на нескольких языках, текстовое поле может хранить значение для каждого языка. Над таким полем — вкладки языков (`RU | EN`), каждая со своим вводом;…
-- [Переход с fastleo 2.x и 3.0](vendor/camanru/fastleo/docs/upgrade-from-3.md) — Fastleo 4.0 написан заново. Обратной совместимости со старыми версиями нет: другое имя пакета, другой namespace, раздел админки описывается не свойствами…
+- [Переход с fastleo 2.x и 3.0](vendor/camanru/fastleo/docs/upgrade-from-3.md) — > **Это не обновление версии, а другая админка.** Fastleo 4 — не «3.0 с новым номером»: разделы описываются заново классами-ресурсами, меняются форматы данных…
 - [Проверка значений](vendor/camanru/fastleo/docs/validation.md) — Значения формы проверяются правилами [валидации Laravel](https://laravel.com/docs/13.x/validation). Правила собираются из полей, видимых в форме.

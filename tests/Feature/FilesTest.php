@@ -110,6 +110,47 @@ it('deletes selected files and folders with their thumbnails', function (): void
         ->and($this->disk->get('uploads/keep.txt'))->toBe('keep');
 });
 
+it('hides folders and files named in files.hidden and does not delete them one by one', function (): void {
+    config(['fastleo.files.hidden' => ['thumbs', '*.bak']]);
+    $this->disk->put('uploads/doctors/thumbs/a.jpg', UploadedFile::fake()->image('a.jpg')->getContent());
+    $this->disk->put('uploads/doctors/ivanov.jpg', UploadedFile::fake()->image('a.jpg')->getContent());
+    $this->disk->put('uploads/doctors/old.bak', 'x');
+    $this->disk->put('uploads/doctors/Thumbs-list.txt', 'x');
+
+    $this->get(route('fastleo.files.index', ['folder' => 'uploads/doctors']))
+        ->assertOk()
+        ->assertSee('data-entry="uploads/doctors/ivanov.jpg"', false)
+        ->assertSee('data-entry="uploads/doctors/Thumbs-list.txt"', false)
+        ->assertDontSee('data-entry="uploads/doctors/thumbs"', false)
+        ->assertDontSee('data-entry="uploads/doctors/old.bak"', false);
+
+    $this->deleteJson(route('fastleo.files.destroy'), ['paths' => ['uploads/doctors/thumbs', 'uploads/doctors/old.bak', 'uploads/doctors/ivanov.jpg']])
+        ->assertOk()
+        ->assertJson(['deleted' => 1]);
+
+    expect($this->disk->exists('uploads/doctors/thumbs/a.jpg'))->toBeTrue()
+        ->and($this->disk->exists('uploads/doctors/old.bak'))->toBeTrue()
+        ->and($this->disk->exists('uploads/doctors/ivanov.jpg'))->toBeFalse();
+});
+
+it('hides the content of a hidden folder too: no listing, no picker, no deleting inside', function (): void {
+    config(['fastleo.files.hidden' => 'thumbs']);
+    $this->disk->put('uploads/doctors/thumbs/a.jpg', UploadedFile::fake()->image('a.jpg')->getContent());
+    $this->disk->put('uploads/doctors/ivanov.jpg', UploadedFile::fake()->image('b.jpg')->getContent());
+
+    $this->get(route('fastleo.files.index', ['folder' => 'uploads/doctors/thumbs']))
+        ->assertOk()
+        ->assertDontSee('data-entry="uploads/doctors/thumbs/a.jpg"', false)
+        ->assertDontSee('data-entry="uploads/doctors/ivanov.jpg"', false);
+    $this->get(route('fastleo.files.index', ['picker' => 'field', 'current' => 'uploads/doctors/thumbs/a.jpg']))
+        ->assertOk()
+        ->assertDontSee('data-entry="uploads/doctors/thumbs/a.jpg"', false);
+
+    $this->deleteJson(route('fastleo.files.destroy'), ['paths' => ['uploads/doctors/thumbs/a.jpg']])->assertOk()->assertJson(['deleted' => 0]);
+
+    expect($this->disk->exists('uploads/doctors/thumbs/a.jpg'))->toBeTrue();
+});
+
 it('creates a thumbnail on the first view and sends to it', function (): void {
     $this->disk->put('uploads/a.jpg', UploadedFile::fake()->image('a.jpg', 1200, 600)->getContent());
 

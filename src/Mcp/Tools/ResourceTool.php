@@ -62,7 +62,7 @@ abstract class ResourceTool extends Tool
         $slug = $request->get('resource');
         $resource = is_string($slug) ? Fastleo::resources()->find($slug) : null;
 
-        if (! $resource instanceof Resource || ! $resource::isAvailableInMcp()) {
+        if (! $resource instanceof Resource || ! $resource->isAvailableInMcp()) {
             $slugs = array_filter(array_keys(Fastleo::resources()->all()), fn (string $slug): bool => Fastleo::resources()->find($slug)?->isAvailableInMcp() === true);
 
             throw new ToolFailed(__('fastleo::mcp.unknown_resource', ['slug' => is_string($slug) ? $slug : '', 'list' => implode(', ', $slugs)]));

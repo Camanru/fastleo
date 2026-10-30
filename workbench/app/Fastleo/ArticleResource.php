@@ -63,6 +63,9 @@ final class ArticleResource extends Resource
 
     protected static bool $importable = true;
 
+    /** В демо раздел открыт ИИ-агенту явно: в нём есть Email и Tel, а такие разделы по умолчанию закрыты от MCP. */
+    protected static bool $mcpPersonalData = true;
+
     protected static ?string $label = 'Статьи';
 
     protected static ?string $singular = 'Статья';

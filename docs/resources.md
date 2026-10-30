@@ -145,6 +145,7 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 | `$activity` | `true` | Вести [журнал изменений](activity.md) раздела: кнопка «История», откат |
 | `$globallySearchable` | `true` | Записи раздела находит [глобальный поиск](list.md#глобальный-поиск) (Ctrl+K) |
 | `$mcp` | `true` | Раздел доступен ИИ-агентам через [MCP-сервер](claude.md#mcp-сервер); `false` — сервер его не видит |
+| `$mcpPersonalData` | `false` | Раздел с данными людей — полями `Email`, `Tel` или полем со словом `email`, `phone`, `tel`, `telephone`, `cellphone`, `whatsapp`, `viber` в имени (`client_phone`, `phone2`, `phones`, `phoneNumber`, `PHONE`; галочки, файлы и даты по имени не проверяются), в том числе внутри `HasMany`, `Repeater` и `Blocks` — сервер не видит, даже если `$mcp = true`. `true` — открыть такой раздел явно ([подробнее](claude.md#mcp-сервер)) |
 
 Все свойства — статические и типизированные:
 

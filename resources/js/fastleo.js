@@ -513,6 +513,35 @@ Alpine.data('fastleoConfirm', () => ({
 }));
 
 /**
+ * Быстрый переключатель галочки в списке: клик отправляет новое значение и меняет значок без перезагрузки.
+ * <form x-data="fastleoQuickToggle({ on, failed })" @submit.prevent="send">. Ошибка — значок остаётся прежним, под ним сообщение сервера.
+ */
+Alpine.data('fastleoQuickToggle', ({ on, failed }) => ({
+    on,
+    busy: false,
+    error: '',
+
+    async send() {
+        if (this.busy) {
+            return;
+        }
+
+        this.busy = true;
+        this.error = '';
+
+        try {
+            const data = await requestJson(this.$el.action, 'POST', { value: this.on ? 0 : 1 });
+
+            this.on = data.value === true;
+        } catch (error) {
+            this.error = error.data?.message || failed;
+        } finally {
+            this.busy = false;
+        }
+    },
+}));
+
+/**
  * CSRF-токен страницы для запросов fetch.
  */
 function csrfToken() {
