@@ -64,7 +64,7 @@ return [
     'action_unbound' => 'Действие :action не привязано к ресурсу: верните его из actions() ресурса.',
     'publish_post' => 'Замыкание Publish::make() в ресурсе :resource должно вернуть Fastleo\\Publishing\\Post: return Post::make($текст)->images([...])->button(...).',
     'set_toggle_field' => 'SetToggle: в ресурсе :resource нет поля «:field» типа Checkbox или Toggle. Укажите имя такого поля из fields().',
-    'action_key' => 'Ключ действия «:key» (:action) в ресурсе :resource недопустим или повторяется: только латиница в нижнем регистре, цифры и дефис; встроенные ключи delete, restore, force-delete заняты. Задайте свой: protected ?string $key = \'...\'.',
+    'action_key' => 'Ключ действия «:key» (:action) в ресурсе :resource недопустим или повторяется: только латиница в нижнем регистре, цифры и дефис; ключи встроенных действий :reserved заняты в любом разделе. Задайте свой: protected ?string $key = \'...\'.',
     'action_field' => 'Поле «:field» (:type) нельзя использовать в мини-форме действия :action: там работают только простые поля (без связей, вложенных блоков и JSON-полей, зависимых списков, Slug, Password, Gallery, RichText и многоязычных полей).',
     'field_translatable' => 'Поле «:field» (:type) не может быть многоязычным: translatable() работает у Text, Textarea, Markdown, Code и RichText.',
     'page_slug' => 'Адрес «:slug» у :class недопустим: только латиница в нижнем регистре, цифры и дефис.',

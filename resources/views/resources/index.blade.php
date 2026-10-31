@@ -34,7 +34,8 @@
         return $actionsHtml[$record->getKey()] ??= view('fastleo::resources.row-actions', $data)->render();
     };
     $singleActions = $resource->actionsFor(false, $trashed);
-    $formActions = array_filter($resource->listActions(), fn ($action) => $action->isForTrash() === $trashed);
+    // Формы — только для показанных действий: в разделе «только для просмотра» нет формы удаления.
+    $formActions = $bulkActions + $singleActions;
     $selectable = $bulkActions !== [];
     $pageIds = $records->map(fn ($record) => (string) $record->getKey())->values()->all();
     $recordUrl = function ($record) use ($allows, $slug, $trashed): ?string {
@@ -284,6 +285,7 @@
                         @endphp
                         <tr
                             @if ($tone) data-tone="{{ $tone }}" @endif
+                            @if ($resource->isUnread($record)) data-unread @endif
                             @class(['group/row hover:bg-hover aria-selected:bg-primary-soft [&:last-child>td]:border-b-0 [&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 compact:[&>td]:py-1.5', 'cursor-pointer' => $url !== null])
                             @if ($url) data-url="{{ $url }}" @endif
                             data-record="{{ $record->getKey() }}"
@@ -339,6 +341,7 @@
                 @endphp
                 <li
                     @if ($tone) data-tone="{{ $tone }}" @endif
+                    @if ($resource->isUnread($record)) data-unread @endif
                     @if ($url) data-url="{{ $url }}" @endif
                     class="fastleo-card p-3.5 aria-selected:border-primary aria-selected:bg-[color-mix(in_srgb,var(--color-primary)_7%,var(--color-surface))]"
                     data-record="{{ $record->getKey() }}"

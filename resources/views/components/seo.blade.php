@@ -10,7 +10,7 @@
     $tags = \Fastleo\Support\SeoTags::resolve($model, $field, $title, $description, $image, $canonical, $type);
 @endphp
 @if ($tags['title'] !== null)
-    <title>{{ $tags['title'] }}</title>
+    <title>{!! e($tags['title'], false) !!}</title>
 @endif
 @if ($tags['description'] !== null)
     <meta name="description" content="{{ $tags['description'] }}">
@@ -25,7 +25,7 @@
     <meta property="og:site_name" content="{{ $tags['site'] }}">
 @endif
 @if ($tags['title'] !== null)
-    <meta property="og:title" content="{{ $tags['title'] }}">
+    <meta property="og:title" content="{!! e($tags['title'], false) !!}">
 @endif
 @if ($tags['description'] !== null)
     <meta property="og:description" content="{{ $tags['description'] }}">

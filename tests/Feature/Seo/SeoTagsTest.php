@@ -23,7 +23,7 @@ function articlePage(mixed $test, Article $article, string $query = '', array $s
 
 describe('component', function (): void {
     it('prints the values of the Seo field and the Open Graph tags', function (): void {
-        $article = Article::factory()->create(['title' => 'Название', 'seo' => ['title' => 'Лечение зубов', 'description' => 'Описание для поиска', 'image' => 'articles/a.jpg']]);
+        $article = Article::factory()->create(['title' => 'Название', 'seo' => ['title' => 'Лечение зубов', 'description' => 'Описание для поиска', 'image' => 'uploads/articles/a.jpg']]);
 
         articlePage($this, $article)
             ->assertOk()
@@ -35,7 +35,7 @@ describe('component', function (): void {
             ->assertSee('<meta property="og:site_name" content="Клиника">', false)
             ->assertSee('<meta name="twitter:card" content="summary_large_image">', false)
             ->assertSee('<link rel="canonical" href="https://site.test/articles/'.$article->id.'">', false)
-            ->assertSee('property="og:image" content="'.SeoTags::absolute(FileStore::url('articles/a.jpg')).'"', false)
+            ->assertSee('property="og:image" content="'.SeoTags::absolute(FileStore::url('uploads/articles/a.jpg')).'"', false)
             ->assertDontSee('noindex');
     });
 
@@ -143,4 +143,14 @@ describe('an absolute address', function (): void {
             ->and(SeoTags::absolute('HTTP://cdn.test/a.jpg'))->toBe('HTTP://cdn.test/a.jpg')
             ->and(SeoTags::absolute('/storage/a.jpg'))->toBe('https://site.test/storage/a.jpg');
     });
+});
+
+it('escapes a title passed with {{ }} or as a value only once and still escapes tags', function (): void {
+    $title = 'Кофе & "чай" <script>';
+
+    foreach (['<x-fastleo::seo title="{{ $title }}" canonical="/" />', '<x-fastleo::seo :title="$title" canonical="/" />'] as $template) {
+        expect(Blade::render($template, ['title' => $title]))
+            ->toContain('<title>Кофе &amp; &quot;чай&quot; &lt;script&gt;</title>')
+            ->not->toContain('&amp;amp;');
+    }
 });

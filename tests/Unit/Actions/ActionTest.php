@@ -50,10 +50,13 @@ it('names an action after its class and puts the built-in ones first', function 
         ->and($actions['mark-featured']->clientOptions())->toBe(['confirm' => 'Показать на главной?', 'button' => 'На главную', 'danger' => false, 'form' => false]);
 });
 
-it('refuses an action whose key is taken', function (): void {
-    $taken = new class extends Action
+it('refuses an action whose key is taken by a built-in one, even where that one is off', function (string $key): void {
+    $taken = new class($key) extends Action
     {
-        protected ?string $key = 'delete';
+        public function __construct(string $key)
+        {
+            $this->key = $key;
+        }
 
         public function handle(Collection $records, array $data): ActionResult
         {
@@ -62,7 +65,7 @@ it('refuses an action whose key is taken', function (): void {
     };
 
     resourceWithActions([$taken])->listActions();
-})->throws(LogicException::class, 'delete, restore, force-delete заняты');
+})->with(['delete', 'mark-read', 'mark-unread'])->throws(LogicException::class, 'delete, restore, force-delete, mark-read, mark-unread заняты в любом разделе');
 
 it('refuses fields that do not work in a mini form', function (Field $field): void {
     $action = new class($field) extends Action

@@ -452,10 +452,18 @@ final class Doctor
             return;
         }
 
-        foreach (['sort_column' => $resource::sortColumn(), 'tree_column' => $resource::treeColumn()] as $key => $column) {
+        foreach (['sort_column' => $resource::sortColumn(), 'tree_column' => $resource::treeColumn(), 'read_column' => $resource::readColumn()] as $key => $column) {
             if ($column !== null && ! isset($columns[$column])) {
                 $this->add('error', $scope, $key, ['column' => $column, 'table' => $model->getTable()]);
             }
+        }
+
+        $readColumn = $resource::readColumn();
+        $readType = $readColumn === null ? null : ($columns[$readColumn] ?? null);
+
+        // Отметка пишет в колонку время или NULL: в boolean или NOT NULL открытие записи упадёт с ошибкой базы.
+        if ($readColumn !== null && $readType !== null && ($readType['nullable'] !== true || ! is_string($readType['type_name']) || preg_match('/date|time/i', $readType['type_name']) !== 1)) {
+            $this->add('error', $scope, 'read_column_type', ['column' => $readColumn], 'read_column_type_hint');
         }
 
         $this->setToggles($resource, $scope);

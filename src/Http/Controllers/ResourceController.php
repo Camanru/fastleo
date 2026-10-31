@@ -102,6 +102,7 @@ final class ResourceController
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id, $resource::usesSoftDeletes());
         Authorization::authorize('view', $resource, $record);
+        $this->markRead($resource, $record);
 
         return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
     }
@@ -114,6 +115,7 @@ final class ResourceController
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id);
         Authorization::authorize('update', $resource, $record);
+        $this->markRead($resource, $record);
 
         return view('fastleo::resources.form', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
     }
@@ -428,6 +430,19 @@ final class ResourceController
     {
         if (method_exists($record, 'restore')) {
             $record->restore();
+        }
+    }
+
+    /**
+     * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели и журнала).
+     */
+    private function markRead(Resource $resource, Model $record): void
+    {
+        $column = $resource::readColumn();
+
+        if ($column !== null && $record->getAttribute($column) === null && $resource->markRead([$record->getKey()]) > 0) {
+            $record->setAttribute($column, $record->freshTimestamp());
+            $record->syncOriginalAttribute($column);
         }
     }
 }

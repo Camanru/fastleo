@@ -52,7 +52,7 @@ final class ReportPage extends \Fastleo\Page
 
 - `<x-fastleo::layouts.app title="…" description="…" :count="12">` — рамка админки: меню, шапка и заголовок страницы. Кнопки справа от заголовка передаются слотом `<x-slot:actions>…</x-slot:actions>`;
 - `<x-fastleo::card title="…" description="…">` — карточка (слот `<x-slot:action>` — действие в правом верхнем углу);
-- `<x-fastleo::button variant="primary" icon="plus" :href="…">` — кнопка или ссылка-кнопка. Варианты: `primary`, `secondary` (по умолчанию), `ghost`, `danger`, `danger-soft`, `icon`, `icon-danger` (только иконка, подпись — в `<span class="sr-only">`). Размеры `size`: `md`, `sm`, `lg`;
+- `<x-fastleo::button variant="primary" icon="plus" :href="…">` — кнопка или ссылка-кнопка. Варианты: `primary`, `secondary` (по умолчанию), `ghost`, `danger`, `danger-soft`, `dashed` (добавить пункт: пунктирная рамка во всю ширину), `icon`, `icon-danger` (только иконка, подпись — в `<span class="sr-only">`). Размеры `size`: `md`, `sm`, `lg`;
 - `<x-fastleo::badge tone="success">Опубликована</x-fastleo::badge>` — статус. Тона: `success`, `warning`, `danger`, `info`, `neutral`; смысл всегда дублируйте текстом;
 - `<x-fastleo::icon name="house" />` — иконка [Lucide](https://lucide.dev/icons);
 - `<x-fastleo::flash />` — сообщение после действия (всплывает снизу справа).
@@ -61,16 +61,19 @@ CSS админки собран заранее, поэтому классы Tail
 
 ### Кнопки и формы на своей странице
 
-Маршруты сайта внутри админки объявляются через `Fastleo::routes()`: они получают префикс и домен админки, вход, проверку доступа, CSRF, русский язык и заголовки безопасности.
+Маршруты сайта внутри админки объявляются через `Fastleo::routes()`: они получают префикс и домен админки, вход, проверку доступа, CSRF, русский язык и заголовки безопасности. Маршруты кнопок и форм страницы привяжите к ней (`page:`) — тогда на них действуют права страницы: закрытая методом `canAccess()` страница отвечает 403 и на своих маршрутах, недоступная (`isAvailable()`) — 404.
 
 ```php
 // routes/web.php
+use App\Fastleo\ReportPage;
 use Fastleo\Fastleo;
 
 Fastleo::routes(function () {
     Route::post('report/run', RunReportController::class)->name('report-run');
-});
+}, page: ReportPage::class);
 ```
+
+Без `page` маршрут открыт любому администратору — так делайте только маршруты, которые не относятся к одной странице.
 
 Адрес — `/fastleo/pages/report/run`, имя — `fastleo.pages.report-run`. В форме используйте `@csrf` и `route('fastleo.pages.report-run')`. Берите маршруты длиннее одного сегмента (`report/run`), чтобы не пересечься со страницей `/fastleo/pages/{страница}`.
 

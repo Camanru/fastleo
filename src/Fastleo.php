@@ -10,6 +10,7 @@ use Fastleo\Health\HealthChecks;
 use Fastleo\Health\HealthResult;
 use Fastleo\Http\Middleware\Authenticate;
 use Fastleo\Http\Middleware\AuthenticateSession;
+use Fastleo\Http\Middleware\AuthorizePage;
 use Fastleo\Http\Middleware\EnsureCanAccessFastleo;
 use Fastleo\Http\Middleware\RecordActivity;
 use Fastleo\Http\Middleware\RequireTwoFactor;
@@ -98,23 +99,34 @@ final class Fastleo
      * Адреса — `/fastleo/pages/…`, имена — `fastleo.pages.…`. Берите маршруты длиннее одного сегмента
      * (`report/run`), чтобы не пересечься со страницей `/fastleo/pages/{страница}`.
      *
+     * Маршруты кнопок и форм своей страницы привязывайте к ней (`page:`): тогда они проверяют то же, что и страница, —
+     * `isAvailable()` (иначе 404) и `canAccess()` администратора (иначе 403). Без `page` маршрут открыт любому
+     * администратору.
+     *
      * ```php
      * // routes/web.php
      * Fastleo::routes(function () {
      *     Route::post('report/run', RunReportController::class)->name('report-run'); // fastleo.pages.report-run
-     * });
+     * }, page: ReportPage::class);
      * ```
      *
      * @param  Closure(): void  $routes
+     * @param  class-string<Page>|null  $page  страница, права которой действуют на маршрутах
      */
-    public static function routes(Closure $routes): void
+    public static function routes(Closure $routes, ?string $page = null): void
     {
         $domain = config('fastleo.domain');
 
         Route::group([
             'prefix' => trim(config()->string('fastleo.path', 'fastleo'), '/').'/pages',
             'domain' => is_string($domain) && $domain !== '' ? $domain : null,
-            'middleware' => [...config()->array('fastleo.middleware', ['web']), SetLocale::class, SecurityHeaders::class, ...self::adminMiddleware()],
+            'middleware' => [
+                ...config()->array('fastleo.middleware', ['web']),
+                SetLocale::class,
+                SecurityHeaders::class,
+                ...self::adminMiddleware(),
+                ...($page === null ? [] : [AuthorizePage::class.':'.$page]),
+            ],
             'as' => 'fastleo.pages.',
         ], $routes);
     }

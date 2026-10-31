@@ -7,6 +7,7 @@ namespace Fastleo;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\DeleteRecords;
 use Fastleo\Actions\ForceDeleteRecords;
+use Fastleo\Actions\MarkRead;
 use Fastleo\Actions\RestoreRecords;
 use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fields\BelongsTo;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
 use LogicException;
 
@@ -139,6 +141,12 @@ abstract class Resource
     /** Раз в сколько секунд обновлять список и связанные таблицы раздела без перезагрузки; null — не обновлять. */
     protected static ?int $poll = null;
 
+    /**
+     * Колонка отметки «просмотрено» (`timestamp`, nullable): открытие записи ставит время, число в меню считает
+     * непросмотренные, их строки в списке выделены. null — отметки нет.
+     */
+    protected static ?string $readColumn = null;
+
     /** Поля, разложенные из fields() (считаются один раз на объект). */
     private ?FormSchema $schema = null;
 
@@ -225,7 +233,8 @@ abstract class Resource
     }
 
     /**
-     * Число в меню рядом с разделом (например, новые заявки) или null.
+     * Число в меню рядом с разделом (например, новые заявки) или null. С `$readColumn` по умолчанию — число
+     * непросмотренных записей (с ограничением `query()` раздела).
      *
      * ```php
      * public static function badge(): ?int
@@ -236,7 +245,68 @@ abstract class Resource
      */
     public static function badge(): ?int
     {
-        return null;
+        $column = static::readColumn();
+
+        if ($column === null) {
+            return null;
+        }
+
+        /** @var static $resource */
+        $resource = resolve(static::class);
+        $query = $resource->newQuery();
+
+        return $query->whereNull($query->qualifyColumn($column))->count() ?: null;
+    }
+
+    /**
+     * Колонка отметки «просмотрено» или null.
+     *
+     * ```php
+     * protected static ?string $readColumn = 'read_at'; // $table->timestamp('read_at')->nullable();
+     * ```
+     */
+    public static function readColumn(): ?string
+    {
+        return static::$readColumn;
+    }
+
+    /**
+     * Запись ещё не просматривали (у раздела есть `$readColumn`, а отметки нет). Запись, выбранная без этой колонки
+     * (`query()` раздела с `select()`), непросмотренной не считается.
+     */
+    public function isUnread(Model $record): bool
+    {
+        $column = static::readColumn();
+
+        return $column !== null && array_key_exists($column, $record->getAttributes()) && $record->getAttribute($column) === null;
+    }
+
+    /**
+     * Отметить записи просмотренными (`true`) или нет: прямым запросом, без событий модели, журнала изменений
+     * и смены `updated_at` — отметка не меняет саму запись. Без `$readColumn` ничего не делает.
+     *
+     * ```php
+     * $resource->markRead([$lead->getKey()], read: true);
+     * ```
+     *
+     * @param  list<mixed>  $keys  ключи записей
+     * @return int сколько записей изменилось
+     */
+    public function markRead(array $keys, bool $read = true): int
+    {
+        $column = static::readColumn();
+
+        if ($column === null || $keys === []) {
+            return 0;
+        }
+
+        $model = $this->newModel();
+
+        // Без глобальных scope модели: ключи — записи, которые раздел уже нашёл через свой query() (в том числе из корзины).
+        return $model->newQueryWithoutScopes()->toBase()
+            ->whereIn($model->getQualifiedKeyName(), $keys)
+            ->when($read, fn (QueryBuilder $query): QueryBuilder => $query->whereNull($model->qualifyColumn($column)), fn (QueryBuilder $query): QueryBuilder => $query->whereNotNull($model->qualifyColumn($column)))
+            ->update([$column => $read ? $model->freshTimestampString() : null]);
     }
 
     /**
@@ -518,6 +588,9 @@ abstract class Resource
         return static::$slug ?? Str::kebab(Str::pluralStudly(class_basename(static::model())));
     }
 
+    /** Ключи встроенных действий: заняты в любом разделе, даже если само действие в нём не появляется (нет корзины или `$readColumn`). */
+    public const array RESERVED_ACTION_KEYS = ['delete', 'restore', 'force-delete', 'mark-read', 'mark-unread'];
+
     /** Тона подсветки строки (`rowTone()`). */
     public const array ROW_TONES = ['success', 'warning', 'danger', 'info', 'neutral'];
 
@@ -740,7 +813,8 @@ abstract class Resource
     }
 
     /**
-     * Все действия раздела по ключу: встроенные (удалить; в корзине — восстановить, удалить навсегда) и `actions()`.
+     * Все действия раздела по ключу: встроенные (удалить; в корзине — восстановить, удалить навсегда; с `$readColumn` —
+     * «Просмотрено», «Не просмотрено») и `actions()`. Ключи встроенных (`RESERVED_ACTION_KEYS`) своим действиям не даются.
      *
      * @return array<string, Action>
      *
@@ -755,11 +829,19 @@ abstract class Resource
         $actions = [];
         $builtIn = static::usesSoftDeletes() ? [new DeleteRecords, new RestoreRecords, new ForceDeleteRecords] : [new DeleteRecords];
 
-        foreach ([...$builtIn, ...$this->actions()] as $action) {
+        if (static::readColumn() !== null) {
+            $builtIn = [MarkRead::make(true), MarkRead::make(false), ...$builtIn];
+        }
+
+        foreach ($builtIn as $action) {
+            $actions[$action->key()] = $action->forResource($this);
+        }
+
+        foreach ($this->actions() as $action) {
             $key = $action->key();
 
-            if (isset($actions[$key]) || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $key) !== 1) {
-                throw new LogicException(__('fastleo::exceptions.action_key', ['action' => $action::class, 'key' => $key, 'resource' => static::class], Fastleo::LOCALE));
+            if (isset($actions[$key]) || in_array($key, self::RESERVED_ACTION_KEYS, true) || preg_match('/^[a-z0-9]+(?:-[a-z0-9]+)*$/', $key) !== 1) {
+                throw new LogicException(__('fastleo::exceptions.action_key', ['action' => $action::class, 'key' => $key, 'resource' => static::class, 'reserved' => implode(', ', self::RESERVED_ACTION_KEYS)], Fastleo::LOCALE));
             }
 
             $actions[$key] = $action->forResource($this);

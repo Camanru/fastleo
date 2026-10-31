@@ -244,7 +244,7 @@ trait QueriesRelatedRecords
         $query = $this->orderedOptionsQuery($dependency);
 
         if ($search !== '') {
-            $query->whereRaw(new ContainsExpression($query->qualifyColumn($this->getTitleColumn())), [ContainsExpression::pattern($search)]);
+            ContainsExpression::where($query, $query->qualifyColumn($this->getTitleColumn()), $search);
         }
 
         return $this->options($query->limit($limit)->get());

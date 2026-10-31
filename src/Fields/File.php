@@ -19,12 +19,6 @@ use Override;
 class File extends FileField
 {
     #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.file';
-    }
-
-    #[Override]
     protected function typeRules(): array
     {
         return ['string', $this->pathRule()];

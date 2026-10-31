@@ -53,8 +53,8 @@ final class ResourceInspector
             'icon' => $resource::icon(),
             'position' => $resource::position(),
             'in_menu' => $resource::inMenu(),
-            // Число у пункта меню: у ресурса переопределён `badge()`.
-            'has_badge' => new \ReflectionMethod($resource, 'badge')->getDeclaringClass()->getName() !== Resource::class,
+            // Число у пункта меню: у ресурса переопределён `badge()` или есть отметка «просмотрено».
+            'has_badge' => new \ReflectionMethod($resource, 'badge')->getDeclaringClass()->getName() !== Resource::class || $resource::readColumn() !== null,
         ];
 
         try {
@@ -70,6 +70,7 @@ final class ResourceInspector
                 'soft_deletes' => $resource::usesSoftDeletes(),
                 'sort_column' => $resource::sortColumn(),
                 'tree_column' => $resource::treeColumn(),
+                'read_column' => $resource::readColumn(),
                 'exportable' => $resource::isExportable(),
                 'importable' => $resource::isImportable(),
                 'import_key' => $resource::importKey(),

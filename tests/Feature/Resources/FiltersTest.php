@@ -165,7 +165,7 @@ it('searches the options of a many-to-many filter on the server', function (): v
     Topic::factory()->create(['title' => 'Здоровье']);
     Topic::factory()->create(['title' => 'Спорт']);
 
-    $this->getJson(route('fastleo.resources.filter-options', ['articles', 'topics', 'q' => 'Здор']))
+    $this->getJson(route('fastleo.resources.filter-options', ['articles', 'topics', 'q' => 'здор']))
         ->assertOk()
         ->assertJsonPath('options.0.label', 'Здоровье')
         ->assertJsonCount(1, 'options');
@@ -175,7 +175,7 @@ it('searches the options of a relation filter on the server', function (): void 
     Category::factory()->create(['title' => 'Новости']);
     Category::factory()->create(['title' => 'Акции']);
 
-    $this->getJson(route('fastleo.resources.filter-options', ['articles', 'category_id', 'q' => 'Нов']))
+    $this->getJson(route('fastleo.resources.filter-options', ['articles', 'category_id', 'q' => 'нов']))
         ->assertOk()
         ->assertJsonPath('options.0.label', 'Новости')
         ->assertJsonCount(1, 'options');

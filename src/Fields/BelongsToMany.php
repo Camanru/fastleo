@@ -192,7 +192,7 @@ class BelongsToMany extends Field implements SearchesOptions
     }
 
     #[Override]
-    public function view(): string
+    protected function packageView(): string
     {
         return 'fastleo::fields.combobox';
     }

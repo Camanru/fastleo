@@ -60,12 +60,6 @@ class Text extends Field
     }
 
     #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.text';
-    }
-
-    #[Override]
     protected function canBeTranslated(): bool
     {
         return true;

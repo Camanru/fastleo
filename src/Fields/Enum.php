@@ -75,10 +75,4 @@ class Enum extends Select
 
         return parent::typeRules();
     }
-
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.select';
-    }
 }

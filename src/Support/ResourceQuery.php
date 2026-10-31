@@ -240,15 +240,15 @@ final class ResourceQuery
             return;
         }
 
-        $pattern = ContainsExpression::pattern($this->search);
+        $search = $this->search;
 
-        $query->where(function (Builder $where) use ($fields, $pattern): void {
+        $query->where(function (Builder $where) use ($fields, $search): void {
             foreach ($fields as $field) {
                 $column = $where->qualifyColumn($field->name);
 
                 // Многоязычное поле — поиск по каждому языку (JSON-путь колонки).
                 foreach ($field->isTranslatable() ? array_map(fn (string $locale): string => $column.'->'.$locale, Fastleo::locales()) : [$column] as $target) {
-                    $where->whereRaw(new ContainsExpression($target), [$pattern], 'or');
+                    ContainsExpression::where($where, $target, $search, 'or');
                 }
             }
         });

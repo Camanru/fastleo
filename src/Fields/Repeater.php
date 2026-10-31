@@ -287,12 +287,6 @@ class Repeater extends Field
         ])->render());
     }
 
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.repeater';
-    }
-
     /**
      * Пустое значение здесь имеет свой смысл (галочка, пароль, файл, список, вложенные записи) — `emptyValue()` недоступен.
      */

@@ -181,12 +181,6 @@ class Slug extends Text
     }
 
     #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.slug';
-    }
-
-    #[Override]
     protected function canBeTranslated(): bool
     {
         return false;

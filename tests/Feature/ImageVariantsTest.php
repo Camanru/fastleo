@@ -229,3 +229,13 @@ describe('fastleo:images', function (): void {
         expect(Variants::sizes('uploads/a.jpg', 'card'))->toBe([]);
     });
 });
+
+it('escapes the alt text passed with {{ }} or as a value only once and still escapes tags', function (): void {
+    $alt = 'Кофе & "чай" <script>';
+
+    foreach (['<x-fastleo::picture src="uploads/a.jpg" alt="{{ $alt }}" />', '<x-fastleo::picture src="uploads/a.jpg" :alt="$alt" />'] as $template) {
+        expect(Blade::render($template, ['alt' => $alt]))
+            ->toContain('alt="Кофе &amp; &quot;чай&quot; &lt;script&gt;"')
+            ->not->toContain('&amp;amp;');
+    }
+});

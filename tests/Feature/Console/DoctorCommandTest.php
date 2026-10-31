@@ -81,7 +81,15 @@ it('reports a field without a column, outside $fillable, without a cast and with
         ->and($errors)->toContain('Поле «tags» хранит массив')
         ->and($errors)->toContain('Поле «status» (Enum) требует каст')
         ->and($errors)->toContain('Связь поля «category_id»')
-        ->and($errors)->toContain('Колонка порядка «nope»');
+        ->and($errors)->toContain('Колонка порядка «nope»')
+        ->and($errors)->toContain('Колонка отметки «просмотрено» «seen_at»');
+});
+
+it('reports a read column that cannot hold the time of reading', function (): void {
+    useFixtureResources('DoctorReadColumn');
+
+    expect(implode("\n", messages('read-flag', 'error')))->toContain('Колонка отметки «просмотрено» «is_published» ($readColumn) должна быть датой со временем')
+        ->and(collect(diagnosed()['problems'])->firstWhere('scope', 'read-flag')['hint'] ?? null)->toBe("\$table->timestamp('is_published')->nullable()->index();");
 });
 
 it('warns about a NOT NULL column without required()', function (): void {

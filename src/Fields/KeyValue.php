@@ -259,12 +259,6 @@ class KeyValue extends Field
         return new HtmlString('<dl class="flex flex-col gap-1 whitespace-normal">'.implode('', $rows).'</dl>');
     }
 
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.key-value';
-    }
-
     /**
      * Сохранённое значение (объект или json-строка) → пары.
      *

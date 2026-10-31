@@ -1,10 +1,10 @@
 # Переход с fastleo 2.x и 3.0
 
-> **Это не обновление версии, а другая админка.** Fastleo 4 — не «3.0 с новым номером»: разделы описываются заново классами-ресурсами, меняются форматы данных (пути файлов, очистка HTML в редакторе, значения по умолчанию), часть таблиц и колонок называется так же, но устроена иначе, а поведение не повторяет 3.0. Закладывайте на переход время как на подключение новой админки к существующим данным, а не как на `composer update`. Что именно меняется, перечислено ниже и в разделе [«Что устроено иначе»](#что-устроено-иначе-или-не-переносится).
+> **Это не обновление версии, а другая админка.** Fastleo 4 написан заново, обратной совместимости нет: другое имя пакета и namespace, разделы описываются заново классами-ресурсами, меняются форматы данных (пути файлов, очистка HTML в редакторе, значения по умолчанию), часть таблиц и колонок называется так же, но устроена иначе. Закладывайте на переход время как на подключение новой админки к существующим данным, а не как на `composer update`. Что устроено иначе — в [конце страницы](#что-устроено-иначе-или-не-переносится).
 
-Fastleo 4.0 написан заново. Обратной совместимости со старыми версиями нет: другое имя пакета, другой namespace, раздел админки описывается не свойствами модели, а отдельным классом-ресурсом. Данные сайта (таблицы, загруженные файлы, пароли администраторов) остаются, но код админки придётся описать заново — по шагам ниже.
+Данные сайта (таблицы, загруженные файлы, пароли администраторов) остаются, а код админки описывается заново — по шагам ниже.
 
-Версии 2.x и 3.0 устроены почти одинаково (свойство `$fastleo` у модели, массив `$fastleo_columns`, колонка `users.fastleo_admin`, файлы в `storage/app/public/uploads`), поэтому инструкция одна. Где они различаются, это отмечено. Отметка «3.0» значит, что такой возможности в 2.x не было, а «в части сборок 3.0» — что она была только в некоторых сборках 3.0.
+Версии 2.x и 3.0 устроены почти одинаково (свойство `$fastleo` у модели, массив `$fastleo_columns`, колонка `users.fastleo_admin`, файлы в `storage/app/public/uploads`), поэтому инструкция одна. Где они различаются, это отмечено. Отметка «3.0» значит, что такой возможности в 2.x не было. Отметка «если было в 3.0» — возможность была не в каждой копии 3.0 (их дорабатывали под разные сайты): нет её в вашем коде — строку пропустите.
 
 Переезжаете не с fastleo, а с другой админки (MoonShine, самописной)? Читайте [migrating.md](migrating.md).
 
@@ -23,11 +23,11 @@ Fastleo 4.0 написан заново. Обратной совместимос
 | `$fastleo_description` (карточка на главной) | `protected static ?string $description` — пояснение под заголовком списка |
 | `$fastleo_icon` (3.0, Font Awesome: `'fa-user-md'`) | `protected static string $icon` — имя иконки [Lucide](https://lucide.dev/icons): `'stethoscope'` |
 | `$fastleo_order` (3.0): `['id', 'desc']` | `protected static ?array $defaultOrder = ['id', 'desc']` (по умолчанию — новые сверху) |
-| `$fastleo_position` (в части сборок 3.0) | `protected static int $position` |
-| `$fastleo_per_page` (в части сборок 3.0) | `protected static ?int $perPage` |
-| `$fastleo_tree = 'parent_id'` (в части сборок 3.0) | `protected static ?string $treeColumn = 'parent_id'` и метод `parent()` в модели ([дерево](resources.md#дерево)) |
+| `$fastleo_position` (если было в 3.0) | `protected static int $position` |
+| `$fastleo_per_page` (если было в 3.0) | `protected static ?int $perPage` |
+| `$fastleo_tree = 'parent_id'` (если было в 3.0) | `protected static ?string $treeColumn = 'parent_id'` и метод `parent()` в модели ([дерево](resources.md#дерево)) |
 | `fastleoBadge()` и `$fastleo_badge_title` (3.0) | `public static function badge(): ?int` в ресурсе — число у пункта меню. Подписи-предупреждения на главной нет, для неё — [виджет](dashboard.md) `Stat` |
-| `fastleoUrl()` (в части сборок 3.0) | `public function url(Model $record): ?string` в ресурсе — кнопка «Открыть на сайте» |
+| `fastleoUrl()` (если было в 3.0) | `public function url(Model $record): ?string` в ресурсе — кнопка «Открыть на сайте» |
 | запись через query builder: `$fillable` не нужен, события Eloquent не срабатывают | запись через `fill()->save()`: **все поля формы должны быть в `$fillable` модели**, работают касты, мутаторы и observers ([запись в модель](resources.md#запись-в-модель)) |
 
 ### Поля (`$fastleo_columns`)
@@ -77,7 +77,7 @@ Fastleo 4.0 написан заново. Обратной совместимос
 | вход по сессии fastleo (2.x) или middleware `fastleo.auth` (3.0) | guard `fastleo` и метод `canAccessFastleo()` модели пользователя: интерфейс `Fastleo\Auth\FastleoUser` и трейт `Fastleo\Auth\HasFastleoAccess` ([установка](installation.md#2-модель-пользователя)) |
 | `php artisan fastleo:user --admin` | `php artisan fastleo:user admin@site.ru` |
 | раздел «Пользователи» (`/fastleo/users`) — все пользователи сайта | раздел «Администраторы» (`/fastleo/users`) — только пользователи с `fastleo_admin = true` ([подробнее](auth.md#администраторы)) |
-| `remember_days` (в части сборок 3.0) | `auth.remember_days` в `config/fastleo.php` |
+| `remember_days` (если было в 3.0) | `auth.remember_days` в `config/fastleo.php` |
 
 ### Конфиг `config/fastleo.php`
 
@@ -90,8 +90,8 @@ Fastleo 4.0 написан заново. Обратной совместимос
 | `extensions` (3.0) | `files.extensions` |
 | `timezone` (3.0) | `timezone` — пояс полей `DateTime` |
 | `models.namespace`, `models.path` (3.0) | `resources.namespace`, `resources.path` — папка ресурсов, а не моделей |
-| `per_page` (в части сборок 3.0) | `list.per_page` (по умолчанию 25) |
-| `editor` — настройки TinyMCE (в части сборок 3.0) | нет; высота редактора — `RichText::make(...)->height(500)`, разрешённые теги — `->sanitizeUsing(...)` |
+| `per_page` (если было в 3.0) | `list.per_page` (по умолчанию 25) |
+| `editor` — настройки TinyMCE (если было в 3.0) | нет; высота редактора — `RichText::make(...)->height(500)`, разрешённые теги — `->sanitizeUsing(...)` |
 | `menu_links` (3.0) | `menu.links` — ссылки по адресу (`label`, `url`, `icon`, `group`) или своя страница `Fastleo\Page` ([свои страницы](pages.md)) |
 | `info_report`, `info_panels`, `info_actions` (3.0) | свой дашборд — класс `App\Fastleo\Dashboard` с виджетами ([дашборд](dashboard.md)); кнопка «Очистить кеш» есть в виджете `ServerStatus` |
 

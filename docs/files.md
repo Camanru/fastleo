@@ -116,7 +116,7 @@ Gallery::make('photos', 'Фото клиники')->variants('photo');
 Вывод на сайте:
 
 ```blade
-<x-fastleo::picture :src="$doctor->photo" preset="card" alt="{{ $doctor->name }}" sizes="(min-width: 768px) 400px, 100vw" class="rounded-lg" />
+<x-fastleo::picture :src="$doctor->photo" preset="card" :alt="$doctor->name" sizes="(min-width: 768px) 400px, 100vw" class="rounded-lg" />
 ```
 
 ```html

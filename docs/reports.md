@@ -2,6 +2,43 @@
 
 Статистика по менеджерам, продажи за период, заявки по источникам: страница админки без модели, на которой сверху — фильтры (период, менеджер, статус), а под ними — плитки с числами, график и таблицы, пересчитанные по выбранным фильтрам. Это обычная [своя страница](pages.md) (`Fastleo\Page`), только вместо Blade-шаблона вы описываете `filters()` и `widgets()`.
 
+Самый простой отчёт — период и две плитки:
+
+```php
+// app/Fastleo/LeadsReportPage.php
+namespace App\Fastleo;
+
+use App\Models\Lead;
+use Fastleo\Page;
+use Fastleo\Reports\Filters;
+use Fastleo\Reports\Period;
+use Fastleo\Widgets\Stat;
+
+final class LeadsReportPage extends Page
+{
+    protected static ?string $label = 'Заявки за период';
+
+    public function filters(): array
+    {
+        return [
+            Period::make('period', 'Период')->default('month'),
+        ];
+    }
+
+    public function widgets(Filters $filters): array
+    {
+        $leads = fn () => $filters->period('period')->apply(Lead::query(), 'created_at');
+
+        return [
+            Stat::make('Заявок')->value(fn () => $leads()->count()),
+            Stat::make('Продано')->value(fn () => $leads()->where('status', 'sold')->count()),
+        ];
+    }
+}
+```
+
+Полный пример — фильтр по менеджеру, график по дням и таблица с итогами:
+
 ```php
 namespace App\Fastleo;
 
@@ -63,7 +100,7 @@ final class StatisticsPage extends Page
 }
 ```
 
-Страница открывается по адресу `/fastleo/pages/statistics` и появляется в меню, как любая [своя страница](pages.md): `$label`, `$icon`, `$group`, `$position`, `canAccess()`.
+Страница `StatisticsPage` открывается по адресу `/fastleo/pages/statistics` и появляется в меню, как любая [своя страница](pages.md): `$label`, `$icon`, `$group`, `$position`, `canAccess()`.
 
 ## Фильтры
 
@@ -137,4 +174,4 @@ Rows::make('Менеджеры')->rows(fn () => Manager::query()->when($mine, fn
 
 ## Выгрузка отчёта
 
-Готовой кнопки «Скачать» у отчёта нет: сделайте маршрут сайта через `Fastleo::routes()` (с защитой админки и CSRF) и отдайте CSV теми же запросами, взяв значения фильтров теми же, что у страницы (с её умолчаниями): `$filters = Filters::resolve((new StatisticsPage)->filters(), request()); $period = $filters->period('period');` (`Fastleo\Reports\Filters`). Отдельный `new Period('period')` не знает умолчания страницы и без `filter[period]` в адресе возьмёт «сегодня».
+Готовой кнопки «Скачать» у отчёта нет: сделайте маршрут сайта через `Fastleo::routes(..., page: StatisticsPage::class)` (с защитой админки, CSRF и правами страницы) и отдайте CSV теми же запросами, взяв значения фильтров теми же, что у страницы (с её умолчаниями): `$filters = Filters::resolve((new StatisticsPage)->filters(), request()); $period = $filters->period('period');` (`Fastleo\Reports\Filters`). Отдельный `new Period('period')` не знает умолчания страницы и без `filter[period]` в адресе возьмёт «сегодня».

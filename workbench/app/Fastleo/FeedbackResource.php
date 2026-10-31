@@ -28,13 +28,8 @@ final class FeedbackResource extends Resource
 
     protected static bool $readonly = true;
 
-    /**
-     * Обращения за последние сутки — счётчик в меню.
-     */
-    public static function badge(): ?int
-    {
-        return Feedback::query()->where('created_at', '>=', now()->subDay())->count() ?: null;
-    }
+    /** Новые обращения выделены в списке, число в меню — непросмотренные. */
+    protected static ?string $readColumn = 'read_at';
 
     /**
      * Поля обращения.

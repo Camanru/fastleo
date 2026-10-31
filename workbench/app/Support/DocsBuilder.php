@@ -35,6 +35,7 @@ final readonly class DocsBuilder
             'resources/boost/skills/fastleo/SKILL.md' => $this->skill(),
             'resources/boost/guidelines/core.blade.php' => $this->guideline(),
             'docs/llms.txt' => $this->llms(),
+            'docs/faq/README.md' => $this->faqReadme(),
         ];
     }
 
@@ -165,7 +166,7 @@ final readonly class DocsBuilder
         foreach ($files as $file) {
             $name = basename($file);
 
-            if ($name === 'contributing.md') {
+            if (in_array($name, ['contributing.md', 'README.md'], true)) {
                 continue;
             }
 
@@ -174,6 +175,72 @@ final readonly class DocsBuilder
         }
 
         return $lines;
+    }
+
+    /**
+     * Оглавление FAQ (docs/faq/README.md): файлы по темам и все вопросы со ссылками. Собирается из файлов FAQ.
+     */
+    private function faqReadme(): string
+    {
+        $out = ['# FAQ', 'Готовые решения практических задач: вопрос → что сделать и код, который можно скопировать в сайт. Ниже — все вопросы по темам.'];
+
+        foreach ($this->faqFiles() as $file) {
+            $out[] = '## ['.$file['title'].']('.$file['name'].")\n\n".$file['lead'];
+
+            foreach ($file['groups'] as $group => $questions) {
+                $out[] = '**'.$group."**\n\n".implode("\n", array_map(fn (string $question): string => '- ['.$question.']('.$file['name'].'#'.$this->slug($question).')', $questions));
+            }
+        }
+
+        return implode("\n\n", $out)."\n";
+    }
+
+    /**
+     * Файлы FAQ (кроме оглавления): имя, тема, описание и вопросы по группам.
+     *
+     * @return list<array{name: string, title: string, lead: string, groups: array<string, list<string>>}>
+     */
+    private function faqFiles(): array
+    {
+        $files = glob($this->root.'/docs/faq/*.md') ?: [];
+        sort($files);
+        $out = [];
+
+        foreach ($files as $file) {
+            $name = basename($file);
+
+            if ($name === 'README.md') {
+                continue;
+            }
+
+            $markdown = $this->doc('faq/'.$name);
+            $lead = (string) preg_replace('/\s*Все вопросы — \[[^\]]*\]\([^)]*\)\.?/u', '', $this->lead($markdown));
+            $groups = [];
+            $group = '';
+            $inCode = false;
+
+            foreach (explode("\n", $markdown) as $line) {
+                if (str_starts_with($line, '```')) {
+                    $inCode = ! $inCode;
+                } elseif (! $inCode && str_starts_with($line, '## ')) {
+                    $group = trim(substr($line, 3));
+                } elseif (! $inCode && str_starts_with($line, '### ')) {
+                    $groups[$group][] = trim(substr($line, 4));
+                }
+            }
+
+            $out[] = ['name' => $name, 'title' => (string) preg_replace('/^FAQ:\s*/u', '', $this->title($markdown)), 'lead' => trim($lead), 'groups' => $groups];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Якорь заголовка, как его строит GitHub: строчные буквы, без знаков препинания, пробелы — дефисы.
+     */
+    private function slug(string $heading): string
+    {
+        return str_replace(' ', '-', (string) preg_replace('/[^\p{L}\p{N}_\- ]/u', '', mb_strtolower($heading)));
     }
 
     /**
@@ -272,11 +339,13 @@ final readonly class DocsBuilder
     }
 
     /**
-     * Переписать относительные ссылки на файлы docs: `[x](fields/text.md)` → `[x](<префикс>fields/text.md)`.
+     * Переписать относительные ссылки на файлы docs: `[x](fields/text.md)` → `[x](<префикс>fields/text.md)`,
+     * а якорь своей страницы — в ссылку на неё: `[x](#методы)` → `[x](<префикс>fields/text.md#методы)`.
      */
     private function links(string $markdown, string $from, string $prefix): string
     {
         $dir = dirname($from) === '.' ? '' : dirname($from);
+        $markdown = str_replace('](#', ']('.basename($from).'#', $markdown);
 
         return (string) preg_replace_callback(
             '/\]\((?!https?:|#|\/)([^)\s#]+)(#[^)\s]*)?\)/',

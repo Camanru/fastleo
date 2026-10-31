@@ -1192,24 +1192,42 @@ abstract class Field
     }
 
     /**
-     * Blade-шаблон поля в форме. Для класса поля и его родителей по очереди: у класса сайта — шаблон
-     * `resources/views/fastleo/fields/{тип}.blade.php` (сюда пишет `fastleo:make-field`), у класса пакета — шаблон
-     * пакета `fastleo::fields.{тип}`; первый найденный берётся. Поэтому `SiteRichText extends RichText` без своего
-     * шаблона берёт шаблон `rich-text`, а с файлом `fastleo/fields/site-rich-text.blade.php` — свой. Шаблон сайта
+     * Blade-шаблон поля в форме. Сначала классы сайта — сам класс поля и его родители с сайта: шаблон
+     * `resources/views/fastleo/fields/{тип}.blade.php` (сюда пишет `fastleo:make-field`); первый найденный берётся.
+     * Нет такого — шаблон ближайшего поля пакета (`packageView()`). Поэтому `SiteImage extends Image` без своего
+     * шаблона берёт шаблон пакета `file`, а с файлом `fastleo/fields/site-image.blade.php` — свой. Шаблон сайта
      * с тем же именем, что у поля пакета (`fastleo/fields/image.blade.php` своего поля `Image`), поле пакета не трогает;
      * заменить шаблон поля пакета на всём сайте — `resources/views/vendor/fastleo/fields/{тип}.blade.php`.
      *
      * Свой шаблон поля со скриптами подключает их сам: дополнить шаблон пакета — `@include('fastleo::fields.rich-text')`
      * (у File — `fastleo::fields.file`), заменить целиком — скопировать из шаблона пакета блок `@pushOnce`
-     * (`fastleo-hugerte` у RichText, `fastleo-cropper` у File с обрезкой).
+     * (`fastleo-hugerte` у RichText, `fastleo-cropper` у Image с обрезкой).
      */
     public function view(): string
     {
-        foreach ([static::class, ...class_parents($this)] as $class) {
-            $type = Str::kebab(class_basename($class));
-            $view = ($this->isPackageClass($class) ? 'fastleo::fields.' : 'fastleo.fields.').$type;
+        $siteClasses = array_filter([static::class, ...class_parents($this)], fn (string $class): bool => ! $this->isPackageClass($class));
+
+        foreach ($siteClasses as $class) {
+            $view = 'fastleo.fields.'.Str::kebab(class_basename($class));
 
             if (view()->exists($view)) {
+                return $view;
+            }
+        }
+
+        return $this->packageView();
+    }
+
+    /**
+     * Шаблон поля пакета: `fastleo::fields.{тип}` ближайшего класса пакета, у которого он есть. Поле пакета
+     * с шаблоном другого имени (`Enum` — `select`, `BelongsTo` — `combobox`) переопределяет этот метод.
+     */
+    protected function packageView(): string
+    {
+        foreach ([static::class, ...class_parents($this)] as $class) {
+            $view = 'fastleo::fields.'.Str::kebab(class_basename($class));
+
+            if ($this->isPackageClass($class) && view()->exists($view)) {
                 return $view;
             }
         }

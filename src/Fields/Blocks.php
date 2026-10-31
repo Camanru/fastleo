@@ -316,12 +316,6 @@ class Blocks extends Field
         return $blocks === [] ? null : new HtmlString(view('fastleo::fields.blocks-show', ['field' => $this, 'blocks' => $blocks])->render());
     }
 
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.blocks';
-    }
-
     /**
      * Сохранённое значение → блоки известных типов для формы.
      *

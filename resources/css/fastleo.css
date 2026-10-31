@@ -297,6 +297,15 @@ li[data-tone] {
     --row-tone: var(--fl-sunken);
 }
 
+/* Непросмотренная запись (Resource::$readColumn): жирный текст и метка у первой ячейки. */
+:is(tr, li)[data-unread] {
+    font-weight: 600;
+}
+
+tr[data-unread] > td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
 /*
  * Сетка дашборда: 4 колонки (на планшете 2, на телефоне 1). Размер виджета — data-cols / data-rows на карточке
  * (1–4): ширина в колонках и высота в строках. Скрытые виджеты видны только в режиме «Настроить».

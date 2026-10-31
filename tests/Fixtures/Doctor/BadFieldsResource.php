@@ -24,6 +24,8 @@ final class BadFieldsResource extends Resource
 
     protected static ?string $sortColumn = 'nope';
 
+    protected static ?string $readColumn = 'seen_at';
+
     /**
      * Поле без колонки, вне $fillable, без каста, со связью без метода.
      */

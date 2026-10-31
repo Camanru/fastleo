@@ -125,6 +125,7 @@ class DoctorsAdminTest extends TestCase
 | Пункт меню: группа, иконка, позиция; порядок групп; скрыть пункт | в ресурсе `$group`, `$icon`, `$position`, `inMenu()`; порядок групп — `menu.groups` в `config/fastleo.php` | [resources.md](vendor/camanru/fastleo/docs/resources.md), [configuration.md](vendor/camanru/fastleo/docs/configuration.md) |
 | Рабочий раздел сразу после входа; убрать «Дашборд» из меню; меню свёрнуто по умолчанию | `home`, `menu.dashboard`, `menu.collapsed` в `config/fastleo.php` | [configuration.md](vendor/camanru/fastleo/docs/configuration.md) |
 | Число у пункта меню («новых 7», «просрочено 26») | `public static function badge(): ?int` в ресурсе | [resources.md](vendor/camanru/fastleo/docs/resources.md#badge) |
+| Новые заявки или сообщения: выделить непросмотренные, в меню — их число | `protected static ?string $readColumn = 'read_at';` + колонка `timestamp` nullable | [resources.md](vendor/camanru/fastleo/docs/resources.md#отметка-просмотрено) |
 | Название записи в заголовке, крошках, поиске | первый столбец списка, не связь, или `title(Model $record)` | [resources.md](vendor/camanru/fastleo/docs/resources.md#title) |
 | Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](vendor/camanru/fastleo/docs/related.md) |
 | Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`, в ресурсе `$historyPanel = true` | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
@@ -178,7 +179,15 @@ php artisan fastleo:inspect articles   # один раздел по адресу
 php artisan fastleo:inspect --json     # то же для машины
 ```
 
-В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `empty_value` у поля с `emptyValue()`, `quick_toggle: true` у галочки с `quickToggle()`, `badges: true` у списка с цветными метками, `from_query: true` у вычисляемого столбца (`fromQuery()`), `inline_editable: true` у поля с правкой в ячейке, вложенные `fields` у блоков и повторителей. У раздела ещё `relations` — связанные таблицы (`name`, `label`, `resource`, `slug`, `foreign_key`). У фильтра — `name`, `label`, `class`, `has_default` (есть значение по умолчанию). Ключ раздела `poll` — период автообновления списка в секундах или `null`; `history_panel` — включена ли панель истории в карточке. У связанной таблицы ещё `expandable` (строки раскрываются), `aside` (в боковой колонке), `columns` (имена столбцов таблицы для текущего администратора), `quick_add` (имена полей быстрого добавления, `[]` — формы нет) и `add_label` (подпись кнопки). `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
+Что есть в JSON:
+
+- **Раздел:** `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()` или `$readColumn`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `read_column` (колонка отметки «просмотрено» или `null`), `poll` (период автообновления списка в секундах или `null`), `history_panel` (включена ли панель истории в карточке), `fields`, `filters`, `actions`, `relations`.
+- **Поле:** `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса).
+- **Поле, сведения по типу:** `relation` и `related_model` у связей; `folder` и `extensions` у файлов; `options` у `Select` (`null`, если вариантов больше 50); `max_length` у текстовых; `empty_value` у поля с `emptyValue()`; `quick_toggle: true` у галочки с `quickToggle()`; `badges: true` у списка с цветными метками; `from_query: true` у вычисляемого столбца (`fromQuery()`); `inline_editable: true` у поля с правкой в ячейке; вложенные `fields` у блоков и повторителей.
+- **Фильтр:** `name`, `label`, `class`, `has_default` (есть значение по умолчанию).
+- **Связанная таблица** (`relations`): `name`, `label`, `resource`, `slug`, `foreign_key`, `expandable` (строки раскрываются), `aside` (в боковой колонке), `columns` (имена столбцов таблицы для текущего администратора), `quick_add` (имена полей быстрого добавления, `[]` — формы нет), `add_label` (подпись кнопки).
+
+`fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
 
 Если раздел описан с ошибкой, вместо `fields` будет `error` с текстом — остальные разделы выводятся как обычно.
 
@@ -212,7 +221,8 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | связь поля без метода в модели | добавить метод связи |
 | JSON-поле (Gallery, Tags, KeyValue, Repeater, Blocks, Seo, `Select::multiple()`, `translatable()`) без каста `array` | добавить каст в модель |
 | `Enum` без enum-каста | добавить каст в модель |
-| колонка `$sortColumn` или `$treeColumn` не найдена | исправить имя или миграцию |
+| колонка `$sortColumn`, `$treeColumn` или `$readColumn` не найдена | исправить имя или миграцию |
+| колонка `$readColumn` — не дата со временем или NOT NULL | `$table->timestamp('read_at')->nullable()` |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |
 | `query()` ресурса не выполняется при проверке вычисляемых полей `fromQuery()` (`from_query_error`) | исправить `query()` по тексту ошибки базы |
 
@@ -381,5 +391,5 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 - [Тесты разделов в сайте](vendor/camanru/fastleo/docs/testing.md) — Раздел админки — обычные маршруты Laravel, поэтому его тестируют обычными Feature-тестами сайта: войти администратором, открыть страницу, отправить форму,…
 - [Оформление](vendor/camanru/fastleo/docs/theming.md) — Внешний вид админки меняется без сборки: название, логотип и основной цвет — в конфиге, остальное — своим CSS-файлом. Стили и скрипты пакета собраны заранее,…
 - [Многоязычные поля](vendor/camanru/fastleo/docs/translations.md) — Если сайт на нескольких языках, текстовое поле может хранить значение для каждого языка. Над таким полем — вкладки языков (`RU | EN`), каждая со своим вводом;…
-- [Переход с fastleo 2.x и 3.0](vendor/camanru/fastleo/docs/upgrade-from-3.md) — > **Это не обновление версии, а другая админка.** Fastleo 4 — не «3.0 с новым номером»: разделы описываются заново классами-ресурсами, меняются форматы данных…
+- [Переход с fastleo 2.x и 3.0](vendor/camanru/fastleo/docs/upgrade-from-3.md) — > **Это не обновление версии, а другая админка.** Fastleo 4 написан заново, обратной совместимости нет: другое имя пакета и namespace, разделы описываются…
 - [Проверка значений](vendor/camanru/fastleo/docs/validation.md) — Значения формы проверяются правилами [валидации Laravel](https://laravel.com/docs/13.x/validation). Правила собираются из полей, видимых в форме.

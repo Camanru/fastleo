@@ -74,7 +74,7 @@ class BelongsToFilter extends Filter
         $title = $query->qualifyColumn($field->getTitleColumn());
 
         if ($search !== '') {
-            $query->whereRaw(new ContainsExpression($title), [ContainsExpression::pattern($search)]);
+            ContainsExpression::where($query, $title, $search);
         }
 
         $records = $query->orderBy($title)->orderBy($query->getModel()->getQualifiedKeyName())->limit($limit ?? $this->preloadLimit())->get();

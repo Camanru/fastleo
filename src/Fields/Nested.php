@@ -390,12 +390,6 @@ abstract class Nested extends Field
         ])->render());
     }
 
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.nested';
-    }
-
     /**
      * Не выгружается в Excel/CSV.
      */

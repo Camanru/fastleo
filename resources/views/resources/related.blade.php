@@ -93,7 +93,7 @@
                         @foreach ($records as $record)
                             @php($url = $recordUrl($record))
                             @php($tone = $resource->rowToneFor($record))
-                            <tr class="group/row hover:bg-hover [&:last-child>td]:border-b-0 [&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 compact:[&>td]:py-1.5" data-record="{{ $record->getKey() }}" @if ($tone) data-tone="{{ $tone }}" @endif>
+                            <tr class="group/row hover:bg-hover [&:last-child>td]:border-b-0 [&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 compact:[&>td]:py-1.5" data-record="{{ $record->getKey() }}" @if ($tone) data-tone="{{ $tone }}" @endif @if ($resource->isUnread($record)) data-unread @endif>
                                 @if ($expandable)
                                     <td class="w-px !pr-0">
                                         @if ($allows('view', $record))

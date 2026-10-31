@@ -133,7 +133,7 @@ describe('options', function (): void {
         Category::factory()->create(['title' => 'Новости клиники']);
         Category::factory()->create(['title' => 'Акции']);
 
-        $this->getJson(route('fastleo.resources.options', ['articles', 'category_id']).'?q=клиник')
+        $this->getJson(route('fastleo.resources.options', ['articles', 'category_id', 'q' => 'НОВОСТИ']))
             ->assertOk()
             ->assertExactJson(['options' => [['value' => (string) Category::query()->where('title', 'Новости клиники')->value('id'), 'label' => 'Новости клиники']]]);
     });

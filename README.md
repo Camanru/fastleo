@@ -90,7 +90,11 @@ final class DoctorResource extends Resource
 
 The section appears in the menu and opens at `/fastleo/doctors`. The fields must be in the model's `$fillable`.
 
+Check the result with `php artisan fastleo:doctor` — it reports mistakes in sections and site setup ([commands](docs/claude.md#команды)). Without a Policy on the model, any admin has full access to the section ([authorization](docs/authorization.md)).
+
 ## Documentation
+
+Reading order with short descriptions (in Russian): [docs/README.md](docs/README.md). Practical answers with code: [FAQ](docs/faq/README.md).
 
 - [Installation and upgrading](docs/installation.md)
 - [Configuration: `config/fastleo.php`](docs/configuration.md)
@@ -123,6 +127,7 @@ The section appears in the menu and opens at `/fastleo/doctors`. The fields must
 - [Testing your sections](docs/testing.md)
 - [Working with Claude](docs/claude.md)
 - [Upgrading from 2.x and 3.0](docs/upgrade-from-3.md)
+- [Moving from another admin panel](docs/migrating.md)
 - [Package development](https://github.com/Camanru/fastleo/blob/master/docs/contributing.md)
 
 ## License

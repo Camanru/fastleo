@@ -28,6 +28,16 @@ final class Feedback extends Model
     /**
      * Фабрика модели.
      */
+    /**
+     * Касты: время просмотра в админке.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['read_at' => 'datetime'];
+    }
+
     protected static function newFactory(): FeedbackFactory
     {
         return FeedbackFactory::new();

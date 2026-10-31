@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Page;
+use Fastleo\Tests\Fixtures\Pages\SecretPage;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
 
@@ -79,5 +81,29 @@ describe('Fastleo::routes()', function (): void {
 
     it('sends the security headers and keeps the admin locale', function (): void {
         $this->get(route('fastleo.pages.stats-run'))->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+    });
+});
+
+describe('Fastleo::routes() bound to a page', function (): void {
+    beforeEach(function (): void {
+        Fastleo::routes(function (): void {
+            Route::post('secret/run', fn (): string => 'запущено')->name('secret-run');
+        }, page: SecretPage::class);
+        Fastleo::routes(function (): void {
+            Route::get('missing/run', fn (): string => 'нет страницы')->name('missing-run');
+        }, page: Page::class);
+        Route::getRoutes()->refreshNameLookups();
+    });
+
+    it('forbids the route to admins the page is closed for and lets the right admin in', function (): void {
+        $this->post(route('fastleo.pages.secret-run'))->assertForbidden();
+
+        $this->actingAs(admin(['email' => 'owner@example.com']), Fastleo::GUARD);
+        $this->flushSession();
+        $this->post(route('fastleo.pages.secret-run'))->assertOk()->assertSee('запущено');
+    });
+
+    it('answers 404 when the page is not registered', function (): void {
+        $this->get(route('fastleo.pages.missing-run'))->assertNotFound();
     });
 });

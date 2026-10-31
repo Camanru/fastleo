@@ -59,9 +59,25 @@ it('points every link of the skill and llms.txt to an existing docs file', funct
 
     expect($skillLinks[1])->not->toBeEmpty()
         ->and($llmsLinks[1])->not->toBeEmpty()
-        ->and($skill)->not->toContain('docs/vendor/camanru');
+        ->and($skill)->not->toContain('docs/vendor/camanru', '](#')
+        ->and($llms)->not->toContain('](#');
 
     foreach ([...$skillLinks[1], ...$llmsLinks[1]] as $file) {
         expect(packageRoot().'/docs/'.$file)->toBeFile();
+    }
+});
+
+it('keeps every FAQ question unique within its file so that its anchor is stable', function (): void {
+    $files = array_filter(glob(packageRoot().'/docs/faq/*.md') ?: [], fn (string $file): bool => basename($file) !== 'README.md');
+
+    expect($files)->not->toBeEmpty();
+
+    foreach ($files as $file) {
+        $markdown = (string) preg_replace('/```.*?```/s', '', (string) file_get_contents($file));
+        preg_match_all('/^### (.+)$/m', $markdown, $questions);
+
+        expect($markdown)->toStartWith('# FAQ: ')
+            ->and($questions[1])->not->toBeEmpty()
+            ->and(array_unique($questions[1]))->toHaveCount(count($questions[1]));
     }
 });

@@ -26,6 +26,8 @@ $this->actingAs($admin, 'fastleo');
 
 ## Пример
 
+Тестам нужна чистая база с таблицами: в Pest — `->use(RefreshDatabase::class)` в `tests/Pest.php` (в новом Laravel эта строка закомментирована) или `uses(RefreshDatabase::class);` в файле теста, в PHPUnit — `use RefreshDatabase;` в классе. Без этого тесты на SQLite в памяти падают с «no such table».
+
 Pest:
 
 ```php

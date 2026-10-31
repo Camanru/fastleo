@@ -17,7 +17,7 @@ use Override;
  * Поисковая выдача и соцсети для записи: заголовок, описание, картинка и запрет индексации в одной JSON-колонке.
  *
  * Колонка `json`, в модели — каст `'array'` (без него — понятная ошибка). Хранится объект
- * `{"title": "…", "description": "…", "image": "seo/a.jpg", "noindex": true}`; пустые значения не сохраняются.
+ * `{"title": "…", "description": "…", "image": "uploads/seo/a.jpg", "noindex": true}`; пустые значения не сохраняются.
  * В форме — счётчики длины и превью сниппета поисковика. На сайте значения выводит `<x-fastleo::seo>`.
  *
  * ```php
@@ -216,12 +216,6 @@ class Seo extends Field
         }
 
         return $html === '' ? null : new HtmlString('<div class="flex flex-col gap-1 whitespace-normal">'.$html.'</div>');
-    }
-
-    #[Override]
-    public function view(): string
-    {
-        return 'fastleo::fields.seo';
     }
 
     /**

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
-use Illuminate\Support\Facades\DB;
 use Workbench\App\Models\Category;
 
 beforeEach(function (): void {
@@ -37,8 +36,10 @@ it('finds records by a substring of a searchable field regardless of letter case
     Category::factory()->create(['title' => 'Новости компании']);
     Category::factory()->create(['title' => 'Акции']);
 
-    expect(listedTitles(['q' => 'КОМПАН']))->toBe(['Новости компании']);
-})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'SQLite сравнивает без учёта регистра только латиницу');
+    expect(listedTitles(['q' => 'КОМПАН']))->toBe(['Новости компании'])
+        ->and(listedTitles(['q' => 'новости']))->toBe(['Новости компании'])
+        ->and(listedTitles(['q' => 'акЦИИ']))->toBe(['Акции']);
+});
 
 it('finds records by a searchable field', function (): void {
     Category::factory()->create(['title' => 'News archive', 'code' => 'n1']);

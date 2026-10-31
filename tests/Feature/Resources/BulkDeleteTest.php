@@ -72,7 +72,10 @@ it('reports when none of the records could be deleted', function (): void {
 it('offers no deletion in a read-only section', function (): void {
     $feedback = Feedback::factory()->create();
 
-    $this->get(route('fastleo.resources.index', 'feedback'))->assertOk()->assertDontSee('data-bulk-bar', false);
+    $this->get(route('fastleo.resources.index', 'feedback'))
+        ->assertOk()
+        ->assertSee(route('fastleo.resources.action', ['feedback', 'mark-read']), false)
+        ->assertDontSee(route('fastleo.resources.action', ['feedback', 'delete']), false);
     runBuiltIn('feedback', 'delete', [(string) $feedback->id])->assertForbidden();
 
     expect(Feedback::query()->count())->toBe(1);

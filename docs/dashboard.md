@@ -156,7 +156,7 @@ final class QueueSize extends \Fastleo\Widgets\Widget
 {
     public function view(): string
     {
-        return 'widgets.queue-size';          // resources/views/widgets/queue-size.blade.php сайта
+        return 'fastleo.widgets.queue-size';  // resources/views/fastleo/widgets/queue-size.blade.php сайта
     }
 
     protected function payload(): array
