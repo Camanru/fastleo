@@ -10,6 +10,12 @@
 
 Храните сумму колонкой `total` и пересчитывайте её в observer позиции — при сохранении и удалении каждой позиции. В ресурсе сделайте сумму полем только для чтения.
 
+```bash
+php artisan make:model Order -m                                   # модель и миграция orders
+php artisan make:model OrderItem -m                               # модель и миграция order_items
+php artisan make:observer OrderItemObserver --model=OrderItem     # app/Observers/OrderItemObserver.php
+```
+
 ```php
 // app/Models/Order.php
 namespace App\Models;
@@ -100,6 +106,10 @@ Number::make('total', 'Сумма')->readonly()->sortable(),
 
 Считайте итоговую цену в `saving` observer товара и храните её колонкой — тогда по ней можно сортировать и фильтровать список.
 
+```bash
+php artisan make:observer ProductObserver --model=Product   # app/Observers/ProductObserver.php
+```
+
 ```php
 // app/Observers/ProductObserver.php
 namespace App\Observers;
@@ -144,6 +154,11 @@ php artisan tinker --execute="App\Models\Product::query()->lazyById(500)->each->
 ### Как давать заказам номер по порядку без дублей и пропусков?
 
 Ведите счётчик в отдельной таблице и увеличивайте его в `creating`. Админка сохраняет запись в транзакции: строка счётчика заблокирована до конца сохранения, а отменённое сохранение откатывает и счётчик.
+
+```bash
+php artisan make:migration create_order_counters_table
+php artisan make:observer OrderObserver --model=Order       # app/Observers/OrderObserver.php
+```
 
 ```php
 // database/migrations/2026_01_01_000010_create_order_counters_table.php
@@ -191,6 +206,10 @@ Text::make('number', 'Номер')->readonly()->searchable()->sortable(),
 ### Как разрешить только допустимые переходы статуса?
 
 Опишите переходы в enum и добавьте полю правило: допустимы текущий статус и переходы из него. Прыжок «Новый → Выполнен» получит ошибку под полем — в форме, при правке в ячейке и при импорте.
+
+```bash
+php artisan make:enum App/Enums/OrderStatus --string        # app/Enums/OrderStatus.php
+```
 
 ```php
 // app/Enums/OrderStatus.php
@@ -253,6 +272,10 @@ Enum::make('status', 'Статус')->enum(OrderStatus::class)->required()->defa
 
 Сделайте поле статуса `readonly()` и опишите по действию на каждый переход. `visibleFor()` прячет кнопку у записи, где переход невозможен; проверка в `handle()` пропускает такие записи среди выбранных.
 
+```bash
+php artisan fastleo:make-action MarkPaid        # app/Fastleo/Actions/MarkPaid.php
+```
+
 ```php
 // app/Fastleo/Actions/MarkPaid.php
 namespace App\Fastleo\Actions;
@@ -288,6 +311,9 @@ final class MarkPaid extends Action
 
 ```php
 // app/Fastleo/OrderResource.php
+use App\Fastleo\Actions\MarkPaid;
+use App\Fastleo\Actions\ShipOrders; // действие из следующего вопроса
+
 Enum::make('status', 'Статус')->enum(OrderStatus::class)->readonly()->badges(),
 
 public function actions(): array
@@ -301,6 +327,10 @@ public function actions(): array
 ### Как сделать действие с проверкой и транзакцией (списать остатки при отгрузке)?
 
 Обрабатывайте каждый заказ в своей `DB::transaction()` и перечитывайте его с `lockForUpdate()`: два администратора не отгрузят один заказ дважды. Причину отказа бросайте своим исключением — транзакция откатится, а текст попадёт в сообщение.
+
+```bash
+php artisan fastleo:make-action ShipOrders      # app/Fastleo/Actions/ShipOrders.php
+```
 
 ```php
 // app/Fastleo/Actions/ShipOrders.php
@@ -388,6 +418,10 @@ public function updating(Order $order): bool
 
 Отмена работает только при изменении самой записи. Если в форме поменяли лишь вложенные записи (`HasMany`), `updating` не вызывается и они сохранятся. Действия, которые вызывают `update()`, получают `false` молча — проверяйте результат, как в `MarkPaid` и `ShipOrders` выше. Для полного запрета закройте изменение в Policy — пропадут кнопка «Изменить», правка в списке и действия над такой записью:
 
+```bash
+php artisan fastleo:make-policy Order           # app/Policies/OrderPolicy.php, если её ещё нет
+```
+
 ```php
 // app/Policies/OrderPolicy.php
 public function update(User $user, Order $order): bool
@@ -439,6 +473,10 @@ BelongsTo::make('district_id', 'Район')
 
 Само скрытие до даты делает условие `published_at <= now()` на сайте ([FAQ по страницам](pages.md#как-опубликовать-новость-в-назначенный-день-и-час)). Если в момент публикации нужно что-то сделать, запускайте команду по расписанию и отмечайте обработанные записи.
 
+```bash
+php artisan make:command AnnouncePublishedNews --command=news:announce   # app/Console/Commands/AnnouncePublishedNews.php
+```
+
 ```php
 // app/Console/Commands/AnnouncePublishedNews.php
 namespace App\Console\Commands;
@@ -481,6 +519,11 @@ Scope `published()` — из [FAQ по страницам](pages.md#как-оп�
 ### Как запустить тяжёлую обработку после сохранения в очереди?
 
 Отправляйте задачу из observer, который срабатывает после коммита транзакции (`ShouldHandleEventsAfterCommit`): задача не увидит запись, которой ещё нет в базе. Запускайте её, только если изменилось нужное поле.
+
+```bash
+php artisan make:observer ProductObserver --model=Product   # app/Observers/ProductObserver.php
+php artisan make:job GenerateProductPdf                     # app/Jobs/GenerateProductPdf.php
+```
 
 ```php
 // app/Observers/ProductObserver.php
@@ -543,6 +586,11 @@ final class GenerateProductPdf implements ShouldQueue, ShouldBeUnique
 ### Как изменить тысячи записей одним действием?
 
 Сделайте действие с мини-формой, которое только ставит задачу в очередь, а задача обрабатывает записи порциями и сообщает администратору в колокольчик. Действие получает выбранные записи — с «Все» в списке это до 1000 записей за раз.
+
+```bash
+php artisan fastleo:make-action RepriceProducts     # app/Fastleo/Actions/RepriceProducts.php
+php artisan make:job RepriceProductsJob             # app/Jobs/RepriceProductsJob.php
+```
 
 ```php
 // app/Fastleo/Actions/RepriceProducts.php
@@ -664,6 +712,11 @@ protected static ?array $defaultOrder = ['total', 'desc']; // total считае
 ### Как ограничить глубину дерева (не больше трёх уровней)?
 
 Добавьте полю «Родитель» правило-замыкание: глубина родителя плюс высота переносимой ветки не должны превышать предел. Правило срабатывает и для кнопки «+» у записи в дереве.
+
+```bash
+php artisan make:model Category -m              # модель и миграция categories
+php artisan fastleo:make-resource Category      # app/Fastleo/CategoryResource.php
+```
 
 ```php
 // app/Models/Category.php
@@ -799,6 +852,10 @@ A-101;990.50
 
 Сбрасывайте ключ в observer модели после коммита: `saved` срабатывает и при перетаскивании порядка, `deleted` и `restored` — при удалении и возврате из корзины.
 
+```bash
+php artisan make:observer CategoryObserver --model=Category   # app/Observers/CategoryObserver.php
+```
+
 ```php
 // app/Observers/CategoryObserver.php
 namespace App\Observers;
@@ -863,7 +920,7 @@ Route::get('{locale}/{slug}', function (string $locale, string $slug) {
 
 ### Как хранить историю версий и откатывать изменения?
 
-Журнал изменений уже включён: кнопки «История» и «Вернуть» есть у каждой записи. Покажите историю рядом с формой и храните её дольше 30 дней.
+Включите журнал изменений в `config/fastleo.php` (`'activity' => ['enabled' => true]`) — у каждой записи появятся кнопки «История» и «Вернуть». Покажите историю рядом с формой и храните её дольше 30 дней.
 
 ```php
 // app/Fastleo/ProductResource.php
@@ -873,6 +930,7 @@ protected static bool $historyPanel = true;
 ```php
 // config/fastleo.php
 'activity' => [
+    'enabled' => true,
     'keep_days' => 365,
 ],
 ```

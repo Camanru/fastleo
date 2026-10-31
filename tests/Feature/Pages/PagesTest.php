@@ -7,6 +7,7 @@ use Fastleo\Page;
 use Fastleo\Tests\Fixtures\Pages\SecretPage;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
+use Override;
 
 beforeEach(function (): void {
     useFixtureResources('Pages');
@@ -106,4 +107,18 @@ describe('Fastleo::routes() bound to a page', function (): void {
     it('answers 404 when the page is not registered', function (): void {
         $this->get(route('fastleo.pages.missing-run'))->assertNotFound();
     });
+});
+
+it('gives a page with its own template no report variables unless it sets its data itself', function (): void {
+    $page = new class extends Page
+    {
+        #[Override]
+        public function view(): string
+        {
+            return 'fastleo::pages.custom';
+        }
+    };
+
+    expect($page->data(request()))->toBe([])
+        ->and(new class extends Page {}->data(request()))->toHaveKeys(['page', 'items', 'filters', 'widgets', 'hasChart']);
 });

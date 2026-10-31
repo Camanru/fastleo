@@ -17,7 +17,14 @@ Fastleo — админ-панель для сайтов на Laravel 13. Раз�
 4. Тест раздела: сначала посмотрите в `composer.json`, Pest у сайта или PHPUnit, и напишите тест тем же инструментом; примеры тестов (вход, создание, права, действия, файлы) — в [тестах разделов](vendor/camanru/fastleo/docs/testing.md).
 5. `php artisan fastleo:doctor` — ошибок быть не должно. Исправить по подсказкам, повторить.
 
-Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи»:
+Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи». Файлы создаются командами:
+
+```bash
+php artisan make:model Doctor -m                       # модель и миграция
+php artisan migrate                                    # после правки миграции
+php artisan fastleo:make-resource Doctor --generate    # app/Fastleo/DoctorResource.php
+php artisan make:test DoctorsAdminTest                 # tests/Feature/DoctorsAdminTest.php (Pest или PHPUnit — как у сайта)
+```
 
 ```php
 // database/migrations/…_create_doctors_table.php
@@ -128,7 +135,7 @@ class DoctorsAdminTest extends TestCase
 | Новые заявки или сообщения: выделить непросмотренные, в меню — их число | `protected static ?string $readColumn = 'read_at';` + колонка `timestamp` nullable | [resources.md](vendor/camanru/fastleo/docs/resources.md#отметка-просмотрено) |
 | Название записи в заголовке, крошках, поиске | первый столбец списка, не связь, или `title(Model $record)` | [resources.md](vendor/camanru/fastleo/docs/resources.md#title) |
 | Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](vendor/camanru/fastleo/docs/related.md) |
-| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`, в ресурсе `$historyPanel = true` | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
+| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`; история — в ресурсе `$historyPanel = true` и `'activity' => ['enabled' => true]` в `config/fastleo.php` (журнал выключен по умолчанию) | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
 | Добавить дочернюю запись прямо под таблицей, без перехода на другую страницу (задача, комментарий) | `Related::make(…)->quickAdd(['title', 'due_at'])`, подпись кнопки — `->addLabel()` | [related.md](vendor/camanru/fastleo/docs/related.md#быстрое-добавление) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](vendor/camanru/fastleo/docs/related.md#раскрывающиеся-строки) |
 | Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](vendor/camanru/fastleo/docs/fields/select.md) |
@@ -266,7 +273,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | `fastleo:make-action PublishDoctors` | `Actions/PublishDoctors.php` | `actions()` ресурса: [actions.md](vendor/camanru/fastleo/docs/actions.md) |
 | `fastleo:make-filter ByCity` | `Filters/ByCity.php` + шаблон | `filters()` ресурса: [list.md](vendor/camanru/fastleo/docs/list.md) |
 | `fastleo:make-widget QueueSize` | `Widgets/QueueSize.php` + шаблон | `widgets()` класса `Dashboard`: [dashboard.md](vendor/camanru/fastleo/docs/dashboard.md) |
-| `fastleo:make-page Report` | `ReportPage.php` + шаблон | находится сама: [pages.md](vendor/camanru/fastleo/docs/pages.md) |
+| `fastleo:make-page Report [--report]` | `ReportPage.php` + шаблон (`--report` — отчёт из фильтров и виджетов, без шаблона) | находится сама: [pages.md](vendor/camanru/fastleo/docs/pages.md), [reports.md](vendor/camanru/fastleo/docs/reports.md) |
 | `fastleo:make-field Phone` | `Fields/Phone.php` + шаблон | `fields()` ресурса: [fields/custom.md](vendor/camanru/fastleo/docs/fields/custom.md) |
 | `fastleo:make-settings Contacts` | `ContactsSettings.php` со страницей настроек | находится сама: [settings.md](vendor/camanru/fastleo/docs/settings.md) |
 | `fastleo:make-dashboard` | `Dashboard.php` с набором виджетов | находится сам: [dashboard.md](vendor/camanru/fastleo/docs/dashboard.md) |
@@ -274,7 +281,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 
 ## MCP-сервер
 
-Через MCP Claude читает и правит записи самой админки — «покажи последние обращения», «исправь заголовок у статьи 12», «опубликуй все черновики». Сервер работает от имени одного администратора, с его правами: Policy моделей, `readonly`-разделы и проверка значений — те же, что в админке. Правки попадают в [журнал изменений](vendor/camanru/fastleo/docs/activity.md) под его именем.
+Через MCP Claude читает и правит записи самой админки — «покажи последние обращения», «исправь заголовок у статьи 12», «опубликуй все черновики». Сервер работает от имени одного администратора, с его правами: Policy моделей, `readonly`-разделы и проверка значений — те же, что в админке. Правки попадают в [журнал изменений](vendor/camanru/fastleo/docs/activity.md) под его именем (если журнал включён).
 
 Подключение — в `.mcp.json` в корне сайта:
 
@@ -308,7 +315,24 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 
 **Списки при изменении.** Переводы `translatable()` дополняются: присланный язык заменяется, остальные сохраняются. А списки — вложенные записи (HasMany, HasOne), Repeater, Blocks, Gallery, Tags, KeyValue, связи «многие ко многим» и `Select::multiple()` — заменяются целиком: передавайте весь список так, как вернул `get-record` (у вложенных записей — вместе с их `id`). Если в присланном списке нет существующей вложенной записи, а сервер запущен без `--allow-delete`, это ошибка — записи не удаляются.
 
-**Удаление выключено.** Инструмент `delete-record` и встроенные действия удаления доступны, только если сервер запущен с ключом `--allow-delete` (или `'mcp' => ['allow_delete' => true]` в [конфиге](vendor/camanru/fastleo/docs/configuration.md)). Права на удаление всё равно проверяет Policy; запись с вложенными (дерево) не удаляется.
+**Удаление выключено.** Инструмент `delete-record` и встроенные действия удаления доступны, только если удаление включено. Два способа:
+
+- ключ `--allow-delete` в `.mcp.json` — только для этого подключения:
+
+  ```json
+  "args": ["artisan", "fastleo:mcp", "--user=admin@site.ru", "--allow-delete"]
+  ```
+
+- настройка для всех подключений сайта — в [конфиге](vendor/camanru/fastleo/docs/configuration.md):
+
+  ```php
+  // config/fastleo.php
+  'mcp' => [
+      'allow_delete' => true,
+  ],
+  ```
+
+Права на удаление всё равно проверяет Policy; запись с вложенными (дерево) не удаляется. Удаляет агент так же, как кнопка в админке: в корзину, если у модели `SoftDeletes`, иначе насовсем.
 
 **Закрыто от агента:** по умолчанию MCP видит все разделы сайта, в том числе с телефонами и почтой (заявки, обращения, клиенты): сервер локальный и работает от имени одного администратора, поэтому какие данные отдавать агенту, решает разработчик. Чтобы закрыть раздел, задайте в ресурсе `protected static bool $mcp = false;` — это нужно разделам, где лежат чужие данные или адреса получателей заявок. Какие разделы видит агент — в `php artisan fastleo:inspect` (строка `mcp`) и в инструменте `list-resources`. Страницы [настроек](vendor/camanru/fastleo/docs/settings.md) MCP не отдаёт. Всегда закрыты: «Администраторы» (`UserResource`, снять — наследником с `$mcp = true`), встроенные «Уведомления» и «Каналы» с токенами ботов и действия с `protected bool $mcp = false` («Отправить тест» и все действия публикаций, которые что-то делают в мессенджерах: отправить, повторить, обновить, удалить из каналов). Черновик публикации агент создать и поправить может, в том числе действием `Publish` ([публикации](vendor/camanru/fastleo/docs/publishing.md#кнопка-в-разделе-сайта)).
 

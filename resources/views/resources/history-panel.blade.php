@@ -6,7 +6,7 @@
     $labels = [];
 
     foreach ($resource->schema()->fields() as $field) {
-        if (! $field->isHidden()) {
+        if (! $field->isHidden($record)) {
             $labels[$field->name] = $field->getLabel();
         }
     }

@@ -60,7 +60,7 @@ final class ActionsController
         $allowed = $records->filter(fn (Model $record): bool => $action->allows($record))->values();
         abort_if($allowed->isEmpty(), $records->isEmpty() ? 404 : 403);
 
-        $data = $this->data($request, $action);
+        $data = $this->data($request, $resource, $action);
 
         try {
             $result = $action->handle($allowed, $data);
@@ -91,7 +91,7 @@ final class ActionsController
      *
      * @throws ValidationException
      */
-    private function data(Request $request, Action $action): array
+    private function data(Request $request, Resource $resource, Action $action): array
     {
         $validator = ActionInput::validator($action, $request->all());
 
@@ -102,7 +102,7 @@ final class ActionsController
 
             // Форма из связанной таблицы: таблица подгружается отдельным запросом, поэтому ввод и ошибки ждут её в сессии —
             // под ключом «связь + родитель», чтобы их взяла таблица этого родителя, а не соседняя с тем же именем связи.
-            if (is_string($relation) && preg_match('/^[A-Za-z0-9_]{1,64}$/', $relation) === 1 && is_string($parent) && preg_match('/^[A-Za-z0-9_-]{0,64}$/', $parent) === 1) {
+            if (is_string($relation) && preg_match('/^[A-Za-z0-9_]{1,64}$/', $relation) === 1 && is_string($parent) && preg_match('/^[A-Za-z0-9_-]{0,64}$/', $parent) === 1 && $this->isRelationOf($resource, $relation)) {
                 session()->put(RelatedController::pendingKey($relation, $parent), [
                     'action' => $action->key(),
                     'ids' => array_values(array_filter((array) $request->input('ids', []), is_string(...))),
@@ -121,5 +121,22 @@ final class ActionsController
         }
 
         return ActionInput::values($action, $validator);
+    }
+
+    /**
+     * Какой-то раздел описывает связанную таблицу с таким именем связи и этим разделом как дочерним: иначе ввод формы
+     * не ждёт ни одна таблица, и класть его в сессию под присланным ключом незачем.
+     */
+    private function isRelationOf(Resource $child, string $relation): bool
+    {
+        foreach (array_keys(Fastleo::resources()->all()) as $slug) {
+            foreach (Fastleo::resources()->find($slug)?->relations() ?? [] as $related) {
+                if ($related->name === $relation && $related->resource === $child::class) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

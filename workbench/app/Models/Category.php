@@ -44,6 +44,26 @@ final class Category extends Model
     }
 
     /**
+     * Опубликованные статьи категории: связь со своим условием (для связанных таблиц админки).
+     *
+     * @return HasMany<Article, $this>
+     */
+    public function publishedArticles(): HasMany
+    {
+        return $this->hasMany(Article::class)->where('status', 'published');
+    }
+
+    /**
+     * Готовые статьи категории: связь с `orWhere` (на ревью или опубликованные).
+     *
+     * @return HasMany<Article, $this>
+     */
+    public function readyArticles(): HasMany
+    {
+        return $this->hasMany(Article::class)->where('status', 'review')->orWhere('status', 'published');
+    }
+
+    /**
      * Родительская категория (дерево).
      *
      * @return BelongsTo<Category, $this>

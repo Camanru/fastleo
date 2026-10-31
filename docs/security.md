@@ -101,6 +101,10 @@ client_max_body_size 32m;
 
 Если админкой пользуются из известных мест, ограничьте доступ по IP на стороне приложения: правило nginx `location /fastleo { allow …; deny all; }` обходится адресом `/index.php/fastleo/login`, потому что PHP обрабатывается в другом `location`. Надёжнее — свой middleware в `fastleo.middleware`; он проверяет все страницы админки и работает вместе с отдельным доменом:
 
+```bash
+php artisan make:middleware AllowOfficeOnly       # app/Http/Middleware/AllowOfficeOnly.php
+```
+
 ```php
 // app/Http/Middleware/AllowOfficeOnly.php
 namespace App\Http\Middleware;

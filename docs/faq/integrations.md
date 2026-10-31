@@ -116,7 +116,12 @@ return response()->json(['id' => $lead->id], $lead->wasRecentlyCreated ? 201 : 2
 
 ### Как принимать события телефонии (входящий и пропущенный звонок)?
 
-Если АТС сама отправляет события на ваш адрес, сделайте маршрут-вебхук и раздел звонков только для чтения, который обновляется сам. Если телефония отдаёт звонки только по запросу — забирайте их командой по расписанию ([FAQ по CRM](crm.md#как-забирать-пропущенные-звонки-из-телефонии)).
+Если АТС сама отправляет события на ваш адрес, сделайте маршрут-вебхук и раздел звонков только для чтения, который обновляется сам. Если телефония отдаёт звонки только по запросу — забирайте их командой по расписанию ([FAQ по CRM](crm.md#как-забирать-пропущенные-звонки-из-телефонии)). Заготовки:
+
+```bash
+php artisan make:model Call -m                    # модель и миграция звонков
+php artisan fastleo:make-resource Call            # app/Fastleo/CallResource.php
+```
 
 ```php
 // routes/api.php
@@ -186,6 +191,10 @@ final class CallResource extends Resource
 
 Напишите команду: она забирает данные по API (или читает файл обмена), находит товары по артикулу и сохраняет через модель только изменившиеся. Запускайте её планировщиком.
 
+```bash
+php artisan make:command SyncStock --command=stock:sync   # app/Console/Commands/SyncStock.php
+```
+
 ```php
 // app/Console/Commands/SyncStock.php
 namespace App\Console\Commands;
@@ -250,7 +259,7 @@ Observers товара срабатывают (пересчёт цены со с
 
 ### Как получать уведомления админки в Telegram или Max?
 
-Создайте бота и добавьте его в разделе **Система → Уведомления**: всё, что уходит в колокольчик через `Fastleo::notifyAdmins()`, придёт и в выбранные чаты.
+Включите раздел ботов (`'notifications' => ['bots' => Fastleo\Notifications\NotificationBotResource::class]` в `config/fastleo.php`), создайте бота и добавьте его в разделе **Система → Уведомления**: всё, что уходит в колокольчик через `Fastleo::notifyAdmins()`, придёт и в выбранные чаты.
 
 1. Создайте бота: в Telegram — у @BotFather, в Max — в разделе «Чат-боты» кабинета Max для партнёров. Скопируйте токен.
 2. Напишите боту любое сообщение или добавьте его в рабочую группу.
@@ -335,6 +344,10 @@ public function boot(): void
 
 Опишите обычный класс `Notification` с каналом `fastleo` и методом `toFastleo()`, а отправьте через `Notification::send()`.
 
+```bash
+php artisan make:notification OrderPaid           # app/Notifications/OrderPaid.php
+```
+
 ```php
 // app/Notifications/OrderPaid.php
 namespace App\Notifications;
@@ -402,7 +415,7 @@ public function failed(?Throwable $exception): void
 
 ### Как публиковать новости в канал Telegram или Max?
 
-Добавьте канал в разделе **Система → Каналы**, а в ресурс новостей — действие `Publish`. Кнопка «Опубликовать в каналы» создаст черновик поста из записи; администратор правит его и нажимает «Отправить».
+Включите публикации в `config/fastleo.php` ([как](../publishing.md)), добавьте канал в разделе **Система → Каналы**, а в ресурс новостей — действие `Publish`. Кнопка «Опубликовать в каналы» создаст черновик поста из записи; администратор правит его и нажимает «Отправить».
 
 ```php
 // app/Fastleo/NewsResource.php
@@ -445,6 +458,10 @@ php artisan queue:work
 ### Можно ли публиковать в канал автоматически при сохранении новости?
 
 Публикации пакета отправляет только человек кнопкой «Отправить»: пост проверяют перед выходом. Для автоматической отправки сделайте свою задачу очереди, которая вызывает Bot API мессенджера, и запускайте её командой по расписанию в момент публикации. Observer `created` для этого не годится: он отправил бы черновик и новость с будущей датой.
+
+```bash
+php artisan make:command PostNewsToChannel --command=news:post-to-channel   # app/Console/Commands/PostNewsToChannel.php
+```
 
 ```php
 // app/Console/Commands/PostNewsToChannel.php
@@ -509,7 +526,12 @@ php artisan tinker --execute="Mail::raw('Проверка почты', fn (\$m) 
 
 ### Как отправить письмо клиенту кнопкой из админки?
 
-Сделайте действие с правом `view`, которое ставит письмо в очередь. Закройте его от MCP: письма клиентам отправляет человек.
+Сделайте действие с правом `view`, которое ставит письмо в очередь. Закройте его от MCP: письма клиентам отправляет человек. Заготовки:
+
+```bash
+php artisan make:mail OrderInvoice --markdown=mail.order-invoice   # app/Mail/OrderInvoice.php и шаблон письма
+php artisan fastleo:make-action SendInvoice                        # app/Fastleo/Actions/SendInvoice.php
+```
 
 ```php
 // app/Mail/OrderInvoice.php
@@ -574,7 +596,7 @@ final class SendInvoice extends Action
 }
 ```
 
-Заготовки: `php artisan make:mail OrderInvoice --markdown=mail.order-invoice` и `php artisan fastleo:make-action SendInvoice`. Подключите действие в `actions()` ресурса заказов. Подробнее — [своё действие](../actions.md#своё-действие), [права действия](../actions.md#права).
+Подключите действие в `actions()` ресурса заказов. Подробнее — [своё действие](../actions.md#своё-действие), [права действия](../actions.md#права).
 
 ### Как дать в письме ссылку на запись в админке?
 
@@ -594,6 +616,10 @@ $url = Fastleo::mailUrl('fastleo.resources.show', ['orders', $order->id]);
 ### Как выгрузить товары для 1С или маркетплейса файлом?
 
 Кнопка «Экспорт» в списке выгружает xlsx или csv с теми столбцами, что видны в разделе. Чтобы файл был в нужном виде, сделайте отдельный раздел-выгрузку той же модели: только нужные поля, только для просмотра.
+
+```bash
+php artisan fastleo:make-resource ProductFeed --model="App\Models\Product"   # app/Fastleo/ProductFeedResource.php
+```
 
 ```php
 // app/Fastleo/ProductFeedResource.php

@@ -6,6 +6,10 @@
 
 Телефоны — отдельная таблица `client_phones`, а в форме клиента — блоки [`HasMany`](fields/has-many.md). Нормализация — мутатор модели, поэтому она работает и в форме, и при импорте, и из кода сайта.
 
+```bash
+php artisan make:model ClientPhone -m             # модель и миграция таблицы client_phones
+```
+
 ```php
 // ClientResource::fields()
 HasMany::make('phones', 'Телефоны')->fields([Tel::make('phone', 'Телефон')->required()])->max(10),
@@ -37,7 +41,12 @@ Tel::make('phone', 'Телефон')->required()
   Под полем появится «Такое значение уже есть. Открыть: Иванов Иван» — ссылка, если у администратора есть право открыть эту запись.
 - **Дубль: открыть существующего клиента.** Из входящей заявки кнопка ведёт к клиенту с таким номером, а если его нет — к форме нового клиента:
 
+```bash
+php artisan fastleo:make-action OpenClient        # app/Fastleo/Actions/OpenClient.php
+```
+
 ```php
+// app/Fastleo/Actions/OpenClient.php; подключается в actions() раздела заявок: new OpenClient()
 final class OpenClient extends Action
 {
     protected ?string $label = 'Открыть клиента';
@@ -61,8 +70,12 @@ final class OpenClient extends Action
 
 Две разные задачи, обе решаются Policy и `query()`:
 
+```bash
+php artisan fastleo:make-policy Offer             # app/Policies/OfferPolicy.php
+```
+
 ```php
-// Менеджер видит все заявки, но менять и удалять может только свои (и админ — любые)
+// app/Policies/OfferPolicy.php: менеджер видит все заявки, но менять и удалять может только свои (и админ — любые)
 final class OfferPolicy
 {
     public function viewAny(User $user): bool { return true; }
@@ -87,7 +100,12 @@ public function query(Builder $query): Builder
 
 Автора записи ставит observer, а не поле формы: так менеджер не назначит заявку другому, подставив значение в запрос.
 
+```bash
+php artisan make:observer OfferObserver --model=Offer   # app/Observers/OfferObserver.php
+```
+
 ```php
+// app/Observers/OfferObserver.php
 final class OfferObserver
 {
     public function creating(Offer $offer): void
@@ -103,7 +121,12 @@ final class OfferObserver
 
 Два менеджера нажимают кнопку на одной заявке в одну секунду. Условное обновление отдаёт её только первому:
 
+```bash
+php artisan fastleo:make-action TakeLead          # app/Fastleo/Actions/TakeLead.php
+```
+
 ```php
+// app/Fastleo/Actions/TakeLead.php; подключается в actions() раздела заявок: new TakeLead()
 final class TakeLead extends Action
 {
     protected ?string $label = 'Взять в работу';
@@ -174,11 +197,15 @@ Route::post('leads', function (Request $request) {
 
 Пропущенные звонки, которые отдаёт телефония по запросу, забирает команда по расписанию:
 
+```bash
+php artisan make:command ImportMissedCalls --command=leads:import-missed-calls   # app/Console/Commands/ImportMissedCalls.php
+```
+
 ```php
 // routes/console.php
 Schedule::command('leads:import-missed-calls')->everyTenMinutes()->withoutOverlapping()->onOneServer();
 
-// команда
+// handle() команды
 $calls = Http::withToken((string) fastleo_setting('telephony.token'))->timeout(10)->retry(2, 500)->get(config('services.telephony.url').'/lost-calls', ['minutes' => 10])->throw()->json();
 ```
 
@@ -217,7 +244,16 @@ Tel::make('client_phone', 'Телефон')->fromQuery(),
 
 Если прежняя система хранила пароли в своём формате (например, `md5(strrev(md5($пароль)))`), входить с ними можно, не сбрасывая: свой `Hasher` проверяет старый хеш, а при первом входе fastleo перезаписывает его обычным bcrypt (`needsRehash()`).
 
+```bash
+php artisan make:class Hashing/LegacyHasher       # app/Hashing/LegacyHasher.php
+```
+
 ```php
+// app/Hashing/LegacyHasher.php
+namespace App\Hashing;
+
+use Illuminate\Hashing\BcryptHasher;
+
 final class LegacyHasher extends BcryptHasher
 {
     public function check($value, $hashedValue, array $options = []): bool

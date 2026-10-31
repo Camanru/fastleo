@@ -340,17 +340,29 @@ final class Related
     /**
      * Ограничение запроса дочернего раздела: записи этого родителя.
      *
+     * Внешний ключ ставится отдельным условием, а всё, что метод связи добавил сам (`->where('type', 'sale')`, `->orWhere(…)`),
+     * — в скобках. Так `orWhere` связи не открывает чужих родителей и записи, скрытые `query()` дочернего раздела,
+     * а глобальные скоупы дочерней модели (корзина) остаются как в разделе.
+     *
+     * ```php
+     * $query = $related->child()->newQuery();
+     * $related->scopeFor($category)($query); // … and category_id = 5 and (status = 'review' or status = 'published')
+     * ```
+     *
      * @return Closure(Builder<Model>): mixed
      */
     public function scopeFor(Model $parent): Closure
     {
-        $relation = $this->relation();
-        $key = $parent->getAttribute($relation->getLocalKeyName());
+        /** @var HasManyRelation<Model, Model> $live */
+        $live = $parent->{$this->name}();
+        $key = $parent->getAttribute($live->getLocalKeyName());
 
         // Ключа у родителя нет (связь по необязательной колонке): записей «без родителя» в таблице родителя быть не должно.
         return fn (Builder $query): Builder => $key === null
             ? $query->whereRaw('1 = 0')
-            : $query->where($query->qualifyColumn($relation->getForeignKeyName()), $key);
+            : $query
+                ->where($query->qualifyColumn($live->getForeignKeyName()), $key)
+                ->where(fn (Builder $nested): Builder => $nested->mergeConstraintsFrom($live->getQuery()));
     }
 
     /**

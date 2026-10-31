@@ -87,6 +87,10 @@ public function canAccessFastleo(): bool
 ],
 ```
 
+```bash
+php artisan make:model Admin -m                   # модель и миграция таблицы admins
+```
+
 ```php
 // app/Models/Admin.php
 namespace App\Models;
@@ -101,7 +105,7 @@ class Admin extends Authenticatable implements FastleoUser
 
     protected function casts(): array
     {
-        return ['password' => 'hashed', 'fastleo_admin' => 'boolean'];
+        return ['password' => 'hashed'];
     }
 }
 ```
@@ -231,6 +235,10 @@ public function query(Builder $query): Builder
 
     return $user?->is_admin ? $query : $query->where('manager_id', $user?->getKey());
 }
+```
+
+```bash
+php artisan make:observer OfferObserver --model=Offer   # app/Observers/OfferObserver.php
 ```
 
 ```php
@@ -409,7 +417,12 @@ php artisan fastleo:doctor
 
 Если doctor пишет «Нет таблицы password_reset_tokens для ссылок сброса пароля…», создайте её миграцией:
 
+```bash
+php artisan make:migration create_password_reset_tokens_table
+```
+
 ```php
+// database/migrations/…_create_password_reset_tokens_table.php
 Schema::create('password_reset_tokens', function (Blueprint $table) {
     $table->string('email')->primary();
     $table->string('token');
@@ -457,16 +470,19 @@ php artisan optimize   # на боевом сайте: пересобрать к
 
 ### Как узнать, кто изменил запись?
 
-Откройте запись и нажмите «История» — там автор, время и «было → стало» по каждому полю. Все изменения сразу — пункт меню «Журнал» (`/fastleo/activity`), фильтры по разделу и автору.
+Если журнал изменений включён (`'activity' => ['enabled' => true]` в `config/fastleo.php`), откройте запись и нажмите «История» — там автор, время и «было → стало» по каждому полю. Все изменения сразу — пункт меню «Журнал» (`/fastleo/activity`), фильтры по разделу и автору.
 
 Записи хранятся 30 дней. Дольше:
 
 ```php
 // config/fastleo.php
 'activity' => [
+    'enabled' => true,
     'keep_days' => 90,
 ],
 ```
+
+Массив `activity` заменяет умолчание целиком: без `'enabled' => true` журнал выключится.
 
 Чистка старых записей идёт по расписанию — нужен работающий `schedule:run` в cron.
 
@@ -485,7 +501,7 @@ php artisan optimize   # на боевом сайте: пересобрать к
 protected static bool $activity = false;
 ```
 
-Выключить журнал целиком: `'activity' => ['enabled' => false]` в `config/fastleo.php`.
+Журнал выключен по умолчанию; если вы его включили, выключить целиком — `'enabled' => false` в массиве `activity` в `config/fastleo.php`.
 
 Подробнее — [отключить журнал для раздела](../activity.md#отключить-журнал-для-раздела).
 
@@ -539,6 +555,10 @@ protected static bool $activity = false;
 
 Добавьте свой middleware в `fastleo.middleware` — он проверяет все страницы админки, включая вход:
 
+```bash
+php artisan make:middleware AllowOfficeOnly      # app/Http/Middleware/AllowOfficeOnly.php
+```
+
 ```php
 // app/Http/Middleware/AllowOfficeOnly.php
 namespace App\Http\Middleware;
@@ -572,6 +592,10 @@ final class AllowOfficeOnly
 ### Как проверить тестом, что права раздела работают?
 
 Войдите в тесте нужным пользователем через guard `fastleo` и проверьте запрет и то, что запись не изменилась:
+
+```bash
+php artisan make:test Admin/DoctorsAccessTest --pest   # tests/Feature/Admin/DoctorsAccessTest.php
+```
 
 ```php
 // tests/Feature/Admin/DoctorsAccessTest.php

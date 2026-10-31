@@ -10,6 +10,12 @@
 
 Храните телефоны в отдельной таблице и выведите их в форме клиента блоками `HasMany`. Номер приводите к одному виду мутатором модели — так он одинаков из формы, импорта и кода сайта.
 
+```bash
+php artisan make:model Client -m                # модель и миграция clients, если их ещё нет
+php artisan make:model ClientPhone -m           # модель и миграция client_phones
+php artisan fastleo:make-resource Client        # app/Fastleo/ClientResource.php
+```
+
 ```php
 // database/migrations/2026_01_01_000001_create_client_phones_table.php
 Schema::create('client_phones', function (Blueprint $table) {
@@ -75,8 +81,13 @@ public function fields(): array
 
 Держите в таблице клиентов колонку со всеми номерами через пробел, обновляйте её observer'ом телефона и отметьте её `searchable()`.
 
+```bash
+php artisan make:migration add_phones_digits_to_clients_table
+php artisan make:observer ClientPhoneObserver --model=ClientPhone   # app/Observers/ClientPhoneObserver.php
+```
+
 ```php
-// миграция
+// database/migrations/…_add_phones_digits_to_clients_table.php
 $table->string('phones_digits', 500)->default('');
 
 // app/Observers/ClientPhoneObserver.php
@@ -134,6 +145,10 @@ Tel::make('phone', 'Основной телефон')->required()
 
 Добавьте разделу заявок действие: оно ищет клиента по номеру и ведёт в его карточку, а если клиента нет — в форму создания с подставленными именем и телефоном.
 
+```bash
+php artisan fastleo:make-action OpenClient      # app/Fastleo/Actions/OpenClient.php
+```
+
 ```php
 // app/Fastleo/Actions/OpenClient.php
 namespace App\Fastleo\Actions;
@@ -165,6 +180,8 @@ final class OpenClient extends Action
 }
 
 // app/Fastleo/LeadResource.php
+use App\Fastleo\Actions\OpenClient;
+
 public function actions(): array
 {
     return [new OpenClient];
@@ -283,6 +300,10 @@ Route::post('leads', function (Request $request) {
 
 Напишите команду, которая забирает звонки по API телефонии, и запускайте её по расписанию.
 
+```bash
+php artisan make:command ImportMissedCalls --command=leads:import-missed-calls   # app/Console/Commands/ImportMissedCalls.php
+```
+
 ```php
 // app/Console/Commands/ImportMissedCalls.php
 namespace App\Console\Commands;
@@ -320,6 +341,11 @@ Schedule::command('leads:import-missed-calls')->everyTenMinutes()->withoutOverla
 
 Опишите статусы enum с методами `label()` и `tone()` и выведите полем `Enum` с `badges()`.
 
+```bash
+php artisan make:enum App/Enums/LeadStatus --string        # app/Enums/LeadStatus.php
+php artisan make:migration add_status_to_leads_table
+```
+
 ```php
 // app/Enums/LeadStatus.php
 namespace App\Enums;
@@ -356,7 +382,7 @@ enum LeadStatus: string
 ```
 
 ```php
-// миграция
+// database/migrations/…_add_status_to_leads_table.php
 $table->string('status', 20)->default('new')->index();
 
 // app/Models/Lead.php
@@ -395,8 +421,12 @@ Enum::make('status', 'Статус')->enum(LeadStatus::class)->required()->badge
 
 Добавьте в заявку колонку `manager_id`, связь `manager()` и поле `BelongsTo` с вариантами только из администраторов.
 
+```bash
+php artisan make:migration add_manager_id_to_leads_table
+```
+
 ```php
-// миграция
+// database/migrations/…_add_manager_id_to_leads_table.php
 $table->foreignId('manager_id')->nullable()->index()->constrained('users')->nullOnDelete();
 
 // app/Models/Lead.php
@@ -439,6 +469,11 @@ public function filters(): array
 ### Как сделать кнопку «Взять в работу», чтобы двое не взяли одну заявку?
 
 Сделайте действие с условным обновлением: заявка достаётся тому, кто успел первым. Отдельный метод Policy `take` решает, кто вообще может брать заявки (даже без права их менять), а «ещё ничья» проверяет само действие: на устаревшей странице менеджер увидит «Заявку уже взял другой менеджер», а не ошибку 403.
+
+```bash
+php artisan fastleo:make-action TakeLead        # app/Fastleo/Actions/TakeLead.php
+php artisan fastleo:make-policy Lead            # app/Policies/LeadPolicy.php, если её ещё нет
+```
 
 ```php
 // app/Fastleo/Actions/TakeLead.php
@@ -486,6 +521,8 @@ public function take(User $user, Lead $lead): bool
 }
 
 // app/Fastleo/LeadResource.php
+use App\Fastleo\Actions\TakeLead;
+
 public function actions(): array
 {
     return [new TakeLead];
@@ -579,6 +616,10 @@ public static function badge(): ?int
 
 Добавьте колонку `read_at` и укажите её в ресурсе. Открыли заявку — она просмотрена для всех; в меню число непросмотренных, в списке они жирные. Свой `badge()` для этого не нужен.
 
+```bash
+php artisan make:migration add_read_at_to_leads_table
+```
+
 ```php
 // database/migrations/…_add_read_at_to_leads_table.php
 Schema::table('leads', function (Blueprint $table) {
@@ -597,8 +638,13 @@ protected static ?string $readColumn = 'read_at';
 
 Сделайте раздел задач и подключите его к клиенту связанной таблицей с `quickAdd()` — маленькая форма появится прямо под таблицей.
 
+```bash
+php artisan make:model Task -m                  # модель и миграция tasks
+php artisan fastleo:make-resource Task          # app/Fastleo/TaskResource.php
+```
+
 ```php
-// миграция
+// database/migrations/…_create_tasks_table.php
 Schema::create('tasks', function (Blueprint $table) {
     $table->id();
     $table->foreignId('client_id')->constrained()->cascadeOnDelete();
@@ -657,6 +703,10 @@ Related::make('tasks', TaskResource::class)
 ### Как напомнить менеджеру о задаче в срок?
 
 Запускайте по расписанию команду: она находит задачи с наступившим сроком и кладёт уведомление в колокольчик ответственного.
+
+```bash
+php artisan make:command RemindTasks --command=tasks:remind   # app/Console/Commands/RemindTasks.php
+```
 
 ```php
 // app/Console/Commands/RemindTasks.php
@@ -721,8 +771,14 @@ public function actions(): array
 
 Сделайте раздел комментариев и выведите его в карточке заявки справа с быстрым добавлением. Автора ставит observer, а не поле формы.
 
+```bash
+php artisan make:model LeadComment -m                                # модель и миграция lead_comments
+php artisan fastleo:make-resource LeadComment                        # app/Fastleo/LeadCommentResource.php
+php artisan make:observer LeadCommentObserver --model=LeadComment    # app/Observers/LeadCommentObserver.php
+```
+
 ```php
-// миграция
+// database/migrations/…_create_lead_comments_table.php
 Schema::create('lead_comments', function (Blueprint $table) {
     $table->id();
     $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
@@ -732,6 +788,11 @@ Schema::create('lead_comments', function (Blueprint $table) {
 });
 
 // app/Observers/LeadCommentObserver.php
+namespace App\Observers;
+
+use App\Models\LeadComment;
+use Fastleo\Fastleo;
+
 final class LeadCommentObserver
 {
     public function creating(LeadComment $comment): void
@@ -794,8 +855,12 @@ public function relations(): array
 
 Добавьте блоки `HasMany` с полем `File` внутри — у каждой заявки будет своя папка файлов.
 
+```bash
+php artisan make:model LeadFile -m              # модель и миграция lead_files
+```
+
 ```php
-// миграция
+// database/migrations/…_create_lead_files_table.php
 Schema::create('lead_files', function (Blueprint $table) {
     $table->id();
     $table->foreignId('lead_id')->constrained()->cascadeOnDelete();
@@ -819,7 +884,7 @@ HasMany::make('files', 'Файлы')->fields([
 
 ### Как посмотреть, кто и что менял в заявке?
 
-Журнал изменений включён по умолчанию — кнопка «История» есть на странице заявки. Чтобы последние изменения были видны прямо в карточке, включите панель справа.
+Включите журнал изменений в `config/fastleo.php` (`'activity' => ['enabled' => true]`) — на странице заявки появится кнопка «История». Чтобы последние изменения были видны прямо в карточке, включите панель справа.
 
 ```php
 // app/Fastleo/LeadResource.php
@@ -833,6 +898,10 @@ protected static bool $historyPanel = true;
 ### Как уведомить менеджера в колокольчик, когда ему назначили заявку?
 
 Повесьте на модель заявки observer и при смене `manager_id` вызывайте `Fastleo::notify()`.
+
+```bash
+php artisan make:observer LeadObserver --model=Lead   # app/Observers/LeadObserver.php
+```
 
 ```php
 // app/Observers/LeadObserver.php
@@ -871,14 +940,23 @@ Observer срабатывает при назначении из формы, и�
 
 Боты раздела «Уведомления» пишут в общие чаты администраторов. Чтобы написать конкретному менеджеру, храните его `telegram_chat_id` и отправляйте сообщение своей задачей очереди.
 
+```bash
+php artisan make:migration add_telegram_chat_id_to_users_table
+php artisan fastleo:make-settings Telegram      # app/Fastleo/TelegramSettings.php
+php artisan make:job SendTelegramMessage        # app/Jobs/SendTelegramMessage.php
+```
+
 ```php
-// миграция
+// database/migrations/…_add_telegram_chat_id_to_users_table.php
 $table->string('telegram_chat_id', 32)->nullable();
 
 // app/Fastleo/TelegramSettings.php — токен бота задаётся в админке
-use Fastleo\Fields\Text;
+namespace App\Fastleo;
 
-final class TelegramSettings extends \Fastleo\Settings
+use Fastleo\Fields\Text;
+use Fastleo\Settings;
+
+final class TelegramSettings extends Settings
 {
     protected static ?string $label = 'Telegram';
 
@@ -935,7 +1013,7 @@ if ($lead->manager->telegram_chat_id) {
 
 ### Как сообщить о новой заявке в рабочий чат Telegram?
 
-Вызовите `Fastleo::notifyAdmins()` и подключите бота в разделе **Система → Уведомления**. Сообщение уйдёт в колокольчик всем администраторам и в чаты бота.
+Вызовите `Fastleo::notifyAdmins()`, включите раздел ботов (`notifications.bots`, [как](../notifications.md#как-включить-ботов)) и подключите бота в разделе **Система → Уведомления**. Сообщение уйдёт в колокольчик всем администраторам и в чаты бота.
 
 ```php
 use Fastleo\Fastleo;
@@ -957,6 +1035,10 @@ Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body("{$l
 ### Как сделать отчёт по менеджерам за период?
 
 Создайте страницу-отчёт: фильтр периода, плитки и таблица `Rows` с итогом. Всё считается одним запросом с группировкой.
+
+```bash
+php artisan fastleo:make-page ManagersReport --report   # app/Fastleo/ManagersReportPage.php
+```
 
 ```php
 // app/Fastleo/ManagersReportPage.php

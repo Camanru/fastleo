@@ -47,6 +47,16 @@ it('describes how the section sits in the menu: group, icon, position, a visible
         ->and(inspected('feedback')['has_badge'])->toBeTrue();
 });
 
+it('says there is no history panel while the activity log is switched off', function (): void {
+    useFixtureResources('Aside');
+
+    expect(inspected('categories')['history_panel'])->toBeTrue();
+
+    config(['fastleo.activity.enabled' => false]);
+
+    expect(inspected('categories')['history_panel'])->toBeFalse();
+});
+
 it('describes fields: rules, relation, files and enum options', function (): void {
     $fields = collect(inspected('articles')['fields'])->keyBy('name');
 

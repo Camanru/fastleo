@@ -499,6 +499,10 @@ public function actions(): array
 
 Опишите поля в `fields()` действия — откроется окно с мини-формой, значения придут в `$data` уже проверенными.
 
+```bash
+php artisan fastleo:make-action ShipOrders        # app/Fastleo/Actions/ShipOrders.php
+```
+
 ```php
 // app/Fastleo/Actions/ShipOrders.php
 namespace App\Fastleo\Actions;
@@ -545,6 +549,10 @@ final class ShipOrders extends Action
 
 Задайте свойства класса действия.
 
+```bash
+php artisan fastleo:make-action CancelOrder       # app/Fastleo/Actions/CancelOrder.php
+```
+
 ```php
 // app/Fastleo/Actions/CancelOrder.php
 protected ?string $label = 'Отменить заказ';
@@ -585,6 +593,10 @@ public function visibleFor(Model $record): bool
 ### Как после действия перейти на другую страницу или отдать файл?
 
 Верните `ActionResult::redirect()` или `ActionResult::download()`.
+
+```bash
+php artisan fastleo:make-action ExportInvoices    # app/Fastleo/Actions/ExportInvoices.php
+```
 
 ```php
 // app/Fastleo/Actions/ExportInvoices.php

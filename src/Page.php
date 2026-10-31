@@ -84,12 +84,24 @@ abstract class Page
     }
 
     /**
-     * Данные для шаблона. Для отчёта (шаблон по умолчанию) — фильтры и посчитанные виджеты.
+     * Данные для шаблона. Для отчёта (шаблон по умолчанию) — фильтры и посчитанные виджеты; у страницы со своим
+     * `view()` — пусто, пока `data()` не переопределён. Ключи массива становятся переменными шаблона.
+     *
+     * ```php
+     * public function data(Request $request): array
+     * {
+     *     return ['total' => Lead::count()]; // в шаблоне — {{ $total }}
+     * }
+     * ```
      *
      * @return array<string, mixed>
      */
     public function data(Request $request): array
     {
+        if ($this->view() !== 'fastleo::pages.report') {
+            return [];
+        }
+
         $items = $this->filters();
         $filters = Filters::resolve($items, $request);
         $widgets = [];

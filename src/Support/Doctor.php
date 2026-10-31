@@ -93,6 +93,14 @@ final class Doctor
     private array $problems = [];
 
     /**
+     * Таблицы пакета, которых нет (не выполнен `migrate`): о них уже есть одна общая ошибка,
+     * у встроенных разделов на этих таблицах вторая не нужна.
+     *
+     * @var list<string>
+     */
+    private array $missingPackageTables = [];
+
+    /**
      * Выполнить все проверки.
      *
      * @return list<Problem>
@@ -100,6 +108,7 @@ final class Doctor
     public function run(): array
     {
         $this->problems = [];
+        $this->missingPackageTables = [];
 
         $this->site();
         $this->cache();
@@ -200,10 +209,41 @@ final class Doctor
             $this->add('warning', 'site', 'robots_file', hint: 'robots_file_hint');
         }
 
-        $disk = config('fastleo.files.disk', 'public');
-
-        if ($disk === 'public' && config('filesystems.disks.public.driver') === 'local' && ! file_exists(public_path('storage'))) {
+        if (self::storageLinkMissing()) {
             $this->add('warning', 'site', 'storage_link', hint: 'storage_link_hint');
+        }
+    }
+
+    /**
+     * Файлы админки лежат на локальном диске `public`, а ссылки `public/storage` нет — загруженное не откроется по адресу.
+     *
+     * ```php
+     * Doctor::storageLinkMissing(); // true до php artisan storage:link
+     * ```
+     */
+    public static function storageLinkMissing(): bool
+    {
+        return config('fastleo.files.disk', 'public') === 'public'
+            && config('filesystems.disks.public.driver') === 'local'
+            && ! file_exists(public_path('storage'));
+    }
+
+    /**
+     * Не все миграции пакета выполнены (или база недоступна) — сайту ещё нужен `php artisan migrate`.
+     *
+     * ```php
+     * Doctor::packageMigrationsPending(); // false после php artisan migrate
+     * ```
+     */
+    public static function packageMigrationsPending(): bool
+    {
+        try {
+            /** @var MigrationRepositoryInterface $repository */
+            $repository = resolve('migration.repository');
+
+            return ! $repository->repositoryExists() || array_diff(array_keys(self::MIGRATIONS), $repository->getRan()) !== [];
+        } catch (Throwable) {
+            return true;
         }
     }
 
@@ -226,13 +266,8 @@ final class Doctor
     private function tables(): void
     {
         try {
-            foreach (self::MIGRATIONS as $tables) {
-                foreach ($tables as $table) {
-                    if (! Schema::hasTable($table)) {
-                        $this->add('error', 'site', 'table_missing_package', ['table' => $table], 'migrate_hint');
-                    }
-                }
-            }
+            $this->missingPackageTables = array_values(array_filter(array_merge(...array_values(self::MIGRATIONS)), fn (string $table): bool => ! Schema::hasTable($table)));
+            $missing = $this->missingPackageTables === [] ? [] : [trans()->string('fastleo::doctor.package_tables', ['tables' => implode(', ', $this->missingPackageTables)], Fastleo::LOCALE)];
 
             $users = UserModel::fastleoClassName();
             $adminColumn = false;
@@ -242,8 +277,12 @@ final class Doctor
                 $adminColumn = Schema::hasTable($table) && Schema::hasColumn($table, 'fastleo_admin');
 
                 if (Schema::hasTable($table) && ! $adminColumn) {
-                    $this->add('error', 'site', 'column_missing_package', ['table' => $table, 'column' => 'fastleo_admin'], 'migrate_hint');
+                    $missing[] = trans()->string('fastleo::doctor.package_admin_column', ['table' => $table], Fastleo::LOCALE);
                 }
+            }
+
+            if ($missing !== []) {
+                $this->add('error', 'site', 'package_not_migrated', ['what' => implode('; ', $missing)], 'migrate_hint');
             }
 
             $this->migrationConflicts($adminColumn);
@@ -628,7 +667,9 @@ final class Doctor
             $schema = Schema::connection($model->getConnectionName());
 
             if (! $schema->hasTable($model->getTable())) {
-                $this->add('error', $scope, 'table_missing', ['table' => $model->getTable(), 'model' => $model::class], 'migrate_hint');
+                if (! in_array($model->getTable(), $this->missingPackageTables, true)) {
+                    $this->add('error', $scope, 'table_missing', ['table' => $model->getTable(), 'model' => $model::class], 'migrate_hint');
+                }
 
                 return null;
             }

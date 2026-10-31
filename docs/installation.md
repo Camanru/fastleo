@@ -26,11 +26,12 @@ php artisan fastleo:install
 
 - публикует `config/fastleo.php` (существующий файл не перезаписывает);
 - публикует CSS/JS в `public/vendor/fastleo`;
-- проверяет, что модель пользователя готова к входу в админку;
+- кладёт skill для Claude Code в `.claude/skills/fastleo` ([работа с Claude](claude.md));
+- подключает модель пользователя к админке (шаг 2);
 - напоминает, если очередь работает в режиме `sync`;
 - показывает следующие шаги.
 
-Код выхода `1` значит, что модель пользователя ещё не подключена (шаг 2).
+Код выхода `1` значит, что модель пользователя подключить автоматически не получилось — подключите её вручную (шаг 2).
 
 Если ассеты (готовые CSS и JS админки) не опубликованы, админка открывается без стилей. При `APP_DEBUG=true` на странице появляется заметная плашка с командой `php artisan vendor:publish --tag=fastleo-assets`; на боевом сайте плашки нет. После обновления пакета публикуйте ассеты заново.
 
@@ -38,28 +39,57 @@ php artisan fastleo:install
 
 Вход в админку работает поверх обычной таблицы `users` сайта, через отдельный guard `fastleo` (guard — способ входа в `config/auth.php`; пакет добавляет свой сам, описывать его не нужно). Вход на сайте и вход в админку независимы: пользователь, вошедший на сайт, не попадает в админку, пока не войдёт в неё сам.
 
-Кто может входить, решает метод `canAccessFastleo()` из интерфейса `Fastleo\Auth\FastleoUser`. Готовая реализация — трейт `HasFastleoAccess`: доступ есть, если в колонке `fastleo_admin` истина.
+Кто может входить, решает метод `canAccessFastleo()` из интерфейса `Fastleo\Auth\FastleoUser`. Готовая реализация — трейт `HasFastleoAccess`: доступ есть, если в колонке `fastleo_admin` истина. Каст этой колонки к `bool` трейт задаёт сам; свой каст в модели (`$casts` или `casts()`) главнее.
+
+`fastleo:install` подключает модель сам и пишет об этом:
+
+```
+INFO  Модель App\Models\User подключена к админке: добавлены интерфейс Fastleo\Auth\FastleoUser и трейт Fastleo\Auth\HasFastleoAccess (app/Models/User.php).
+```
+
+В файле модели появляются три правки, остальное не меняется. Так выглядит модель нового сайта на Laravel 13 после `fastleo:install` (добавленное помечено `// fastleo`):
 
 ```php
+<?php
+
 namespace App\Models;
 
-use Fastleo\Auth\FastleoUser;
-use Fastleo\Auth\HasFastleoAccess;
+// use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Database\Factories\UserFactory;
+use Fastleo\Auth\FastleoUser; // fastleo
+use Fastleo\Auth\HasFastleoAccess; // fastleo
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable implements FastleoUser
+#[Fillable(['name', 'email', 'password'])]
+#[Hidden(['password', 'remember_token'])]
+class User extends Authenticatable implements FastleoUser // fastleo: implements FastleoUser
 {
-    use HasFastleoAccess;
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, HasFastleoAccess, Notifiable; // fastleo: HasFastleoAccess
 
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
     protected function casts(): array
     {
         return [
+            'email_verified_at' => 'datetime',
             'password' => 'hashed',
-            'fastleo_admin' => 'boolean',
         ];
     }
 }
 ```
+
+Файл не трогается, если модель лежит не в папке `app` сайта (модель из пакета), файл недоступен для записи, в нём уже упоминается `FastleoUser` или `HasFastleoAccess` (модель начали подключать вручную) или класс объявлен необычно. Тогда `fastleo:install` пишет `ERROR … не подключена к админке` и завершается с кодом `1` — внесите эти три правки сами, как в примере выше. Частые ошибки при ручной правке:
+
+- `Cannot use Illuminate\Foundation\Auth\User as Authenticatable because the name is already in use` — строку `use … as Authenticatable` добавили второй раз; оставьте одну.
+- `Interface "App\Models\FastleoUser" not found` — нет строк `use Fastleo\Auth\…` вверху файла.
 
 **Не добавляйте `fastleo_admin` в `$fillable`** и не используйте `$guarded = []` у модели пользователя: иначе форма регистрации или профиля сайта сможет выдать права администратора. Флаг ставит команда `fastleo:user`.
 
@@ -78,11 +108,14 @@ public function canAccessFastleo(): bool
 
 Если пользователи хранятся не в провайдере `users` из `config/auth.php`, укажите свой в `fastleo.auth.provider` ([настройки](configuration.md)).
 
-## 3. Миграция
+## 3. Миграция и ссылка на файлы
 
 ```bash
 php artisan migrate
+php artisan storage:link
 ```
+
+`storage:link` создаёт ссылку `public/storage` на `storage/app/public`, где лежат загруженные в админке файлы: без неё картинки и файлы не откроются на сайте. Если ссылка уже есть (сайт её делал), повторять не нужно; `fastleo:install` напоминает о ней, только пока ссылки нет. Файлам на другом диске (S3, R2) ссылка не нужна.
 
 На сайте, где раньше стояла другая админка, `migrate` и «Забыли пароль?» могут упасть из-за старых таблиц и колонок — см. [переезд с другой админки](migrating.md).
 

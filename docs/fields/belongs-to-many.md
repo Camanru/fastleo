@@ -12,6 +12,10 @@ BelongsToMany::make('topics', 'Темы');
 
 **Колонка:** своей колонки нет — связь хранится в промежуточной (pivot) таблице. Миграция и метод модели:
 
+```bash
+php artisan make:migration create_article_topic_table
+```
+
 ```php
 // Миграция
 Schema::create('article_topic', function (Blueprint $table) {

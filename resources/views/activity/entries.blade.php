@@ -20,10 +20,12 @@
         @php
             $resource = $resources[$entry->resource] ?? null;
             $restricted = in_array($entry->id, $hiddenEntries ?? [], true);
+            $subject = ($entryRecords ?? [])[$entry->id] ?? null;
             $labels = [];
             if ($resource !== null) {
                 foreach ($resource->schema()->fields() as $field) {
-                    if (! $field->isHidden()) {
+                    // Записи нет (удалена насовсем): поле со скрытием по условию на запись не показывается — проверить не на чем.
+                    if ($subject === null ? ! $field->hasHiddenCondition() && ! $field->isHidden() : ! $field->isHidden($subject)) {
                         $labels[$field->name] = $field->getLabel();
                     }
                 }

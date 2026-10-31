@@ -3,7 +3,7 @@
 Своё поле — класс-наследник готового поля и Blade-шаблон формы, если готовых полей не хватает.
 
 ```bash
-php artisan fastleo:make-field Phone
+php artisan fastleo:make-field Phone              # app/Fastleo/Fields/Phone.php + resources/views/fastleo/fields/phone.blade.php
 ```
 
 ```php

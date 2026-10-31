@@ -19,6 +19,10 @@ HasOne::make('banner', 'Баннер')->fields([
 
 **Колонка:** своей колонки нет — вложенная запись лежит в своей таблице с уникальным внешним ключом на родителя:
 
+```bash
+php artisan make:model ArticleBanner -m           # модель блока и миграция таблицы article_banners
+```
+
 ```php
 // Миграция
 Schema::create('article_banners', function (Blueprint $table) {

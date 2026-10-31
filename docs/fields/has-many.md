@@ -23,6 +23,10 @@ HasMany::make('prices', 'Цены')
 
 **Колонка:** своей колонки нет — записи блоков лежат в своей таблице с внешним ключом на родителя:
 
+```bash
+php artisan make:model Price -m                   # модель блока и миграция таблицы prices
+```
+
 ```php
 // Миграция
 Schema::create('prices', function (Blueprint $table) {

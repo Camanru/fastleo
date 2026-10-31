@@ -34,6 +34,10 @@
 
 Миграция для голых имён. Запускайте её **после** того, как адреса с `/storage/` уже приведены к `uploads/…`: она трогает только значения без `/`, остальные оставляет как есть. Файлы обновляйте через `chunkById`: обычные `chunk()`/`lazy()` со смещением пропускают строки, когда сами меняют значение, по которому отбирают.
 
+```bash
+php artisan make:migration prefix_upload_paths
+```
+
 ```php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;

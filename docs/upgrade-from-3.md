@@ -174,9 +174,11 @@ composer require camanru/fastleo
 php artisan fastleo:install
 ```
 
-`fastleo:install` публикует новый `config/fastleo.php` и CSS/JS в `public/vendor/fastleo`, кладёт skill для Claude и проверяет модель пользователя. Код выхода `1` — модель пользователя ещё не подключена (шаг 4). Подробно — [установка](installation.md).
+`fastleo:install` публикует новый `config/fastleo.php` и CSS/JS в `public/vendor/fastleo`, кладёт skill для Claude и подключает модель пользователя (интерфейс и трейт, шаг 4). Код выхода `1` — подключить модель автоматически не вышло, сделайте шаг 4 вручную. Подробно — [установка](installation.md).
 
 ### 4. Модель пользователя
+
+Если `fastleo:install` написал «Модель … подключена к админке», проверьте файл модели; иначе внесите правку сами:
 
 ```php
 namespace App\Models;
@@ -188,14 +190,6 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 class User extends Authenticatable implements FastleoUser
 {
     use HasFastleoAccess;
-
-    protected function casts(): array
-    {
-        return [
-            'password' => 'hashed',
-            'fastleo_admin' => 'boolean',
-        ];
-    }
 }
 ```
 
@@ -207,7 +201,12 @@ class User extends Authenticatable implements FastleoUser
 
 Старая версия уже создала колонку `users.fastleo_admin` и таблицу `fastleo_settings`. Миграции 4.0 создают их заново, со своей схемой, и на старой базе упадут с ошибкой «колонка (таблица) уже существует». Поэтому до миграций пакета старые переименовываются, а после — флаги администраторов переносятся в новую колонку.
 
-Laravel выполняет новые миграции сайта и пакета вместе, по порядку имён файлов. Первая миграция ниже должна идти **раньше** миграций пакета (их имена начинаются с `2026_10_28`), вторая — **позже**. Поэтому возьмите имена файлов как в примере.
+Laravel выполняет новые миграции сайта и пакета вместе, по порядку имён файлов. Первая миграция ниже должна идти **раньше** миграций пакета (их имена начинаются с `2026_10_28`), вторая — **позже**. Поэтому возьмите имена файлов как в примере: создайте файлы командой и переименуйте (команда ставит в имя сегодняшнюю дату).
+
+```bash
+php artisan make:migration prepare_fastleo_4      # → 2026_10_27_000000_prepare_fastleo_4.php
+php artisan make:migration finish_fastleo_4       # → 2026_10_31_000000_finish_fastleo_4.php
+```
 
 ```php
 // database/migrations/2026_10_27_000000_prepare_fastleo_4.php
@@ -289,6 +288,10 @@ php artisan fastleo:user admin@site.ru --no-interaction
 Сами файлы остаются на месте: старая папка `storage/app/public/uploads` — это корень файлового менеджера 4.0 по умолчанию (диск `public`, папка `uploads`). Если в старом конфиге `uploads` был другим, например `'public/files'`, поменяйте в `config/fastleo.php` ключ `files.root` на `'files'`. Ссылка `public/storage` нужна, как и раньше: `php artisan storage:link`.
 
 **Значения в колонках.** Старая версия писала в колонку адрес `/storage/uploads/…`, 4.0 — путь на диске `uploads/…`. Поля `Image` и `File` старый адрес не принимают: не покажут превью и не дадут сохранить запись. Переведите все колонки, где было `'media' => true` (и во вложенных таблицах `include`), — `/storage/` в начале отрезается:
+
+```bash
+php artisan make:migration convert_fastleo_file_paths
+```
 
 ```php
 // database/migrations/2026_10_31_000100_convert_fastleo_file_paths.php
@@ -403,6 +406,10 @@ HasMany::make('rows', 'Блоки')->fields([
 
 `select` с `'multiple' => true` хранил ключи строкой `3,7,12`. В 4.0 связь с записями другой таблицы — промежуточная таблица и поле [BelongsToMany](fields/belongs-to-many.md). Пример переноса для врачей и услуг (колонка `doctors.services`):
 
+```bash
+php artisan make:migration move_doctor_services
+```
+
 ```php
 // database/migrations/2026_10_31_000200_move_doctor_services.php
 use Illuminate\Database\Migrations\Migration;
@@ -510,7 +517,11 @@ class Article extends Model
 }
 ```
 
-и ресурс:
+и ресурс — заготовка командой, затем правка полей:
+
+```bash
+php artisan fastleo:make-resource Article --generate   # app/Fastleo/ArticleResource.php
+```
 
 ```php
 // app/Fastleo/ArticleResource.php (адрес раздела — /fastleo/articles)

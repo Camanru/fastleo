@@ -48,6 +48,10 @@ protected function casts(): array
 
 Перевод обычной колонки: сначала превратите старые строки в JSON, потом смените тип колонки миграцией. Поиск и сортировка списка читают колонку как JSON — строка не в JSON (или колонка `text` в PostgreSQL) даст ошибку базы.
 
+```bash
+php artisan make:migration translate_pages_title   # код ниже — в up() этой миграции
+```
+
 ```php
 // Один раз, до смены типа; в PostgreSQL смена типа — DB::statement('alter table pages alter column title type json using title::json').
 DB::table('pages')->whereNotNull('title')->orderBy('id')->each(fn (object $page) => DB::table('pages')

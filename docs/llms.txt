@@ -10,7 +10,14 @@
 4. Тест раздела: сначала посмотрите в `composer.json`, Pest у сайта или PHPUnit, и напишите тест тем же инструментом; примеры тестов (вход, создание, права, действия, файлы) — в [тестах разделов](testing.md).
 5. `php artisan fastleo:doctor` — ошибок быть не должно. Исправить по подсказкам, повторить.
 
-Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи»:
+Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи». Файлы создаются командами:
+
+```bash
+php artisan make:model Doctor -m                       # модель и миграция
+php artisan migrate                                    # после правки миграции
+php artisan fastleo:make-resource Doctor --generate    # app/Fastleo/DoctorResource.php
+php artisan make:test DoctorsAdminTest                 # tests/Feature/DoctorsAdminTest.php (Pest или PHPUnit — как у сайта)
+```
 
 ```php
 // database/migrations/…_create_doctors_table.php
@@ -121,7 +128,7 @@ class DoctorsAdminTest extends TestCase
 | Новые заявки или сообщения: выделить непросмотренные, в меню — их число | `protected static ?string $readColumn = 'read_at';` + колонка `timestamp` nullable | [resources.md](resources.md#отметка-просмотрено) |
 | Название записи в заголовке, крошках, поиске | первый столбец списка, не связь, или `title(Model $record)` | [resources.md](resources.md#title) |
 | Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](related.md) |
-| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`, в ресурсе `$historyPanel = true` | [related.md](related.md#боковая-колонка-карточки) |
+| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`; история — в ресурсе `$historyPanel = true` и `'activity' => ['enabled' => true]` в `config/fastleo.php` (журнал выключен по умолчанию) | [related.md](related.md#боковая-колонка-карточки) |
 | Добавить дочернюю запись прямо под таблицей, без перехода на другую страницу (задача, комментарий) | `Related::make(…)->quickAdd(['title', 'due_at'])`, подпись кнопки — `->addLabel()` | [related.md](related.md#быстрое-добавление) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](related.md#раскрывающиеся-строки) |
 | Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](fields/select.md) |

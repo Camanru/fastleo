@@ -6,6 +6,7 @@ namespace Fastleo\Actions;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Checkbox;
+use Fastleo\Fields\Field;
 use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\RecordWriter;
 use Fastleo\Support\ValidationMessages;
@@ -108,8 +109,9 @@ final class SetToggle extends Action
                 continue;
             }
 
-            // Правило условия показа (`visibleWhen`) ищет управляющее поле среди данных: берём его из записи, как форма.
-            $input = [$field->name => $this->value];
+            // Правила поля видят остальные поля записи (`required_if:other`, `different:other`), как в форме. Условие показа
+            // (`visibleWhen`) ищет управляющее поле среди данных: оно берётся из записи, даже если его нельзя менять.
+            $input = [...RecordWriter::currentValues($resource, $record), $field->name => Field::conditionValue($this->value)];
             $controlling = $field->getVisibleWhen()['field'] ?? null;
 
             if ($controlling !== null) {

@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use BackedEnum;
 use Closure;
+use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\Nested;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Проверка и запись полей ресурса в модель — общее у формы и импорта из файла.
@@ -25,6 +29,39 @@ use Illuminate\Support\Facades\DB;
  */
 final class RecordWriter
 {
+    /**
+     * Значения простых полей записи, как их отправляет форма: нужны правилам вроде `different:other`, когда проверяется одно поле.
+     * Скаляры — строкой (`true` → `'1'`, `5` → `'5'`, enum → значение), чтобы `same:`/`different:` сравнивали как в форме.
+     * Вложенные записи, связи «многие ко многим» и переводы не читаются; поле, значение которого не читается
+     * (исключение в `hydrate()`), пропускается — правила видят его пустым.
+     *
+     * ```php
+     * $data = [...RecordWriter::currentValues($resource, $record), 'status' => $value];
+     * ```
+     *
+     * @return array<string, mixed>
+     */
+    public static function currentValues(Resource $resource, Model $record): array
+    {
+        $values = [];
+        $fields = array_filter(
+            $resource->writableFields($record),
+            fn (Field $field): bool => ! $field instanceof Nested && ! $field instanceof BelongsToMany && ! $field->isTranslatable(),
+        );
+
+        foreach ($fields as $field) {
+            try {
+                $value = $field->hydrate($record);
+            } catch (Throwable) {
+                continue;
+            }
+
+            $values[$field->name] = is_scalar($value) || $value instanceof BackedEnum ? Field::conditionValue($value) : $value;
+        }
+
+        return $values;
+    }
+
     /**
      * Правила полей; в дереве — запрет сделать родителем саму запись или её потомка.
      *

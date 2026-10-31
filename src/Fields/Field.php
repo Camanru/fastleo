@@ -891,6 +891,15 @@ abstract class Field
     }
 
     /**
+     * Поле скрывается условием на запись: `hidden(fn ($record) => …)`. Журнал удалённой насовсем записи
+     * значения таких полей не показывает — проверить условие не на чем.
+     */
+    public function hasHiddenCondition(): bool
+    {
+        return $this->hidden instanceof Closure;
+    }
+
+    /**
      * Поле скрыто для этой записи (null — создание или список).
      */
     public function isHidden(?Model $record = null): bool

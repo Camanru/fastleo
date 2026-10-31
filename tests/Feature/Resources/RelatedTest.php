@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Http\Controllers\RelatedController;
 use Fastleo\Related;
 use Fastleo\Support\ReturnUrl;
 use Fastleo\Tests\Fixtures\Policies\HiddenArticlePolicy;
@@ -295,6 +296,15 @@ describe('a failed action form', function (): void {
             ->assertSessionHasErrors('data.code');
     });
 
+    it('is not kept for a relation that no section describes for this one', function (): void {
+        $article = categoryArticle($this->category);
+        $page = route('fastleo.resources.show', ['categories', $this->category->id]);
+
+        $this->from($page)->post(route('fastleo.resources.action', ['articles', 'stamp-articles']), ['ids' => [(string) $article->id], 'data' => ['code' => 'ошибка-ввода'], '_related' => 'nothing', '_related_parent' => (string) $this->category->id])
+            ->assertSessionMissing(RelatedController::pendingKey('nothing', (string) $this->category->id))
+            ->assertSessionHasErrors('data.code');
+    });
+
     it('ignores a name of a relation that is not a name', function (): void {
         $article = categoryArticle($this->category);
 
@@ -374,6 +384,38 @@ describe('the way back', function (): void {
             ->and(ReturnUrl::sanitize(request()->root().'/fastleo/articles/1'))->toBe(request()->root().'/fastleo/articles/1')
             ->and(ReturnUrl::sanitize(['a']))->toBeNull()
             ->and(ReturnUrl::sanitize(str_repeat('a', 2100)))->toBeNull();
+    });
+});
+
+describe('the relation conditions', function (): void {
+    it('limit the table, the counter and the search to what the relation method selects', function (): void {
+        useFixtureResources('RelatedConstrained');
+        categoryArticle($this->category, ['title' => 'Опубликованная', 'status' => 'published']);
+        categoryArticle($this->category, ['title' => 'Черновик', 'status' => 'draft']);
+        $other = Category::factory()->create();
+        categoryArticle($other, ['title' => 'Чужая опубликованная', 'status' => 'published']);
+        $url = route('fastleo.resources.related', ['categories', $this->category->id, 'publishedArticles']);
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('Опубликованная')
+            ->assertDontSee('Черновик')
+            ->assertDontSee('Чужая опубликованная');
+
+        $this->get($url.'?q=Черновик')->assertOk()->assertDontSee('Черновик');
+    });
+
+    it('stay in brackets: an orWhere of the relation does not open other parents or what the child section hides', function (): void {
+        useFixtureResources('RelatedConstrained');
+        categoryArticle($this->category, ['title' => 'Своя на ревью', 'status' => 'review']);
+        categoryArticle($this->category, ['title' => 'Своя избранная', 'status' => 'published', 'is_featured' => true]);
+        categoryArticle(Category::factory()->create(), ['title' => 'Чужая опубликованная', 'status' => 'published']);
+
+        $this->get(route('fastleo.resources.related', ['categories', $this->category->id, 'readyArticles']))
+            ->assertOk()
+            ->assertSee('Своя на ревью')
+            ->assertDontSee('Своя избранная')
+            ->assertDontSee('Чужая опубликованная');
     });
 });
 

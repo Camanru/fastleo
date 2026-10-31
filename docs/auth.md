@@ -116,7 +116,11 @@
 
 - Если `password_resets` пользуется сброс пароля самого сайта (`'table' => 'password_resets'` у брокера `users`), не переименовывайте её — опишите брокер админки на неё же: `'fastleo' => ['provider' => 'users', 'table' => 'password_resets', 'expire' => 60, 'throttle' => 60]` (провайдер — тот же, что у guard `fastleo`, `fastleo.auth.provider`).
 - Если сайт ею не пользуется — переименуйте миграцией (`Schema::rename('password_resets', 'password_reset_tokens')`) или опишите тот же брокер.
-- Если таблицы нет — создайте:
+- Если таблицы нет — создайте миграцией:
+
+```bash
+php artisan make:migration create_password_reset_tokens_table
+```
 
 ```php
 Schema::create('password_reset_tokens', function (Blueprint $table) {

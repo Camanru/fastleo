@@ -222,7 +222,11 @@ final readonly class TwoFactor
             throw ValidationException::withMessages(['code' => __('fastleo::auth.two_factor_unreadable')]);
         }
 
-        $step = $this->google2fa->verifyKeyNewer(is_string($secret) ? $secret : '', $code, $credential->last_step ?? 0, 1);
+        if (! is_string($secret)) {
+            return false;
+        }
+
+        $step = $this->google2fa->verifyKeyNewer($secret, $code, $credential->last_step ?? 0, 1);
 
         if (! is_int($step)) {
             return false;

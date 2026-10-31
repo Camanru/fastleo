@@ -49,9 +49,14 @@ public function actions(): array
 
 ## Своё действие
 
-Класс-наследник `Fastleo\Actions\Action` (удобно класть в `app/Fastleo/Actions`) и метод `actions()` ресурса. Заготовку класса создаёт `php artisan fastleo:make-action PublishDoctors`:
+Класс-наследник `Fastleo\Actions\Action` в `app/Fastleo/Actions` и метод `actions()` ресурса. Заготовка класса:
+
+```bash
+php artisan fastleo:make-action PublishArticles   # app/Fastleo/Actions/PublishArticles.php
+```
 
 ```php
+// app/Fastleo/Actions/PublishArticles.php
 namespace App\Fastleo\Actions;
 
 use App\Models\Article;
@@ -76,6 +81,8 @@ final class PublishArticles extends Action
 
 ```php
 // app/Fastleo/ArticleResource.php
+use App\Fastleo\Actions\PublishArticles;
+
 public function actions(): array
 {
     return [new PublishArticles];

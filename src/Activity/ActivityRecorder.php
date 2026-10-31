@@ -81,7 +81,7 @@ final class ActivityRecorder
      */
     public static function isEnabled(): bool
     {
-        return config()->boolean('fastleo.activity.enabled', true);
+        return config()->boolean('fastleo.activity.enabled', false);
     }
 
     /**

@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Page;
+use Fastleo\Reports\Filters;
+use Fastleo\Reports\Period;
+use Fastleo\Widgets\Stat;
+use Override;
+
+/**
+ * Отчёт «{{ label }}»: фильтры сверху, под ними виджеты, пересчитанные по выбранным фильтрам.
+ * Своего шаблона нет — страницу рисует админка.
+ */
+final class {{ class }} extends Page
+{
+    protected static ?string $label = '{{ label }}';
+
+    protected static string $icon = 'chart-column';
+
+    #[Override]
+    public function filters(): array
+    {
+        return [
+            Period::make('period', 'Период')->default('month'),
+        ];
+    }
+
+    #[Override]
+    public function widgets(Filters $filters): array
+    {
+        $period = $filters->period('period');
+
+        return [
+            // Например: Stat::make('Заявок')->value(fn () => $period->apply(Lead::query(), 'created_at')->count()),
+            Stat::make('Дней в периоде')->value(fn (): int => count($period->days())),
+        ];
+    }
+}

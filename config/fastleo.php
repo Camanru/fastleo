@@ -1,9 +1,6 @@
 <?php
 
 declare(strict_types=1);
-use Fastleo\Notifications\NotificationBotResource;
-use Fastleo\Publishing\ChannelResource;
-use Fastleo\Publishing\PublicationResource;
 use Fastleo\Resources\UserResource;
 
 return [
@@ -69,12 +66,13 @@ return [
     |--------------------------------------------------------------------------
     |
     | enabled — вести журнал изменений, сделанных в админке (кто, когда, было → стало, откат).
+    | По умолчанию выключен: true — включить (пункт «Журнал» в меню и история записи).
     | keep_days — сколько дней хранятся записи (чистит команда fastleo:prune).
     |
     */
 
     'activity' => [
-        'enabled' => true,
+        'enabled' => false,
         'keep_days' => 30,
     ],
 
@@ -99,14 +97,15 @@ return [
     |
     | keep_days — сколько дней хранятся уведомления в колокольчике (чистит fastleo:prune).
     | bots — раздел «Уведомления»: боты Telegram и Max, через которые Fastleo::notifyAdmins()
-    | дублирует уведомления в чаты администраторов. Класс ресурса (свой наследник) или null — раздела нет.
+    | дублирует уведомления в чаты администраторов. По умолчанию null — раздела нет; включить —
+    | Fastleo\Notifications\NotificationBotResource::class (или свой наследник).
     | mail — дублировать уведомления письмом каждому администратору с адресом (через очередь сайта, если она есть).
     |
     */
 
     'notifications' => [
         'keep_days' => 90,
-        'bots' => NotificationBotResource::class,
+        'bots' => null,
         'mail' => false,
     ],
 
@@ -117,13 +116,14 @@ return [
     |
     | channels — раздел «Каналы»: каналы Telegram и Max для публикации записей сайта.
     | publications — раздел «Публикации»: посты и журнал отправки (в меню — когда есть канал).
-    | Класс ресурса (свой наследник) или null — раздела нет.
+    | По умолчанию null — разделов нет; включить — Fastleo\Publishing\ChannelResource::class
+    | и Fastleo\Publishing\PublicationResource::class (или свои наследники).
     |
     */
 
     'publishing' => [
-        'channels' => ChannelResource::class,
-        'publications' => PublicationResource::class,
+        'channels' => null,
+        'publications' => null,
     ],
 
     /*

@@ -65,6 +65,29 @@ it('does not highlight records selected without the read column', function (): v
         ->and($resource->isUnread(Feedback::query()->firstOrFail()))->toBeTrue();
 });
 
+it('counts the rows of the list in the badge when the section groups its query', function (): void {
+    $resource = new class extends Resource
+    {
+        protected static string $model = Feedback::class;
+
+        protected static ?string $readColumn = 'read_at';
+
+        public function fields(): array
+        {
+            return [];
+        }
+
+        public function query(Builder $query): Builder
+        {
+            return $query->select('name')->groupBy('name');
+        }
+    };
+    Feedback::factory()->count(3)->create(['name' => 'Анна']);
+    Feedback::factory()->create(['name' => 'Борис']);
+
+    expect($resource::badge())->toBe(2);
+});
+
 it('marks records the section sees past a global scope of the model, trashed ones included', function (): void {
     $resource = new class extends Resource
     {

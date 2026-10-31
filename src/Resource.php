@@ -255,7 +255,8 @@ abstract class Resource
         $resource = resolve(static::class);
         $query = $resource->newQuery();
 
-        return $query->whereNull($query->qualifyColumn($column))->count() ?: null;
+        // Строки списка, а не размер первой группы, если `query()` раздела группирует.
+        return $query->whereNull($query->qualifyColumn($column))->toBase()->getCountForPagination() ?: null;
     }
 
     /**
@@ -432,11 +433,12 @@ abstract class Resource
 
     /**
      * В боковой колонке карточки записи — панель «История изменений» (`protected static bool $historyPanel = true;`).
-     * Нужен журнал изменений раздела (`$activity`); показывается тем, кто может смотреть журнал и запись.
+     * Нужен включённый журнал (`fastleo.activity.enabled`) и журнал раздела (`$activity`); показывается тем, кто может
+     * смотреть журнал и запись.
      */
     public static function hasHistoryPanel(): bool
     {
-        return static::$historyPanel && static::$activity;
+        return static::$historyPanel && static::$activity && ActivityRecorder::isEnabled();
     }
 
     /**

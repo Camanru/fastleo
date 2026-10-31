@@ -77,14 +77,14 @@
 
 ```php
 'activity' => [
-    'enabled' => true,
+    'enabled' => false,
     'keep_days' => 30,
 ],
 ```
 
 | Ключ | По умолчанию | Что делает |
 |---|---|---|
-| `activity.enabled` | `true` | Вести журнал изменений, сделанных в админке ([подробнее](activity.md)) |
+| `activity.enabled` | `false` | Вести журнал изменений, сделанных в админке; `true` — включить ([подробнее](activity.md)) |
 | `activity.keep_days` | `30` | Сколько дней хранятся записи; чистит `fastleo:prune` |
 
 ## Журнал ошибок
@@ -160,7 +160,7 @@
 ```php
 'notifications' => [
     'keep_days' => 90,
-    'bots' => Fastleo\Notifications\NotificationBotResource::class,
+    'bots' => null, // включить: Fastleo\Notifications\NotificationBotResource::class
     'mail' => false,
 ],
 
@@ -176,7 +176,7 @@
 |---|---|---|
 | `notifications.keep_days` | `90` | Сколько дней хранятся уведомления колокольчика; чистит `fastleo:prune` |
 | `notifications.mail` | `false` | Дублировать `Fastleo::notifyAdmins()` письмом каждому администратору с адресом ([подробнее](notifications.md#копия-на-почту)) |
-| `notifications.bots` | `NotificationBotResource::class` | Раздел «Уведомления»: боты Telegram и Max для чатов администраторов; `null` — раздела нет ([подробнее](notifications.md#боты-telegram-и-max)) |
+| `notifications.bots` | `null` | Раздел «Уведомления»: боты Telegram и Max для чатов администраторов; `null` — раздела нет, включить — `Fastleo\Notifications\NotificationBotResource::class` или свой наследник ([подробнее](notifications.md#боты-telegram-и-max)) |
 | `messengers.max.url` | `https://platform-api2.max.ru` | Адрес Bot API Max |
 | `messengers.max.certificate` | `null` | Сертификат для запросов к API Max; `null` — сертификат Минцифры из пакета |
 
@@ -184,15 +184,15 @@
 
 ```php
 'publishing' => [
-    'channels' => Fastleo\Publishing\ChannelResource::class,
-    'publications' => Fastleo\Publishing\PublicationResource::class,
+    'channels' => null,     // включить: Fastleo\Publishing\ChannelResource::class
+    'publications' => null, // включить: Fastleo\Publishing\PublicationResource::class
 ],
 ```
 
 | Ключ | По умолчанию | Что делает |
 |---|---|---|
-| `publishing.channels` | `ChannelResource::class` | Раздел «Каналы» для публикаций в Telegram и Max; `null` — раздела нет ([подробнее](publishing.md)) |
-| `publishing.publications` | `PublicationResource::class` | Раздел «Публикации»: посты и журнал отправки; `null` — раздела нет |
+| `publishing.channels` | `null` | Раздел «Каналы» для публикаций в Telegram и Max; `null` — раздела нет, включить — `Fastleo\Publishing\ChannelResource::class` или свой наследник ([подробнее](publishing.md)) |
+| `publishing.publications` | `null` | Раздел «Публикации»: посты и журнал отправки; `null` — раздела нет, включить — `Fastleo\Publishing\PublicationResource::class` или свой наследник |
 
 ## SoftNetica
 

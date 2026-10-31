@@ -22,6 +22,10 @@ Enum::make('status', 'Статус')->enum(ArticleStatus::class)->badges();
 
 **Подписи вариантов** — метод `label()` enum, если он есть, иначе имя случая:
 
+```bash
+php artisan make:enum App/Enums/ArticleStatus --string   # app/Enums/ArticleStatus.php
+```
+
 ```php
 enum ArticleStatus: string
 {

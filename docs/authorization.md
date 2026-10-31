@@ -27,9 +27,17 @@
 
 Метода нет в Policy — действие запрещено (так работает Laravel). Запрещённое действие возвращает 403, даже если запрос отправлен в обход кнопок.
 
+Заготовка со всеми способностями, которые спрашивает админка (`viewAny`, `view`, `create`, `update`, `delete`, `restore`, `forceDelete`, `reorder`, `import`, `export`; везде `true`), — лучше, чем `make:policy` Laravel:
+
+```bash
+php artisan fastleo:make-policy Article           # app/Policies/ArticlePolicy.php (модель App\Models\Article; другая — --model=)
+```
+
+Затем впишите условия, например:
+
 ```php
 // app/Policies/ArticlePolicy.php
-class ArticlePolicy
+final class ArticlePolicy
 {
     public function viewAny(User $user): bool { return true; }
     public function view(User $user, Article $article): bool { return true; }
@@ -46,8 +54,6 @@ class ArticlePolicy
     public function forceDelete(User $user, Article $article): bool { return $user->is_super; }
 }
 ```
-
-Заготовка со всеми способностями, которые спрашивает админка (`viewAny`, `view`, `create`, `update`, `delete`, `restore`, `forceDelete`, `reorder`, `import`, `export`; везде `true`): `php artisan fastleo:make-policy Article` (создаёт `app/Policies/ArticlePolicy.php`, модель — `App\Models\Article` или `--model=`).
 
 Policy находится по правилам Laravel (`App\Policies\ArticlePolicy` для `App\Models\Article`) или регистрируется явно: `Gate::policy(Article::class, ArticlePolicy::class)`. Пользователь в методах Policy — администратор, вошедший в админку (guard `fastleo`). `Gate::before()` сайта тоже действует.
 

@@ -259,6 +259,27 @@ describe('SetToggle action', function (): void {
         expect($draft->refresh()->is_published)->toBeFalse()->and($published->refresh()->is_published)->toBeFalse();
     });
 
+    it('lets the rules of the field see the other fields of the record', function (): void {
+        $blocked = Article::factory()->create(['title' => 'Нельзя', 'is_published' => false]);
+        $allowed = Article::factory()->create(['title' => 'Можно', 'is_published' => false]);
+
+        $this->post(route('fastleo.resources.action', ['context-articles', 'set-is-published-on']), ['ids' => [$blocked->id, $allowed->id]])
+            ->assertSessionHas('fastleo.success');
+
+        expect($blocked->refresh()->is_published)->toBeFalse()->and($allowed->refresh()->is_published)->toBeTrue();
+        $this->postJson(toggleUrl('context-articles', $blocked, 'is_published'), ['value' => 1])->assertUnprocessable();
+    });
+
+    it('compares the other fields as the form sends them and skips a field whose value cannot be read', function (): void {
+        $published = Article::factory()->create(['is_published' => true, 'is_featured' => false]);
+        $draft = Article::factory()->create(['is_published' => false, 'is_featured' => false]);
+
+        $this->postJson(toggleUrl('context-articles', $published, 'is_featured'), ['value' => '1'])->assertOk();
+        $this->postJson(toggleUrl('context-articles', $draft, 'is_featured'), ['value' => '1'])->assertUnprocessable();
+
+        expect($published->refresh()->is_featured)->toBeTrue()->and($draft->refresh()->is_featured)->toBeFalse();
+    });
+
     it('does not count a record whose saving an observer cancelled', function (): void {
         $article = Article::factory()->create(['is_published' => false]);
         Article::updating(fn (): bool => false);

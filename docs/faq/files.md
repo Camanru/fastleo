@@ -256,6 +256,10 @@ $table->string('price')->nullable();
 
 Положите поле `File` на страницу настроек — тогда таблица не нужна.
 
+```bash
+php artisan fastleo:make-settings Documents       # app/Fastleo/DocumentsSettings.php
+```
+
 ```php
 // app/Fastleo/DocumentsSettings.php
 namespace App\Fastleo;
@@ -477,6 +481,10 @@ public function boot(): void
 ### Как перенести картинки со старого сайта или из другой админки?
 
 Положите файлы в корень загрузок (`storage/app/public/uploads`) и приведите значения в колонках к виду `uploads/…` миграцией.
+
+```bash
+php artisan make:migration convert_photo_paths
+```
 
 ```php
 // database/migrations/2026_11_01_000200_convert_photo_paths.php

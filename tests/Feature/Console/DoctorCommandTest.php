@@ -237,8 +237,19 @@ it('rejects a user model that cannot enter the admin', function (): void {
 it('asks to migrate when package tables are missing', function (): void {
     Schema::drop('fastleo_imports');
 
-    expect(implode("\n", messages('site', 'error')))->toContain('Нет таблицы fastleo_imports');
+    expect(implode("\n", messages('site', 'error')))->toContain('Не выполнены миграции fastleo: нет таблиц fastleo_imports');
 });
+
+it('reports unapplied package migrations as one error without repeating it for built-in sections', function (): void {
+    Schema::drop('fastleo_notification_bots');
+    Schema::drop('fastleo_imports');
+
+    $errors = collect(diagnosed()['problems'])->where('level', 'error');
+
+    expect($errors->where('scope', 'site')->pluck('message')->all())
+        ->toContain('Не выполнены миграции fastleo: нет таблиц fastleo_imports, fastleo_notification_bots.')
+        ->and($errors->where('scope', 'notification-bots')->all())->toBe([]);
+})->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'DROP TABLE в MySQL неявно закрывает транзакцию теста и оставляет базу без таблицы');
 
 it('asks to migrate when the admin flag column is missing', function (): void {
     Schema::table('users', function ($table): void {
@@ -732,7 +743,7 @@ describe('package migrations without the migrations table', function (): void {
 it('does not fail when the SoftNetica checks cannot read the settings', function (): void {
     Schema::drop('fastleo_settings');
 
-    expect(implode("\n", messages('site', 'error')))->toContain('Нет таблицы fastleo_settings');
+    expect(implode("\n", messages('site', 'error')))->toContain('нет таблиц fastleo_settings');
 });
 
 describe('relations and blocks that do not work', function (): void {

@@ -2,6 +2,45 @@
 
 Записи сайта (новости, статьи, акции) можно публиковать в каналы Telegram и Max прямо из админки: боты пакета отправляют пост с текстом, картинками и кнопкой-ссылкой.
 
+## Как включить
+
+По умолчанию разделов «Каналы» и «Публикации» нет. Включаются в `config/fastleo.php`, оба ключа вместе:
+
+```php
+'publishing' => [
+    'channels' => Fastleo\Publishing\ChannelResource::class,
+    'publications' => Fastleo\Publishing\PublicationResource::class,
+],
+```
+
+После этого в меню появляется **Система → Каналы**; пункт «Публикации» появляется, когда есть хотя бы один включённый канал. Кнопку «Опубликовать в каналы» в разделы сайта добавляет действие `Publish` ([ниже](#кнопка-в-разделе-сайта)) — без включённых «Публикаций» оно не показывается. Таблицы `fastleo_channels`, `fastleo_publications`, `fastleo_publication_deliveries` уже есть после `php artisan migrate`. Если конфиг закеширован, выполните `php artisan optimize`.
+
+Нужны оба раздела: каналы без «Публикаций» некуда отправлять, а «Публикации» без каналов отправить некуда.
+
+**Свой вариант раздела** (группа меню, подписи, права) — наследник в папке разделов сайта и его класс в ключе:
+
+```php
+// app/Fastleo/PostingChannelResource.php
+namespace App\Fastleo;
+
+use Fastleo\Publishing\ChannelResource;
+
+final class PostingChannelResource extends ChannelResource
+{
+    protected static ?string $group = 'Контент';
+}
+```
+
+```php
+// config/fastleo.php
+'publishing' => [
+    'channels' => App\Fastleo\PostingChannelResource::class,
+    'publications' => Fastleo\Publishing\PublicationResource::class,
+],
+```
+
+Выключить — `null` в обоих ключах: встроенные разделы и кнопка `Publish` пропадут, каналы и посты останутся в таблицах. Свой класс-наследник из папки разделов сайта (`app/Fastleo`) находится и без ключа — чтобы убрать его, удалите класс или вынесите из этой папки.
+
 ## Каналы
 
 Раздел **Система → Каналы** — куда публиковать. У канала: название, мессенджер, токен бота, номер канала и галочка «Публиковать в этот канал».
@@ -112,5 +151,5 @@ public function actions(): array
 
 | Ключ | По умолчанию | Что делает |
 |---|---|---|
-| `publishing.channels` | `ChannelResource::class` | Раздел «Каналы»; `null` — раздела нет. Свой вариант — наследник `Fastleo\Publishing\ChannelResource` |
-| `publishing.publications` | `PublicationResource::class` | Раздел «Публикации»; `null` — раздела нет. Свой вариант — наследник `Fastleo\Publishing\PublicationResource` |
+| `publishing.channels` | `null` | Раздел «Каналы»; `null` — раздела нет. Включить — `Fastleo\Publishing\ChannelResource::class` или свой наследник |
+| `publishing.publications` | `null` | Раздел «Публикации»; `null` — раздела нет. Включить — `Fastleo\Publishing\PublicationResource::class` или свой наследник |

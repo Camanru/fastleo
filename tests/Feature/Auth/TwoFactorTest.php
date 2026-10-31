@@ -404,3 +404,16 @@ describe('required protection', function (): void {
         $this->get(route('fastleo.dashboard'))->assertOk();
     });
 });
+
+it('refuses a code instead of failing when the stored secret is empty', function (): void {
+    $twoFactor = resolve(TwoFactor::class);
+    $twoFactor->begin($this->admin);
+    TwoFactorCredential::query()->update(['confirmed_at' => now()]);
+    TwoFactorCredential::retrieved(fn (TwoFactorCredential $credential): mixed => $credential->setRawAttributes([...$credential->getAttributes(), 'secret' => null]));
+
+    try {
+        expect($twoFactor->verify($this->admin, '123456'))->toBeFalse();
+    } finally {
+        TwoFactorCredential::getEventDispatcher()->forget('eloquent.retrieved: '.TwoFactorCredential::class);
+    }
+});

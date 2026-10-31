@@ -34,10 +34,11 @@ final readonly class ActivityController
     public function __construct(private Reverter $reverter) {}
 
     /**
-     * Общий журнал с фильтрами по разделу и автору.
+     * Общий журнал с фильтрами по разделу и автору. Выключенный журнал — 404, как и другие выключенные разделы.
      */
     public function index(Request $request): View
     {
+        abort_unless(ActivityRecorder::isEnabled(), 404);
         abort_unless(ActivityRecorder::canView(), 403);
 
         $resources = $this->visibleResources();
@@ -55,10 +56,12 @@ final readonly class ActivityController
         }
 
         $entries = $query->paginate(self::PER_PAGE)->withQueryString();
+        $subjects = $this->subjects($entries->items(), $resources);
 
         return view('fastleo::activity.index', [
             'entries' => $entries,
-            'hiddenEntries' => $this->hiddenEntries($entries->items(), $resources),
+            'hiddenEntries' => $subjects['hidden'],
+            'entryRecords' => $subjects['records'],
             'resources' => $resources,
             'authors' => Activity::query()->whereNotNull('user_id')->whereIn('resource', array_keys($resources))->distinct()->limit(100)->pluck('user_name', 'user_id'),
             'filters' => ['resource' => is_string($slug) ? $slug : '', 'user' => is_string($author) ? $author : ''],
@@ -94,6 +97,7 @@ final readonly class ActivityController
             'record' => $record,
             'recordId' => $id,
             'entries' => $entries,
+            'entryRecords' => $record instanceof Model ? $entries->mapWithKeys(fn (Activity $entry): array => [$entry->id => $record])->all() : [],
             'resources' => [$resource::slug() => $resource],
         ]);
     }
@@ -137,14 +141,16 @@ final readonly class ActivityController
     }
 
     /**
-     * Записи журнала, о которых администратор не должен читать: запись существует, но вне выборки `query()`
+     * Записи журнала, о которых администратор не должен читать (`hidden`): запись существует, но вне выборки `query()`
      * раздела или Policy не даёт её смотреть. Удалённые насовсем записи проверить нечем — они показываются.
+     * Заодно — живые записи, о которых идёт речь (`records`, по номеру записи журнала): по ним поля, скрытые для
+     * конкретной записи, не попадают в журнал.
      *
      * @param  array<array-key, Activity>  $entries
      * @param  array<string, Resource>  $resources
-     * @return list<int>
+     * @return array{hidden: list<int>, records: array<int, Model>}
      */
-    private function hiddenEntries(array $entries, array $resources): array
+    private function subjects(array $entries, array $resources): array
     {
         $ids = [];
 
@@ -155,6 +161,7 @@ final readonly class ActivityController
         }
 
         $hidden = [];
+        $records = [];
 
         foreach (array_intersect_key($ids, $resources) as $slug => $subjects) {
             $resource = $resources[$slug];
@@ -175,11 +182,13 @@ final readonly class ActivityController
 
                 if (! $record instanceof Model || ! Authorization::allows('view', $resource, $record)) {
                     $hidden[] = $entry->id;
+                } else {
+                    $records[$entry->id] = $record;
                 }
             }
         }
 
-        return $hidden;
+        return ['hidden' => $hidden, 'records' => $records];
     }
 
     /**

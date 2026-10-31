@@ -6,7 +6,12 @@
 
 ### Как создать раздел с нуля?
 
-Создайте миграцию, модель с `$fillable` и класс-ресурс в `app/Fastleo` — регистрировать его не нужно.
+Создайте миграцию, модель с `$fillable` и класс-ресурс в `app/Fastleo` — регистрировать его не нужно. Заготовки:
+
+```bash
+php artisan make:model Doctor -m                  # модель и миграция
+php artisan fastleo:make-resource Doctor          # app/Fastleo/DoctorResource.php
+```
 
 ```php
 // database/migrations/2026_01_01_000000_create_doctors_table.php
@@ -428,8 +433,12 @@ BelongsTo::make('category_id', 'Категория')
 
 Создайте промежуточную таблицу, метод `belongsToMany` и поле с именем метода. В `$fillable` ничего добавлять не нужно.
 
+```bash
+php artisan make:migration create_doctor_service_table
+```
+
 ```php
-// миграция
+// database/migrations/…_create_doctor_service_table.php
 Schema::create('doctor_service', function (Blueprint $table) {
     $table->foreignId('doctor_id')->constrained()->cascadeOnDelete();
     $table->foreignId('service_id')->constrained()->cascadeOnDelete();
@@ -462,8 +471,12 @@ BelongsToMany::make('services', 'Услуги'),
 
 Для списка записей — `HasMany` с полями блока, для одной записи — `HasOne`. Имя поля — метод связи модели.
 
+```bash
+php artisan make:model DoctorPrice -m             # модель и миграция
+```
+
 ```php
-// миграция
+// database/migrations/…_create_doctor_prices_table.php
 Schema::create('doctor_prices', function (Blueprint $table) {
     $table->id();
     $table->foreignId('doctor_id')->constrained()->cascadeOnDelete();
@@ -580,6 +593,10 @@ protected function casts(): array
 ### Как сделать статус из PHP enum?
 
 Опишите backed enum с `label()`, добавьте enum-каст в модель и поле `Enum`.
+
+```bash
+php artisan make:enum App/Enums/OrderStatus --string   # app/Enums/OrderStatus.php
+```
 
 ```php
 // app/Enums/OrderStatus.php
@@ -787,8 +804,12 @@ protected static bool $readonly = true;
 
 Добавьте модели `SoftDeletes` и колонку `deleted_at` — в разделе появится вкладка «Корзина» с восстановлением и удалением навсегда.
 
+```bash
+php artisan make:migration add_deleted_at_to_products_table
+```
+
 ```php
-// миграция
+// database/migrations/…_add_deleted_at_to_products_table.php
 Schema::table('products', function (Blueprint $table) {
     $table->softDeletes();
 });
@@ -812,6 +833,10 @@ class Product extends Model
 ### Как выполнить свой код при сохранении записи?
 
 Повесьте observer на модель. Админка пишет через Eloquent по одной записи, поэтому observer срабатывает в форме, импорте, действиях и правке в ячейке.
+
+```bash
+php artisan make:observer ProductObserver --model=Product   # app/Observers/ProductObserver.php
+```
 
 ```php
 // app/Observers/ProductObserver.php

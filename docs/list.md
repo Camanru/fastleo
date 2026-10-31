@@ -114,7 +114,11 @@ BooleanFilter::make('has_photo', 'С фото')
 
 **Свой тип фильтра** — наследник `Fastleo\Filters\Filter` с методами `value()` (проверить значение из адреса, `null` — фильтр выключен), `query()` (условие) и `view()` (Blade-шаблон: получает `$filter`, `$value` и `$form` — id формы списка для атрибута `form`).
 
-Заготовка класса и шаблона: `php artisan fastleo:make-filter ByCity` (создаёт `app/Fastleo/Filters/ByCity.php` и `resources/views/fastleo/filters/by-city.blade.php`; подключается в `filters()` ресурса как `ByCity::make('city', 'Город')`).
+Заготовка класса и шаблона (подключается в `filters()` ресурса как `ByCity::make('city', 'Город')` и `use App\Fastleo\Filters\ByCity;`):
+
+```bash
+php artisan fastleo:make-filter ByCity            # app/Fastleo/Filters/ByCity.php + resources/views/fastleo/filters/by-city.blade.php
+```
 
 **Безопасность.** Применяются только фильтры из `filters()`: колонка из адреса без фильтра игнорируется. Значение не из вариантов, массив вместо строки, несуществующая дата — фильтр не применяется, ошибки нет.
 

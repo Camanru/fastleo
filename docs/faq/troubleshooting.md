@@ -395,7 +395,7 @@ php artisan fastleo:doctor
 1. Копия базы и `storage/app/public/uploads`.
 2. `composer remove fastleo/fastleo`, удалить старые `config/fastleo.php`, `storage/app/public/fastleo`, `resources/views/vendor/fastleo`.
 3. `composer require camanru/fastleo` и `php artisan fastleo:install`.
-4. Модель пользователя — трейт `HasFastleoAccess` и интерфейс `FastleoUser`.
+4. Модель пользователя — трейт `HasFastleoAccess` и интерфейс `FastleoUser` (`fastleo:install` добавляет их сам, если модель обычная).
 5. `php artisan migrate`, пути файлов — к виду `uploads/…`.
 6. Разделы — по одному ресурсу на модель.
 7. `php artisan fastleo:doctor` без ошибок.

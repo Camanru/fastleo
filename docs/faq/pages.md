@@ -6,7 +6,14 @@
 
 ### Как сделать раздел «Страницы» для «О нас», «Контакты», «Услуги»?
 
-Создайте таблицу, модель и ресурс, а на сайте — маршрут по адресу страницы. Адрес раздела `pages` занят самой админкой, поэтому задайте ресурсу свой `$slug`.
+Создайте таблицу, модель и ресурс, а на сайте — маршрут по адресу страницы. Адрес раздела `pages` занят самой админкой, поэтому задайте ресурсу свой `$slug`. Заготовки:
+
+```bash
+php artisan make:model Page -m                    # модель и миграция
+php artisan fastleo:make-resource Page            # app/Fastleo/PageResource.php
+```
+
+Сразу после генерации впишите в `PageResource` свой `$slug` (`'site-pages'`, как в примере ниже): пока у ресурса адрес `pages`, админка не открывается и сообщает, что адрес занят.
 
 ```php
 // database/migrations/2026_11_01_000000_create_pages_table.php
@@ -157,6 +164,10 @@ Blocks::make('blocks', 'Блоки страницы')->blocks([
 
 Сделайте страницу настроек «Главная» — она хранит одну запись без таблицы.
 
+```bash
+php artisan fastleo:make-settings Home            # app/Fastleo/HomeSettings.php
+```
+
 ```php
 // app/Fastleo/HomeSettings.php
 namespace App\Fastleo;
@@ -187,13 +198,19 @@ final class HomeSettings extends \Fastleo\Settings
 <x-fastleo::picture :src="fastleo_setting('home.banner')" alt="" />
 ```
 
-Заготовка класса — `php artisan fastleo:make-settings Home`. Подробнее — [настройки сайта](../settings.md).
+Подробнее — [настройки сайта](../settings.md).
 
 ## Новости и статьи
 
 ### Как сделать раздел «Новости» с анонсом, текстом и обложкой?
 
-Миграция, модель с кастами и ресурс; дата публикации и галочка — в боковой колонке формы.
+Миграция, модель с кастами и ресурс; дата публикации и галочка — в боковой колонке формы. Заготовки:
+
+```bash
+php artisan make:model News -m                    # модель и миграция
+php artisan fastleo:make-resource News            # app/Fastleo/NewsResource.php
+php artisan make:controller NewsController        # app/Http/Controllers/NewsController.php
+```
 
 ```php
 // database/migrations/2026_11_01_000100_create_news_table.php
@@ -333,6 +350,12 @@ class NewsController extends Controller
 
 Заведите отдельный раздел «Рубрики» и поле `BelongsTo` у новости.
 
+```bash
+php artisan make:model Category -m                         # модель и миграция рубрик
+php artisan fastleo:make-resource Category                 # app/Fastleo/CategoryResource.php
+php artisan make:migration add_category_id_to_news_table   # колонка category_id у новостей
+```
+
 ```php
 // app/Fastleo/NewsResource.php
 use Fastleo\Fields\BelongsTo;
@@ -345,6 +368,10 @@ BelongsTo::make('category_id', 'Рубрика'),
 ### Как показать «Новости» и «Статьи» из одной таблицы двумя разделами?
 
 Сделайте два ресурса одной модели и ограничьте каждый методом `query()`; тип новой записи задайте скрытым полем.
+
+```bash
+php artisan fastleo:make-resource Article --model="App\Models\News"   # app/Fastleo/ArticleResource.php
+```
 
 ```php
 // app/Fastleo/ArticleResource.php
@@ -529,8 +556,12 @@ public function url(Model $record): ?string
 }
 ```
 
+```bash
+php artisan make:migration add_parent_id_to_pages_table
+```
+
 ```php
-// миграция
+// database/migrations/…_add_parent_id_to_pages_table.php
 $table->foreignId('parent_id')->nullable()->constrained('pages')->nullOnDelete();
 $table->unsignedInteger('sort')->default(0);
 ```
@@ -833,6 +864,10 @@ final class ContactsSettings extends \Fastleo\Settings
 ### Как вставлять счётчик Метрики или код в `<head>` из админки?
 
 Добавьте на страницу настроек поле `Code` и выведите его без экранирования. Код не чистится — закройте страницу для всех, кроме доверенных администраторов.
+
+```bash
+php artisan fastleo:make-settings Counters        # app/Fastleo/CountersSettings.php
+```
 
 ```php
 // app/Fastleo/CountersSettings.php

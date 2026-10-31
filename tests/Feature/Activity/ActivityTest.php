@@ -166,7 +166,7 @@ describe('recording', function (): void {
         $this->post(route('fastleo.resources.store', 'topics'), ['title' => 'Тихо']);
 
         expect(Activity::query()->count())->toBe(0);
-        $this->get(route('fastleo.activity.index'))->assertForbidden();
+        $this->get(route('fastleo.activity.index'))->assertNotFound();
         $this->get(route('fastleo.dashboard'))->assertDontSee(route('fastleo.activity.index'), false);
     });
 
@@ -412,6 +412,36 @@ describe('pages', function (): void {
             ->assertSee('Было')
             ->assertSee('Стало')
             ->assertSee('data-activity-revert', false);
+    });
+
+    it('does not show values of a field that is hidden for this very record', function (): void {
+        useFixtureResources('ActivityRecordHidden');
+        $secret = Topic::factory()->create(['title' => 'Секрет']);
+        $open = Topic::factory()->create(['title' => 'Открытая']);
+
+        foreach ([[$secret, 'Старый секрет', 'Новый секрет'], [$open, 'Старая открытая', 'Новая открытая']] as [$topic, $old, $new]) {
+            Activity::query()->create([
+                'user_id' => (string) $this->me->id, 'user_name' => 'Анна', 'resource' => 'topics', 'subject_id' => (string) $topic->id,
+                'subject_label' => (string) $topic->title, 'event' => 'updated', 'changes' => ['title' => ['old' => $old, 'new' => $new]],
+            ]);
+        }
+
+        $this->get(route('fastleo.activity.index'))->assertOk()->assertSee('Новая открытая')->assertDontSee('Новый секрет')->assertSee('изменено (значение скрыто)');
+        $this->get(route('fastleo.resources.history', ['topics', $secret->id]))->assertOk()->assertDontSee('Новый секрет')->assertSee('изменено (значение скрыто)');
+        $this->get(route('fastleo.resources.history', ['topics', $open->id]))->assertOk()->assertSee('Новая открытая');
+        $this->get(route('fastleo.resources.show', ['topics', $secret->id]))->assertOk()->assertSee('data-history-panel', false)->assertDontSee('Новый секрет');
+        $this->get(route('fastleo.resources.show', ['topics', $open->id]))->assertOk()->assertSee('Новая открытая');
+    });
+
+    it('hides the values of a field with a condition on the record once the record is deleted for good', function (): void {
+        useFixtureResources('ActivityRecordHidden');
+        Activity::query()->create([
+            'user_id' => (string) $this->me->id, 'user_name' => 'Анна', 'resource' => 'topics', 'subject_id' => '99999',
+            'subject_label' => 'Секрет', 'event' => 'updated', 'changes' => ['title' => ['old' => 'Секрет', 'new' => 'Новый секрет']],
+        ]);
+
+        $this->get(route('fastleo.activity.index'))->assertOk()->assertDontSee('Новый секрет')->assertSee('изменено (значение скрыто)');
+        $this->get(route('fastleo.resources.history', ['topics', '99999']))->assertOk()->assertDontSee('Новый секрет')->assertSee('изменено (значение скрыто)');
     });
 
     it('shows the history of a deleted record and does not offer revert without the right', function (): void {

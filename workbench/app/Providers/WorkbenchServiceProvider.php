@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Fastleo\Notifications\NotificationBotResource;
+use Fastleo\Publishing\ChannelResource;
+use Fastleo\Publishing\PublicationResource;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Workbench\App\Console\BuildDocsCommand;
@@ -31,6 +34,11 @@ final class WorkbenchServiceProvider extends ServiceProvider
                 'photo' => ['widths' => [480, 1200], 'watermark' => true],
             ],
             'fastleo.images.watermark.path' => 'uploads/watermark.png',
+            // Демо показывает всё: журнал, боты уведомлений и публикации выключены у пакета по умолчанию.
+            'fastleo.activity.enabled' => true,
+            'fastleo.notifications.bots' => NotificationBotResource::class,
+            'fastleo.publishing.channels' => ChannelResource::class,
+            'fastleo.publishing.publications' => PublicationResource::class,
         ]);
     }
 

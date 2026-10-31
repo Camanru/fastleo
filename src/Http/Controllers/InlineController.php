@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Http\Controllers;
 
 use Fastleo\Fastleo;
-use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
-use Fastleo\Fields\Nested;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
@@ -56,16 +54,8 @@ final class InlineController
         $value = $request->input('value');
         abort_unless($request->has('value') && ($value === null || (is_scalar($value) && ! is_bool($value) && strlen((string) $value) <= InlineEdit::MAX_LENGTH)), 422);
 
-        $data = [];
-
-        // Значения остальных простых полей нужны правилам вроде `different:other`; вложенные записи и связи не читаются.
-        foreach ($resource->writableFields($record) as $other) {
-            if (! $other instanceof Nested && ! $other instanceof BelongsToMany && ! $other->isTranslatable()) {
-                $data[$other->name] = $other->hydrate($record);
-            }
-        }
-
-        $data[$field->name] = $value;
+        // Значения остальных простых полей нужны правилам вроде `different:other`.
+        $data = [...RecordWriter::currentValues($resource, $record), $field->name => $value];
 
         $validator = validator(
             $data,

@@ -57,7 +57,15 @@ Fastleo::resolveAdminsUsing(fn () => User::role('editor')->get());
 
 Колокольчик — обычный канал Laravel Notifications с именем `fastleo`. Свои уведомления сайта могут писать в него же:
 
+```bash
+php artisan make:notification LeadCreated         # app/Notifications/LeadCreated.php
+```
+
 ```php
+// app/Notifications/LeadCreated.php
+namespace App\Notifications;
+
+use App\Models\Lead;
 use Fastleo\Notifications\FastleoMessage;
 use Illuminate\Notifications\Notification;
 
@@ -67,7 +75,7 @@ final class LeadCreated extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['fastleo', 'mail'];
+        return ['fastleo'];
     }
 
     public function toFastleo(object $notifiable): FastleoMessage
@@ -76,6 +84,7 @@ final class LeadCreated extends Notification
     }
 }
 
+// где отправляете (observer, контроллер)
 Notification::send(Fastleo::admins(), new LeadCreated($lead));
 ```
 
@@ -89,7 +98,7 @@ Notification::send(Fastleo::admins(), new LeadCreated($lead));
 
 ## Боты Telegram и Max
 
-Раздел **Система → Уведомления** — список ботов. У каждого: название, мессенджер, токен, чаты получателей и галочка «Отправлять уведомления». Это служебные чаты администраторов (личные или рабочая группа), а не каналы для подписчиков — для них есть [публикации](publishing.md).
+Раздел **Система → Уведомления** — список ботов (по умолчанию выключен, как включить — [ниже](#как-включить-ботов)). У каждого: название, мессенджер, токен, чаты получателей и галочка «Отправлять уведомления». Это служебные чаты администраторов (личные или рабочая группа), а не каналы для подписчиков — для них есть [публикации](publishing.md).
 
 1. Создайте бота: в Telegram — у [@BotFather](https://t.me/BotFather), в Max — в разделе «Чат-боты» кабинета Max для партнёров. Скопируйте токен.
 2. Напишите боту любое сообщение или добавьте его в рабочую группу.
@@ -111,7 +120,44 @@ Notification::send(Fastleo::admins(), new LeadCreated($lead));
 
 **Max и сертификат Минцифры.** API Max (`platform-api2.max.ru`) подписан корневым сертификатом Минцифры (Russian Trusted Root CA), которого нет в обычных хранилищах сертификатов. Пакет доверяет ему **только в запросах к API Max** — сертификат лежит в пакете, системные настройки сервера не меняются. Свой файл — `'messengers' => ['max' => ['certificate' => '/путь/к/сертификату.pem']]`.
 
-Раздел убирается целиком: `'notifications' => ['bots' => null]`. Свой вариант раздела — наследник `Fastleo\Notifications\NotificationBotResource` в этом же ключе.
+### Как включить ботов
+
+По умолчанию раздела «Уведомления» нет, и `notifyAdmins()` пишет только в колокольчик (и на почту, если включена [копия на почту](#копия-на-почту)). Включается в `config/fastleo.php`:
+
+```php
+'notifications' => [
+    'bots' => Fastleo\Notifications\NotificationBotResource::class,
+],
+```
+
+После этого в меню появляется **Система → Уведомления**, а `notifyAdmins()` дублирует каждое уведомление во все включённые боты. Таблица `fastleo_notification_bots` уже есть после `php artisan migrate`. Если конфиг закеширован, выполните `php artisan optimize`.
+
+**Свой вариант раздела** (другая группа меню, подпись, права) — наследник в папке разделов сайта, и его класс в том же ключе:
+
+```php
+// app/Fastleo/BotResource.php
+namespace App\Fastleo;
+
+use Fastleo\Notifications\NotificationBotResource;
+
+final class BotResource extends NotificationBotResource
+{
+    protected static ?string $group = 'Настройки';
+
+    protected static ?string $label = 'Боты для админов';
+}
+```
+
+```php
+// config/fastleo.php
+'notifications' => [
+    'bots' => App\Fastleo\BotResource::class,
+],
+```
+
+Класс нужно указать в ключе, даже если он лежит в `app/Fastleo`: без ключа раздел будет виден, но `notifyAdmins()` не станет слать сообщения в мессенджеры.
+
+Выключить снова — `'bots' => null`: раздел пропадёт, а `notifyAdmins()` перестанет писать в мессенджеры; сохранённые боты останутся в таблице. Свой класс-наследник из папки разделов сайта (`app/Fastleo`) раздел находит и без ключа — чтобы убрать его из меню, удалите класс или вынесите из этой папки.
 
 ## Настройки
 
@@ -119,7 +165,7 @@ Notification::send(Fastleo::admins(), new LeadCreated($lead));
 |---|---|---|
 | `notifications.keep_days` | `90` | Сколько дней хранятся уведомления; чистит `fastleo:prune` |
 | `notifications.mail` | `false` | Дублировать `notifyAdmins()` письмом каждому администратору с адресом ([подробнее](#копия-на-почту)) |
-| `notifications.bots` | `NotificationBotResource::class` | Раздел «Уведомления» (боты Telegram и Max); `null` — раздела и отправки в мессенджеры нет |
+| `notifications.bots` | `null` | Раздел «Уведомления» (боты Telegram и Max); `null` — раздела и отправки в мессенджеры нет, включить — `NotificationBotResource::class` или свой наследник ([как](#как-включить-ботов)) |
 | `messengers.max.url` | `https://platform-api2.max.ru` | Адрес Bot API Max |
 | `messengers.max.certificate` | `null` | Сертификат для запросов к API Max; `null` — сертификат Минцифры из пакета |
 

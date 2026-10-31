@@ -102,6 +102,19 @@ it('creates a page that the registry finds and the admin opens', function (): vo
         ->assertSee('Содержимое страницы «Report»');
 });
 
+it('creates a report page with a period filter and no own view', function (): void {
+    $this->artisan('fastleo:make-page', ['name' => 'LeadsReport', '--report' => true])->assertSuccessful();
+
+    expect($this->sandbox.'/Fastleo/LeadsReportPage.php')->toBeFile()
+        ->and($this->sandbox.'/views/fastleo/leads-report.blade.php')->not->toBeFile();
+    require $this->sandbox.'/Fastleo/LeadsReportPage.php';
+
+    $this->actingAs(admin(), 'fastleo')
+        ->get(route('fastleo.pages.show', ['page' => 'leads-report', 'period' => ['from' => '2026-10-01', 'to' => '2026-10-31']]))
+        ->assertOk()
+        ->assertSeeInOrder(['Дней в периоде', '31']);
+});
+
 it('creates a field that extends Text and has its own view', function (): void {
     $this->artisan('fastleo:make-field', ['name' => 'Phone'])->assertSuccessful();
 

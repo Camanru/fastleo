@@ -28,6 +28,10 @@ Select::make('days', 'Дни приёма')->options([1 => 'Пн', 2 => 'Вт', 
 
 Для enum добавьте каст: `'status' => ArticleStatus::class`.
 
+```bash
+php artisan make:enum App/Enums/ArticleStatus --string   # app/Enums/ArticleStatus.php
+```
+
 ```php
 enum ArticleStatus: string
 {

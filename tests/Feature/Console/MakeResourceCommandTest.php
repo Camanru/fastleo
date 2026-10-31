@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\Feedback;
 use Workbench\App\Models\Page;
 
 beforeEach(function (): void {
@@ -90,6 +91,16 @@ it('imports a model named like a class of the package under another name', funct
 
     // Файл подключается без фатальной ошибки «имя Resource уже используется».
     expect(generatedFields($this->sandbox.'/PageResource.php', $this->namespace.'\\PageResource'))->toBeArray();
+});
+
+it('makes a nullable read_at column the read mark of the resource, not a field', function (): void {
+    $this->artisan('fastleo:make-resource', ['name' => 'Feedback', '--model' => Feedback::class, '--generate' => true])
+        ->doesntExpectOutputToContain('read_at')
+        ->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/FeedbackResource.php'))
+        ->toContain("protected static ?string \$readColumn = 'read_at';")
+        ->not->toContain("make('read_at'");
 });
 
 it('finds relations, the tree, the manual order and the slug', function (): void {

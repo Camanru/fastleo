@@ -4,9 +4,16 @@
 
 ## Свой дашборд
 
-Создайте класс `Dashboard` рядом с ресурсами (по умолчанию `app/Fastleo/Dashboard.php`, namespace `App\Fastleo`) и верните виджеты:
+Класс `Dashboard` лежит рядом с ресурсами (по умолчанию `app/Fastleo/Dashboard.php`, namespace `App\Fastleo`). Заготовка со встроенными виджетами:
+
+```bash
+php artisan fastleo:make-dashboard                # app/Fastleo/Dashboard.php
+```
+
+Впишите свои виджеты в `widgets()`:
 
 ```php
+// app/Fastleo/Dashboard.php
 namespace App\Fastleo;
 
 use App\Models\Lead;
@@ -149,10 +156,20 @@ Gate::define('clearFastleoCache', fn (User $user) => $user->is_owner);
 
 ## Свой виджет
 
-Наследуйте `Fastleo\Widgets\Widget`: `view()` возвращает Blade-шаблон, `payload()` — данные для него. Карточку (рамку и заголовок) рисует дашборд, шаблон выводит только содержимое:
+Наследуйте `Fastleo\Widgets\Widget`: `view()` возвращает Blade-шаблон, `payload()` — данные для него. Карточку (рамку и заголовок) рисует дашборд, шаблон выводит только содержимое. Заготовка класса и шаблона:
+
+```bash
+php artisan fastleo:make-widget QueueSize         # app/Fastleo/Widgets/QueueSize.php + resources/views/fastleo/widgets/queue-size.blade.php
+```
 
 ```php
-final class QueueSize extends \Fastleo\Widgets\Widget
+// app/Fastleo/Widgets/QueueSize.php
+namespace App\Fastleo\Widgets;
+
+use Fastleo\Widgets\Widget;
+use Illuminate\Support\Facades\DB;
+
+final class QueueSize extends Widget
 {
     public function view(): string
     {
@@ -168,4 +185,4 @@ final class QueueSize extends \Fastleo\Widgets\Widget
 
 В шаблоне доступны ключи `payload()` как переменные; рамку-карточку с заголовком рисует сам дашборд — внутри шаблона берите готовые компоненты (`button`, `icon`). Классы Tailwind из шаблонов сайта в CSS админки не попадают (CSS собран заранее), поэтому для разметки берите компоненты пакета или свои стили.
 
-Свой набор виджетов: `php artisan fastleo:make-dashboard` создаёт класс `Dashboard` (`app/Fastleo/Dashboard.php`) с виджетами по умолчанию — пакет находит его сам. Заготовка класса и шаблона виджета: `php artisan fastleo:make-widget QueueSize` (создаёт `app/Fastleo/Widgets/QueueSize.php` и `resources/views/fastleo/widgets/queue-size.blade.php`; подключается в `widgets()` класса `Dashboard`).
+Виджет подключается в `widgets()` класса `Dashboard`: `QueueSize::make('Очередь')` (и `use App\Fastleo\Widgets\QueueSize;`).

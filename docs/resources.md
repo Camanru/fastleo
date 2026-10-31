@@ -6,6 +6,10 @@
 
 Модель и таблица — обычные, как в любом проекте на Laravel:
 
+```bash
+php artisan make:model Doctor -m                  # модель и миграция
+```
+
 ```php
 // database/migrations/2026_01_01_000000_create_doctors_table.php
 Schema::create('doctors', function (Blueprint $table) {
@@ -35,6 +39,10 @@ class Doctor extends Model
 ```
 
 Ресурс — в папке `app/Fastleo` (подхватывается сам, регистрировать не нужно):
+
+```bash
+php artisan fastleo:make-resource Doctor          # app/Fastleo/DoctorResource.php
+```
 
 ```php
 // app/Fastleo/DoctorResource.php
@@ -70,7 +78,7 @@ final class DoctorResource extends Resource
 
 **Права.** Если у модели нет Policy, раздел полностью доступен любому администратору: просмотр, создание, правка, удаление. Ограничить доступ — Policy модели, подробно в [правах доступа](authorization.md).
 
-Заготовку ресурса можно создать командой — с `--generate` поля подбираются по колонкам таблицы:
+Поля можно сразу подобрать по колонкам таблицы — ключ `--generate` (после `php artisan migrate`):
 
 ```bash
 php artisan fastleo:make-resource Doctor --generate
@@ -114,6 +122,7 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 
 - `NOT NULL` без значения по умолчанию → `required()` (кроме `Toggle` и `Slug`).
 - Целая колонка `sort`, `position` или `sort_order` → `$sortColumn` ресурса (поля для неё нет).
+- Колонка `read_at` (дата со временем, `nullable`) → `$readColumn` ресурса (поля для неё нет).
 - `parent_id` со связью `parent()` на ту же модель → `$treeColumn = 'parent_id'` и поле `BelongsTo` «Parent».
 - Первое текстовое поле получает `searchable()->sortable()`.
 - Комментарий колонки становится подписью поля, иначе подпись — из имени колонки.
@@ -146,8 +155,8 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 | `$exportable` | `true` | Кнопка «Экспорт» в xlsx/csv — [import-export.md](import-export.md) |
 | `$importable` | `false` | Кнопка «Импорт» из xlsx/csv — [import-export.md](import-export.md#импорт) |
 | `$importKey` | `null` — ключ модели | Столбец сопоставления строк файла с записями (`'sku'`) |
-| `$activity` | `true` | Вести [журнал изменений](activity.md) раздела: кнопка «История», откат |
-| `$historyPanel` | `false` | Панель «История изменений» справа от формы в карточке записи (нужен `$activity`) — [related.md](related.md#боковая-колонка-карточки) |
+| `$activity` | `true` | Вести [журнал изменений](activity.md) раздела: кнопка «История», откат (если журнал включён в `fastleo.activity.enabled`) |
+| `$historyPanel` | `false` | Панель «История изменений» справа от формы в карточке записи (нужны `$activity` и включённый журнал `fastleo.activity.enabled`) — [related.md](related.md#боковая-колонка-карточки) |
 | `$globallySearchable` | `true` | Записи раздела находит [глобальный поиск](list.md#глобальный-поиск) (Ctrl+K) |
 | `$poll` | `null` | Раз в сколько секунд (5–3600) список и [связанные таблицы](related.md) раздела обновляются сами — [list.md](list.md#автообновление-списка) |
 | `$readColumn` | `null` | Колонка отметки «просмотрено» (`'read_at'`): открытая запись становится просмотренной, число в меню — непросмотренные — [ниже](#отметка-просмотрено) |

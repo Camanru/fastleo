@@ -2,11 +2,17 @@
 
 ## Своя страница админки
 
-Страница без модели: отчёт, инструкция для редакторов, панель управления. Класс наследует `Fastleo\Page`, лежит рядом с ресурсами, а шаблон — в `resources/views` сайта. Оба файла создаёт `php artisan fastleo:make-page Report` (класс `ReportPage`, шаблон `resources/views/fastleo/report.blade.php`).
+Страница без модели: отчёт, инструкция для редакторов, панель управления. Класс наследует `Fastleo\Page`, лежит рядом с ресурсами, а шаблон — в `resources/views` сайта. Оба файла создаёт команда (суффикс `Page` добавляется сам); отчёт из фильтров и виджетов без шаблона — `fastleo:make-page LeadsReport --report` ([отчёты](reports.md)):
+
+```bash
+php artisan fastleo:make-page Report              # app/Fastleo/ReportPage.php + resources/views/fastleo/report.blade.php
+```
 
 ```php
+// app/Fastleo/ReportPage.php
 namespace App\Fastleo;
 
+use App\Models\Lead;
 use Illuminate\Http\Request;
 
 final class ReportPage extends \Fastleo\Page
@@ -43,8 +49,8 @@ final class ReportPage extends \Fastleo\Page
 | `$group` | `null` | Группа меню |
 | `$position` | `0` | Порядок в группе |
 | `$slug` | kebab имени класса без «Page» | Часть адреса. Адрес `softnetica` занят встроенным разделом |
-| `view()` | обязательно | Blade-шаблон |
-| `data(Request)` | `[]` | Данные для шаблона |
+| `view()` | `'fastleo::pages.report'` — [отчёт](reports.md) из `filters()` и `widgets()` | Свой Blade-шаблон страницы |
+| `data(Request)` | `[]`; у отчёта (без своего `view()`) — фильтры и посчитанные виджеты | Данные для своего шаблона |
 | `canAccess($user)` | всем администраторам | Закрыть страницу: не видна в меню, ответ 403 |
 | `isAvailable()` | `true` | Страница существует только при условии: если `false`, её нет в меню и поиске, а адрес отвечает 404 |
 

@@ -2,7 +2,11 @@
 
 Статистика по менеджерам, продажи за период, заявки по источникам: страница админки без модели, на которой сверху — фильтры (период, менеджер, статус), а под ними — плитки с числами, график и таблицы, пересчитанные по выбранным фильтрам. Это обычная [своя страница](pages.md) (`Fastleo\Page`), только вместо Blade-шаблона вы описываете `filters()` и `widgets()`.
 
-Самый простой отчёт — период и две плитки:
+Самый простой отчёт — период и две плитки. Заготовку отчёта создаёт `fastleo:make-page` с ключом `--report`: класс с фильтром периода и плиткой, без своего шаблона:
+
+```bash
+php artisan fastleo:make-page LeadsReport --report   # app/Fastleo/LeadsReportPage.php
+```
 
 ```php
 // app/Fastleo/LeadsReportPage.php
@@ -39,7 +43,12 @@ final class LeadsReportPage extends Page
 
 Полный пример — фильтр по менеджеру, график по дням и таблица с итогами:
 
+```bash
+php artisan fastleo:make-page Statistics --report    # app/Fastleo/StatisticsPage.php
+```
+
 ```php
+// app/Fastleo/StatisticsPage.php
 namespace App\Fastleo;
 
 use App\Models\Lead;

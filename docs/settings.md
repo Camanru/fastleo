@@ -4,9 +4,14 @@
 
 ## Страница настроек
 
-Класс создаётся рядом с ресурсами (по умолчанию `app/Fastleo/`) и наследует `Fastleo\Settings`. Заготовка: `php artisan fastleo:make-settings Contacts` (создаёт `ContactsSettings.php`; не перезаписывает существующий файл без `--force`).
+Класс создаётся рядом с ресурсами (по умолчанию `app/Fastleo/`) и наследует `Fastleo\Settings`. Заготовка (суффикс `Settings` добавляется сам; существующий файл без `--force` не перезаписывается):
+
+```bash
+php artisan fastleo:make-settings Contacts        # app/Fastleo/ContactsSettings.php
+```
 
 ```php
+// app/Fastleo/ContactsSettings.php
 namespace App\Fastleo;
 
 use Fastleo\Fields\{Email, Repeater, Tel, Text, Textarea, Toggle, Url};

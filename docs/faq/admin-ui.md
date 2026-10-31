@@ -171,7 +171,11 @@ return [
 
 ### Как сделать отчёт за период с фильтрами?
 
-Создайте класс-наследник `Page` с методами `filters()` и `widgets()`. Шаблон не нужен.
+Создайте класс-наследник `Page` с методами `filters()` и `widgets()`. Шаблон не нужен — отчёт выводит пакет; заготовку без шаблона создаёт `--report`.
+
+```bash
+php artisan fastleo:make-page SalesReport --report   # app/Fastleo/SalesReportPage.php
+```
 
 ```php
 // app/Fastleo/SalesReportPage.php
@@ -371,7 +375,12 @@ final class InstructionsPage extends Page
 
 ### Как добавить на свою страницу кнопку, которая что-то делает?
 
-Объявите POST-маршрут через `Fastleo::routes()` (вход и CSRF уже есть) и поставьте в шаблоне `<x-fastleo::action-form>` — кнопку с окном подтверждения.
+Объявите POST-маршрут через `Fastleo::routes()` (вход и CSRF уже есть) и поставьте в шаблоне `<x-fastleo::action-form>` — кнопку с окном подтверждения. Заготовки:
+
+```bash
+php artisan fastleo:make-page Tools               # app/Fastleo/ToolsPage.php и resources/views/fastleo/tools.blade.php
+php artisan make:job RebuildPrices                # app/Jobs/RebuildPrices.php
+```
 
 ```php
 // routes/web.php

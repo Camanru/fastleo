@@ -25,6 +25,16 @@ use Illuminate\Database\Eloquent\Model;
 trait HasFastleoAccess
 {
     /**
+     * Каст колонки fastleo_admin к bool, чтобы модели не нужно было описывать его самой
+     * (Laravel вызывает метод при создании модели, как у SoftDeletes). Свой каст модели из `$casts`
+     * или `casts()` главнее.
+     */
+    public function initializeHasFastleoAccess(): void
+    {
+        $this->casts += ['fastleo_admin' => 'boolean'];
+    }
+
+    /**
      * Пользователь — администратор fastleo, если в колонке fastleo_admin истина.
      *
      * ```php

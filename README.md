@@ -8,11 +8,11 @@ What's included:
 
 - **Sections**: a list with search, filters, sorting and pagination; a form with tabs and columns; a detail view, trash, manual ordering and trees; per-record and bulk actions; Excel/CSV export and import.
 - **35 field types and custom fields**: text, numbers, dates, choices, relations (BelongsTo, BelongsToMany, HasMany, HasOne), images with WebP variants, files, gallery, rich text editor, Markdown, JSON fields (Repeater, KeyValue, the Blocks page builder), SEO, translatable fields.
-- **Admin environment**: a dashboard with widgets, site settings, custom pages, an activity log with rollback, an error log, notifications with Telegram and Max bots, Ctrl+K search, sitemap and robots.txt, closing the site for visitors, a file manager, and an optional connection to the SoftNetica site maintenance service.
+- **Admin environment**: a dashboard with widgets, site settings, custom pages, an activity log with rollback, an error log, notifications with Telegram and Max bots, publishing to Telegram and Max channels, Ctrl+K search, sitemap and robots.txt, closing the site for visitors, a file manager, and an optional connection to the SoftNetica site maintenance service.
 - **Security**: a separate login with rate limits, two-factor authentication, permissions via model Policies, only declared fields are written, upload protection ([details](docs/security.md)).
 - **Claude**: a skill and Laravel Boost guidelines, the `fastleo:doctor` and `fastleo:inspect` commands, an MCP server — you can ask for a section in a single sentence ([details](docs/claude.md)).
 
-Dark mode and mobile layout work out of the box.
+Dark mode and mobile layout work out of the box. The activity log, the notification bots and publishing are off by default — [how to switch them on](docs/configuration.md).
 
 Coming from 2.x or 3.0? 4.0 is a new admin panel, not an upgrade of the old one — sections are described again as classes and data formats change; see the [migration guide](docs/upgrade-from-3.md). Moving from another admin panel (MoonShine, a hand-made one)? See [moving to fastleo](docs/migrating.md). What's new — [CHANGELOG](CHANGELOG.md).
 
@@ -29,7 +29,7 @@ composer require camanru/fastleo
 php artisan fastleo:install
 ```
 
-Enable admin access in your user model:
+`fastleo:install` connects your `app/Models/User.php` to the admin panel: it adds the `FastleoUser` interface and the `HasFastleoAccess` trait and keeps everything else. If the model is unusual and the command cannot change it, it says so — add them by hand ([example](docs/installation.md#2-модель-пользователя)):
 
 ```php
 use Fastleo\Auth\FastleoUser;
@@ -37,14 +37,15 @@ use Fastleo\Auth\HasFastleoAccess;
 
 class User extends Authenticatable implements FastleoUser
 {
-    use HasFastleoAccess;
+    use HasFactory, HasFastleoAccess, Notifiable;
 }
 ```
 
-Add the `fastleo_admin` column and create an administrator:
+Add the `fastleo_admin` column and the package tables, link the public disk (uploaded files open from `public/storage`) and create an administrator:
 
 ```bash
 php artisan migrate
+php artisan storage:link
 php artisan fastleo:user admin@example.com
 ```
 
@@ -52,10 +53,12 @@ Open `https://example.com/fastleo` and log in.
 
 ## Your first section
 
-A section is a class in `app/Fastleo`. The command below creates a stub with fields based on the table columns; then adjust the labels and the icon — you will get something like this:
+A section is a class in `app/Fastleo` on top of an ordinary model and table. Create the model and the migration, migrate, then generate a stub with fields based on the table columns; adjust the labels and the icon — you will get something like this:
 
 ```bash
-php artisan fastleo:make-resource Doctor --generate
+php artisan make:model Doctor -m                       # model and migration: add the columns, then migrate
+php artisan migrate
+php artisan fastleo:make-resource Doctor --generate    # app/Fastleo/DoctorResource.php
 ```
 
 ```php

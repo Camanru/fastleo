@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\FastleoServiceProvider;
 use Fastleo\Http\Middleware\CloseSiteForVisitors;
@@ -94,4 +95,19 @@ it('does not touch commands and the schedule when the site is served over HTTP',
     $this->app->forgetInstance(Schedule::class);
 
     expect($before)->toBe(1)->and($scheduled())->toBe(1);
+});
+
+it('ships with the activity log, notification bots and publishing switched off', function (): void {
+    $defaults = require dirname(__DIR__, 2).'/config/fastleo.php';
+
+    expect($defaults['activity']['enabled'])->toBeFalse()
+        ->and($defaults['notifications']['bots'])->toBeNull()
+        ->and($defaults['publishing']['channels'])->toBeNull()
+        ->and($defaults['publishing']['publications'])->toBeNull();
+});
+
+it('keeps the activity log off when the site config has no activity key', function (): void {
+    config(['fastleo.activity' => []]);
+
+    expect(ActivityRecorder::isEnabled())->toBeFalse();
 });

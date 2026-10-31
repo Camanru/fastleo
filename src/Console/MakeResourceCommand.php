@@ -160,6 +160,13 @@ final class MakeResourceCommand extends Command
                 continue;
             }
 
+            // Отметка «просмотрено» — тоже свойство ресурса: её ставит пакет, когда запись открывают.
+            if ($column['name'] === 'read_at' && $column['nullable'] && in_array(strtolower($column['type_name']), ['datetime', 'timestamp', 'timestamptz'], true)) {
+                $this->properties['readColumn'] = 'read_at';
+
+                continue;
+            }
+
             if ($column['name'] === 'parent_id' && ($parentRelation = $this->belongsToRelation($model, 'parent_id')) instanceof BelongsTo && $parentRelation->getRelated()::class === $model::class) {
                 $this->properties['treeColumn'] = 'parent_id';
             }

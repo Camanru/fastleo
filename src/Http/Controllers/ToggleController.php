@@ -50,8 +50,9 @@ final class ToggleController
         // Без значения «снятая галочка» означала бы false: переключатель всегда присылает явное 1 или 0.
         abort_unless($request->has('value'), 422);
 
-        // Правило условия показа (`visibleWhen`) ищет управляющее поле среди данных: берём его из записи, как это делает форма.
-        $data = [$field->name => $request->input('value')];
+        // Правила поля видят остальные поля записи (`prohibited_if:title,…`), как в форме. Условие показа (`visibleWhen`)
+        // ищет управляющее поле среди данных: оно берётся из записи, даже если его нельзя менять.
+        $data = [...RecordWriter::currentValues($resource, $record), $field->name => $request->input('value')];
         $controlling = $field->getVisibleWhen()['field'] ?? null;
 
         if ($controlling !== null) {
