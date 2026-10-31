@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 use Fastleo\Fields\Field;
 use Fastleo\Resource;
+use Fastleo\Tests\Fixtures\MakeResource\BrokenRelationThing;
 use Fastleo\Tests\Fixtures\Models\Ghost;
+use Fastleo\Tests\Fixtures\Models\LimitedThing;
 use Fastleo\Tests\Fixtures\Models\OpenUser;
 use Fastleo\Tests\Fixtures\Models\Resource as ResourceModel;
 use Fastleo\Tests\Fixtures\Models\SpatiePage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Page;
@@ -207,4 +210,28 @@ it('recognises key value pairs and translatable attributes of spatie models', fu
     $this->artisan('fastleo:make-resource', ['name' => 'SpatiePage', '--model' => SpatiePage::class, '--generate' => true])->assertSuccessful();
 
     expect(File::get($this->sandbox.'/SpatiePageResource.php'))->toContain("Text::make('title', 'Title')->translatable()->required()->searchable()->sortable()");
+});
+
+it('writes the length of a text column into the field when it differs from the default', function (): void {
+    createLimitsTable();
+
+    $this->artisan('fastleo:make-resource', ['name' => 'Limited', '--model' => LimitedThing::class, '--generate' => true])->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/LimitedResource.php'))
+        ->toContain("Text::make('title', 'Title')->maxLength(500)")
+        ->and(File::get($this->sandbox.'/LimitedResource.php'))->toContain("Tel::make('phone', 'Phone')->maxLength(255)");
+});
+
+it('does not fail on a relation method of the model that throws', function (): void {
+    Schema::create('broken_relation_things', function ($table): void {
+        $table->id();
+        $table->string('title');
+        $table->unsignedBigInteger('owner_id')->nullable();
+    });
+
+    $this->artisan('fastleo:make-resource', ['name' => 'BrokenRelation', '--model' => BrokenRelationThing::class, '--generate' => true])->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/BrokenRelationResource.php'))
+        ->toContain("Number::make('owner_id'")
+        ->not->toContain('BelongsTo');
 });

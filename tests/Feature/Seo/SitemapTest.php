@@ -64,6 +64,24 @@ describe('records', function (): void {
         expect(sitemapLocs($this))->toBe(['https://site.test/articles/'.$shown->id]);
     });
 
+    it('skips a record marked noindex when the model keeps the seo column as a JSON string', function (): void {
+        useFixtureResources('SitemapRawSeo');
+        enableSitemap();
+        $shown = Article::factory()->create(['seo' => ['title' => 'Да']]);
+        Article::factory()->create(['seo' => ['noindex' => true]]);
+
+        expect(sitemapLocs($this))->toBe(['https://site.test/articles/'.$shown->id]);
+    });
+
+    it('stops reading records once the files are full', function (): void {
+        enableSitemap(['per_file' => 1]);
+        Article::factory()->count(Sitemap::MAX_FILES + 2)->create(['is_published' => true]);
+
+        expect(sitemapLocs($this))->toHaveCount(Sitemap::MAX_FILES);
+        $this->get('/sitemap-'.Sitemap::MAX_FILES.'.xml')->assertOk();
+        $this->get('/sitemap-'.(Sitemap::MAX_FILES + 1).'.xml')->assertNotFound();
+    });
+
     it('adds the date of the last change', function (): void {
         enableSitemap();
         $article = Article::factory()->create(['is_published' => true]);

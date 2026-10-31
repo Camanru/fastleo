@@ -6,6 +6,7 @@ use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Widgets\Chart;
 use Fastleo\Widgets\Stat;
+use Fastleo\Widgets\Table;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Gate;
@@ -169,6 +170,35 @@ describe('Chart::countByDay', function (): void {
     });
 });
 
+describe('hourly grouping by database', function (): void {
+    it('groups by hour with the function of each supported database and falls back to days for the rest', function (string $driver, ?string $expected): void {
+        $expression = new ReflectionMethod(Chart::class, 'hourExpression');
+
+        expect($expression->invoke(null, $driver, 'created_at'))->toBe($expected);
+    })->with([
+        'sqlite' => ['sqlite', "strftime('%Y-%m-%d %H', created_at)"],
+        'mysql' => ['mysql', "date_format(created_at, '%Y-%m-%d %H')"],
+        'mariadb' => ['mariadb', "date_format(created_at, '%Y-%m-%d %H')"],
+        'pgsql' => ['pgsql', "to_char(created_at, 'YYYY-MM-DD HH24')"],
+        'sqlsrv' => ['sqlsrv', null],
+    ]);
+});
+
+describe('a widget without a title and a table without a section', function (): void {
+    it('has an empty title when none is given', function (): void {
+        expect(Stat::make()->getTitle())->toBe('')
+            ->and(Chart::make()->getTitle())->toBe('');
+    });
+
+    it('has no title, is hidden and reports a failure when the section is not chosen', function (): void {
+        $table = Table::make();
+
+        expect($table->getTitle())->toBe('')
+            ->and($table->isVisible())->toBeFalse()
+            ->and($table->resolve())->toBe(['failed' => true]);
+    });
+});
+
 describe('Stat', function (): void {
     it('formats numbers and passes strings through', function (): void {
         $stat = Stat::make('Число')->value(1234567);
@@ -193,7 +223,7 @@ describe('Stat', function (): void {
     });
 
     it('clamps the column span', function (): void {
-        expect(Stat::make('a')->columnSpan(9)->getSpan())->toBe(4)
+        expect(Stat::make('a')->columnSpan(9)->getSpan())->toBe(6)
             ->and(Stat::make('a')->columnSpan(0)->getSpan())->toBe(1);
     });
 });

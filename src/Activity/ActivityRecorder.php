@@ -6,6 +6,7 @@ namespace Fastleo\Activity;
 
 use Closure;
 use Fastleo\Fastleo;
+use Fastleo\Fields\Field;
 use Fastleo\Fields\Password;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
@@ -183,17 +184,18 @@ final class ActivityRecorder
         }
 
         $hidden = array_values(array_merge($model->getHidden(), ['password', 'remember_token'], $this->passwordFields($slug)));
+        $computed = $this->computedFields($slug);
         $soft = method_exists($model, 'isForceDeleting');
         $changes = null;
         $snapshot = null;
 
         switch ($event) {
             case 'created':
-                $changes = $this->attributes($model, $hidden, null);
+                $changes = $this->attributes($model, $hidden, null, computed: $computed);
 
                 break;
             case 'updated':
-                $changes = $this->attributes($model, $hidden, array_keys($model->getChanges()), true);
+                $changes = $this->attributes($model, $hidden, array_keys($model->getChanges()), true, $computed);
 
                 if ($changes === []) {
                     return;
@@ -205,11 +207,11 @@ final class ActivityRecorder
                     return; // запишет forceDeleted
                 }
 
-                $snapshot = $soft ? null : $this->snapshot($model, $hidden);
+                $snapshot = $soft ? null : $this->snapshot($model, $hidden, $computed);
 
                 break;
             case 'forceDeleted':
-                $snapshot = $this->snapshot($model, $hidden);
+                $snapshot = $this->snapshot($model, $hidden, $computed);
 
                 break;
         }
@@ -229,15 +231,16 @@ final class ActivityRecorder
      *
      * @param  list<string>  $hidden
      * @param  list<string>|null  $only  только эти атрибуты; null — все (создание)
+     * @param  list<string>  $computed  вычисляемые столбцы из query() (`fromQuery()`): колонок в таблице нет
      * @return array<string, array{old?: mixed, new?: mixed, hidden?: bool}>
      */
-    private function attributes(Model $model, array $hidden, ?array $only, bool $withOld = false): array
+    private function attributes(Model $model, array $hidden, ?array $only, bool $withOld = false, array $computed = []): array
     {
         $result = [];
         $attributes = $model->getAttributes();
 
         foreach ($only ?? array_keys($attributes) as $key) {
-            if ($key === $model->getKeyName() || in_array($key, self::IGNORED, true) || $key === $model->getCreatedAtColumn() || $key === $model->getUpdatedAtColumn()) {
+            if ($key === $model->getKeyName() || in_array($key, $computed, true) || in_array($key, self::IGNORED, true) || $key === $model->getCreatedAtColumn() || $key === $model->getUpdatedAtColumn()) {
                 continue;
             }
 
@@ -257,14 +260,15 @@ final class ActivityRecorder
      * Копия записи без скрытых атрибутов — для восстановления удалённой.
      *
      * @param  list<string>  $hidden
+     * @param  list<string>  $computed  вычисляемые столбцы из query() (`fromQuery()`): колонок в таблице нет
      * @return array<string, mixed>
      */
-    private function snapshot(Model $model, array $hidden): array
+    private function snapshot(Model $model, array $hidden, array $computed = []): array
     {
         $snapshot = [];
 
         foreach ($model->getAttributes() as $key => $value) {
-            if (! in_array($key, $hidden, true)) {
+            if (! in_array($key, $hidden, true) && ! in_array($key, $computed, true)) {
                 $snapshot[$key] = $this->clean($value);
             }
         }
@@ -328,6 +332,21 @@ final class ActivityRecorder
         }
 
         return $names;
+    }
+
+    /**
+     * Имена вычисляемых столбцов раздела (`fromQuery()`): значение приходит из query(), в таблице колонки нет — в журнал
+     * и снимок удалённой записи не попадает (иначе возврат записи упал бы на несуществующей колонке).
+     *
+     * @return list<string>
+     */
+    private function computedFields(string $slug): array
+    {
+        $resource = Fastleo::resources()->find($slug);
+
+        return $resource instanceof Resource
+            ? array_values(array_map(fn (Field $field): string => $field->name, array_filter($resource->schema()->fields(), fn (Field $field): bool => $field->isFromQuery())))
+            : [];
     }
 
     /**

@@ -140,11 +140,7 @@ final class InspectCommand extends Command
 
         $rows = [];
 
-        foreach (is_array($section['fields'] ?? null) ? $section['fields'] : [] as $field) {
-            if (! is_array($field)) {
-                continue;
-            }
-
+        foreach (array_filter(is_array($section['fields'] ?? null) ? $section['fields'] : [], is_array(...)) as $field) {
             $rules = is_array($field['rules'] ?? null) ? $field['rules'] : [];
             $first = array_key_first($rules);
             $rows[] = [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Resource;
@@ -18,7 +19,7 @@ use Illuminate\Pagination\Paginator;
 
 /**
  * Выборка для списка раздела по параметрам адреса: поиск `q`, фильтры `filter[имя]`,
- * сортировка `sort`/`direction`, «все записи» `per_page=all`, корзина, ветка дерева `parent`.
+ * сортировка `sort`/`direction`, «все записи» `per_page=all`, число записей `per_page=50`, корзина, ветка дерева `parent`.
  *
  * Сортировать можно только по полям `sortable()`, искать — только по `searchable()`:
  * имена колонок из адреса в запрос не попадают; фильтры — только описанные в `filters()` ресурса.
@@ -39,6 +40,9 @@ final class ResourceQuery
     /** Показать все записи одной страницей (не больше `fastleo.list.max_all`). */
     public readonly bool $all;
 
+    /** Число записей на странице, выбранное в списке (`per_page=50`, только из `Resource::perPageOptions()`), или null. */
+    public readonly ?int $size;
+
     /** Ветка дерева: ключ записи, чьи потомки показываются, или null — всё дерево. */
     public readonly ?string $parent;
 
@@ -49,10 +53,20 @@ final class ResourceQuery
      */
     public readonly array $filters;
 
+    /**
+     * Значения фильтров по умолчанию (`Filter::default()`): вид списка без параметров в адресе.
+     *
+     * @var array<string, mixed>
+     */
+    private readonly array $defaults;
+
     /** Дерево записей раздела (строится один раз на запрос). */
     private ?Tree $tree = null;
 
-    public function __construct(private readonly Resource $resource, Request $request, public readonly bool $trashed = false)
+    /**
+     * @param  (Closure(Builder<Model>): mixed)|null  $scope  своё ограничение запроса (связанная таблица: записи одного родителя); с ним список плоский — без дерева
+     */
+    public function __construct(private readonly Resource $resource, Request $request, public readonly bool $trashed = false, bool $withDefaults = true, private readonly ?Closure $scope = null)
     {
         $search = $request->query('q');
         $this->search = is_string($search) ? mb_substr(trim($search), 0, 255) : '';
@@ -62,19 +76,30 @@ final class ResourceQuery
         $this->sort = is_string($sort) && in_array($sort, $sortable, true) ? $sort : null;
         $this->direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
         $this->all = $request->query('per_page') === 'all';
+        $size = $request->query('per_page');
+        $this->size = is_string($size) && ctype_digit($size) && in_array((int) $size, $resource::perPageOptions(), true) ? (int) $size : null;
 
         $input = $request->query('filter');
         $filters = [];
+        $defaults = [];
 
         foreach ($resource->listFilters() as $name => $filter) {
-            $value = $filter->value(is_array($input) ? ($input[$name] ?? null) : null);
+            // Ключ есть в адресе (даже пустой — «Все») — решает администратор; нет — умолчание фильтра.
+            $given = is_array($input) && array_key_exists($name, $input);
+            $default = $withDefaults ? $filter->value($filter->defaultInput()) : null;
+            $value = $given ? $filter->value($input[$name]) : $default;
 
             if ($value !== null) {
                 $filters[$name] = $value;
             }
+
+            if ($default !== null) {
+                $defaults[$name] = $default;
+            }
         }
 
         $this->filters = $filters;
+        $this->defaults = $defaults;
 
         $parent = $request->query('parent');
         $this->parent = is_string($parent) && RecordKey::valid($this->resource->newModel(), $parent) && $this->isTree() && $this->tree()->has($parent) ? $parent : null;
@@ -85,7 +110,7 @@ final class ResourceQuery
      */
     public function isTree(): bool
     {
-        return $this->resource::treeColumn() !== null && $this->isDefaultView();
+        return ! $this->scope instanceof Closure && $this->resource::treeColumn() !== null && $this->isDefaultView();
     }
 
     /**
@@ -111,9 +136,9 @@ final class ResourceQuery
      *
      * @return LengthAwarePaginatorContract<int, Model>
      */
-    public function paginate(): LengthAwarePaginatorContract
+    public function paginate(?int $perPage = null): LengthAwarePaginatorContract
     {
-        $perPage = $this->all ? max(1, config()->integer('fastleo.list.max_all', 1000)) : $this->resource::perPage();
+        $perPage = $this->all ? max(1, config()->integer('fastleo.list.max_all', 1000)) : ($this->size ?? $perPage ?? $this->resource::perPage());
 
         if (! $this->isTree()) {
             return $this->query()->paginate($perPage)->withQueryString();
@@ -148,6 +173,10 @@ final class ResourceQuery
         if ($this->trashed && method_exists($model, 'getQualifiedDeletedAtColumn')) {
             $column = $model->getQualifiedDeletedAtColumn();
             $query->withoutGlobalScope(SoftDeletingScope::class)->whereNotNull(is_string($column) ? $column : 'deleted_at');
+        }
+
+        if ($this->scope instanceof Closure) {
+            ($this->scope)($query);
         }
 
         $this->applySearch($query);
@@ -187,6 +216,15 @@ final class ResourceQuery
     public function isNarrowed(): bool
     {
         return $this->search !== '' || $this->filters !== [];
+    }
+
+    /**
+     * Вид списка отличается от того, что открывается без параметров: есть поиск или фильтры не такие, как по умолчанию
+     * (в том числе выбрано «Все» при умолчании). От него зависит кнопка «Сбросить».
+     */
+    public function isChanged(): bool
+    {
+        return $this->search !== '' || $this->filters !== $this->defaults;
     }
 
     /**
@@ -230,8 +268,11 @@ final class ResourceQuery
 
         if ($this->sort !== null) {
             // Многоязычное поле сортируется по основному языку.
-            $translatable = $this->resource->schema()->field($this->sort)?->isTranslatable() ?? false;
-            $query->orderBy($query->qualifyColumn($this->sort).($translatable ? '->'.Fastleo::locales()[0] : ''), $this->direction);
+            $field = $this->resource->schema()->field($this->sort);
+            $translatable = $field?->isTranslatable() ?? false;
+            // Вычисляемый столбец из query() — псевдоним в запросе, а не колонка таблицы.
+            $column = $field?->isFromQuery() === true ? $this->sort : $query->qualifyColumn($this->sort);
+            $query->orderBy($column.($translatable ? '->'.Fastleo::locales()[0] : ''), $this->direction);
         } elseif ($manual !== null) {
             $query->orderBy($query->qualifyColumn($manual));
         } elseif (($order = $this->resource::defaultOrder()) !== null) {

@@ -6,7 +6,9 @@ use Fastleo\Fastleo;
 use Fastleo\Publishing\Delivery;
 use Fastleo\Publishing\Publication;
 use Fastleo\Publishing\SendDelivery;
+use Fastleo\Publishing\SendPublication;
 use Fastleo\Publishing\StartPublication;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
@@ -107,4 +109,42 @@ it('lets the admin send an overdue scheduled publication by hand', function (): 
     $this->post(route('fastleo.resources.action', ['publications', 'send-now']), ['ids' => [(string) $this->publication->id]]);
 
     expect($this->publication->refresh())->status->toBe('sent')->scheduled_at->toBeNull();
+});
+
+it('puts the sending in the queue and says so when the time is not set', function (): void {
+    Queue::fake();
+
+    $this->post(route('fastleo.resources.action', ['publications', 'send']), ['ids' => [(string) $this->publication->id]])
+        ->assertSessionHas('fastleo.success', 'Отправка началась: результат будет в журнале.');
+
+    Queue::assertPushed(SendDelivery::class, 1);
+    expect($this->publication->refresh()->status)->toBe('sending');
+});
+
+it('does not send a publication whose channels were all switched off', function (): void {
+    Queue::fake();
+    $this->channel->update(['enabled' => false]);
+
+    $this->post(route('fastleo.resources.action', ['publications', 'send']), ['ids' => [(string) $this->publication->id]])
+        ->assertSessionHas('fastleo.error', 'Выберите хотя бы один включённый канал.');
+
+    Queue::assertNothingPushed();
+    expect($this->publication->refresh()->status)->toBe('draft')->and(Delivery::query()->count())->toBe(0);
+});
+
+it('does nothing when the action got no publication', function (): void {
+    Queue::fake();
+
+    $result = new SendPublication()->handle(new EloquentCollection, []);
+
+    expect($result->type)->toBe('error');
+    Queue::assertNothingPushed();
+});
+
+it('waits for nothing when the publication has no time', function (): void {
+    Queue::fake();
+
+    StartPublication::schedule($this->publication);
+
+    Queue::assertNothingPushed();
 });

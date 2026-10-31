@@ -10,6 +10,9 @@ use Fastleo\Mcp\Tools\ListResources;
 use Fastleo\Messengers\MessengerFailed;
 use Fastleo\Notifications\NotificationBot;
 use Fastleo\Notifications\SendAdminMessage;
+use Fastleo\Notifications\SendTestMessage;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -81,6 +84,16 @@ describe('section', function (): void {
         expect($bot->refresh())->messenger->value->toBe('max')->token->toBe(MAX_TOKEN);
     });
 
+    it('explains what it is under the title of the list', function (): void {
+        $this->get(route('fastleo.resources.index', 'notification-bots'))->assertOk()->assertSee('Боты Telegram и Max, которые дублируют уведомления колокольчика');
+    });
+
+    it('checks the token and the chats only after the messenger is chosen', function (): void {
+        $this->post(route('fastleo.resources.store', 'notification-bots'), botForm(['messenger' => '', 'token' => 'не токен', 'recipients' => ['@channel_name']]))
+            ->assertSessionHasErrors('messenger')
+            ->assertSessionDoesntHaveErrors(['token', 'recipients']);
+    });
+
     it('can be switched off in the config', function (): void {
         config(['fastleo.notifications.bots' => null]);
         Fastleo::resources()->flush();
@@ -115,6 +128,16 @@ describe('test message', function (): void {
     });
 });
 
+describe('test message without a bot', function (): void {
+    it('answers with an error when the action got no bot', function (): void {
+        app()->setLocale(Fastleo::LOCALE);
+
+        $result = new SendTestMessage()->handle(new EloquentCollection, []);
+
+        expect($result->type)->toBe('error')->and($result->message)->toBe('Сообщение не отправлено: —');
+    });
+});
+
 describe('job', function (): void {
     it('sends the text to its chat', function (): void {
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 5]])]);
@@ -145,5 +168,25 @@ describe('job', function (): void {
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'chat not found'], 400)]);
 
         expect(fn () => new SendAdminMessage(notificationBot(), '12345', 'Заявка')->handle())->toThrow(MessengerFailed::class, 'chat not found');
+    });
+
+    it('puts itself back in the queue for the time the messenger asks to wait', function (): void {
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Too Many Requests', 'parameters' => ['retry_after' => 7]], 429)]);
+        $job = new SendAdminMessage(notificationBot(), '12345', 'Заявка')->withFakeQueueInteractions();
+
+        $job->handle();
+
+        $job->assertReleased(7);
+        $job->assertNotFailed();
+    });
+
+    it('does not repeat a message that may have already arrived', function (): void {
+        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+        $job = new SendAdminMessage(notificationBot(), '12345', 'Заявка')->withFakeQueueInteractions();
+
+        $job->handle();
+
+        $job->assertFailed();
+        $job->assertNotReleased();
     });
 });

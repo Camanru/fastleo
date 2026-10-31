@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 final readonly class DocsBuilder
 {
     /** Описание skill: по нему Claude решает, когда его подключать. */
-    private const string SKILL_DESCRIPTION = 'Use this skill when creating or changing sections (CRUD) of the Fastleo admin panel in a Laravel site: resources in app/Fastleo, fields, filters, actions, dashboard widgets, settings pages, and the migration, model and test for a new section; also for the fastleo:* artisan commands (make-resource, inspect, doctor). Trigger on: fastleo, админка, раздел админки, ресурс, поле формы, фильтр, действие, виджет.';
+    private const string SKILL_DESCRIPTION = 'Use this skill when creating or changing sections (CRUD) of the Fastleo admin panel in a Laravel site: resources in app/Fastleo, fields, filters, actions, dashboard widgets, settings pages, and the migration, model and test for a new section; also for menu items and counters, related tables on a record card, inline editing, computed columns, list filters, report/statistics pages and CRM-style tasks (clients, requests, tasks, leads); also for the fastleo:* artisan commands (make-resource, inspect, doctor). Trigger on: fastleo, админка, раздел админки, ресурс, поле формы, фильтр, действие, виджет, меню, счётчик, связанные таблицы, отчёт, статистика, CRM.';
 
     /** Краткое описание пакета для начала skill и llms.txt. */
     private const string SUMMARY = 'Fastleo — админ-панель для сайтов на Laravel 13. Раздел админки (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.';
@@ -82,13 +82,14 @@ final readonly class DocsBuilder
             .self::SUMMARY."\n\n"
             ."### Порядок работы\n\n".trim(implode("\n", $steps))."\n\n"
             ."### Правила\n\n".$sections['Правила']."\n\n"
+            .'Меню и счётчики, связанные таблицы, правка в списке, фильтры, действия, отчёты и рецепты CRM уже есть в пакете — таблица «Что выбрать» в skill `fastleo`. '
             .'Подробности: skill `fastleo` и docs в `'.self::SITE_DOCS.'` (`php artisan fastleo:inspect --json` — текущая конфигурация сайта).';
 
         return "@verbatim\n".$this->links($text, 'claude.md', self::SITE_DOCS)."\n@endverbatim\n";
     }
 
     /**
-     * Справочник по API для любых нейросетей: порядок работы, поля с методами и указатель docs.
+     * Справочник по API для любых нейросетей: порядок работы, правила, «что выбрать», поля с методами и указатель docs.
      */
     private function llms(): string
     {
@@ -96,6 +97,7 @@ final readonly class DocsBuilder
         $out = ['# Fastleo', '> '.self::SUMMARY];
         $out[] = "## Порядок работы\n\n".$claude['Порядок работы'];
         $out[] = "## Правила\n\n".$claude['Правила'];
+        $out[] = "## Что выбрать\n\n".$claude['Что выбрать'];
         $out[] = "## Поля\n\n".implode("\n\n", $this->fieldEntries());
         $out[] = "## Документация\n\n".implode("\n", $this->docIndex(''));
 

@@ -134,7 +134,7 @@ final class DashboardGrid
         return [
             'widget' => $widget,
             'key' => $key,
-            'cols' => $entry === null ? $widget->getSpan() : max(1, min(4, $entry['cols'])),
+            'cols' => $entry === null ? min(4, $widget->getSpan()) : max(1, min(4, $entry['cols'])),
             'rows' => $entry === null ? $widget->getRows() : max(1, min(4, $entry['rows'])),
             'hidden' => $entry !== null && $entry['hidden'],
         ];

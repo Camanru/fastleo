@@ -10,7 +10,7 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Категории без своего `title()`: заголовком станет первый столбец списка — связь с родителем.
+ * Категории без своего `title()`: первый столбец списка — связь с родителем, но заголовком станет название.
  */
 final class PlainCategoryResource extends Resource
 {

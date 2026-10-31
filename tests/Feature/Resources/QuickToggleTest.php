@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\NoUpdateArticlePolicy;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Models\Article;
 
@@ -118,6 +119,32 @@ describe('switching', function (): void {
         'not a boolean' => [['value' => 'maybe']],
         'array' => [['value' => [1]]],
     ]);
+});
+
+describe('a refusal while saving', function (): void {
+    it('explains why the database refused the value and keeps the record', function (): void {
+        $article = Article::factory()->create(['is_published' => false]);
+        Article::updating(function (): never {
+            throw new QueryException('sqlite', 'update articles', [], new PDOException('FOREIGN KEY constraint failed'));
+        });
+
+        $this->postJson(toggleUrl('articles', $article, 'is_published'), ['value' => 1])
+            ->assertUnprocessable()
+            ->assertJsonFragment(['message' => 'Не удалось сохранить или удалить: запись связана с другими записями или указана несуществующая связанная запись.']);
+
+        expect($article->refresh()->is_published)->toBeFalse();
+    });
+
+    it('says so when an observer of the site cancels the switch', function (): void {
+        $article = Article::factory()->create(['is_published' => false]);
+        Article::updating(fn (): bool => false);
+
+        $this->postJson(toggleUrl('articles', $article, 'is_published'), ['value' => 1])
+            ->assertUnprocessable()
+            ->assertJsonFragment(['message' => 'Сайт отменил сохранение (обработчик модели вернул false). Изменения не записаны.']);
+
+        expect($article->refresh()->is_published)->toBeFalse();
+    });
 });
 
 describe('refusals', function (): void {

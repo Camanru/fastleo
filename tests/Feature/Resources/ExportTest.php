@@ -6,6 +6,8 @@ use Fastleo\Exports\Exporter;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Testing\TestResponse;
 use Workbench\App\Enums\ArticleStatus;
@@ -173,4 +175,22 @@ describe('large tables', function (): void {
 
         expect(exportedKeys(Article::query()->where('views', '>', 5)))->toBe([$kept->id]);
     });
+});
+
+it('leaves out a record that was deleted while the file was being written', function (): void {
+    $kept = Article::factory()->create(['title' => 'Остаётся']);
+    $gone = Article::factory()->create(['title' => 'Исчезает']);
+    $deleted = false;
+
+    DB::listen(function (QueryExecuted $query) use (&$deleted, $gone): void {
+        if (! $deleted && preg_match('/^select\s+[`"]articles[`"]\.[`"]id[`"]\s+from\s+[`"]articles[`"]/i', $query->sql) === 1) {
+            $deleted = true;
+            DB::table('articles')->where('id', $gone->id)->delete();
+        }
+    });
+
+    $rows = exportedRows(exportArticles(['format' => 'csv'])->assertOk(), 'csv');
+
+    expect($deleted)->toBeTrue()
+        ->and(array_column($rows, 0))->toBe(['id', (string) $kept->id]);
 });

@@ -30,6 +30,9 @@ use UnitEnum;
  */
 class Select extends Field implements SearchesOptions
 {
+    /** Тона цветных меток (как у `<x-fastleo::badge>`). */
+    private const array TONES = ['success', 'warning', 'danger', 'info', 'neutral'];
+
     /**
      * Варианты: массив, класс enum или замыкание, возвращающее массив.
      *
@@ -39,6 +42,13 @@ class Select extends Field implements SearchesOptions
 
     /** Можно выбрать несколько вариантов. */
     protected bool $multiple = false;
+
+    /**
+     * Цветные метки в списке и на просмотре: значение варианта → тон; null — метки выключены.
+     *
+     * @var array<string, string>|null
+     */
+    protected ?array $badges = null;
 
     /**
      * Варианты, вычисленные один раз за запрос (по значению зависимости).
@@ -76,6 +86,62 @@ class Select extends Field implements SearchesOptions
         $this->multiple = $multiple;
 
         return $this;
+    }
+
+    /**
+     * Цветные метки статуса вместо текста в списке и на просмотре. Тона: `success`, `warning`, `danger`, `info`,
+     * `neutral`. Вариант, которого нет в массиве, — `neutral`. Без массива тон берётся из метода `tone()` enum
+     * (рядом с `label()`); у остальных вариантов — `neutral`. Выгрузка, импорт и форма не меняются.
+     *
+     * ```php
+     * Select::make('status')->options(['new' => 'Новая', 'done' => 'Выполнена'])->badges(['new' => 'info', 'done' => 'success']);
+     * Enum::make('status')->enum(OfferStatus::class)->badges();
+     * ```
+     *
+     * @param  array<array-key, string>  $tones  значение варианта → тон
+     *
+     * @throws InvalidArgumentException неизвестный тон
+     */
+    public function badges(array $tones = []): static
+    {
+        $map = [];
+
+        foreach ($tones as $value => $tone) {
+            if (! in_array($tone, self::TONES, true)) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.badge_tone', ['field' => $this->name, 'tone' => $tone, 'tones' => implode(', ', self::TONES)], Fastleo::LOCALE));
+            }
+
+            $map[(string) $value] = $tone;
+        }
+
+        $this->badges = $map;
+
+        return $this;
+    }
+
+    /**
+     * Включены цветные метки: поле не выводится своим `formatUsing()`.
+     */
+    public function hasBadges(): bool
+    {
+        return $this->badges !== null && ! $this->formatUsing instanceof Closure;
+    }
+
+    /**
+     * Выбранные варианты записи для цветных меток: подпись и тон (для зависимого списка — варианты записи).
+     *
+     * @return list<array{label: string, tone: string}>
+     */
+    public function badgeItems(Model $record): array
+    {
+        $dependency = $this->dependsOn === null ? null : self::dependencyValue($record->getAttribute($this->dependsOn));
+        $items = [];
+
+        foreach ($this->labelItems($record->getAttribute($this->name), $this->getOptions($dependency)) as $item) {
+            $items[] = ['label' => $item['label'], 'tone' => $this->badgeTone($item['value'])];
+        }
+
+        return $items;
     }
 
     /**
@@ -358,18 +424,55 @@ class Select extends Field implements SearchesOptions
      */
     private function labels(mixed $value, array $options): ?string
     {
+        $labels = array_column($this->labelItems($value, $options), 'label');
+
+        return $labels === [] ? null : implode(', ', $labels);
+    }
+
+    /**
+     * Выбранные значения с подписями; неизвестное значение остаётся своей подписью.
+     *
+     * @param  array<array-key, string>  $options
+     * @return list<array{value: string, label: string}>
+     */
+    private function labelItems(mixed $value, array $options): array
+    {
         $values = $this->multiple ? (is_iterable($value) ? [...$value] : []) : [$value];
-        $labels = [];
+        $items = [];
 
         foreach ($values as $item) {
             $key = $this->scalar($item);
 
             if ($key !== null && $key !== '' && ! $this->isEmptyValue($key)) {
-                $labels[] = $options[$key] ?? $key;
+                $items[] = ['value' => $key, 'label' => $options[$key] ?? $key];
             }
         }
 
-        return $labels === [] ? null : implode(', ', $labels);
+        return $items;
+    }
+
+    /**
+     * Тон метки варианта: из `badges([...])`, иначе метод `tone()` случая enum, иначе `neutral`.
+     */
+    public function badgeTone(string $value): string
+    {
+        if (isset($this->badges[$value])) {
+            return $this->badges[$value];
+        }
+
+        $enum = $this->options;
+
+        if (is_string($enum) && is_subclass_of($enum, BackedEnum::class)) {
+            foreach ($enum::cases() as $case) {
+                if ((string) $case->value === $value && method_exists($case, 'tone')) {
+                    $tone = $case->tone();
+
+                    return is_string($tone) && in_array($tone, self::TONES, true) ? $tone : 'neutral';
+                }
+            }
+        }
+
+        return 'neutral';
     }
 
     /**

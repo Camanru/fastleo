@@ -9,6 +9,7 @@ use Fastleo\Messengers\TelegramBot;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 
 beforeEach(function (): void {
     Http::preventStrayRequests();
@@ -166,6 +167,150 @@ describe('max', function (): void {
             ['id' => '555', 'title' => 'Анна', 'type' => 'dialog'],
             ['id' => '-800', 'title' => '-800', 'type' => 'chat'],
         ]);
+    });
+});
+
+/**
+ * Картинка для публикации: имя и содержимое, которое отдаётся по требованию.
+ *
+ * @return array{name: string, open: Closure(): string}
+ */
+function botImage(string $name = 'photo.jpg'): array
+{
+    return ['name' => $name, 'open' => fn (): string => 'jpeg'];
+}
+
+describe('telegram posts', function (): void {
+    it('refuses a chat where the bot is not a member', function (): void {
+        Http::fake([
+            'api.telegram.org/*/getMe' => Http::response(['ok' => true, 'result' => ['id' => 777, 'username' => 'site_bot']]),
+            'api.telegram.org/*/getChat' => Http::response(['ok' => true, 'result' => ['id' => -500, 'type' => 'supergroup', 'title' => 'Чат']]),
+            'api.telegram.org/*/getChatMember' => Http::response(['ok' => true, 'result' => ['status' => 'left']]),
+        ]);
+
+        expect(messengerFailure(fn (): array => new TelegramBot(TELEGRAM_TOKEN)->checkChannel('-500'))->getMessage())->toBe('Бот не состоит в этом чате: добавьте его в чат.');
+    });
+
+    it('does not edit a post whose message number is unknown', function (): void {
+        Http::fake();
+
+        expect(messengerFailure(fn () => new TelegramBot(TELEGRAM_TOKEN)->editPost('1', 'text', [], [], 'Текст', null))->getMessage())->toContain('Неизвестен номер сообщения');
+        Http::assertNothingSent();
+    });
+
+    it('passes on a failure of the edit except for the answer that nothing changed', function (): void {
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Bad Request: message to edit not found'], 400)]);
+
+        expect(messengerFailure(fn () => new TelegramBot(TELEGRAM_TOKEN)->editPost('1', 'text', ['text' => '5'], [], 'Текст', null))->getMessage())->toBe('Bad Request: message to edit not found');
+    });
+
+    it('does not leak the token when the connection breaks while a photo is uploaded', function (): void {
+        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out for https://api.telegram.org/bot'.TELEGRAM_TOKEN.'/sendPhoto')]);
+
+        $failure = messengerFailure(fn () => new TelegramBot(TELEGRAM_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null));
+
+        expect($failure->getMessage())->toBe('нет связи с Telegram')->and($failure->uncertain)->toBeTrue();
+    });
+
+    it('explains a rejection of the photo', function (): void {
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Bad Request: wrong file identifier'], 400)]);
+
+        expect(messengerFailure(fn () => new TelegramBot(TELEGRAM_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('Bad Request: wrong file identifier');
+    });
+});
+
+describe('max posts', function (): void {
+    it('does not send a post that has already gone', function (): void {
+        Http::fake();
+        $steps = [];
+
+        new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, ['message' => 'mid.1'], function (array $step) use (&$steps): void {
+            $steps[] = $step;
+        });
+
+        Http::assertNothingSent();
+        expect($steps)->toBe([]);
+    });
+
+    it('gives up at once on a failure that is not about the images', function (): void {
+        Sleep::fake();
+        Http::fake(['platform-api2.max.ru/messages*' => Http::response(['code' => 'chat.denied', 'message' => 'Access denied'], 403)]);
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('Access denied');
+        Sleep::assertNeverSlept();
+    });
+
+    it('gives up when Max is still processing the images after the third attempt', function (): void {
+        Sleep::fake();
+        Http::fake(['platform-api2.max.ru/messages*' => Http::response(['message' => 'attachment.not.ready'], 400)]);
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('attachment.not.ready');
+        Sleep::assertSleptTimes(2);
+        Http::assertSentCount(3);
+    });
+
+    it('treats an answer without the message id as a failure and remembers nothing', function (): void {
+        Http::fake(['platform-api2.max.ru/messages*' => Http::response(['message' => ['body' => []]])]);
+        $steps = [];
+
+        $failure = messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], function (array $step) use (&$steps): void {
+            $steps[] = $step;
+        }));
+
+        expect($failure->getMessage())->toBe('Max прислал непонятный ответ')->and($steps)->toBe([]);
+    });
+
+    it('does not edit a post whose message number is unknown', function (): void {
+        Http::fake();
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->editPost('1', 'message', [], [], 'Текст', null))->getMessage())->toContain('Неизвестен номер сообщения');
+        Http::assertNothingSent();
+    });
+
+    it('deletes only the messages of the post, not the saved picture tokens', function (): void {
+        Http::fake(['platform-api2.max.ru/messages*' => Http::response(['success' => true])]);
+
+        new MaxBot(MAX_TOKEN)->deletePost('1', ['message' => 'mid.1', 'media' => ['tok-1', 'tok-2']]);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (HttpRequest $request): bool => $request->method() === 'DELETE' && str_contains($request->url(), 'message_id=mid.1'));
+    });
+
+    it('does not send the post to an upload address that is not https', function (): void {
+        Http::fake(['platform-api2.max.ru/uploads*' => Http::response(['url' => 'http://upload.example/up'])]);
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('Max прислал непонятный ответ');
+        Http::assertNotSent(fn (HttpRequest $request): bool => str_starts_with($request->url(), 'http://upload.example'));
+    });
+
+    it('explains a rejection of the picture without asking Max to publish', function (): void {
+        Http::fake([
+            'platform-api2.max.ru/uploads*' => Http::response(['url' => 'https://iu.oneme.ru/upload?id=1']),
+            'iu.oneme.ru/*' => Http::response(['message' => 'upload.failed'], 500),
+        ]);
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('upload.failed');
+        Http::assertNotSent(fn (HttpRequest $request): bool => str_contains($request->url(), '/messages'));
+    });
+
+    it('reports a broken connection while a picture is uploaded as a message that surely did not go', function (): void {
+        Http::fake([
+            'platform-api2.max.ru/uploads*' => Http::response(['url' => 'https://iu.oneme.ru/upload?id=1']),
+            'iu.oneme.ru/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out'),
+        ]);
+
+        $failure = messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null));
+
+        expect($failure->getMessage())->toBe('нет связи с Max')->and($failure->uncertain)->toBeFalse();
+    });
+
+    it('does not leak the token when the connection breaks and says whether the message could have arrived', function (): void {
+        Http::fake(['platform-api2.max.ru/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out, token '.MAX_TOKEN)]);
+
+        $failure = messengerFailure(fn (): string => new MaxBot(MAX_TOKEN)->sendText('1', 'Привет'));
+
+        expect($failure->getMessage())->toBe('нет связи с Max')->and($failure->getPrevious())->toBeNull()->and($failure->uncertain)->toBeTrue();
+        expect(messengerFailure(fn (): array => new MaxBot(MAX_TOKEN)->me())->uncertain)->toBeFalse();
     });
 });
 

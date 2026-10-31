@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Tests\Fixtures\RecordTitle\FormOnlyResource;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Page;
 
@@ -31,21 +32,23 @@ describe('title() of a resource', function (): void {
         expect($this->getJson(route('fastleo.search', ['q' => 'Вентиляц']))->assertOk()->json('groups.0.items.0.title'))->toBe('Раздел «Вентиляция»');
     });
 
-    it('shows the key in the search when the first column of the list is empty', function (): void {
+    it('shows the key in the search when the list has only an empty relation', function (): void {
         $category = Category::factory()->create(['title' => 'Вентиляция', 'parent_id' => null]);
 
         $groups = collect($this->getJson(route('fastleo.search', ['q' => 'Вентиляц']))->assertOk()->json('groups'));
 
-        expect($groups->firstWhere('label', 'Простые категории')['items'][0]['title'])->toBe((string) $category->id);
+        expect($groups->firstWhere('label', 'Только связь')['items'][0]['title'])->toBe((string) $category->id);
     });
 
-    it('takes the first column of the list as plain text when title() is not overridden', function (): void {
+    it('takes the first column that is not a relation as plain text when title() is not overridden', function (): void {
         $parent = Category::factory()->create(['title' => 'Каталог']);
         $child = Category::factory()->create(['title' => 'Вентиляция', 'parent_id' => $parent->id]);
         $resource = Fastleo::resources()->find('plain-categories');
 
-        expect($resource->title($child))->toBe('Каталог')
-            ->and($resource->title($child))->not->toContain('<');
+        // Первый столбец — связь с родителем, но заголовок записи — её собственное название.
+        expect($resource->title($child))->toBe('Вентиляция')
+            ->and($resource->title($child))->not->toContain('<')
+            ->and(collect($this->getJson(route('fastleo.search', ['q' => 'Вентиляц']))->assertOk()->json('groups'))->firstWhere('label', 'Простые категории')['items'][0]['title'])->toBe('Вентиляция');
     });
 });
 
@@ -59,4 +62,10 @@ it('titles a record by the first language of a multilingual first column, not by
 
     expect($resource->title($page))->toBe('О компании');
     $this->get(route('fastleo.resources.edit', ['site-pages', $page->id]))->assertOk()->assertSee('О компании')->assertDontSee('{"ru"', false);
+});
+
+it('gives an empty title to a record of a section that has no column in the list', function (): void {
+    $category = Category::factory()->create(['title' => 'Вентиляция']);
+
+    expect(new FormOnlyResource()->title($category))->toBe('');
 });

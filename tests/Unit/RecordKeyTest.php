@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Support\RecordKey;
 use Fastleo\Tests\Fixtures\Models\TreeNode;
+use Illuminate\Database\Eloquent\Model;
 use Workbench\App\Models\Category;
 
 it('accepts only digits for a number key', function (string $value, bool $valid): void {
@@ -30,4 +31,14 @@ it('accepts only a real uuid for a model with uuid keys', function (string $valu
 it('knows the exact format only for numbers, uuid and ulid', function (): void {
     expect(RecordKey::strict(new Category, '1'))->toBeTrue()
         ->and(RecordKey::strict(new TreeNode, 'abc'))->toBeFalse();
+});
+
+it('has no exact format for a string key that is neither uuid nor ulid', function (): void {
+    $model = new class extends Model
+    {
+        protected $keyType = 'string';
+    };
+
+    expect(RecordKey::strict($model, 'any-slug'))->toBeNull()
+        ->and(RecordKey::valid($model, 'any-slug'))->toBeTrue();
 });

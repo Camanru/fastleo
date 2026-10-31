@@ -60,7 +60,7 @@ final class ListRecords extends ResourceTool
             'filter' => $request->get('filters'),
             'sort' => $request->get('sort'),
             'direction' => $request->get('direction'),
-        ], fn (mixed $value): bool => $value !== null)));
+        ], fn (mixed $value): bool => $value !== null)), withDefaults: false);
 
         $perPage = min(self::MAX_PER_PAGE, $this->positive($data['per_page'] ?? null, $resource::perPage()));
         $page = $this->positive($data['page'] ?? null, 1);

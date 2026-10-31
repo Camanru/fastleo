@@ -92,7 +92,7 @@ final class RunAction extends ResourceTool
         try {
             $result = $action->handle($allowed, ActionInput::values($action, $validator));
         } catch (QueryException $exception) {
-            throw new ToolFailed(DatabaseErrors::explain($exception), $exception->getCode(), $exception);
+            throw new ToolFailed(DatabaseErrors::explain($exception), (int) $exception->getCode(), previous: $exception);
         }
 
         $message = $result->message ?? __('fastleo::mcp.action_done');

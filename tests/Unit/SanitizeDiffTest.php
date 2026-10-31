@@ -26,3 +26,9 @@ it('shows a text that only ends differently', function (): void {
 
     expect($before)->toBe('<p>a</p>')->and($after)->toBe('<p>a</p><br>');
 });
+
+it('steps back to the first byte of a multibyte character that differs only in its last byte', function (): void {
+    [$before, $after] = SanitizeDiff::around('Жи', 'Жй');
+
+    expect($before)->toBe('Жи')->and($after)->toBe('Жй');
+});

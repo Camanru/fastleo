@@ -86,7 +86,7 @@ final class SearchController
                 continue;
             }
 
-            $search = new ResourceQuery($resource, Request::create('/', 'GET', ['q' => $query]));
+            $search = new ResourceQuery($resource, Request::create('/', 'GET', ['q' => $query]), withDefaults: false);
 
             if (! $search->hasSearch()) {
                 continue;

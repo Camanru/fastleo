@@ -117,11 +117,7 @@ final class FilesController
         $stored = [];
         $errors = [];
 
-        foreach (is_array($files) ? $files : [] as $file) {
-            if (! $file instanceof UploadedFile) {
-                continue;
-            }
-
+        foreach (array_filter(is_array($files) ? $files : [], fn (mixed $file): bool => $file instanceof UploadedFile) as $file) {
             try {
                 $path = FileStore::store($file, $folder);
                 $stored[] = ['path' => $path, 'url' => FileStore::url($path), 'name' => basename($path), 'image' => FileTypes::isImage($path)];

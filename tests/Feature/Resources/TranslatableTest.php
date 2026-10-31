@@ -132,3 +132,14 @@ it('takes the languages from the config and falls back to the language of the si
     config(['fastleo.locales' => null, 'app.locale' => 'kk']);
     expect(Fastleo::locales())->toBe(['kk']);
 });
+
+it('removes the translation of a language whose cell of the file is empty and keeps the other languages', function (): void {
+    Storage::fake('local');
+    $page = Page::factory()->create(['title' => ['ru' => 'Главная', 'en' => 'Home']]);
+
+    $this->post(route('fastleo.resources.import', 'site-pages'), [
+        'file' => UploadedFile::fake()->createWithContent('pages.csv', "id;Заголовок (RU);Заголовок (EN)\n{$page->id};Главная страница;\n"),
+    ]);
+
+    expect($page->fresh()?->title)->toBeStoredJson(['ru' => 'Главная страница']);
+});

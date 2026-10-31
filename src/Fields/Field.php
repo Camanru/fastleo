@@ -6,7 +6,9 @@ namespace Fastleo\Fields;
 
 use Closure;
 use Fastleo\Fastleo;
+use Fastleo\Support\InlineEdit;
 use Fastleo\Support\JsonItem;
+use Fastleo\Support\QueryColumn;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -87,6 +89,12 @@ abstract class Field
     /** Поле участвует в поиске по списку. */
     protected bool $searchable = false;
 
+    /** Значение приходит из `query()` ресурса (`withCount`, `withSum`, подзапрос), в базу не пишется. */
+    protected bool $fromQuery = false;
+
+    /** Значение правится прямо в ячейке списка. */
+    protected bool $inlineEditable = false;
+
     /** Поле попадает в выгрузку Excel/CSV и загрузку из неё. */
     protected bool $exportable = true;
 
@@ -102,6 +110,9 @@ abstract class Field
      * @var (Closure(mixed, Model): (string|Htmlable|null))|null
      */
     protected ?Closure $formatUsing = null;
+
+    /** @var (Closure(string): ?Model)|null Поиск записи с таким же значением (ссылка при ошибке «уже есть»). */
+    protected ?Closure $duplicateOf = null;
 
     /** Свой Blade-шаблон ячейки списка. */
     protected ?string $listView = null;
@@ -206,6 +217,38 @@ abstract class Field
         $this->default = $value;
 
         return $this;
+    }
+
+    /**
+     * Ссылка на существующую запись, когда значение занято: рядом с ошибкой формы («Такое значение уже есть»)
+     * показывается «Открыть: название» — если у администратора есть право открыть эту запись. Сама проверка уникальности —
+     * обычное правило (`rules()`); замыкание получает введённое значение и возвращает запись или `null`.
+     *
+     * ```php
+     * Tel::make('phone')
+     *     ->rules(fn (?Client $record) => [Rule::unique('clients', 'phone')->ignore($record)])
+     *     ->duplicateOf(fn (string $phone) => Client::query()->where('phone', $phone)->first());
+     * ```
+     *
+     * @param  Closure(string): ?Model  $find
+     */
+    public function duplicateOf(Closure $find): static
+    {
+        $this->duplicateOf = $find;
+
+        return $this;
+    }
+
+    /**
+     * Запись с таким же значением (только если задан `duplicateOf()` и значение — непустая строка).
+     */
+    public function duplicateRecord(mixed $value): ?Model
+    {
+        if (! $this->duplicateOf instanceof Closure || ! is_string($value) || $value === '') {
+            return null;
+        }
+
+        return ($this->duplicateOf)($value);
     }
 
     /**
@@ -602,9 +645,87 @@ abstract class Field
      */
     public function searchable(bool $searchable = true): static
     {
+        if ($searchable && $this->fromQuery) {
+            throw new LogicException(__('fastleo::exceptions.from_query_searchable', ['field' => $this->name], Fastleo::LOCALE));
+        }
+
         $this->searchable = $searchable;
 
         return $this;
+    }
+
+    /**
+     * Значение поля приходит из `query()` ресурса, а не из колонки таблицы: число заявок клиента, сумма продаж, подзапрос.
+     * Поле только для показа: в списке (по заголовку можно сортировать), на просмотре, в выгрузке и ответах MCP; в форме,
+     * импорте, записи MCP и журнале изменений его нет. Искать и фильтровать по нему нельзя. Имя поля — псевдоним значения
+     * в запросе (`withCount('offers')` даёт `offers_count`).
+     *
+     * ```php
+     * public function query(Builder $query): Builder
+     * {
+     *     return $query->withCount('offers')->withSum('soldItems as revenue', 'price');
+     * }
+     *
+     * Number::make('offers_count', 'Заявок')->fromQuery()->sortable(),
+     * Number::make('revenue', 'Выручка')->fromQuery()->sortable()->formatUsing(fn ($v) => number_format((float) $v, 0, ',', ' ').' ₽'),
+     * ```
+     *
+     * @throws LogicException тип поля не подходит (связи, файлы, пароль, редактор) или оно уже `searchable()`
+     */
+    public function fromQuery(bool $fromQuery = true): static
+    {
+        if ($fromQuery && ! QueryColumn::supports($this)) {
+            throw new LogicException(__('fastleo::exceptions.from_query_type', ['field' => $this->name, 'type' => class_basename($this)], Fastleo::LOCALE));
+        }
+
+        if ($fromQuery && $this->searchable) {
+            throw new LogicException(__('fastleo::exceptions.from_query_searchable', ['field' => $this->name], Fastleo::LOCALE));
+        }
+
+        $this->fromQuery = $fromQuery;
+
+        return $this->onlyInList($fromQuery);
+    }
+
+    /**
+     * Править значение прямо в ячейке списка: щёлкнул, изменил, ушёл из поля — сохранилось (Enter тоже). Запись идёт так же,
+     * как из формы: право `update`, правила поля, Eloquent, observers, журнал изменений. Подходят текст, число, список и
+     * `BelongsTo` (если вариантов не больше `fastleo.relations.preload`). Поле не должно зависеть от других полей формы
+     * (`dependsOn()`, `visibleWhen()`) и они от него — иначе значения разойдутся; такое описание — ошибка.
+     * У первого столбца пропадает ссылка на запись.
+     *
+     * ```php
+     * Number::make('price', 'Цена')->inlineEditable();
+     * Enum::make('status', 'Статус')->enum(OfferStatus::class)->inlineEditable();
+     * ```
+     *
+     * @throws LogicException тип поля не подходит
+     */
+    public function inlineEditable(bool $inlineEditable = true): static
+    {
+        if ($inlineEditable && ! InlineEdit::supports($this)) {
+            throw new LogicException(__('fastleo::exceptions.inline_type', ['field' => $this->name, 'type' => class_basename($this)], Fastleo::LOCALE));
+        }
+
+        $this->inlineEditable = $inlineEditable;
+
+        return $this;
+    }
+
+    /**
+     * Значение поля правится прямо в ячейке списка.
+     */
+    public function isInlineEditable(): bool
+    {
+        return $this->inlineEditable;
+    }
+
+    /**
+     * Значение поля приходит из `query()` ресурса.
+     */
+    public function isFromQuery(): bool
+    {
+        return $this->fromQuery;
     }
 
     /**
@@ -741,7 +862,7 @@ abstract class Field
      */
     public function isWritable(): bool
     {
-        return ! $this->readonly && ! $this->disabled;
+        return ! $this->readonly && ! $this->disabled && ! $this->fromQuery;
     }
 
     /**
@@ -790,12 +911,28 @@ abstract class Field
     }
 
     /**
+     * Поле описано в форме (не `onlyInList()`): его значение может прийти из формы, даже если для кого-то оно скрыто.
+     */
+    public function isInForm(): bool
+    {
+        return $this->showInForm;
+    }
+
+    /**
      * Поле есть в форме вообще (не `onlyInList()` и не скрыто для текущего админа).
      * Создание или редактирование здесь не учитывается.
      */
     public function isFormField(): bool
     {
         return $this->showInForm && ! $this->isHidden();
+    }
+
+    /**
+     * Поле описано как столбец списка (не `hideInList()`); права администратора не учитываются.
+     */
+    public function isInList(): bool
+    {
+        return $this->showInList;
     }
 
     /**
@@ -811,7 +948,8 @@ abstract class Field
      */
     public function isVisibleOnShow(Model $record): bool
     {
-        if (! $this->showInForm || $this->isHidden($record)) {
+        // Вычисляемый столбец (`fromQuery()`) в форме не показывается, но на странице просмотра нужен.
+        if ((! $this->showInForm && ! $this->fromQuery) || $this->isHidden($record)) {
             return false;
         }
 
@@ -1293,7 +1431,7 @@ abstract class Field
      */
     public function writesAttribute(): bool
     {
-        return true;
+        return ! $this->fromQuery;
     }
 
     /**

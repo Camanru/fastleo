@@ -29,6 +29,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
 use Fastleo\Imports\ImportRecords;
 use Fastleo\Messengers\ChatIds;
+use Fastleo\Page;
 use Fastleo\Resource;
 use Fastleo\Settings;
 use Fastleo\SoftNetica\Connection;
@@ -118,6 +119,12 @@ final class Doctor
             if (! in_array($class, $resources, true)) {
                 $this->add('warning', 'site', 'built_in_slug_taken', ['slug' => $class::slug(), 'other' => $resources[$class::slug()] ?? '?'], 'built_in_slug_taken_hint');
             }
+        }
+
+        $home = config('fastleo.home');
+
+        if (is_string($home) && $home !== '' && ! $registry->find($home) instanceof \Fastleo\Resource && ! $registry->findPage($home) instanceof Page) {
+            $this->add('warning', 'site', 'home_unknown', ['home' => $home], 'home_unknown_hint');
         }
 
         $importable = false;
@@ -431,6 +438,7 @@ final class Doctor
             $fields = $resource->schema()->fields();
             $resource->listFilters();
             $resource->listActions();
+            $resource->listRelations();
             $model = $resource->newModel();
         } catch (Throwable $e) {
             $this->add('error', $scope, 'resource', ['message' => $e->getMessage()]);
@@ -451,8 +459,67 @@ final class Doctor
         }
 
         $this->setToggles($resource, $scope);
+        $this->relatedTables($resource, $scope);
+        $this->queryColumns($resource, $fields, $scope);
         $this->fields($fields, $model, $columns, $scope, ! $resource::isReadonly());
         $this->inputVars($fields, $scope, ! $resource::isReadonly());
+    }
+
+    /**
+     * Вычисляемые поля (`fromQuery()`): значение должно прийти из `query()` ресурса. Проверяется по первой записи раздела.
+     *
+     * @param  list<Field>  $fields
+     */
+    private function queryColumns(Resource $resource, array $fields, string $scope): void
+    {
+        $computed = array_values(array_filter($fields, fn (Field $field): bool => $field->isFromQuery()));
+
+        if ($computed === []) {
+            return;
+        }
+
+        try {
+            $record = $resource->newQuery()->first();
+        } catch (Throwable $e) {
+            $this->add('error', $scope, 'from_query_error', ['message' => $e->getMessage()]);
+
+            return;
+        }
+
+        if (! $record instanceof Model) {
+            return;
+        }
+
+        foreach ($computed as $field) {
+            if (! array_key_exists($field->name, $record->getAttributes())) {
+                $this->add('warning', $scope, 'from_query_missing', ['field' => $field->name], 'from_query_missing_hint');
+            }
+        }
+    }
+
+    /**
+     * Связанные таблицы: форма дочернего раздела должна иметь поле внешнего ключа, иначе «Добавить» не сможет подставить родителя.
+     */
+    private function relatedTables(Resource $resource, string $scope): void
+    {
+        foreach ($resource->listRelations() as $related) {
+            $child = $related->child();
+            $key = $related->foreignKey();
+
+            if (! in_array($key, array_map(fn (Field $field): string => $field->name, $child->writableFields(null)), true)) {
+                $this->add('warning', $scope, 'related_foreign', ['relation' => $related->name, 'child' => $child::slug(), 'key' => $key], 'related_foreign_hint');
+            }
+
+            if ($related->hasQuickAdd()) {
+                $given = array_map(fn (Field $field): string => $field->name, $related->quickAddFields());
+
+                foreach ($child->writableFields(null) as $field) {
+                    if ($field->isRequired() && $field->name !== $key && ! $field->hasDefault() && ! in_array($field->name, $given, true)) {
+                        $this->add('warning', $scope, 'related_quick_required', ['relation' => $related->name, 'field' => $field->name, 'child' => $child::slug()], 'related_quick_required_hint');
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -594,6 +661,10 @@ final class Doctor
                 $this->add('warning', $scope, 'quick_toggle_readonly', ['field' => $field->name], 'quick_toggle_readonly_hint');
             }
 
+            if ($field->isInlineEditable() && (! $field->isWritable() || ! $field->showsInEditForm())) {
+                $this->add('warning', $scope, 'inline_readonly', ['field' => $field->name], 'inline_readonly_hint');
+            }
+
             if (! $field->writesAttribute()) {
                 continue;
             }
@@ -606,7 +677,8 @@ final class Doctor
                 continue;
             }
 
-            if ($editable && $field->isWritable() && ! $model->isFillable($field->name)) {
+            // Поле только для списка (`onlyInList()`) в форму не попадает и из формы не пишется — `$fillable` ему не нужен.
+            if ($editable && $field->isWritable() && $field->isInForm() && ! $model->isFillable($field->name)) {
                 $this->add('error', $scope, 'field_not_fillable', ['field' => $field->name, 'model' => $model::class], 'field_not_fillable_hint');
             }
 

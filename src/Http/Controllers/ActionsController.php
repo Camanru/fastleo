@@ -85,7 +85,7 @@ final class ActionsController
     }
 
     /**
-     * Проверенные значения мини-формы действия. Ошибка — назад с окном формы открытым.
+     * Проверенные значения мини-формы действия. Ошибка — назад с окном формы открытым (в связанной таблице — через сессию).
      *
      * @return array<string, mixed>
      *
@@ -96,10 +96,28 @@ final class ActionsController
         $validator = ActionInput::validator($action, $request->all());
 
         if ($validator->fails()) {
+            $input = $request->except(['data.password', 'data.password_confirmation', 'data.current_password']);
+            $relation = $request->input('_related');
+            $parent = $request->input('_related_parent', '');
+
+            // Форма из связанной таблицы: таблица подгружается отдельным запросом, поэтому ввод и ошибки ждут её в сессии —
+            // под ключом «связь + родитель», чтобы их взяла таблица этого родителя, а не соседняя с тем же именем связи.
+            if (is_string($relation) && preg_match('/^[A-Za-z0-9_]{1,64}$/', $relation) === 1 && is_string($parent) && preg_match('/^[A-Za-z0-9_-]{0,64}$/', $parent) === 1) {
+                session()->put(RelatedController::pendingKey($relation, $parent), [
+                    'action' => $action->key(),
+                    'ids' => array_values(array_filter((array) $request->input('ids', []), is_string(...))),
+                    'input' => $input,
+                    'errors' => $validator->errors()->getMessages(),
+                    'at' => now()->getTimestamp(),
+                ]);
+
+                throw new ValidationException($validator, back());
+            }
+
             session()->flash('fastleo.action', $action->key());
 
             // Поле с именем «password» другого типа тоже не должно попасть в сессию.
-            throw new ValidationException($validator, back()->withInput($request->except(['data.password', 'data.password_confirmation', 'data.current_password']))->withErrors($validator));
+            throw new ValidationException($validator, back()->withInput($input)->withErrors($validator));
         }
 
         return ActionInput::values($action, $validator);

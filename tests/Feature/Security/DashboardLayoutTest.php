@@ -32,6 +32,16 @@ it('does not save a widget that is closed to this administrator', function (): v
     expect(DashboardLayout::query()->first()?->layout)->toBe([['key' => 'counter', 'cols' => 2, 'rows' => 1, 'hidden' => false]]);
 });
 
+it('accepts the sizes and the flag sent as text, the way a form or a hand-made request sends them', function (): void {
+    $this->actingAs(admin(['name' => 'Борис']), Fastleo::GUARD);
+
+    $this->putJson(route('fastleo.dashboard.layout.save'), ['widgets' => [
+        ['key' => 'counter', 'cols' => '2', 'rows' => '3', 'hidden' => '1'],
+    ]])->assertNoContent();
+
+    expect(DashboardLayout::query()->first()?->layout)->toBe([['key' => 'counter', 'cols' => 2, 'rows' => 3, 'hidden' => true]]);
+});
+
 it('writes the layout only for the signed-in administrator', function (): void {
     $victim = admin(['name' => 'Анна']);
     $me = admin(['name' => 'Борис']);

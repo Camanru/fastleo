@@ -35,6 +35,12 @@ final class Chart extends Widget
 
     private ?string $label = null;
 
+    /** @var (Closure(): array<array-key, array<array-key, int|float|numeric-string>>)|null */
+    private ?Closure $series = null;
+
+    /** Самое большее линий на одном графике. */
+    private const int MAX_SERIES = 8;
+
     /**
      * Линия.
      */
@@ -63,6 +69,24 @@ final class Chart extends Widget
     public function data(Closure $data): static
     {
         $this->data = $data;
+
+        return $this;
+    }
+
+    /**
+     * Несколько линий (столбцов) на одном графике: замыкание возвращает «название линии → (подпись точки → число)».
+     * Подписи точек объединяются в порядке появления, пропущенное — ноль; над графиком показывается легенда.
+     * Заменяет `data()`.
+     *
+     * ```php
+     * Chart::make('Динамика')->series(fn () => ['Заявки' => ['01.03' => 4, '02.03' => 7], 'Продажи' => ['01.03' => 1, '02.03' => 3]]);
+     * ```
+     *
+     * @param  Closure(): array<array-key, array<array-key, int|float|numeric-string>>  $series
+     */
+    public function series(Closure $series): static
+    {
+        $this->series = $series;
 
         return $this;
     }
@@ -159,6 +183,10 @@ final class Chart extends Widget
     #[Override]
     protected function payload(): array
     {
+        if ($this->series instanceof Closure) {
+            return $this->seriesPayload(($this->series)());
+        }
+
         $points = $this->data instanceof Closure ? array_slice(($this->data)(), 0, self::MAX_POINTS, true) : [];
         $values = array_map(fn (mixed $value): int|float => is_numeric($value) ? $value + 0 : 0, array_values($points));
 
@@ -170,6 +198,42 @@ final class Chart extends Widget
                 'values' => $values,
             ],
             'empty' => $values === [],
+        ];
+    }
+
+    /**
+     * Данные нескольких линий: общие подписи точек, значения по линиям.
+     *
+     * @param  array<array-key, array<array-key, mixed>>  $series
+     * @return array<string, mixed>
+     */
+    private function seriesPayload(array $series): array
+    {
+        $series = array_slice($series, 0, self::MAX_SERIES, true);
+        $labels = [];
+
+        foreach ($series as $points) {
+            foreach (array_keys($points) as $label) {
+                $labels[(string) $label] = true;
+            }
+        }
+
+        $labels = array_slice(array_keys($labels), 0, self::MAX_POINTS);
+        $datasets = [];
+
+        foreach ($series as $name => $points) {
+            $byLabel = [];
+
+            foreach ($points as $label => $value) {
+                $byLabel[(string) $label] = is_numeric($value) ? $value + 0 : 0;
+            }
+
+            $datasets[] = ['label' => (string) $name, 'values' => array_map(fn (string $label): int|float => $byLabel[$label] ?? 0, $labels)];
+        }
+
+        return [
+            'chart' => ['type' => $this->type, 'label' => $this->label ?? $this->getTitle(), 'labels' => array_map(strval(...), $labels), 'datasets' => $datasets],
+            'empty' => $labels === [],
         ];
     }
 }

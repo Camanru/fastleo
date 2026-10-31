@@ -156,12 +156,8 @@ final readonly class ActivityController
 
         $hidden = [];
 
-        foreach ($ids as $slug => $subjects) {
-            $resource = $resources[$slug] ?? null;
-
-            if (! $resource instanceof Resource) {
-                continue;
-            }
+        foreach (array_intersect_key($ids, $resources) as $slug => $subjects) {
+            $resource = $resources[$slug];
 
             $scoped = $resource->newQuery()->withoutGlobalScope(SoftDeletingScope::class)->whereKey($subjects)->get()->keyBy(function (Model $record): string {
                 $key = $record->getKey();

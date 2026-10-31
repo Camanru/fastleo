@@ -29,6 +29,20 @@ enum ArticleStatus: string
 }
 ```
 
+**Цветные метки.** Добавьте рядом с `label()` метод `tone()`, который возвращает `success`, `warning`, `danger`, `info` или `neutral`, и включите `->badges()`:
+
+```php
+public function tone(): string
+{
+    return match ($this) {
+        self::Draft => 'neutral',
+        self::Published => 'success',
+    };
+}
+```
+
+Нет метода или он вернул другое — метка нейтральная.
+
 **Проверка:** значение — одно из значений enum.
 
 | Метод | Что делает |
@@ -36,5 +50,6 @@ enum ArticleStatus: string
 | `enum(Status::class)` | Enum вариантов (обязательно; не enum — ошибка описания) |
 | `multiple()` | Можно выбрать несколько |
 | `placeholder('Выберите')` | Текст пустого варианта |
+| `badges()` | Цветные метки в списке и на просмотре; тон берётся из метода `tone()` enum, можно задать массивом `badges(['draft' => 'neutral'])` ([Select](select.md)) |
 
 То же умеет `Select::make()->options(Status::class)`; `Enum` короче и сразу ругается, если enum не указан. Остальное — как у [Select](select.md).

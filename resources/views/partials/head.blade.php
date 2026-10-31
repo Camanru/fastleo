@@ -15,7 +15,7 @@
 
         var sidebar = localStorage.getItem('fastleo-sidebar');
         document.documentElement.classList.toggle('fl-compact', localStorage.getItem('fastleo-density') === 'compact');
-        document.documentElement.classList.toggle('fl-collapsed', sidebar === null ? window.innerWidth < 1280 : sidebar === '1');
+        document.documentElement.classList.toggle('fl-collapsed', sidebar === null ? {!! match (config('fastleo.menu.collapsed')) { true => 'true', false => 'false', default => 'window.innerWidth < 1280' } !!} : sidebar === '1');
     })();
 </script>
 <link rel="stylesheet" href="{{ \Fastleo\Support\Assets::url('fastleo.css') }}">

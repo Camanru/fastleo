@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Models\TreeNode;
+use Illuminate\Database\QueryException;
 
 beforeEach(function (): void {
     $this->actingAs(admin(), Fastleo::GUARD);
@@ -69,4 +70,18 @@ it('answers 404 for a key that is not a uuid without asking the database', funct
     $this->get(route('fastleo.resources.index', ['resource' => 'tree-nodes', 'parent' => 'not-a-uuid']))->assertOk();
 
     expect(collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, '"id" = ?')))->toBeEmpty();
+});
+
+it('leaves the cycle check to the other rules when the database cannot look the parent key up', function (): void {
+    $node = TreeNode::query()->create(['title' => 'Узел']);
+    DB::beforeExecuting(function (string $query): void {
+        if (preg_match('/^select\s+["`]?id["`]?\s+from/i', $query) === 1) {
+            throw new QueryException(DB::getDefaultConnection(), $query, [], new PDOException('invalid input syntax'));
+        }
+    });
+
+    $this->put(route('fastleo.resources.update', ['tree-nodes', $node->id]), ['title' => 'Узел', 'parent_id' => 'not-a-key'])
+        ->assertSessionHasErrors('parent_id');
+
+    expect($node->fresh()?->parent_id)->toBeNull();
 });

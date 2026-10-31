@@ -53,8 +53,15 @@ final class LogsController
         abort_unless(LogReader::canView(), 403);
 
         $name = is_string($request->input('file')) ? $request->input('file') : '';
-        $size = LogReader::forApp()->clear($name);
-        abort_if($size === null, 404);
+        $reader = LogReader::forApp();
+        $size = $reader->clear($name);
+
+        if ($size === null) {
+            abort_unless($reader->has($name), 404);
+
+            // Файл есть, но закрыт для записи: это не «нет такого журнала».
+            return to_route('fastleo.logs.index', ['file' => $name])->with('fastleo.error', __('fastleo::logs.clear_failed', ['name' => $name]));
+        }
 
         return to_route('fastleo.logs.index', ['file' => $name])->with('fastleo.success', __('fastleo::logs.cleared', ['name' => $name, 'size' => CacheCleaner::format($size)]));
     }

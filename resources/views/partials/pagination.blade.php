@@ -1,8 +1,12 @@
 {{-- Страницы списка: «Записи 1–25 из 120», назад/вперёд, номера, «Все» / «Постранично».
+     $sizes — варианты числа записей на странице (по умолчанию нет выбора; только полный список — таблицы внутри карточки их не показывают).
+     $inline (по умолчанию нет) — подгружаемый кусок страницы (связанная таблица): выбор размера не переходит по адресу сам, его подхватывает fastleoRelated.
      $bordered (по умолчанию да) — линия сверху, когда строка внутри карточки таблицы; иначе строка сама в рамке (карточки на телефоне). --}}
 @php
     $showToggle = $paginator->total() > $paginator->perPage() || $all;
     $bordered ??= true;
+    $inline ??= false;
+    $sizes = ($sizes ?? []) !== [] && ($paginator->total() > min($sizes) || $all) ? $sizes : [];
     $pageLink = 'flex size-[30px] items-center justify-center rounded-[7px]';
 @endphp
 @if ($paginator->total() > 0)
@@ -12,6 +16,17 @@
         </span>
 
         <div class="flex-1"></div>
+
+        @if ($sizes !== [])
+            <label class="flex items-center gap-2">
+                <span>{{ __('fastleo::resources.per_page_size') }}</span>
+                <select class="fastleo-input h-8 w-auto py-0 pr-8" @unless ($inline) x-data x-on:change="window.location = $event.target.value" @endunless data-per-page>
+                    @foreach ($sizes as $size)
+                        <option value="{{ request()->fullUrlWithQuery(['per_page' => $size, 'page' => null]) }}" @selected(! $all && $paginator->perPage() === $size)>{{ $size }}</option>
+                    @endforeach
+                </select>
+            </label>
+        @endif
 
         @if ($showToggle)
             <a href="{{ request()->fullUrlWithQuery(['per_page' => $all ? null : 'all', 'page' => null]) }}" class="rounded-[7px] px-2 py-1 font-medium text-primary-text hover:bg-hover">

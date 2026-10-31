@@ -55,19 +55,15 @@ final class DashboardController
         $visible = array_filter(DashboardGrid::keyed(Fastleo::dashboard()), fn (Widget $widget): bool => $widget->isVisible());
         $layout = [];
 
-        foreach (Arr::array($input, 'widgets') as $entry) {
-            if (! is_array($entry)) {
-                continue;
-            }
-
+        foreach (array_filter(Arr::array($input, 'widgets'), is_array(...)) as $entry) {
             $key = Arr::string($entry, 'key');
 
             if (isset($visible[$key]) && ! isset($layout[$key])) {
                 $layout[$key] = [
                     'key' => $key,
-                    'cols' => Arr::integer($entry, 'cols'),
-                    'rows' => Arr::integer($entry, 'rows'),
-                    'hidden' => Arr::boolean($entry, 'hidden'),
+                    'cols' => $this->number($entry['cols']),
+                    'rows' => $this->number($entry['rows']),
+                    'hidden' => filter_var($entry['hidden'], FILTER_VALIDATE_BOOLEAN),
                 ];
             }
         }
@@ -107,5 +103,13 @@ final class DashboardController
         $key = Fastleo::guard()->id();
 
         return is_scalar($key) ? (string) $key : '';
+    }
+
+    /**
+     * Размер виджета из запроса: число или число текстом (форма и запрос, собранный вручную, присылают строку).
+     */
+    private function number(mixed $value): int
+    {
+        return is_scalar($value) ? (int) $value : 1;
     }
 }

@@ -16,6 +16,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
 use Fastleo\Filters\Filter;
 use Fastleo\Page;
+use Fastleo\Related;
 use Fastleo\Resource;
 use Fastleo\Settings;
 use Illuminate\Support\Facades\Gate;
@@ -49,6 +50,11 @@ final class ResourceInspector
             'label' => $resource::label(),
             'singular' => $resource::singular(),
             'group' => $resource::group(),
+            'icon' => $resource::icon(),
+            'position' => $resource::position(),
+            'in_menu' => $resource::inMenu(),
+            // Число у пункта меню: у ресурса переопределён `badge()`.
+            'has_badge' => new \ReflectionMethod($resource, 'badge')->getDeclaringClass()->getName() !== Resource::class,
         ];
 
         try {
@@ -68,9 +74,12 @@ final class ResourceInspector
                 'importable' => $resource::isImportable(),
                 'import_key' => $resource::importKey(),
                 'mcp' => $resource->isAvailableInMcp(),
+                'poll' => $resource::poll(),
+                'history_panel' => $resource::hasHistoryPanel(),
                 'fields' => $this->fields($resource->schema()->fields()),
                 'filters' => array_values(array_map($this->filter(...), $resource->listFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
+                'relations' => array_values(array_map($this->related(...), $resource->listRelations())),
             ];
         } catch (Throwable $e) {
             return [...$info, 'error' => $e->getMessage()];
@@ -169,6 +178,18 @@ final class ResourceInspector
             $details['quick_toggle'] = true;
         }
 
+        if ($field instanceof Select && $field->hasBadges()) {
+            $details['badges'] = true;
+        }
+
+        if ($field->isFromQuery()) {
+            $details['from_query'] = true;
+        }
+
+        if ($field->isInlineEditable()) {
+            $details['inline_editable'] = true;
+        }
+
         if ($field instanceof FileField) {
             $details['folder'] = $field->uploadFolder();
             $details['extensions'] = $field->acceptedExtensions();
@@ -216,11 +237,30 @@ final class ResourceInspector
     }
 
     /**
-     * @return array{name: string, label: string, class: class-string}
+     * @return array{name: string, label: string, resource: class-string, slug: string, foreign_key: string, expandable: bool, aside: bool, columns: list<string>, quick_add: list<string>, add_label: string}
+     */
+    private function related(Related $related): array
+    {
+        return [
+            'name' => $related->name,
+            'label' => $related->getLabel(),
+            'resource' => $related->resource,
+            'slug' => $related->child()::slug(),
+            'foreign_key' => $related->foreignKey(),
+            'expandable' => $related->isExpandable(),
+            'aside' => $related->isAside(),
+            'columns' => array_map(fn (Field $field): string => $field->name, $related->tableFields()),
+            'quick_add' => array_map(fn (Field $field): string => $field->name, $related->quickAddFields()),
+            'add_label' => $related->getAddLabel(),
+        ];
+    }
+
+    /**
+     * @return array{name: string, label: string, class: class-string, has_default: bool}
      */
     private function filter(Filter $filter): array
     {
-        return ['name' => $filter->name, 'label' => $filter->getLabel(), 'class' => $filter::class];
+        return ['name' => $filter->name, 'label' => $filter->getLabel(), 'class' => $filter::class, 'has_default' => $filter->hasDefault()];
     }
 
     /**

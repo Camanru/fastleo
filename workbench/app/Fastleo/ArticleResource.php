@@ -94,7 +94,7 @@ final class ArticleResource extends Resource
                     BelongsToMany::make('topics', 'Темы')->hideInList(),
                     Textarea::make('excerpt', 'Анонс')->rows(4)->maxLength(1000)->searchable(),
                     Grid::make(3, [
-                        Enum::make('status', 'Статус')->enum(ArticleStatus::class)->required()->sortable(),
+                        Enum::make('status', 'Статус')->enum(ArticleStatus::class)->badges()->required()->sortable(),
                         Number::make('views', 'Просмотры')->integer()->min(0)->default(0)->sortable(),
                         Number::make('price', 'Цена, ₽')->min(0)->step(0.01)->hideInList(),
                     ]),

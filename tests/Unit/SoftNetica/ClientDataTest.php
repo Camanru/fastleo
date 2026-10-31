@@ -63,6 +63,14 @@ describe('strings and types', function (): void {
         expect(ClientData::from(['ssl' => ['expires_at' => $date]])->ssl['at'])->toBeNull();
     })->with(['not a date' => ['вчера'], 'number' => [123], 'too long' => [str_repeat('1', 50)], 'impossible' => ['2026-13-45'], 'array' => [['2026-01-01']]]);
 
+    it('drops a date with a time that cannot exist instead of failing', function (): void {
+        expect(ClientData::from(['ssl' => ['expires_at' => '2026-13-45T10:00:00+00:00']])->ssl['at'])->toBeNull();
+    });
+
+    it('turns the colors of SoftNetica into the tones of the badge', function (string $tone, string $badge): void {
+        expect(ClientData::badgeTone($tone))->toBe($badge);
+    })->with([['ok', 'success'], ['warn', 'warning'], ['crit', 'danger'], ['mute', 'neutral']]);
+
     it('shows a date with time in the admin time zone', function (): void {
         config(['fastleo.timezone' => 'Asia/Vladivostok']);
 

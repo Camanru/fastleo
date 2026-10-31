@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use Fastleo\Fastleo;
 use Fastleo\FastleoServiceProvider;
+use Fastleo\Http\Middleware\CloseSiteForVisitors;
 use Illuminate\Auth\SessionGuard;
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Contracts\Http\Kernel;
 use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
@@ -50,4 +53,45 @@ it('explains a fastleo guard that does not use the session driver', function ():
     Auth::forgetGuards();
 
     expect(fn (): SessionGuard => Fastleo::guard())->toThrow(LogicException::class, 'драйвере session');
+});
+
+it('adds the sitemap and robots.txt routes at boot only when they are switched on', function (): void {
+    Route::setRoutes(new RouteCollection);
+    new FastleoServiceProvider($this->app)->boot();
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(Route::has('fastleo.sitemap'))->toBeFalse()
+        ->and(Route::has('fastleo.robots'))->toBeFalse();
+
+    config(['fastleo.sitemap.enabled' => true, 'fastleo.robots.enabled' => true]);
+    new FastleoServiceProvider($this->app)->boot();
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(Route::has('fastleo.sitemap'))->toBeTrue()
+        ->and(Route::has('fastleo.robots'))->toBeTrue();
+});
+
+it('attaches the site closing check to the web group at boot when it is switched on', function (): void {
+    /** @var Illuminate\Foundation\Http\Kernel $kernel */
+    $kernel = resolve(Kernel::class);
+
+    expect($kernel->getMiddlewareGroups()['web'])->not->toContain(CloseSiteForVisitors::class);
+
+    config(['fastleo.closing.enabled' => true]);
+    new FastleoServiceProvider($this->app)->boot();
+
+    expect($kernel->getMiddlewareGroups()['web'])->toContain(CloseSiteForVisitors::class);
+});
+
+it('does not touch commands and the schedule when the site is served over HTTP', function (): void {
+    $scheduled = fn (): int => collect(resolve(Schedule::class)->events())->filter(fn ($event): bool => str_contains((string) $event->command, 'fastleo:prune'))->count();
+    $before = $scheduled();
+
+    $console = new ReflectionProperty($this->app, 'isRunningInConsole');
+    $console->setValue($this->app, false);
+
+    new FastleoServiceProvider($this->app)->boot();
+    $this->app->forgetInstance(Schedule::class);
+
+    expect($before)->toBe(1)->and($scheduled())->toBe(1);
 });

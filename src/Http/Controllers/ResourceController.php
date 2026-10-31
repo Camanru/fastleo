@@ -14,6 +14,7 @@ use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\RecordKey;
 use Fastleo\Support\RecordWriter;
 use Fastleo\Support\ResourceQuery;
+use Fastleo\Support\ReturnUrl;
 use Fastleo\Support\ValidationMessages;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -68,8 +69,8 @@ final class ResourceController
         $resource = $this->resource($resource);
         Authorization::authorize('create', $resource);
 
-        // Значения по умолчанию из модели и колонок базы; «+» в дереве: родитель новой записи подставляется из ?parent=, если такая запись видна в разделе.
-        $defaults = ModelDefaults::for($resource);
+        // Значения по умолчанию из модели и колонок базы, затем ?prefill[поле]=значение; «+» в дереве: родитель новой записи подставляется из ?parent=, если такая запись видна в разделе.
+        $defaults = [...ModelDefaults::for($resource), ...ModelDefaults::prefill($resource, $request->query('prefill'))];
         $tree = $resource::treeColumn();
         $parent = $request->query('parent');
 
@@ -77,7 +78,7 @@ final class ResourceController
             $defaults[$tree] = $parent;
         }
 
-        return view('fastleo::resources.form', ['resource' => $resource, 'record' => null, 'defaults' => $defaults]);
+        return view('fastleo::resources.form', ['resource' => $resource, 'record' => null, 'defaults' => $defaults, 'returnUrl' => ReturnUrl::from($request)]);
     }
 
     /**
@@ -96,25 +97,25 @@ final class ResourceController
     /**
      * Страница просмотра записи.
      */
-    public function show(string $resource, string $id): View
+    public function show(Request $request, string $resource, string $id): View
     {
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id, $resource::usesSoftDeletes());
         Authorization::authorize('view', $resource, $record);
 
-        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record]);
+        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
     }
 
     /**
      * Форма редактирования записи.
      */
-    public function edit(string $resource, string $id): View
+    public function edit(Request $request, string $resource, string $id): View
     {
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id);
         Authorization::authorize('update', $resource, $record);
 
-        return view('fastleo::resources.form', ['resource' => $resource, 'record' => $record]);
+        return view('fastleo::resources.form', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
     }
 
     /**
@@ -132,7 +133,7 @@ final class ResourceController
     /**
      * Удалить запись: в корзину для моделей с SoftDeletes, иначе навсегда.
      */
-    public function destroy(string $resource, string $id): RedirectResponse
+    public function destroy(Request $request, string $resource, string $id): RedirectResponse
     {
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id);
@@ -150,7 +151,8 @@ final class ResourceController
             return back(fallback: route('fastleo.resources.index', $resource::slug()))->with('fastleo.error', __('fastleo::resources.delete_cancelled'));
         }
 
-        return to_route('fastleo.resources.index', $resource::slug())
+        // Удаление из связанной таблицы возвращает на страницу родителя.
+        return ($this->returnTo($request) ?? to_route('fastleo.resources.index', $resource::slug()))
             ->with('fastleo.success', __($resource::usesSoftDeletes() ? 'fastleo::resources.trashed_message' : 'fastleo::resources.deleted'));
     }
 
@@ -209,9 +211,10 @@ final class ResourceController
     private function save(Request $request, Resource $resource, Model $record, ?Model $existing): RedirectResponse
     {
         // После ошибки — всегда обратно на форму, а не на «предыдущий адрес» из Referer.
+        $return = ReturnUrl::from($request);
         $formUrl = $existing instanceof Model
-            ? route('fastleo.resources.edit', [$resource::slug(), $existing->getKey()])
-            : route('fastleo.resources.create', $resource::slug());
+            ? route('fastleo.resources.edit', array_filter([$resource::slug(), $existing->getKey(), 'return' => $return], fn (mixed $value): bool => $value !== null))
+            : route('fastleo.resources.create', array_filter([$resource::slug(), 'return' => $return], fn (mixed $value): bool => $value !== null));
 
         // Сервер получил форму не целиком (лимит PHP max_input_vars): без отказа хвост вложенных записей удалился бы.
         if ($request->has('_fl_begin') && ! $request->has('_fl_end')) {
@@ -243,16 +246,16 @@ final class ResourceController
         $after = $request->input('_after');
         $after = is_string($after) && in_array($after, self::AFTER_SAVE, true) ? $after : 'edit';
 
-        if ($after === 'create' && ! Authorization::allows('create', $resource)) {
+        if ($after === 'create' && (! Authorization::allows('create', $resource) || $return !== null)) {
             $after = 'index';
         }
 
         $redirect = match ($after) {
-            'index' => to_route('fastleo.resources.index', $resource::slug()),
+            'index' => $this->returnTo($request) ?? to_route('fastleo.resources.index', $resource::slug()),
             'create' => to_route('fastleo.resources.create', $resource::slug()),
             default => Authorization::allows('update', $resource, $record)
-                ? to_route('fastleo.resources.edit', [$resource::slug(), $record->getKey()])
-                : to_route('fastleo.resources.index', $resource::slug()),
+                ? to_route('fastleo.resources.edit', array_filter([$resource::slug(), $record->getKey(), 'return' => $return], fn (mixed $value): bool => $value !== null))
+                : ($this->returnTo($request) ?? to_route('fastleo.resources.index', $resource::slug())),
         };
 
         return $redirect->with('fastleo.success', __('fastleo::resources.saved'));
@@ -358,6 +361,16 @@ final class ResourceController
         $key = $record->getKey();
 
         return is_scalar($key) ? (string) $key : '';
+    }
+
+    /**
+     * Переход на страницу, с которой пришли в связанную таблицу (`return` в адресе или `_return` в форме), или null.
+     */
+    private function returnTo(Request $request): ?RedirectResponse
+    {
+        $url = ReturnUrl::from($request);
+
+        return $url === null ? null : redirect()->to($url);
     }
 
     private function resource(string $slug): Resource

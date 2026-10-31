@@ -139,13 +139,7 @@ final class Sitemap
         $files = new SitemapFiles(max(1, min(self::LIMIT, config()->integer('fastleo.sitemap.per_file', self::LIMIT))), self::MAX_FILES);
         $models = [];
 
-        foreach (array_keys(Fastleo::resources()->all()) as $slug) {
-            $resource = Fastleo::resources()->find($slug);
-
-            if (! $resource instanceof Resource) {
-                continue;
-            }
-
+        foreach (array_filter(array_map(fn (string $slug): ?Resource => Fastleo::resources()->find($slug), array_keys(Fastleo::resources()->all()))) as $resource) {
             $query = $resource->sitemap($resource->newModel()->newQuery());
 
             if (! $query instanceof Builder) {

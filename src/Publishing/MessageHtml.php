@@ -48,7 +48,7 @@ final class MessageHtml
         $out = '';
 
         foreach ($node->childNodes as $child) {
-            $out .= self::node($child, $quoted);
+            $out .= $child instanceof DOMText || $child instanceof DOMElement ? self::node($child, $quoted) : '';
         }
 
         return $out;
@@ -57,14 +57,10 @@ final class MessageHtml
     /**
      * Один узел. `$quoted` — уже внутри цитаты (вложенных цитат мессенджеры не понимают).
      */
-    private static function node(DOMNode $node, bool $quoted): string
+    private static function node(DOMText|DOMElement $node, bool $quoted): string
     {
         if ($node instanceof DOMText) {
             return e($node->wholeText, false);
-        }
-
-        if (! $node instanceof DOMElement) {
-            return '';
         }
 
         $tag = strtolower($node->tagName);

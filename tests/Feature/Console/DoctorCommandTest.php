@@ -10,7 +10,9 @@ use Fastleo\Support\Assets;
 use Fastleo\Support\Doctor;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Tests\Fixtures\Fields\StrictRichText;
+use Fastleo\Tests\Fixtures\QuickAdd\CategoryResource as QuickAddCategoryResource;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
+use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -74,6 +76,7 @@ it('reports a field without a column, outside $fillable, without a cast and with
     expect($result['code'])->toBe(1)
         ->and($errors)->toContain('Поле «ghost» пишет в колонку, которой нет в таблице articles')
         ->and($errors)->toContain('Поле «excerpt» не в $fillable модели')
+        ->and($errors)->not->toContain('Поле «author_email» не в $fillable модели')
         ->and($errors)->toContain('Поле «keywords» хранит массив')
         ->and($errors)->toContain('Поле «tags» хранит массив')
         ->and($errors)->toContain('Поле «status» (Enum) требует каст')
@@ -91,6 +94,73 @@ it('does not warn about a NOT NULL column when emptyValue() says what to write i
     useFixtureResources('DoctorEmptyValue');
 
     expect(messages('empty-title', 'warning'))->toBe([]);
+});
+
+it('warns about a related table whose child form cannot fill in the parent', function (): void {
+    useFixtureResources('RelatedBroken');
+    BrokenCategoryResource::$mode = 'create-only';
+
+    expect(implode("\n", messages('categories', 'warning')))->toContain('нет поля «category_id»');
+
+    BrokenCategoryResource::$mode = 'conflict';
+});
+
+it('reports a related table that is described wrongly', function (): void {
+    useFixtureResources('RelatedBroken');
+    BrokenCategoryResource::$mode = 'conflict';
+
+    expect(implode("\n", messages('categories', 'error')))->toContain('перезапишет');
+});
+
+it('finds no problems in a properly described related table', function (): void {
+    useFixtureResources('Related');
+
+    expect(messages('categories', 'warning'))->toBe([])
+        ->and(messages('categories', 'error'))->toBe([]);
+});
+
+it('warns about a required field that the quick add form does not cover', function (): void {
+    useFixtureResources('QuickAdd');
+    QuickAddCategoryResource::$fields = ['views'];
+
+    expect(implode("\n", messages('categories', 'warning')))->toContain('нет обязательного поля «title»');
+
+    QuickAddCategoryResource::$fields = ['title', 'views'];
+});
+
+it('finds no problems in a quick add form that covers the required fields', function (): void {
+    useFixtureResources('QuickAdd');
+
+    expect(messages('categories', 'warning'))->toBe([])
+        ->and(messages('categories', 'error'))->toBe([]);
+});
+
+it('warns about a start page that does not exist', function (): void {
+    useFixtureResources('Related');
+    config(['fastleo.home' => 'nothing']);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain('раздела или страницы «nothing» нет');
+
+    config(['fastleo.home' => 'articles']);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('Стартовая страница');
+});
+
+it('warns about a computed column that the query of the resource does not produce', function (): void {
+    useFixtureResources('FromQuery');
+    Category::factory()->create();
+
+    $warnings = implode("\n", messages('categories', 'warning'));
+
+    expect($warnings)->toContain('«not_counted»')
+        ->and($warnings)->not->toContain('«articles_count»')
+        ->and(messages('categories', 'error'))->toBe([]);
+});
+
+it('warns that a read-only field cannot be edited in the cell', function (): void {
+    useFixtureResources('Inline');
+
+    expect(implode("\n", messages('inline-articles', 'warning')))->toContain('«author_email»: inlineEditable() не сработает');
 });
 
 it('reports a resource whose table does not exist', function (): void {
@@ -514,6 +584,22 @@ describe('markup of the RichText field', function (): void {
             ->and($notes['records'])->toHaveCount(50);
     });
 
+    it('tells a person how many more records the diff does not show', function (): void {
+        DB::table('doctor_rich_notes')->insert(array_fill(0, 60, ['body' => '<div class="x">текст</div>']));
+
+        $this->artisan('fastleo:doctor --sanitize-diff')
+            ->expectsOutputToContain('и ещё записей: 11')
+            ->assertSuccessful();
+    });
+
+    it('says so when the cleaning will change nothing', function (): void {
+        DB::table('doctor_rich_notes')->delete();
+
+        $this->artisan('fastleo:doctor --sanitize-diff')
+            ->expectsOutputToContain('Чистка HTML ничего не изменит')
+            ->assertSuccessful();
+    });
+
     it('fails with the reason when the rich_text setting is not allowed', function (): void {
         config(['fastleo.rich_text.attributes' => ['onclick']]);
 
@@ -545,4 +631,154 @@ describe('quick toggle and SetToggle', function (): void {
         expect(messages('broken-toggle', 'error'))->toContain('Действие set-title-on (SetToggle): в ресурсе нет поля-галочки «title» (Checkbox или Toggle) — запуск действия упадёт.')
             ->and(messages('articles', 'error'))->toBe([]);
     });
+});
+
+describe('columns whose type only SQLite lets a test declare by hand', function (): void {
+    beforeEach(function (): void {
+        if (DB::connection()->getDriverName() !== 'sqlite') {
+            $this->markTestSkipped('тип колонки задаётся вручную, как умеет только SQLite');
+        }
+    });
+
+    beforeEach(function (): void {
+        DB::statement('drop table if exists doctor_columns');
+        DB::statement('create table doctor_columns (id integer primary key, note varchar(20) not null, lowest decimal(5,2) not null, kind "enum(\'a\',\'b\')" not null, tiny smallint not null, tiny_unsigned smallint unsigned not null, mode "enum(\'x\')" not null, stamp varchar(20) not null)');
+        useFixtureResources('DoctorColumns');
+    });
+
+    it('warns when a Textarea may hold more than the column, and a number may go below the column', function (): void {
+        $warnings = implode("\n", messages('column-things', 'warning'));
+
+        expect($warnings)->toContain('Поле «note» допускает 100 символов, а колонка в базе — 20')
+            ->and($warnings)->toContain('Поле «lowest» допускает числа до -5000, а колонка в базе вмещает только -999.99');
+    });
+
+    it('warns when the options of a select are not in the enum of the column', function (): void {
+        expect(implode("\n", messages('column-things', 'warning')))->toContain('Варианты поля «kind» (z) не входят в enum-колонку базы');
+    });
+
+    it('stays silent about options and defaults that cannot be built', function (): void {
+        $warnings = implode("\n", messages('column-things', 'warning'));
+
+        expect($warnings)->not->toContain('«mode»')
+            ->and($warnings)->toContain('Колонка «stamp» не допускает NULL');
+    });
+
+    it('measures integer columns by their type when the main connection is not SQLite', function (): void {
+        $default = config('database.default');
+        config(['database.connections.unreachable' => ['driver' => 'mysql', 'host' => '127.0.0.1', 'port' => 1, 'database' => 'none', 'username' => 'none', 'password' => '']]);
+
+        try {
+            config(['database.default' => 'unreachable']);
+            $warnings = implode("\n", messages('column-things', 'warning'));
+        } finally {
+            config(['database.default' => $default]);
+            DB::purge('unreachable');
+        }
+
+        expect($warnings)->toContain('Поле «tiny» допускает числа до 40000, а колонка в базе вмещает только 32767')
+            ->and($warnings)->toContain('Поле «tiny_unsigned» допускает числа до 70000, а колонка в базе вмещает только 65535');
+    });
+});
+
+it('reports an unreachable database instead of failing', function (): void {
+    $default = config('database.default');
+    config(['database.connections.unreachable' => ['driver' => 'mysql', 'host' => '127.0.0.1', 'port' => 1, 'database' => 'none', 'username' => 'none', 'password' => '']]);
+
+    try {
+        config(['database.default' => 'unreachable']);
+        $result = diagnosed();
+    } finally {
+        config(['database.default' => $default]);
+        DB::purge('unreachable');
+    }
+
+    $scopes = collect($result['problems'])->where('level', 'error')->pluck('scope');
+
+    expect($result['code'])->toBe(1)
+        ->and($scopes)->toContain('site')
+        ->and($scopes)->toContain('articles');
+});
+
+describe('package migrations without the migrations table', function (): void {
+    beforeEach(function (): void {
+        if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+            $this->markTestSkipped('DROP TABLE в MySQL неявно закрывает транзакцию теста и оставляет базу без таблицы');
+        }
+    });
+
+    it('does not look for conflicts while the migrations table does not exist', function (): void {
+        Schema::drop('migrations');
+
+        expect(implode("\n", messages('site', 'error')))->not->toContain('не записана в таблице migrations');
+    })->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'DROP TABLE в MySQL неявно закрывает транзакцию теста и оставляет базу без таблицы');
+
+    it('does not report an unrecorded migration whose tables are gone', function (): void {
+        DB::table('migrations')->where('migration', '2026_10_29_000000_create_fastleo_imports_table')->delete();
+        Schema::drop('fastleo_imports');
+
+        expect(implode("\n", messages('site', 'error')))->not->toContain('не записана в таблице migrations');
+    })->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'DROP TABLE в MySQL неявно закрывает транзакцию теста и оставляет базу без таблицы');
+});
+
+it('does not fail when the SoftNetica checks cannot read the settings', function (): void {
+    Schema::drop('fastleo_settings');
+
+    expect(implode("\n", messages('site', 'error')))->toContain('Нет таблицы fastleo_settings');
+});
+
+describe('relations and blocks that do not work', function (): void {
+    beforeEach(function (): void {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->markTestSkipped('PostgreSQL после ошибки запроса считает транзакцию теста сломанной');
+        }
+    });
+
+    beforeEach(function (): void {
+        useFixtureResources('DoctorBroken');
+    });
+
+    it('reports a block whose relation or fields cannot be built and a related table that does not exist', function (): void {
+        $errors = collect(diagnosed()['problems'])->where('level', 'error')->mapWithKeys(fn (array $problem): array => [$problem['scope'] => $problem['message']]);
+
+        expect($errors['broken-relations'])->toContain('Связь поля «absent»')
+            ->and($errors['broken-relations › ghostLinks'])->toContain('Нет таблицы ghosts модели')
+            ->and($errors['broken-relations › links'])->toContain('Раздел описан с ошибкой');
+    });
+
+    it('does not count the options of a relation whose table does not exist', function (): void {
+        expect(implode("\n", messages('broken-relations', 'warning')))->not->toContain('поиск по серверу');
+    });
+
+    it('warns that a computed column is not read when the query of the resource fails', function (): void {
+        expect(implode("\n", messages('broken-query', 'error')))->toContain('nothing');
+    });
+});
+
+describe('RichText with unusual values', function (): void {
+    beforeEach(function (): void {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $this->markTestSkipped('PostgreSQL после ошибки запроса (колонки нет) считает транзакцию теста сломанной, и проверки следующих разделов молчат');
+        }
+
+        Schema::create('doctor_rich_notes', function ($table): void {
+            $table->id();
+            $table->longText('body')->nullable();
+        });
+        useFixtureResources('DoctorRichTextEdge');
+    });
+
+    it('looks into every language of a translatable text and skips empty ones', function (): void {
+        DB::table('doctor_rich_notes')->insert([
+            ['body' => json_encode(['ru' => '<div class="x">Текст</div>', 'en' => ''], JSON_UNESCAPED_UNICODE)],
+            ['body' => '<p>не JSON</p>'],
+            ['body' => '   '],
+        ]);
+
+        expect(implode("\n", messages('translated-notes', 'warning')))->toContain('в 1 из 3 проверенных записей при сохранении пропадёт разметка');
+    });
+
+    it('does not read the text of a field without a column', function (): void {
+        expect(messages('mutated-notes', 'warning'))->toBe([]);
+    })->skip(fn (): bool => DB::connection()->getDriverName() === 'pgsql', 'PostgreSQL после ошибки запроса считает транзакцию теста сломанной');
 });

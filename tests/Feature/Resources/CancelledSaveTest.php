@@ -73,3 +73,15 @@ it('does not put a password field with a custom name into the session after a va
         ->assertSessionHasErrors('title')
         ->assertSessionMissing('_old_input.pin');
 });
+
+it('rolls back the record when an observer cancels deleting a block that was removed from the form', function (): void {
+    $article = Article::factory()->create(['title' => 'Было']);
+    $article->links()->create(['title' => 'Старая']);
+    ArticleLink::deleting(fn (): bool => false);
+
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => 'Стало', 'links' => []]))
+        ->assertSessionHas('fastleo.error')
+        ->assertSessionMissing('fastleo.success');
+
+    expect($article->fresh()?->title)->toBe('Было')->and($article->links()->count())->toBe(1);
+});

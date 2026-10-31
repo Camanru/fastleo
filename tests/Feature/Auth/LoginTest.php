@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Workbench\App\Models\User;
@@ -192,6 +193,17 @@ describe('special hashing settings', function (): void {
             ->assertSessionHasErrors(['email' => 'Неверный email или пароль.']);
         $this->assertGuest(Fastleo::GUARD);
     })->with(['empty' => '', 'other algorithm' => '5f4dcc3b5aa765d61d8327deb882cf99']);
+
+    it('answers with the usual error when the stored hash was written by another algorithm behind the model cast', function (): void {
+        $admin = admin(['email' => 'admin@example.com']);
+        DB::table('users')->where('id', $admin->id)->update(['password' => md5('password')]);
+        config(['hashing.bcrypt.verify' => true]);
+        Hash::forgetDrivers();
+
+        login(['email' => 'admin@example.com', 'password' => 'password'])
+            ->assertSessionHasErrors(['email' => 'Неверный email или пароль.']);
+        $this->assertGuest(Fastleo::GUARD);
+    });
 
     it('spends the time of a hash check on a user who has no password at all', function (): void {
         Schema::table('users', fn (Blueprint $table) => $table->string('password')->nullable()->change());

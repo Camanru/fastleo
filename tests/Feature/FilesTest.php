@@ -92,6 +92,14 @@ it('creates a folder with a latin name and refuses a duplicate or an empty name'
         ->assertJsonValidationErrors(['name' => 'Имя папки должно содержать буквы или цифры.']);
 });
 
+it('does not create a folder inside a folder that does not exist', function (): void {
+    $this->postJson(route('fastleo.files.folder'), ['folder' => 'uploads/missing', 'name' => 'Новости'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['folder']);
+
+    expect($this->disk->directoryExists('uploads/missing/novosti'))->toBeFalse();
+});
+
 it('deletes selected files and folders with their thumbnails', function (): void {
     $this->disk->put('uploads/a.jpg', UploadedFile::fake()->image('a.jpg')->getContent());
     $this->disk->put('uploads/old/b.jpg', UploadedFile::fake()->image('b.jpg')->getContent());

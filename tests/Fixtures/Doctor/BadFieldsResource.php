@@ -33,6 +33,7 @@ final class BadFieldsResource extends Resource
             Text::make('title'),
             Text::make('ghost'),
             Text::make('excerpt'),
+            Text::make('author_email')->onlyInList(),
             Tags::make('keywords'),
             Select::make('tags')->multiple()->options(['a' => 'A']),
             Enum::make('status')->enum(ArticleStatus::class),

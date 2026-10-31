@@ -11,6 +11,7 @@ use Intervention\Image\Exceptions\ImageException;
 use Intervention\Image\Format;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\ImageInterface;
+use RuntimeException;
 
 /**
  * Работа с картинками через Intervention Image (драйвер GD).
@@ -136,11 +137,7 @@ final class Images
             return 1;
         }
 
-        $stream = fopen('php://memory', 'r+b');
-
-        if ($stream === false) {
-            return 1;
-        }
+        $stream = fopen('php://memory', 'r+b') ?: throw new RuntimeException('Поток php://memory недоступен.');
 
         try {
             fwrite($stream, $binary);

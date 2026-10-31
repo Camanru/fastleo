@@ -10,6 +10,8 @@ use Fastleo\Fields\Text;
 use Fastleo\Settings;
 use Fastleo\Support\FormSchema;
 use Fastleo\Support\SettingsStore;
+use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
@@ -241,4 +243,19 @@ describe('description', function (): void {
 
         expect(fn (): array => Fastleo::resources()->settings())->toThrow(LogicException::class, 'совпадает');
     });
+});
+
+it('ignores stored values that have no field name', function (): void {
+    DB::table('fastleo_settings')->insert(['slug' => 'site', 'value' => json_encode(['первое', 'второе']), 'created_at' => now(), 'updated_at' => now()]);
+    resolve(SettingsStore::class)->flush();
+
+    expect(resolve(SettingsStore::class)->values('site'))->toBe([])
+        ->and(fastleo_setting('site.title'))->toBe('Мой сайт');
+});
+
+it('does not fail when the cache store is unavailable while forgetting the cache', function (): void {
+    config(['cache.default' => 'database', 'cache.stores.database.table' => 'missing_cache_table']);
+
+    expect(fn () => SettingsStore::forgetCached())->not->toThrow(Throwable::class)
+        ->and(fn () => Cache::forget('anything'))->toThrow(QueryException::class);
 });

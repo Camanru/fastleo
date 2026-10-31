@@ -609,3 +609,78 @@ it('removes the file with skipped rows of an import the worker interrupted', fun
 
     expect(Storage::disk('local')->exists($import->errorsPath()))->toBeFalse();
 });
+
+it('fails an import whose uploaded file has disappeared before the worker started', function (): void {
+    Queue::fake();
+    importFile(xlsxFile([['Заголовок'], ['Одна']]));
+    $import = lastImport();
+    Storage::disk('local')->delete($import->path);
+
+    new ImportRecords($import->id)->handle();
+
+    expect($import->fresh()?->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл не читается: нужен xlsx или csv.'])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('fails a file without a single row', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('empty.csv', ''));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'В файле нет ни одного известного столбца. Первая строка должна содержать подписи или имена полей, как в файле экспорта.']);
+});
+
+it('fails an archive that is not a spreadsheet', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('readme.txt', 'это не таблица');
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'fake.xlsx', null, null, true));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл не читается: нужен xlsx или csv.'])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('fails an archive with an entry that cannot be unpacked', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/sharedStrings.xml', '<sst/>');
+    $zip->setEncryptionName('xl/sharedStrings.xml', ZipArchive::EM_AES_256, 'secret');
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'locked.xlsx', null, null, true));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл не читается: нужен xlsx или csv.']);
+});
+
+it('skips a row whose key is a number too big for an integer', function (): void {
+    importFile(xlsxFile([['id', 'Заголовок'], [1.0e19, 'Призрак']]));
+
+    expect(lastImport()->only('created', 'updated', 'skipped'))->toBe(['created' => 0, 'updated' => 0, 'skipped' => 1])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('fails an archive with damaged data whether or not the server reports PHP warnings', function (int $level): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive;
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/sharedStrings.xml', str_repeat('hello world ', 5000));
+    $zip->close();
+
+    // Сжатые данные записи (после локального заголовка) заменены мусором.
+    $bytes = (string) file_get_contents($path);
+    file_put_contents($path, substr_replace($bytes, str_repeat("\xFF", 40), 30 + strlen('xl/sharedStrings.xml') + 20, 40));
+    $previous = error_reporting($level);
+
+    try {
+        importFile(new UploadedFile($path, 'damaged.xlsx', null, null, true));
+    } finally {
+        error_reporting($previous);
+    }
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл не читается: нужен xlsx или csv.']);
+})->with([
+    'warnings reported' => [E_ALL],
+    'warnings hidden' => [E_ALL & ~E_WARNING],
+]);

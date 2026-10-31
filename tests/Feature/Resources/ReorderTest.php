@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\TopicOrderPolicy;
 use Fastleo\Tests\Fixtures\Policies\TopicUpdatePolicy;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Topic;
@@ -179,4 +180,22 @@ describe('order column as a form field', function (): void {
 
         expect($first->fresh()?->sort)->toBe(5);
     });
+});
+
+it('explains why the database refused to renumber and keeps the order', function (): void {
+    [, , $third] = threeTopics();
+    Topic::saving(function (): never {
+        throw new QueryException('sqlite', 'update topics', [], new PDOException('FOREIGN KEY constraint failed'));
+    });
+
+    $this->from(route('fastleo.resources.index', 'topics'))
+        ->post(route('fastleo.resources.reorder', 'topics'), ['id' => $third->id, 'direction' => 'up'])
+        ->assertRedirect(route('fastleo.resources.index', 'topics'))
+        ->assertSessionHas('fastleo.error', 'Не удалось сохранить или удалить: запись связана с другими записями или указана несуществующая связанная запись.');
+
+    $this->postJson(route('fastleo.resources.reorder', 'topics'), ['id' => $third->id, 'direction' => 'up'])
+        ->assertUnprocessable()
+        ->assertJson(['message' => 'Не удалось сохранить или удалить: запись связана с другими записями или указана несуществующая связанная запись.']);
+
+    expect(topicOrder())->toBe(['А', 'Б', 'В']);
 });

@@ -1,5 +1,5 @@
 {{-- Фильтр по датам «с … по …». --}}
-<fieldset class="flex min-w-0 flex-col gap-1 text-sm">
+<fieldset class="flex min-w-0 flex-col gap-1 text-sm sm:col-span-2">
     <legend class="mb-1 text-ink-2">{{ $filter->getLabel() }}</legend>
     <div class="flex items-center gap-2">
         <label class="min-w-0 flex-1">

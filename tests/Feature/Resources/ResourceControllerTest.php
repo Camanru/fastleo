@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Resources\GuardedCategoryResource;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use Workbench\App\Models\Category;
 
 beforeEach(function (): void {
@@ -59,6 +60,14 @@ describe('index', function (): void {
             ->assertDontSee('<script>alert(1)</script>', false);
     });
 });
+
+it('returns to the form of a record whose key is zero when the check fails', function (): void {
+    DB::table('categories')->insert(['id' => 0, 'title' => 'Нулевая']);
+
+    $this->put(route('fastleo.resources.update', ['categories', '0']), ['title' => ''])
+        ->assertRedirect(route('fastleo.resources.edit', ['categories', '0']))
+        ->assertSessionHasErrors('title');
+})->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'MySQL подставляет следующий номер вместо нулевого ключа');
 
 describe('create and store', function (): void {
     it('renders an empty form', function (): void {

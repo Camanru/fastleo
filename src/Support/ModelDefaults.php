@@ -4,9 +4,18 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\Color;
+use Fastleo\Fields\Date;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Select;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Time;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Validator;
 use Throwable;
 
 /**
@@ -53,6 +62,62 @@ final class ModelDefaults
         }
 
         return $values;
+    }
+
+    /**
+     * Значения формы создания из адреса `?prefill[поле]=значение`: ссылка «Добавить» у связанной таблицы подставляет
+     * родителя, «Создать клиента» — телефон. Берутся только строки для видимых и доступных на запись простых полей
+     * (текст, число, дата, время, цвет, список, `BelongsTo`) и только те, что прошли бы проверку формы: вариант вне
+     * списка, запись вне `query()` поля, чужая дата, значение длиннее предела пропускаются без ошибки. Пароли, файлы,
+     * вложенные записи, множественный выбор, многоязычные поля и галочки не заполняются.
+     *
+     * ```php
+     * ModelDefaults::prefill($resource, $request->query('prefill')); // ['client_id' => '5', 'phone' => '79001234567']
+     * ```
+     *
+     * @return array<string, string>
+     */
+    public static function prefill(Resource $resource, mixed $input): array
+    {
+        if (! is_array($input)) {
+            return [];
+        }
+
+        $values = [];
+
+        foreach ($resource->writableFields(null) as $field) {
+            $value = $input[$field->name] ?? null;
+
+            if (! is_string($value) || $value === '' || ! self::prefillable($field) || ! self::passes($field, $value)) {
+                continue;
+            }
+
+            $values[$field->name] = $value;
+        }
+
+        return $values;
+    }
+
+    /**
+     * Простое поле: одно значение-строка, без зависимости от других полей формы.
+     */
+    private static function prefillable(Field $field): bool
+    {
+        return $field->writesAttribute()
+            && ! $field->isTranslatable()
+            && ! $field->isMultiple()
+            && $field->getDependsOn() === null
+            && ($field instanceof Text || $field instanceof Textarea || $field instanceof Number || $field instanceof Color
+                || $field instanceof Date || $field instanceof Time || $field instanceof Select
+                || $field instanceof BelongsTo);
+    }
+
+    /**
+     * Значение прошло бы проверку поля в форме создания.
+     */
+    private static function passes(Field $field, string $value): bool
+    {
+        return ! Validator::make([$field->name => $value], [$field->name => $field->getRules(null)[$field->name] ?? []])->fails();
     }
 
     /**

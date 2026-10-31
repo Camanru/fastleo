@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Fastleo\Support\Html;
 
 use Dom\HTMLDocument;
-use Dom\HTMLElement;
 
 /**
  * Что пропадёт из HTML при чистке: теги, атрибуты и адреса плееров iframe, которых после неё стало меньше.
@@ -64,11 +63,7 @@ final class HtmlLoss
         $result = ['tags' => [], 'attributes' => [], 'hosts' => []];
         $body = HTMLDocument::createFromString('<!DOCTYPE html><body>'.$html, LIBXML_NOERROR)->body;
 
-        if (! $body instanceof HTMLElement) {
-            return $result;
-        }
-
-        foreach ($body->getElementsByTagName('*') as $element) {
+        foreach ($body?->getElementsByTagName('*') ?? [] as $element) {
             $tag = strtolower($element->localName);
             $result['tags'][$tag] = ($result['tags'][$tag] ?? 0) + 1;
 

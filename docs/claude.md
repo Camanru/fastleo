@@ -120,6 +120,37 @@ class DoctorsAdminTest extends TestCase
 - Внешние ключи: миграция таблицы, на которую ссылаются (рубрики), должна выполняться раньше (метка времени меньше), чем миграция таблицы со ссылкой (новости).
 - После каждой правки — `fastleo:doctor`; перед сдачей работы — тест раздела.
 
+## Что выбрать
+
+Прежде чем писать свой код или шаблон, найдите задачу в таблице — почти всё уже есть в пакете.
+
+| Нужно | Как | Подробнее |
+|---|---|---|
+| Пункт меню: группа, иконка, позиция; порядок групп; скрыть пункт | в ресурсе `$group`, `$icon`, `$position`, `inMenu()`; порядок групп — `menu.groups` в `config/fastleo.php` | [resources.md](resources.md), [configuration.md](configuration.md) |
+| Рабочий раздел сразу после входа; убрать «Дашборд» из меню; меню свёрнуто по умолчанию | `home`, `menu.dashboard`, `menu.collapsed` в `config/fastleo.php` | [configuration.md](configuration.md) |
+| Число у пункта меню («новых 7», «просрочено 26») | `public static function badge(): ?int` в ресурсе | [resources.md](resources.md#badge) |
+| Название записи в заголовке, крошках, поиске | первый столбец списка, не связь, или `title(Model $record)` | [resources.md](resources.md#title) |
+| Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](related.md) |
+| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`, в ресурсе `$historyPanel = true` | [related.md](related.md#боковая-колонка-карточки) |
+| Добавить дочернюю запись прямо под таблицей, без перехода на другую страницу (задача, комментарий) | `Related::make(…)->quickAdd(['title', 'due_at'])`, подпись кнопки — `->addLabel()` | [related.md](related.md#быстрое-добавление) |
+| Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](related.md#раскрывающиеся-строки) |
+| Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](fields/select.md) |
+| Подсветить строку списка по состоянию записи (просрочено, выполнено) | `rowTone(Model $record): ?string` в ресурсе — `success`/`warning`/`danger`/`info`/`neutral` | [list.md](list.md#подсветка-строк) |
+| Правка значения прямо в списке | `->inlineEditable()` (текст, число, список, `BelongsTo`); галочка — `->quickToggle()` | [list.md](list.md#правка-в-ячейке) |
+| Столбец из подсчёта, суммы, подзапроса | `->fromQuery()` + `query(Builder $query)` ресурса | [list.md](list.md#вычисляемые-столбцы) |
+| Отчёт с плитками по шесть в ряд | `protected static int $columns = 6;` в странице-отчёте, `columnSpan(1–6)` у виджетов | [reports.md](reports.md#шесть-плиток-в-ряд) |
+| Фильтр списка, в том числе по умолчанию («менеджер — я») | `filters()`, `->default(fn () => …)` | [list.md](list.md) |
+| Список обновляется сам (входящие) | `protected static ?int $poll = 10;` | [list.md](list.md#автообновление-списка) |
+| Кнопка над записью («Взять в работу», «Продать», «Выполнить» с формой) | `actions()`: `Action` и `ActionResult` | [actions.md](actions.md) |
+| Форма создания с подставленными значениями | ссылка `route('fastleo.resources.create', ['resource' => 'cars', 'prefill' => ['client_id' => $id]])` | [layout.md](layout.md#форма-создания-заполненная-из-ссылки) |
+| Ссылка на существующую запись при ошибке «уже есть» | `->rules(…Rule::unique…)` + `->duplicateOf(fn (string $v) => …)` | [fields/README.md](fields/README.md) |
+| Зависимые списки (марка → модель) | `->dependsOn('brand')` | [layout.md](layout.md#зависимые-списки) |
+| Статистика: период, график, таблица с итогами | страница `Page` с `filters()` и `widgets()`: `Period`, `Choice`, `Stat`, `Chart`, `Rows` | [reports.md](reports.md) |
+| Плитки и числа на главной | `Dashboard` и виджеты | [dashboard.md](dashboard.md) |
+| «Только свои записи», права по ролям | Policy модели + `query()` ресурса | [authorization.md](authorization.md), [recipes.md](recipes.md) |
+| Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](recipes.md) |
+| Выгрузка и загрузка Excel | `$exportable`, `$importable` | [import-export.md](import-export.md) |
+
 ## Частые ошибки
 
 | Симптом | Причина | Исправление |
@@ -129,6 +160,10 @@ class DoctorsAdminTest extends TestCase
 | «Enum требует каст» | Enum-поле без enum-каста | `'status' => Status::class` в `casts()` |
 | «Связь поля … метод» | `BelongsTo::make('category_id')` без метода `category()` | добавить метод связи или `->relation('имя')` |
 | «пишет в колонку, которой нет» | поле без колонки | миграция или убрать поле |
+| `fastleo:doctor`: «Связанная таблица … нет поля» (`related_foreign`) | в форме создания дочернего раздела нет поля внешнего ключа (`BelongsTo`) | добавить поле или не скрывать его при создании; быстрое добавление ставит родителя и без поля |
+| `fastleo:doctor`: «в быстром добавлении нет обязательного поля» (`related_quick_required`) | обязательное поле дочернего раздела не вошло в `quickAdd([...])` и не имеет `default()` | добавить поле в `quickAdd`, задать `default()` или снять `required()` (`emptyValue()` не поможет: обязательное поле всё равно не пройдёт проверку) |
+| `fastleo:doctor`: «в результате query() ресурса нет значения» (`from_query_missing`) | `fromQuery()` без `withCount()`, `withSum()` или подзапроса с таким псевдонимом; сортировка по такому столбцу падает | добавить псевдоним в `query()` ресурса |
+| `fastleo:doctor`: «Стартовая страница home» (`home_unknown`) | в `config/fastleo.php` `home` указывает на несуществующий раздел или страницу | верный адрес раздела (`'leads'`) или `null` |
 | ошибка базы при пустом поле | NOT NULL без значения по умолчанию, поле не `required()` | `required()`, `default()` в миграции или `emptyValue(0)` / `emptyValue('')` у поля |
 | админка без стилей | ассеты не опубликованы | `php artisan vendor:publish --tag=fastleo-assets --force` |
 | картинки не открываются | нет `public/storage` | `php artisan storage:link` |
@@ -147,7 +182,7 @@ php artisan fastleo:inspect articles   # один раздел по адресу
 php artisan fastleo:inspect --json     # то же для машины
 ```
 
-В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `empty_value` у поля с `emptyValue()`, `quick_toggle: true` у галочки с `quickToggle()`, вложенные `fields` у блоков и повторителей. `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
+В JSON у раздела есть `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `fields`, `filters`, `actions`. У поля — `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса) и сведения по типу: `relation` и `related_model` у связей, `folder` и `extensions` у файлов, `options` у `Select` (`null`, если вариантов больше 50), `max_length` у текстовых, `empty_value` у поля с `emptyValue()`, `quick_toggle: true` у галочки с `quickToggle()`, `badges: true` у списка с цветными метками, `from_query: true` у вычисляемого столбца (`fromQuery()`), `inline_editable: true` у поля с правкой в ячейке, вложенные `fields` у блоков и повторителей. У раздела ещё `relations` — связанные таблицы (`name`, `label`, `resource`, `slug`, `foreign_key`). У фильтра — `name`, `label`, `class`, `has_default` (есть значение по умолчанию). Ключ раздела `poll` — период автообновления списка в секундах или `null`; `history_panel` — включена ли панель истории в карточке. У связанной таблицы ещё `expandable` (строки раскрываются), `aside` (в боковой колонке), `columns` (имена столбцов таблицы для текущего администратора), `quick_add` (имена полей быстрого добавления, `[]` — формы нет) и `add_label` (подпись кнопки). `fastleo:inspect <адрес>` для одного раздела отдаёт тот же объект раздела без обёртки `resources`.
 
 Если раздел описан с ошибкой, вместо `fields` будет `error` с текстом — остальные разделы выводятся как обычно.
 
@@ -183,6 +218,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | `Enum` без enum-каста | добавить каст в модель |
 | колонка `$sortColumn` или `$treeColumn` не найдена | исправить имя или миграцию |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |
+| `query()` ресурса не выполняется при проверке вычисляемых полей `fromQuery()` (`from_query_error`) | исправить `query()` по тексту ошибки базы |
 
 **Предупреждения:**
 
@@ -205,6 +241,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | у записей с RichText при сохранении пропадут теги, атрибуты или плееры | разрешить их в `fastleo.rich_text` до первого сохранения старых записей; у поля со своим `sanitize()` — в этом методе |
 | у поля с `quickToggle()` стоит `readonly()`, `onlyInList()` или `hideOnEdit()` — переключатель не появится | убрать лишнее у поля или `quickToggle()` |
 | `SetToggle` указывает на поле `readonly()` — действие пропустит все записи | убрать `readonly()` или действие |
+| у поля с `inlineEditable()` стоит `readonly()`, `disabled()`, `hideOnEdit()` или `onlyInList()` — ячейка в списке не станет редактируемой (`inline_readonly`) | убрать лишнее у поля или `inlineEditable()` |
 | включён `fastleo.robots`, а в `public` лежит свой `robots.txt` | удалить файл или выключить `fastleo.robots.enabled` |
 | на боевом сайте планировщик не запускался дольше 10 минут | cron: `* * * * * php artisan schedule:run`; метка запуска хранится в кеше приложения |
 | подключение к SoftNetica: недопустимый адрес (ошибка), нет хостов кабинета, отчёты не доходят дольше 30 минут | исправить `softnetica.url`/`cabinet_hosts`, запустить планировщик |
@@ -252,7 +289,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 |---|---|
 | `list-resources` | разделы, к которым есть доступ |
 | `describe-resource` | поля, правила проверки, связи, фильтры, действия (то же, что `fastleo:inspect`) |
-| `list-records` | записи раздела: `q` (поиск), `filters`, `sort`, `direction`, `page`, `per_page` (до 100) |
+| `list-records` | записи раздела: `q` (поиск), `filters` (значения фильтров по умолчанию не применяются), `sort`, `direction`, `page`, `per_page` (до 100) |
 | `get-record` | запись со всеми значениями формы |
 | `create-record` | новая запись: `values` — значения полей |
 | `update-record` | изменение записи: в `values` — только меняемые поля, остальные не трогаются; списки заменяются целиком (см. ниже) |

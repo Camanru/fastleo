@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Auth\FastleoUser;
 use Fastleo\Auth\TwoFactor;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Auth\User as PlainUser;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -106,6 +107,18 @@ it('stops when several users differ only in letter case', function (): void {
 
     $this->assertDatabaseMissing('users', ['fastleo_admin' => true]);
 })->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'MySQL не хранит адреса, различающиеся только регистром');
+
+it('explains that the database sees the email as an existing one instead of crashing', function (): void {
+    User::creating(function (): never {
+        throw new UniqueConstraintViolationException('sqlite', 'insert into users', [], new PDOException('UNIQUE constraint failed: users.email'));
+    });
+
+    $this->artisan('fastleo:user', ['email' => 'ivan@example.com', '--password' => 'secret-password', '--no-interaction' => true])
+        ->expectsOutputToContain('ivan@example.com база считает')
+        ->assertFailed();
+
+    $this->assertDatabaseCount('users', 0);
+});
 
 it('uses the user provider of a guard described by the site', function (): void {
     config([

@@ -16,7 +16,7 @@
     :title="$title"
     :heading="$recordTitle !== '' ? $recordTitle : null"
     :description="$updatedAt ? __('fastleo::resources.updated_at', ['time' => $updatedAt->timezone(\Fastleo\Fastleo::timezone())->format('d.m.Y H:i')]) : null"
-    :back="['url' => route('fastleo.resources.index', $slug), 'label' => $resource::label()]"
+    :back="['url' => $returnUrl ?? route('fastleo.resources.index', $slug), 'label' => ($returnUrl ?? null) ? __('fastleo::resources.back') : $resource::label()]"
     :crumbs="array_values(array_filter([$resource::group() !== null ? ['label' => $resource::group()] : null, ['label' => $resource::label(), 'url' => route('fastleo.resources.index', $slug)], ['label' => $recordTitle !== '' ? $recordTitle : $title]]))"
 >
     <x-slot:badge>
@@ -55,54 +55,75 @@
 
     <x-fastleo::flash />
 
-    <form
-        method="POST"
-        action="{{ $editing ? route('fastleo.resources.update', [$slug, $record->getKey()]) : route('fastleo.resources.store', $slug) }}"
-        x-data="fastleoForm"
-        data-unsaved="{{ __('fastleo::resources.unsaved') }}"
-        @if ($errors->any()) data-dirty @endif
-        novalidate
-        class="flex flex-col gap-5"
-    >
-        @csrf
-        @if ($editing)
-            @method('PUT')
-        @endif
-        {{-- Метки начала и конца формы: если PHP обрежет длинную форму по max_input_vars, конец не придёт и сохранение откажет. --}}
-        <input type="hidden" name="_fl_begin" value="1">
+    @php
+        $hasSide = $editing && $resource->hasSideColumn($record);
+    @endphp
+    <div @class(['grid items-start gap-5', 'lg:grid-cols-[minmax(0,1fr)_24rem]' => $hasSide])>
+        <div class="flex min-w-0 flex-col gap-5">
+            <form
+                method="POST"
+                action="{{ $editing ? route('fastleo.resources.update', [$slug, $record->getKey()]) : route('fastleo.resources.store', $slug) }}"
+                x-data="fastleoForm"
+                data-unsaved="{{ __('fastleo::resources.unsaved') }}"
+                @if ($errors->any()) data-dirty @endif
+                novalidate
+                class="flex flex-col gap-5"
+            >
+                @csrf
+                @if ($editing)
+                    @method('PUT')
+                @endif
+                {{-- Метки начала и конца формы: если PHP обрежет длинную форму по max_input_vars, конец не придёт и сохранение откажет. --}}
+                <input type="hidden" name="_fl_begin" value="1">
+                @if ($returnUrl ?? null)
+                    <input type="hidden" name="_return" value="{{ $returnUrl }}">
+                @endif
 
-        @if ($errors->any())
-            <div role="alert" class="flex gap-3 rounded-card bg-danger-soft px-4 py-3.5 text-danger">
-                <x-fastleo::icon name="circle-alert" class="mt-px size-[18px] shrink-0" />
-                <span class="text-base font-semibold">{{ __('fastleo::resources.errors_title') }}</span>
-            </div>
-        @endif
+                @if ($errors->any())
+                    <div role="alert" class="flex gap-3 rounded-card bg-danger-soft px-4 py-3.5 text-danger">
+                        <x-fastleo::icon name="circle-alert" class="mt-px size-[18px] shrink-0" />
+                        <span class="text-base font-semibold">{{ __('fastleo::resources.errors_title') }}</span>
+                    </div>
+                @endif
 
-        <div class="flex flex-wrap items-start gap-4">
-            <div class="flex min-w-0 flex-[999_1_520px] flex-col gap-4">
-                @include('fastleo::form.cards', ['items' => $mainItems, 'record' => $record])
-            </div>
-            @if ($asideItems !== [])
-                <div class="flex min-w-0 flex-[1_1_300px] flex-col gap-4 lg:max-w-sm">
-                    @include('fastleo::form.items', ['items' => $asideItems, 'record' => $record])
+                <div class="flex flex-wrap items-start gap-4">
+                    <div class="flex min-w-0 flex-[999_1_520px] flex-col gap-4">
+                        @include('fastleo::form.cards', ['items' => $mainItems, 'record' => $record])
+                    </div>
+                    @if ($asideItems !== [])
+                        <div class="flex min-w-0 flex-[1_1_300px] flex-col gap-4 lg:max-w-sm">
+                            @include('fastleo::form.items', ['items' => $asideItems, 'record' => $record])
+                        </div>
+                    @endif
                 </div>
+
+                <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-[1.8] lg:-mx-8 lg:px-8">
+                    <x-fastleo::button type="submit" variant="primary" icon="save" name="_after" value="edit" data-save title="{{ __('fastleo::resources.save_hint') }}">
+                        {{ __('fastleo::resources.save') }}
+                    </x-fastleo::button>
+                    <x-fastleo::button type="submit" name="_after" value="index">
+                        {{ __('fastleo::resources.save_and_exit') }}
+                    </x-fastleo::button>
+                    @unless ($editing || ($returnUrl ?? null))
+                        <x-fastleo::button type="submit" name="_after" value="create">
+                            {{ __('fastleo::resources.save_and_create') }}
+                        </x-fastleo::button>
+                    @endunless
+                    <span class="ml-auto hidden text-xs text-ink-2 sm:inline" data-mac="{{ __('fastleo::resources.save_hint_mac') }}">{{ __('fastleo::resources.save_hint') }}</span>
+                </div>
+                <input type="hidden" name="_fl_end" value="1">
+            </form>
+            @if ($editing)
+                @include('fastleo::resources.related-sections', ['only' => 'main'])
             @endif
         </div>
-
-        <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-[1.8] lg:-mx-8 lg:px-8">
-            <x-fastleo::button type="submit" variant="primary" icon="save" name="_after" value="edit" data-save title="{{ __('fastleo::resources.save_hint') }}">
-                {{ __('fastleo::resources.save') }}
-            </x-fastleo::button>
-            <x-fastleo::button type="submit" name="_after" value="index">
-                {{ __('fastleo::resources.save_and_exit') }}
-            </x-fastleo::button>
-            @unless ($editing)
-                <x-fastleo::button type="submit" name="_after" value="create">
-                    {{ __('fastleo::resources.save_and_create') }}
-                </x-fastleo::button>
-            @endunless
-            <span class="ml-auto hidden text-xs text-ink-2 sm:inline" data-mac="{{ __('fastleo::resources.save_hint_mac') }}">{{ __('fastleo::resources.save_hint') }}</span>
-        </div>
-        <input type="hidden" name="_fl_end" value="1">
-    </form>
+        @if ($hasSide)
+            <aside class="flex min-w-0 flex-col gap-5" data-card-aside>
+                @if ($resource->showsHistoryPanel($record))
+                    @include('fastleo::resources.history-panel')
+                @endif
+                @include('fastleo::resources.related-sections', ['only' => 'aside'])
+            </aside>
+        @endif
+    </div>
 </x-fastleo::layouts.app>

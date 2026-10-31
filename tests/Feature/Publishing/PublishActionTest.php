@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use Fastleo\Actions\ActionResult;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
 use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Publishing\Publication;
+use Fastleo\Publishing\Publish;
 use Fastleo\Tests\Fixtures\Policies\NoCreatePublicationPolicy;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -111,4 +114,35 @@ it('gives an AI agent a draft through MCP', function (): void {
     FastleoServer::actingAs($this->me, 'fastleo')->tool(RunAction::class, ['resource' => 'articles', 'action' => 'fastleo-publish', 'ids' => [(string) $article->id]])->assertHasNoErrors();
 
     expect(Publication::query()->sole()->status)->toBe('draft');
+});
+
+it('skips an image that the disk refuses to read', function (): void {
+    Storage::fake('public', ['throw' => true]);
+    publishingChannel();
+    $article = Article::factory()->create(['cover' => 'uploads/articles/gone.jpg']);
+
+    publishArticle($article);
+
+    expect(Publication::query()->sole()->images)->toBe([]);
+});
+
+it('answers with an error when the section of publications was switched off before the action ran', function (): void {
+    config(['fastleo.publishing.publications' => null]);
+    Fastleo::resources()->flush();
+    $article = Article::factory()->create();
+    $action = Publish::make(fn (): never => throw new RuntimeException('Не должно вызываться'));
+
+    $result = $action->handle(new EloquentCollection([$article]), []);
+
+    expect($result->type)->toBe('error');
+    expect(Publication::query()->count())->toBe(0);
+});
+
+it('tells the developer when the closure of the action returns something other than a post', function (): void {
+    publishingChannel();
+    $article = Article::factory()->create();
+    $action = Publish::make(fn (): string => 'просто текст')->forResource(Fastleo::resources()->find('articles'));
+
+    expect(fn (): ActionResult => $action->handle(new EloquentCollection([$article]), []))->toThrow(LogicException::class);
+    expect(Publication::query()->count())->toBe(0);
 });

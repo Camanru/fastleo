@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Illuminate\Database\QueryException;
 use Illuminate\Testing\TestResponse;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -84,4 +85,28 @@ it('reports records the model refused to delete', function (): void {
     runBuiltIn('articles', 'delete', [(string) $article->id])->assertSessionHas('fastleo.error', fn (string $message): bool => str_contains($message, 'Не выполнено для 1'));
 
     expect($article->fresh()?->trashed())->toBeFalse();
+});
+
+it('explains why the database refused to delete a record and goes on with the rest', function (): void {
+    [$blocked, $free] = Article::factory()->count(2)->create();
+    Article::deleting(function (Article $article) use ($blocked): void {
+        if ($article->is($blocked)) {
+            throw new QueryException('sqlite', 'update articles', [], new PDOException('FOREIGN KEY constraint failed'));
+        }
+    });
+
+    runBuiltIn('articles', 'delete', [(string) $blocked->id, (string) $free->id])
+        ->assertSessionHas('fastleo.success', fn (string $message): bool => str_starts_with($message, 'Удалено: 1.') && str_contains($message, 'Не выполнено для 1'));
+
+    expect($blocked->fresh()?->trashed())->toBeFalse()->and($free->fresh()?->trashed())->toBeTrue();
+});
+
+it('reports records the model refused to restore', function (): void {
+    $article = Article::factory()->create();
+    $article->delete();
+    Article::restoring(fn (): bool => false);
+
+    runBuiltIn('articles', 'restore', [(string) $article->id])->assertSessionHas('fastleo.error', fn (string $message): bool => str_contains($message, 'Не выполнено для 1'));
+
+    expect(Article::withTrashed()->find($article->id)?->trashed())->toBeTrue();
 });

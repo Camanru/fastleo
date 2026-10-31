@@ -152,10 +152,6 @@ class Slug extends Text
      */
     private function isAutomatic(string $slug, mixed $source): bool
     {
-        if ($this->from === null || $slug === '') {
-            return false;
-        }
-
         $automatic = mb_substr(self::slugify($this->sourceText($source)), 0, $this->maxLength);
 
         return $slug === $automatic || $slug === trim($automatic, '-');

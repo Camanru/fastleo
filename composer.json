@@ -82,7 +82,7 @@
             "@php vendor/bin/phpstan analyse --memory-limit=1G"
         ],
         "test": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser",
-        "test:coverage": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser --coverage --min=95",
+        "test:coverage": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser --coverage --min=100",
         "test:types": "@php vendor/bin/pest --type-coverage --min=100",
         "test:browser": "@php vendor/bin/pest --testsuite=Browser",
         "check": [

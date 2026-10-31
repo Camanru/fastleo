@@ -5,6 +5,10 @@ declare(strict_types=1);
 return [
     'title' => 'Журнал изменений',
     'history' => 'История',
+    'panel_title' => 'История изменений',
+    'panel_all' => 'Вся история',
+    'panel_empty' => 'Изменений пока нет.',
+    'panel_more' => 'и ещё :count',
     'history_title' => 'История: :name',
     'help' => 'Что и когда менялось в админке. Записи хранятся :days.',
     'days' => ':count день|:count дня|:count дней',

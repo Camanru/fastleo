@@ -9,6 +9,8 @@ use Fastleo\Support\CacheCleaner;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Support\ServerReport;
 use Illuminate\Contracts\Console\Kernel;
+use Illuminate\Queue\Failed\FailedJobProviderInterface;
+use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
@@ -79,6 +81,33 @@ describe('report', function (): void {
             ->and(reportRow('База данных')['value'])->toContain(DB::connection()->getDriverName())
             ->and(reportRow('Время сервера')['value'])->toContain(Fastleo::timezone());
     });
+
+    it('counts failed jobs only when the failed job log can count', function (): void {
+        $this->app->instance('queue.failer', new NullFailedJobProvider);
+        expect(reportRow('Упавшие задачи очереди'))->toMatchArray(['value' => '0', 'status' => 'ok']);
+
+        $this->app->instance('queue.failer', Mockery::mock(FailedJobProviderInterface::class));
+        $titles = collect(ServerReport::sections())->flatMap(fn (array $section): array => array_column($section['rows'], 'title'));
+
+        expect($titles->contains('Упавшие задачи очереди'))->toBeFalse();
+    });
+
+    it('shows a dash instead of the free disk space when the disk cannot be measured', function (): void {
+        $this->app->setBasePath(sys_get_temp_dir().'/fastleo-no-such-folder-'.uniqid());
+
+        expect(reportRow('Свободное место'))->toMatchArray(['value' => '—', 'status' => 'ok', 'hint' => null]);
+    });
+
+    it('reads sizes from php.ini in bytes', function (string $value, int $bytes): void {
+        $method = new ReflectionMethod(ServerReport::class, 'bytes');
+
+        expect($method->invoke(null, $value))->toBe($bytes);
+    })->with([
+        'gigabytes' => ['2G', 2 * 1024 ** 3],
+        'megabytes' => ['8m', 8 * 1024 ** 2],
+        'kilobytes' => [' 512K ', 512 * 1024],
+        'plain bytes' => ['1048576', 1048576],
+    ]);
 
     it('checks that storage is writable and notices maintenance mode', function (): void {
         expect(reportRow('Запись в storage и bootstrap/cache')['status'])->toBe('ok')
@@ -222,6 +251,19 @@ describe('clearing the cache', function (): void {
         file_put_contents(Fastleo::resources()->cachePath(), str_repeat('y', 500));
 
         expect(CacheCleaner::size())->toBe(1500);
+    });
+
+    it('counts the files of the file cache store and skips folders that do not exist', function (): void {
+        File::ensureDirectoryExists($this->sandbox.'/app-cache');
+        file_put_contents($this->sandbox.'/app-cache/entry', str_repeat('z', 700));
+        config([
+            'cache.default' => 'file',
+            'cache.stores.file.driver' => 'file',
+            'cache.stores.file.path' => $this->sandbox.'/app-cache',
+            'view.compiled' => $this->sandbox.'/not-created',
+        ]);
+
+        expect(CacheCleaner::size())->toBe(700);
     });
 
     it('clears the cache by POST and reports the freed size', function (): void {

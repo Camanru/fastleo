@@ -206,12 +206,28 @@ Alpine.data('fastleoActions', ({ ids = [], open = null, openIds = [] } = {}) => 
     all: ids,
     selected: [],
     target: [],
+    // Корень блока: формы действий ищутся внутри него, поэтому на странице может быть несколько блоков с одинаковыми ключами.
+    root: null,
+    refreshed: null,
 
     init() {
+        this.root = this.$el;
+        // Список подменён автообновлением (fastleoPoll): «выбрать все» берёт записи нового набора.
+        this.refreshed = (event) => {
+            this.all = event.detail.ids;
+            this.selected = this.selected.filter((id) => this.all.includes(id));
+        };
+        window.addEventListener('fastleo-list-refreshed', this.refreshed);
+
         if (open) {
             this.target = openIds;
-            this.$nextTick(() => document.getElementById(`fastleo-action-${open}`)?.showModal());
+            this.$nextTick(() => this.root.querySelector(`[id="fastleo-action-${open}"]`)?.showModal());
         }
+    },
+
+    // Блок заменён (перезагрузка связанной таблицы): слушатель на window не должен остаться.
+    destroy() {
+        window.removeEventListener('fastleo-list-refreshed', this.refreshed);
     },
 
     get allSelected() {
@@ -227,7 +243,7 @@ Alpine.data('fastleoActions', ({ ids = [], open = null, openIds = [] } = {}) => 
 
         if (form) {
             await this.$nextTick();
-            document.getElementById(`fastleo-action-${key}`).showModal();
+            this.root.querySelector(`[id="fastleo-action-${key}"]`).showModal();
 
             return;
         }
@@ -237,7 +253,274 @@ Alpine.data('fastleoActions', ({ ids = [], open = null, openIds = [] } = {}) => 
         }
 
         await this.$nextTick();
-        document.getElementById(`fastleo-action-form-${key}`).requestSubmit();
+        this.root.querySelector(`[id="fastleo-action-form-${key}"]`).requestSubmit();
+    },
+}));
+
+// Страница уходит (отправка формы, переход): фоновые запросы больше не нужны, иначе они «съедят» flash следующей страницы.
+// Если уход отменили (окно «есть несохранённые изменения»), через секунду автообновление продолжается.
+let leaving = false;
+window.addEventListener('beforeunload', () => {
+    leaving = true;
+    setTimeout(() => (leaving = false), 1000);
+});
+window.addEventListener('pageshow', () => (leaving = false));
+
+/**
+ * Можно ли сейчас подменить содержимое области без вреда: вкладка видна, страница не уходит, в области не набирают текст
+ * в поле, не открыто окно или меню, не идёт сохранение ячейки и никто не перетаскивает строку.
+ */
+function canRefresh(region) {
+    const active = document.activeElement;
+
+    return (
+        !document.hidden &&
+        !leaving &&
+        !region.querySelector('.sortable-chosen, .sortable-ghost') &&
+        !(region.contains(active) && active.matches('input, select, textarea')) &&
+        !document.querySelector('dialog[open]') &&
+        !region.querySelector('[aria-expanded="true"], [aria-busy="true"], [data-inline] :disabled')
+    );
+}
+
+/**
+ * Автообновление списка раздела (`$poll`): раз в interval секунд запрашивает ту же страницу и подменяет область
+ * [data-list-region], если она изменилась. Пока выбраны записи, правят ячейку или открыто окно — пропускает.
+ * Первый запрос — снимок для сравнения, область не трогает.
+ */
+Alpine.data('fastleoPoll', ({ interval }) => ({
+    timer: null,
+    last: null,
+    busy: false,
+
+    init() {
+        this.tick(true);
+        this.timer = setInterval(() => this.tick(false), interval * 1000);
+    },
+
+    destroy() {
+        clearInterval(this.timer);
+    },
+
+    async tick(snapshot) {
+        if (this.busy || (!snapshot && !canRefresh(this.$el))) {
+            return;
+        }
+
+        this.busy = true;
+
+        try {
+            const response = await fetch(location.href, { headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+
+            if (!response.ok) {
+                return;
+            }
+
+            const fresh = new DOMParser().parseFromString(await response.text(), 'text/html').querySelector('[data-list-region]');
+
+            if (fresh === null || snapshot || fresh.innerHTML === this.last) {
+                this.last = fresh?.innerHTML ?? this.last;
+
+                return;
+            }
+
+            // Пока выбраны записи, список не трогаем: выбор пропал бы вместе со строками.
+            if ((Alpine.$data(this.$el.parentElement)?.selected ?? []).length > 0 || !canRefresh(this.$el)) {
+                return;
+            }
+
+            this.last = fresh.innerHTML;
+            this.$el.innerHTML = fresh.innerHTML;
+            window.dispatchEvent(new CustomEvent('fastleo-list-refreshed', { detail: { ids: [...this.$el.querySelectorAll('tbody tr[data-record]')].map((row) => row.dataset.record) } }));
+        } catch {
+            // Нет связи — попробуем в следующий раз.
+        } finally {
+            this.busy = false;
+        }
+    },
+}));
+
+/**
+ * Связанная таблица на странице записи: <section x-data="fastleoRelated({ url, error, poll })"> с контейнером x-ref="body".
+ * Таблица приходит отдельным запросом (url) и подставляется в body; ссылки в [data-related-nav] (сортировка, страницы)
+ * и форма поиска [data-related-search] подгружают её заново, остальные формы и ссылки работают как обычно.
+ * Запрос и состояние у каждой таблицы свои, поэтому несколько таблиц на странице не мешают друг другу.
+ */
+Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
+    url,
+    html: null,
+    timer: null,
+    destroyed: false,
+
+    async init() {
+        this.$el.addEventListener('click', (event) => this.navigate(event));
+        this.$el.addEventListener('submit', (event) => this.search(event));
+        // «На странице»: значение варианта — готовый адрес таблицы с выбранным размером.
+        this.$el.addEventListener('change', (event) => {
+            const select = event.target instanceof Element ? event.target.closest('select[data-per-page]') : null;
+
+            if (select !== null && this.owns(select)) {
+                this.load(select.value);
+            }
+        });
+        this.$el.addEventListener('fastleo-reload', (event) => (this.owns(event.target) ? this.load(this.url) : null));
+        await this.load(this.url);
+
+        // Автообновление (`$poll` дочернего раздела): та же страница таблицы, подмена только при изменении.
+        if (poll !== null && !this.destroyed) {
+            this.timer = setInterval(() => (canRefresh(this.$el) ? this.load(this.url, true) : null), poll * 1000);
+        }
+    },
+
+    destroy() {
+        this.destroyed = true;
+        clearInterval(this.timer);
+    },
+
+    async load(target, quiet = false) {
+        if (!quiet) {
+            this.$el.setAttribute('aria-busy', 'true');
+        }
+
+        try {
+            const response = await fetch(target, { headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+
+            // Редирект — сессия истекла и вместо таблицы пришла страница входа.
+            if (!response.ok || response.redirected) {
+                throw new Error(String(response.status));
+            }
+
+            const html = await response.text();
+
+            if (quiet && (html === this.html || !canRefresh(this.$el))) {
+                return;
+            }
+
+            this.html = html;
+            this.$refs.body.innerHTML = html;
+            this.url = target;
+        } catch {
+            if (!quiet) {
+                this.$refs.body.textContent = error;
+            }
+        } finally {
+            this.$el.removeAttribute('aria-busy');
+        }
+    },
+
+    navigate(event) {
+        const toggle = event.target instanceof Element ? event.target.closest('button[data-expand]') : null;
+
+        if (toggle !== null && this.owns(toggle)) {
+            event.preventDefault();
+            this.expand(toggle);
+
+            return;
+        }
+
+        const link = event.target instanceof Element ? event.target.closest('[data-related-nav] a[href]') : null;
+
+        if (link === null || !this.owns(link) || event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) {
+            return;
+        }
+
+        event.preventDefault();
+        this.load(link.href);
+    },
+
+    /**
+     * Элемент относится к этой таблице, а не к вложенной в раскрытую строку (события всплывают к внешней).
+     */
+    owns(element) {
+        return element.closest('[data-related]') === this.$el;
+    },
+
+    /**
+     * Раскрыть или скрыть строку (`Related::expandable()`): под строкой показываются связанные таблицы её записи.
+     * Содержимое строки-раскрытия приходит один раз отдельным запросом и дальше живёт сам (вложенные таблицы
+     * раскрываются так же).
+     */
+    async expand(button) {
+        const row = button.closest('tr');
+        const expansion = row?.nextElementSibling;
+
+        if (!row || !expansion || !expansion.matches('tr[data-expansion]')) {
+            return;
+        }
+
+        const open = expansion.hidden;
+        expansion.hidden = !open;
+        row.setAttribute('aria-expanded', String(open));
+        button.setAttribute('aria-expanded', String(open));
+
+        const body = expansion.querySelector('[data-expansion-body]');
+
+        if (!open || body.dataset.loaded) {
+            return;
+        }
+
+        body.dataset.loaded = '1';
+
+        try {
+            const response = await fetch(expansion.dataset.url, { headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+
+            if (!response.ok || response.redirected) {
+                throw new Error(String(response.status));
+            }
+
+            body.innerHTML = await response.text();
+        } catch {
+            delete body.dataset.loaded;
+            body.textContent = error;
+        }
+    },
+
+    search(event) {
+        const form = event.target instanceof Element ? event.target.closest('form[data-related-search]') : null;
+
+        if (form === null || !this.owns(form)) {
+            return;
+        }
+
+        event.preventDefault();
+        const params = new URLSearchParams(new FormData(form));
+
+        for (const [name, value] of [...params]) {
+            if (value === '') {
+                params.delete(name);
+            }
+        }
+
+        this.load(`${form.action}?${params.toString()}`);
+    },
+}));
+
+/**
+ * Быстрое добавление записи в связанной таблице: <form x-data="fastleoQuickAdd({ url, failed })">. Значения уходят
+ * запросом POST; успех — таблица перечитывается (форма очищается вместе с ней), ошибка проверки — списком под полями.
+ */
+Alpine.data('fastleoQuickAdd', ({ url, failed }) => ({
+    busy: false,
+    errors: [],
+
+    async submit(event) {
+        if (this.busy) {
+            return;
+        }
+
+        this.busy = true;
+        this.errors = [];
+
+        try {
+            await requestJson(url, 'POST', new FormData(event.target));
+            this.$dispatch('fastleo-reload');
+        } catch (error) {
+            const messages = Object.values(error.data?.errors ?? {}).flat();
+
+            this.errors = messages.length > 0 ? messages : [error.data?.message || failed];
+        } finally {
+            this.busy = false;
+        }
     },
 }));
 
@@ -537,6 +820,66 @@ Alpine.data('fastleoQuickToggle', ({ on, failed }) => ({
             this.error = error.data?.message || failed;
         } finally {
             this.busy = false;
+        }
+    },
+}));
+
+/**
+ * Правка значения в ячейке списка: <div x-data="fastleoInline({ url, value, failed, tones })">. Значение сохраняется, когда поле
+ * теряет фокус или нажат Enter (событие change); Escape возвращает сохранённое. Ошибка проверки показывается под полем,
+ * и в поле остаётся прежнее значение. tones — классы цвета выбранного варианта (список с метками). После сохранения
+ * вычисляемые столбцы строки (маржа, сумма) заменяются теми, что прислал сервер: data.cells = { поле: html }.
+ */
+Alpine.data('fastleoInline', ({ url, value, failed, tones = {} }) => ({
+    value,
+    tones,
+    saved: value,
+    busy: false,
+    error: '',
+
+    async save() {
+        if (this.busy || this.value === this.saved) {
+            return;
+        }
+
+        this.busy = true;
+        this.error = '';
+
+        try {
+            const data = await requestJson(url, 'PATCH', { value: this.value === '' ? null : this.value });
+
+            this.saved = this.value = data.value ?? '';
+            this.refreshCells(data.cells ?? {});
+        } catch (error) {
+            this.error = error.data?.message || failed;
+            this.value = this.saved;
+        } finally {
+            this.busy = false;
+        }
+    },
+
+    revert() {
+        this.value = this.saved;
+        this.error = '';
+    },
+
+    /** Подставить пересчитанные вычисляемые столбцы строки (таблица и карточка списка). */
+    refreshCells(cells) {
+        const id = this.$el.closest('[data-record]')?.dataset.record;
+        const region = this.$el.closest('[data-list-region], [data-related-table]') ?? document;
+
+        if (!id) {
+            return;
+        }
+
+        for (const [name, html] of Object.entries(cells)) {
+            for (const row of region.querySelectorAll(`[data-record="${CSS.escape(id)}"]`)) {
+                const cell = row.querySelector(`[data-field="${CSS.escape(name)}"]`);
+
+                if (cell) {
+                    (cell.querySelector(':scope > a') ?? cell).innerHTML = html;
+                }
+            }
         }
     },
 }));

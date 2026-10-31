@@ -24,4 +24,16 @@ enum ArticleStatus: string
             self::Published => 'Опубликовано',
         };
     }
+
+    /**
+     * Тон цветной метки в списке (`Enum::badges()`).
+     */
+    public function tone(): string
+    {
+        return match ($this) {
+            self::Draft => 'neutral',
+            self::Review => 'warning',
+            self::Published => 'success',
+        };
+    }
 }

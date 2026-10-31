@@ -74,6 +74,8 @@ Fastleo::routes(function () {
 
 Адрес — `/fastleo/pages/report/run`, имя — `fastleo.pages.report-run`. В форме используйте `@csrf` и `route('fastleo.pages.report-run')`. Берите маршруты длиннее одного сегмента (`report/run`), чтобы не пересечься со страницей `/fastleo/pages/{страница}`.
 
+Страница с фильтрами (период, список) и виджетами вместо своего шаблона — [reports.md](reports.md).
+
 ## Журнал ошибок
 
 Пункт «Журнал ошибок» в меню (группа «Система») показывает записи `storage/logs/*.log` от новых к старым, по 50 на страницу.

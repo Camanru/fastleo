@@ -111,7 +111,7 @@ jobs:
 
       - run: composer update --no-interaction --no-progress --prefer-dist
 
-      - name: Тесты с покрытием ≥ 95 % и типами 100 %
+      - name: Тесты с покрытием 100 % и типами 100 %
         if: matrix.php == '8.4' && matrix.database == 'sqlite'
         run: |
           composer test:types

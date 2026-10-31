@@ -5,6 +5,8 @@ declare(strict_types=1);
 use Fastleo\Auth\LoginHistory;
 use Fastleo\Auth\LoginRecord;
 use Fastleo\Auth\NewLoginNotification;
+use Fastleo\Fastleo;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Support\Facades\Notification;
 
 beforeEach(function (): void {
@@ -96,4 +98,22 @@ it('prunes devices not seen for a long time', function (): void {
 
     expect(LoginRecord::query()->pluck('user_agent')->all())->toBe(['Firefox']);
     expect(resolve(LoginHistory::class)->prune())->toBe(0);
+});
+
+it('does not record logins on other guards', function (): void {
+    event(new Login('web', admin(['email' => 'site@example.com']), false));
+
+    expect(LoginRecord::query()->count())->toBe(0);
+});
+
+it('does not try to email an admin who has no address about a new device', function (): void {
+    $nameless = admin(['email' => '']);
+
+    foreach (['Chrome', 'Firefox'] as $agent) {
+        request()->headers->set('User-Agent', $agent);
+        event(new Login(Fastleo::GUARD, $nameless, false));
+    }
+
+    expect(LoginRecord::query()->count())->toBe(2);
+    Notification::assertNothingSent();
 });

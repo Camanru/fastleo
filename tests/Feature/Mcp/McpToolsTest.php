@@ -6,6 +6,8 @@ use Fastleo\Activity\Activity;
 use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
+use Fastleo\Mcp\RecordSaver;
+use Fastleo\Mcp\ToolFailed;
 use Fastleo\Mcp\Tools\CreateRecord;
 use Fastleo\Mcp\Tools\DeleteRecord;
 use Fastleo\Mcp\Tools\DescribeResource;
@@ -21,8 +23,11 @@ use Fastleo\Tests\Fixtures\McpPersonal\PlainResource;
 use Fastleo\Tests\Fixtures\McpUsers\OpenUserResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Testing\PendingTestResponse;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -67,6 +72,16 @@ it('describes a section with fields, rules and the rights of the admin', functio
 
 it('names the available sections when the address is wrong', function (): void {
     mcp()->tool(DescribeResource::class, ['resource' => 'nothing'])->assertHasErrors(['Раздела «nothing» нет. Доступные адреса:']);
+});
+
+it('lists records without the default values of the list filters', function (): void {
+    useFixtureResources('FilterDefaults');
+    Article::factory()->create(['title' => 'Опубликованная', 'status' => 'published']);
+    Article::factory()->create(['title' => 'Черновая', 'status' => 'draft']);
+
+    mcp()->tool(ListRecords::class, ['resource' => 'status-default'])
+        ->assertSee('Опубликованная')
+        ->assertSee('Черновая');
 });
 
 it('lists records with search, filters, sorting and paging', function (): void {
@@ -448,4 +463,129 @@ describe('closing sections from the agent', function (): void {
 
         mcp()->tool(ListResources::class)->assertSee('"resource":"plain"')->assertDontSee('"resource":"users"');
     });
+});
+
+it('lists every tool with the arguments the agent has to send', function (string $tool, array $required): void {
+    config(['fastleo.mcp.allow_delete' => true]);
+
+    mcp()->tools()->assertRegistered($tool);
+
+    $schema = new $tool()->toArray()['inputSchema'];
+
+    expect($schema['required'] ?? [])->toEqualCanonicalizing($required);
+})->with([
+    'list-resources' => [ListResources::class, []],
+    'describe-resource' => [DescribeResource::class, ['resource']],
+    'list-records' => [ListRecords::class, ['resource']],
+    'get-record' => [GetRecord::class, ['resource', 'id']],
+    'create-record' => [CreateRecord::class, ['resource', 'values']],
+    'update-record' => [UpdateRecord::class, ['resource', 'id', 'values']],
+    'delete-record' => [DeleteRecord::class, ['resource', 'id']],
+    'run-action' => [RunAction::class, ['resource', 'action', 'ids']],
+]);
+
+it('refuses to write into a read-only section even when called directly', function (): void {
+    app()->setLocale(Fastleo::LOCALE);
+    $feedback = Fastleo::resources()->find('feedback');
+
+    expect(fn (): Model => RecordSaver::save($feedback, null, ['name' => 'x']))->toThrow(ToolFailed::class, 'только для чтения');
+});
+
+/**
+ * Отказ базы, каким его отдаёт настоящий драйвер: код исключения PDO — строка SQLSTATE, а не число.
+ */
+function pdoRefusal(string $message, string $sqlstate): PDOException
+{
+    $exception = new class($message) extends PDOException {};
+    new ReflectionProperty(Exception::class, 'code')->setValue($exception, $sqlstate);
+    $exception->errorInfo = [$sqlstate, 0, $message];
+
+    return $exception;
+}
+
+it('explains why the database refused to save a record', function (): void {
+    Article::creating(function (): never {
+        throw new QueryException('sqlite', 'insert into articles', [], pdoRefusal('NOT NULL constraint failed: articles.title', '23000'));
+    });
+
+    mcp()->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'Refused', 'status' => 'draft']])
+        ->assertHasErrors(['Не удалось сохранить']);
+
+    expect(Article::query()->count())->toBe(0);
+});
+
+it('reports a save cancelled by an observer of the site', function (): void {
+    Article::creating(fn (): bool => false);
+
+    mcp()->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'Cancelled', 'status' => 'draft']])
+        ->assertHasErrors(['Сайт отменил сохранение']);
+
+    expect(Article::query()->count())->toBe(0);
+});
+
+it('does not run the delete tool when deletion is off even if it is called directly', function (): void {
+    $article = Article::factory()->create();
+    Fastleo::guard()->setUser(admin());
+
+    $response = new DeleteRecord()->handle(new Request(['resource' => 'articles', 'id' => (string) $article->id]));
+
+    expect($response->isError())->toBeTrue()
+        ->and((string) $response->content())->toContain('Удаление отключено')
+        ->and(Article::query()->count())->toBe(1);
+});
+
+it('explains why the database refused to delete a record', function (): void {
+    config(['fastleo.mcp.allow_delete' => true]);
+    $draft = Article::factory()->create(['is_published' => false]);
+    Article::deleting(function (): never {
+        throw new QueryException('sqlite', 'delete from articles', [], pdoRefusal('FOREIGN KEY constraint failed', '23000'));
+    });
+
+    mcp()->tool(DeleteRecord::class, ['resource' => 'articles', 'id' => (string) $draft->id])
+        ->assertHasErrors(['запись связана с другими записями']);
+
+    expect(Article::query()->count())->toBe(1);
+});
+
+it('reports a delete cancelled by an observer of the site', function (): void {
+    config(['fastleo.mcp.allow_delete' => true]);
+    $draft = Article::factory()->create(['is_published' => false]);
+    Article::deleting(fn (): bool => false);
+
+    mcp()->tool(DeleteRecord::class, ['resource' => 'articles', 'id' => (string) $draft->id])
+        ->assertHasErrors(['Сайт отменил удаление']);
+
+    expect(Article::query()->count())->toBe(1);
+});
+
+it('does not run an action that is closed for the agent', function (): void {
+    useFixtureResources('McpActions');
+    $article = Article::factory()->create();
+
+    mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'hide-from-agent', 'ids' => [(string) $article->id]])
+        ->assertHasErrors(['запускает только человек']);
+});
+
+it('runs a single-record action for one record only', function (): void {
+    useFixtureResources('Actions');
+    [$first, $second] = Article::factory()->count(2)->create(['type' => 'news']);
+
+    mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'archive-article', 'ids' => [(string) $first->id, (string) $second->id]])
+        ->assertHasErrors(['одной записи']);
+});
+
+it('explains why the database refused an action', function (): void {
+    useFixtureResources('McpActions');
+    $article = Article::factory()->create();
+
+    mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'refused-by-database', 'ids' => [(string) $article->id]])
+        ->assertHasErrors(['запись связана с другими записями']);
+});
+
+it('explains a real database refusal of an action to the agent', function (): void {
+    useFixtureResources('Actions');
+    $article = Article::factory()->create(['type' => 'news']);
+
+    mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'broken', 'ids' => [(string) $article->id]])
+        ->assertHasErrors(['такое значение уже есть']);
 });

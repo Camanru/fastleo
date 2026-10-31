@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Fastleo;
 
+use Fastleo\Reports\Filters;
+use Fastleo\Reports\ReportFilter;
+use Fastleo\Widgets\Chart;
+use Fastleo\Widgets\Widget;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -55,20 +59,84 @@ abstract class Page
     /** Позиция в меню внутри группы. */
     protected static int $position = 0;
 
+    /** Колонок в сетке виджетов страницы-отчёта: 4 или 6 (шесть плиток в ряд). */
+    protected static int $columns = 4;
+
     /** Часть адреса `/fastleo/pages/{slug}`. По умолчанию — kebab имени класса без «Page». */
     protected static ?string $slug = null;
 
     /**
-     * Blade-шаблон страницы (в нём подключается `<x-fastleo::layouts.app>`).
+     * Колонок в сетке виджетов отчёта: 6, если так задано в `$columns`, иначе 4. Широкие экраны показывают столько плиток
+     * в ряд; виджет шире сетки занимает всю строку.
      */
-    abstract public function view(): string;
+    public static function columns(): int
+    {
+        return static::$columns === 6 ? 6 : 4;
+    }
 
     /**
-     * Данные для шаблона.
+     * Blade-шаблон страницы (в нём подключается `<x-fastleo::layouts.app>`). Без своего шаблона страница — отчёт:
+     * панель фильтров (`filters()`) и сетка виджетов (`widgets()`).
+     */
+    public function view(): string
+    {
+        return 'fastleo::pages.report';
+    }
+
+    /**
+     * Данные для шаблона. Для отчёта (шаблон по умолчанию) — фильтры и посчитанные виджеты.
      *
      * @return array<string, mixed>
      */
     public function data(Request $request): array
+    {
+        $items = $this->filters();
+        $filters = Filters::resolve($items, $request);
+        $widgets = [];
+        $hasChart = false;
+
+        foreach ($this->widgets($filters) as $widget) {
+            if ($widget->isVisible()) {
+                $widgets[] = ['widget' => $widget, 'data' => $widget->resolve()];
+                $hasChart = $hasChart || $widget instanceof Chart;
+            }
+        }
+
+        return ['page' => $this, 'items' => $items, 'filters' => $filters, 'widgets' => $widgets, 'hasChart' => $hasChart];
+    }
+
+    /**
+     * Фильтры страницы-отчёта: период, список. Значения приходят в `widgets()`.
+     *
+     * ```php
+     * public function filters(): array
+     * {
+     *     return [Period::make('period', 'Период')->default('month'), Choice::make('manager', 'Менеджер')->options([1 => 'Анна'])];
+     * }
+     * ```
+     *
+     * @return list<ReportFilter>
+     */
+    public function filters(): array
+    {
+        return [];
+    }
+
+    /**
+     * Виджеты страницы-отчёта (`Stat`, `Chart`, `Rows`, `Table`, свои): значения фильтров берутся в замыканиях.
+     *
+     * ```php
+     * public function widgets(Filters $filters): array
+     * {
+     *     $period = $filters->period('period');
+     *
+     *     return [Stat::make('Заявок')->value(fn () => $period->apply(Lead::query(), 'created_at')->count())];
+     * }
+     * ```
+     *
+     * @return list<Widget>
+     */
+    public function widgets(Filters $filters): array
     {
         return [];
     }

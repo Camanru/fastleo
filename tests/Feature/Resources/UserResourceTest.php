@@ -5,10 +5,12 @@ declare(strict_types=1);
 use Fastleo\Auth\TwoFactor;
 use Fastleo\Fastleo;
 use Fastleo\Resources\UserResource;
+use Fastleo\Resources\Users\AdminAccess;
 use Fastleo\Resources\Users\UserGuard;
 use Fastleo\Tests\Fixtures\Policies\SelfOnlyUserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -171,6 +173,24 @@ it('refuses to take the access from the last admin through the form', function (
     $record = $last->refresh();
     expect(UserGuard::isLastAdmin($record))->toBeTrue()
         ->and(UserGuard::isCurrentUser($record))->toBeTrue();
+});
+
+it('names the last admin as the reason when the access is taken from them by someone else', function (): void {
+    $last = admin(['email' => 'last@example.com']);
+    $this->me->forceFill(['fastleo_admin' => false])->save();
+    $rules = AdminAccess::make('fastleo_admin', 'Доступ')->getRules($last->refresh());
+
+    $removal = Validator::make(['fastleo_admin' => '0'], $rules);
+
+    expect($removal->fails())->toBeTrue()
+        ->and($removal->errors()->first('fastleo_admin'))->toBe(__('fastleo::users.last_admin', [], Fastleo::LOCALE))
+        ->and(Validator::make(['fastleo_admin' => '1'], $rules)->passes())->toBeTrue();
+});
+
+it('refuses an email sent as a list instead of a string', function (): void {
+    $this->post(route('fastleo.resources.store', 'users'), adminForm(['email' => ['boris@example.com']]))->assertSessionHasErrors('email');
+
+    expect(User::query()->count())->toBe(1);
 });
 
 it('hides the delete button for the own record and shows it for others', function (): void {

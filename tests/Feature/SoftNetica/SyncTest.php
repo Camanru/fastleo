@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Composer\InstalledVersions;
 use Fastleo\Fastleo;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\Synchronizer;
@@ -141,6 +142,17 @@ describe('a broken database', function (): void {
         }]);
 
         expect(syncNow())->toBe(SyncResult::Offline);
+    });
+
+    it('treats a state that cannot be read as empty', function (): void {
+        connectSoftNetica();
+        Fastleo::setting('softnetica.token');
+        Schema::drop('fastleo_settings');
+        app()->forgetInstance(SyncState::class);
+
+        expect(resolve(SyncState::class)->client())->toBeNull()
+            ->and(resolve(SyncState::class)->isStale())->toBeTrue()
+            ->and(resolve(SyncState::class)->isRejected(SOFTNETICA_TOKEN))->toBeFalse();
     });
 
     it('ignores a broken date in the saved state', function (): void {
@@ -386,6 +398,20 @@ describe('the answer of the panel', function (): void {
             ->and(Connection::connected())->toBeTrue();
     });
 
+    it('does not record a failed attempt for the old token after a new one was entered', function (): void {
+        connectSoftNetica();
+        Http::fake(function () {
+            connectSoftNetica(SOFTNETICA_OTHER_TOKEN);
+
+            return Http::response('', 500);
+        });
+
+        expect(syncNow())->toBe(SyncResult::Offline);
+
+        app()->forgetInstance(SyncState::class);
+        expect(resolve(SyncState::class)->attemptedAt())->toBeNull()->and(Connection::connected())->toBeTrue();
+    });
+
     it('does not throw when the connection fails', function (): void {
         connectSoftNetica();
         Http::fake(fn () => throw new ConnectionException('cURL error 28: timed out'));
@@ -463,5 +489,29 @@ describe('the command', function (): void {
 
         $this->artisan('fastleo:softnetica-sync')->assertSuccessful();
         Http::assertNothingSent();
+    });
+});
+
+describe('the version in the user agent', function (): void {
+    it('falls back to dev when the package is not known to Composer', function (): void {
+        connectSoftNetica();
+        Http::fake([SOFTNETICA_URL => acceptedResponse()]);
+        $installed = new ReflectionClass(InstalledVersions::class);
+        $original = ['installed' => $installed->getProperty('installed')->getValue(), 'vendors' => $installed->getProperty('canGetVendors')->getValue(), 'local' => $installed->getProperty('installedIsLocalDir')->getValue()];
+
+        InstalledVersions::reload(['root' => ['name' => 'site/app', 'pretty_version' => '1.0.0', 'version' => '1.0.0.0', 'reference' => null, 'type' => 'project', 'install_path' => __DIR__, 'aliases' => [], 'dev' => true], 'versions' => []]);
+        $installed->getProperty('canGetVendors')->setValue(null, false);
+
+        try {
+            $result = syncNow();
+        } finally {
+            $installed->getProperty('installed')->setValue(null, $original['installed']);
+            $installed->getProperty('installedByVendor')->setValue(null, []);
+            $installed->getProperty('canGetVendors')->setValue(null, $original['vendors']);
+            $installed->getProperty('installedIsLocalDir')->setValue(null, $original['local']);
+        }
+
+        expect($result)->toBe(SyncResult::Connected);
+        Http::assertSent(fn (HttpRequest $request): bool => $request->header('User-Agent') === ['Fastleo/dev']);
     });
 });

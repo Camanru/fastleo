@@ -8,6 +8,9 @@ use Fastleo\Actions\Action;
 use Fastleo\Actions\DeleteRecords;
 use Fastleo\Actions\ForceDeleteRecords;
 use Fastleo\Actions\RestoreRecords;
+use Fastleo\Activity\ActivityRecorder;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
 use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
@@ -59,6 +62,9 @@ abstract class Resource
     /** Название одной записи («Врач»): кнопка «Создать», заголовки форм. */
     protected static ?string $singular = null;
 
+    /** Подпись кнопки создания в списке («Добавить заявку»); null — «Создать». */
+    protected static ?string $createLabel = null;
+
     /** Пояснение под заголовком списка («Новости и материалы блога»). По умолчанию нет. */
     protected static ?string $description = null;
 
@@ -76,6 +82,13 @@ abstract class Resource
 
     /** Записей на странице списка; null — из config('fastleo.list.per_page'). */
     protected static ?int $perPage = null;
+
+    /**
+     * Варианты «На странице» под списком; null — из config('fastleo.list.per_page_options'), `[]` — выбора нет.
+     *
+     * @var list<int>|null
+     */
+    protected static ?array $perPageOptions = null;
 
     /**
      * Порядок списка по умолчанию: [колонка, 'asc'|'desc']; null — новые записи сверху.
@@ -114,11 +127,17 @@ abstract class Resource
     /** Вести журнал изменений раздела («кто, когда, было → стало», откат). */
     protected static bool $activity = true;
 
+    /** Панель «История изменений» в боковой колонке карточки записи (последние изменения; полная история — по ссылке). */
+    protected static bool $historyPanel = false;
+
     /** Записи раздела находит глобальный поиск (Ctrl+K); `false` — раздел в нём не участвует. */
     protected static bool $globallySearchable = true;
 
     /** Раздел доступен ИИ-агентам через MCP-сервер (`fastleo:mcp`); `false` — сервер его не видит. */
     protected static bool $mcp = true;
+
+    /** Раз в сколько секунд обновлять список и связанные таблицы раздела без перезагрузки; null — не обновлять. */
+    protected static ?int $poll = null;
 
     /** Поля, разложенные из fields() (считаются один раз на объект). */
     private ?FormSchema $schema = null;
@@ -129,6 +148,9 @@ abstract class Resource
      * @var array<string, Filter>|null
      */
     private ?array $filters = null;
+
+    /** @var array<string, Related>|null */
+    private ?array $relations = null;
 
     /**
      * Действия, привязанные к ресурсу (по ключу), вместе со встроенными.
@@ -185,6 +207,24 @@ abstract class Resource
     }
 
     /**
+     * Связанные таблицы на странице записи (просмотр и правка), под формой: записи других разделов, чей внешний
+     * ключ ведёт на эту запись. Не обязательно.
+     *
+     * ```php
+     * public function relations(): array
+     * {
+     *     return [Related::make('cars', CarResource::class), Related::make('offers', OfferResource::class)->label('Заявки')];
+     * }
+     * ```
+     *
+     * @return list<Related>
+     */
+    public function relations(): array
+    {
+        return [];
+    }
+
+    /**
      * Число в меню рядом с разделом (например, новые заявки) или null.
      *
      * ```php
@@ -201,8 +241,10 @@ abstract class Resource
 
     /**
      * Название записи: заголовок формы и просмотра, хлебные крошки, подпись ветки дерева и результат поиска ⌘K.
-     * По умолчанию — значение первого столбца списка (текстом, без тегов; у многоязычного поля — первый язык),
-     * поэтому первым в `fields()` ставят поле с названием, а не `Select` или `Image`. Другое название — переопределить:
+     * По умолчанию — значение первого столбца списка, который не является связью (текстом, без тегов; у многоязычного
+     * поля — первый язык): у позиции заявки заголовком станет её название, а не номер заявки-родителя. Если связей нет
+     * или все столбцы — связи, берётся первый столбец. Первым в `fields()` ставят поле с названием, а не `Select` или
+     * `Image`. Другое название — переопределить:
      *
      * ```php
      * public function title(Model $record): string
@@ -215,7 +257,8 @@ abstract class Resource
      */
     public function title(Model $record): string
     {
-        $field = $this->listFields()[0] ?? null;
+        $columns = $this->listFields();
+        $field = array_find($columns, fn (Field $column): bool => ! $column instanceof BelongsTo && ! $column instanceof BelongsToMany) ?? $columns[0] ?? null;
 
         if (! $field instanceof Field) {
             return '';
@@ -318,6 +361,44 @@ abstract class Resource
     }
 
     /**
+     * В боковой колонке карточки записи — панель «История изменений» (`protected static bool $historyPanel = true;`).
+     * Нужен журнал изменений раздела (`$activity`); показывается тем, кто может смотреть журнал и запись.
+     */
+    public static function hasHistoryPanel(): bool
+    {
+        return static::$historyPanel && static::$activity;
+    }
+
+    /**
+     * В боковой колонке карточки этой записи есть панель истории: она включена, журнал работает, администратор
+     * может смотреть журнал раздела и саму запись.
+     */
+    public function showsHistoryPanel(Model $record): bool
+    {
+        return static::hasHistoryPanel() && ActivityRecorder::canView() && Authorization::allows('viewAny', $this) && Authorization::allows('view', $this, $record);
+    }
+
+    /**
+     * В карточке записи есть боковая колонка: панель истории или таблицы `Related::aside()`, доступные администратору.
+     */
+    public function hasSideColumn(Model $record): bool
+    {
+        if ($this->showsHistoryPanel($record)) {
+            return true;
+        }
+
+        return $this->showsRelations($record) && array_any($this->listRelations(), fn (Related $related): bool => $related->isAside() && Authorization::allows('view', $this, $record) && Authorization::allows('viewAny', $related->child()));
+    }
+
+    /**
+     * На странице записи показываются связанные таблицы (`relations()`): запись не в корзине — таблица строится по живому родителю.
+     */
+    public function showsRelations(Model $record): bool
+    {
+        return ! method_exists($record, 'trashed') || ! $record->trashed();
+    }
+
+    /**
      * Записи раздела находит глобальный поиск.
      */
     public static function isGloballySearchable(): bool
@@ -338,6 +419,18 @@ abstract class Resource
     public static function inMenu(): bool
     {
         return true;
+    }
+
+    /**
+     * Период автообновления списка в секундах (от 5 до 3600) или null — список обновляется только перезагрузкой.
+     *
+     * ```php
+     * protected static ?int $poll = 10; // входящие заявки появляются сами
+     * ```
+     */
+    public static function poll(): ?int
+    {
+        return static::$poll === null ? null : max(5, min(3600, static::$poll));
     }
 
     /**
@@ -371,6 +464,14 @@ abstract class Resource
     public static function singular(): string
     {
         return static::$singular ?? Str::headline(class_basename(static::model()));
+    }
+
+    /**
+     * Подпись кнопки создания в списке.
+     */
+    public static function createLabel(): string
+    {
+        return static::$createLabel ?? __('fastleo::resources.create');
     }
 
     /**
@@ -415,6 +516,68 @@ abstract class Resource
     public static function slug(): string
     {
         return static::$slug ?? Str::kebab(Str::pluralStudly(class_basename(static::model())));
+    }
+
+    /** Тона подсветки строки (`rowTone()`). */
+    public const array ROW_TONES = ['success', 'warning', 'danger', 'info', 'neutral'];
+
+    /**
+     * Цвет фона строки списка и связанной таблицы: `success`, `warning`, `danger`, `info`, `neutral` или null (без подсветки).
+     * Подсветка — только подсказка глазу: смысл должен быть виден и в самих столбцах (статус текстом, `badges()`).
+     *
+     * ```php
+     * public function rowTone(Model $record): ?string
+     * {
+     *     return match ($record->status) {
+     *         Status::Done => 'success',
+     *         Status::Overdue => 'danger',
+     *         default => null,
+     *     };
+     * }
+     * ```
+     */
+    public function rowTone(Model $record): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Тон строки, проверенный: опечатка в `rowTone()` не остаётся незамеченной.
+     *
+     * @throws LogicException тон не из списка `ROW_TONES`
+     */
+    final public function rowToneFor(Model $record): ?string
+    {
+        $tone = $this->rowTone($record);
+
+        if ($tone !== null && ! in_array($tone, self::ROW_TONES, true)) {
+            throw new LogicException(__('fastleo::exceptions.row_tone', ['class' => static::class, 'tone' => $tone, 'tones' => implode(', ', self::ROW_TONES)], Fastleo::LOCALE));
+        }
+
+        return $tone;
+    }
+
+    /**
+     * Варианты числа записей на странице для выбора под списком: числа из `$perPageOptions` (или `fastleo.list.per_page_options`)
+     * в пределах `fastleo.list.max_all`, плюс обычное число записей раздела; по возрастанию. Пусто — выбора нет.
+     *
+     * @return list<int>
+     */
+    public static function perPageOptions(): array
+    {
+        $configured = config('fastleo.list.per_page_options');
+        $given = static::$perPageOptions ?? (is_array($configured) ? $configured : []);
+        $max = max(1, config()->integer('fastleo.list.max_all', 1000));
+        $sizes = array_values(array_filter(array_map(intval(...), array_filter($given, is_numeric(...))), fn (int $size): bool => $size > 0 && $size <= $max));
+
+        if ($sizes === []) {
+            return [];
+        }
+
+        $sizes[] = static::perPage();
+        sort($sizes);
+
+        return array_values(array_unique($sizes));
     }
 
     /**
@@ -543,6 +706,37 @@ abstract class Resource
         }
 
         return $this->filters = $filters;
+    }
+
+    /**
+     * Связанные таблицы, привязанные к ресурсу, по имени связи.
+     *
+     * @return array<string, Related>
+     *
+     * @throws LogicException две таблицы с одной связью, связь не `HasMany`, раздел не найден, связь ещё и поле формы, раскрываемая таблица без вложенных
+     */
+    public function listRelations(): array
+    {
+        if ($this->relations !== null) {
+            return $this->relations;
+        }
+
+        $relations = [];
+
+        foreach ($this->relations() as $related) {
+            if (isset($relations[$related->name])) {
+                throw new LogicException(__('fastleo::exceptions.related_duplicate', ['relation' => $related->name, 'resource' => static::class], Fastleo::LOCALE));
+            }
+
+            $relations[$related->name] = $related->bind($this);
+
+            // Раскрывать нечего: у дочернего раздела нет своих связанных таблиц.
+            if ($related->isExpandable() && $related->child()->relations() === []) {
+                throw new LogicException(__('fastleo::exceptions.related_expandable', ['relation' => $related->name, 'class' => $related->resource], Fastleo::LOCALE));
+            }
+        }
+
+        return $this->relations = $relations;
     }
 
     /**

@@ -357,6 +357,15 @@ describe('service', function (): void {
             ->and($twoFactor->verifyRecoveryCode($this->admin, 'abcde-fghij'))->toBeFalse();
     });
 
+    it('keeps the secret of enabled protection when the setup is started again', function (): void {
+        $twoFactor = resolve(TwoFactor::class);
+        $enabled = withTwoFactor($this->admin);
+
+        expect($twoFactor->begin($this->admin))->toBe($enabled['secret'])
+            ->and($twoFactor->isEnabled($this->admin))->toBeTrue()
+            ->and($twoFactor->verify($this->admin, totp($enabled['secret'], 1)))->toBeTrue();
+    });
+
     it('builds the otpauth address with the site name and the email', function (): void {
         $twoFactor = resolve(TwoFactor::class);
         $url = $twoFactor->otpauthUrl($this->admin, 'JBSWY3DPEHPK3PXP');

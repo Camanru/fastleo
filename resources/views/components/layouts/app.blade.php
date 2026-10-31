@@ -45,7 +45,7 @@
             :class="menuOpen && 'translate-x-0 shadow-pop'"
         >
             <div class="flex items-center justify-between gap-2 px-1.5 py-0.5 lg:collapsed:justify-center lg:collapsed:px-0">
-                <a href="{{ route('fastleo.dashboard') }}" class="min-w-0 lg:collapsed:[&_[data-brand-text]]:sr-only">@include('fastleo::partials.brand', array_filter(['subtitle' => $host]))</a>
+                <a href="{{ \Fastleo\Support\Home::url() }}" class="min-w-0 lg:collapsed:[&_[data-brand-text]]:sr-only">@include('fastleo::partials.brand', array_filter(['subtitle' => $host]))</a>
                 <button type="button" class="{{ $iconButton }} lg:hidden" @click="menuOpen = false">
                     <span class="sr-only">{{ __('fastleo::layout.menu_close') }}</span>
                     <x-fastleo::icon name="x" class="size-4" />
@@ -60,7 +60,9 @@
 
             <nav class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:collapsed:gap-2.5 lg:collapsed:overflow-visible" aria-label="{{ __('fastleo::layout.menu') }}">
                 <div class="flex flex-col gap-px lg:collapsed:items-center">
-                    @include('fastleo::partials.menu-item', ['url' => route('fastleo.dashboard'), 'icon' => 'layout-dashboard', 'label' => __('fastleo::layout.dashboard'), 'active' => request()->routeIs('fastleo.dashboard'), 'badge' => null])
+                    @if (config('fastleo.menu.dashboard', true))
+                        @include('fastleo::partials.menu-item', ['url' => route('fastleo.dashboard'), 'icon' => 'layout-dashboard', 'label' => __('fastleo::layout.dashboard'), 'active' => request()->routeIs('fastleo.dashboard'), 'badge' => null])
+                    @endif
                     {{-- Пункты без группы идут сразу под дашбордом, без отступа под заголовок группы. --}}
                     @foreach (collect($menuGroups)->where('label', null)->flatMap(fn ($group) => $group['items']) as $item)
                         @include('fastleo::partials.menu-item', ['url' => $item['url'], 'icon' => $item['icon'], 'label' => $item['label'], 'active' => $item['active'], 'badge' => $item['badge']])

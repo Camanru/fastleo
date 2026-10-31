@@ -12,6 +12,7 @@ use Fastleo\Auth\TwoFactor;
 use Fastleo\Auth\UserLookup;
 use Fastleo\Fastleo;
 use Fastleo\Http\Requests\LoginRequest;
+use Fastleo\Support\Home;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\UserProvider;
 use Illuminate\Contracts\View\View;
@@ -28,12 +29,12 @@ use RuntimeException;
 final class AuthController
 {
     /**
-     * Форма входа. Вошедший администратор сразу попадает на дашборд.
+     * Форма входа. Вошедший администратор сразу попадает на стартовую страницу.
      */
     public function create(): View|RedirectResponse
     {
         if ($this->currentAdmin() instanceof FastleoUser) {
-            return to_route('fastleo.dashboard');
+            return redirect()->to(Home::url());
         }
 
         return view('fastleo::auth.login');

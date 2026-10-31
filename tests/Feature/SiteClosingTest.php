@@ -148,3 +148,27 @@ it('stays open when the settings cannot be read', function (): void {
     $this->get('/closing-page')->assertOk()->assertSee('открытый сайт');
     expect(SiteClosing::closed())->toBeFalse();
 });
+
+it('leaves a custom HTTP kernel alone when attaching the check', function (): void {
+    $this->app->instance(Kernel::class, new class implements Kernel
+    {
+        public function bootstrap(): void {}
+
+        public function handle($request): never
+        {
+            throw new LogicException('Не вызывается.');
+        }
+
+        public function terminate($request, $response): void {}
+
+        public function getApplication(): never
+        {
+            throw new LogicException('Не вызывается.');
+        }
+    });
+
+    config(['fastleo.closing.enabled' => true]);
+    SiteClosing::register();
+
+    expect(resolve(Kernel::class))->not->toBeInstanceOf(Illuminate\Foundation\Http\Kernel::class);
+});

@@ -82,7 +82,7 @@ final class RecordSaver
         try {
             RecordWriter::write($resource, $record, $fields, RecordWriter::inInputOrder($validator->validated(), $input));
         } catch (QueryException $exception) {
-            throw new ToolFailed(DatabaseErrors::explain($exception), $exception->getCode(), $exception);
+            throw new ToolFailed(DatabaseErrors::explain($exception), (int) $exception->getCode(), previous: $exception);
         } catch (OperationCancelled) {
             throw new ToolFailed(__('fastleo::resources.save_cancelled', locale: Fastleo::LOCALE));
         }
@@ -103,10 +103,6 @@ final class RecordSaver
     private static function keepOthers(Model $existing, array $fields, array $data): array
     {
         foreach ($fields as $field) {
-            if (! array_key_exists($field->name, $data)) {
-                continue;
-            }
-
             if ($field->isTranslatable() && is_array($data[$field->name])) {
                 $data[$field->name] = array_replace($field->translations($existing), $data[$field->name]);
             }

@@ -66,7 +66,7 @@ final class DeleteRecord extends ResourceTool
         try {
             DB::connection($record->getConnectionName())->transaction(fn (): null => $record->delete() === false ? throw new OperationCancelled : null);
         } catch (QueryException $exception) {
-            throw new ToolFailed(DatabaseErrors::explain($exception), $exception->getCode(), $exception);
+            throw new ToolFailed(DatabaseErrors::explain($exception), (int) $exception->getCode(), previous: $exception);
         } catch (OperationCancelled) {
             throw new ToolFailed(__('fastleo::resources.delete_cancelled', locale: Fastleo::LOCALE));
         }

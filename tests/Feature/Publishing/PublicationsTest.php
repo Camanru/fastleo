@@ -8,12 +8,17 @@ use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Notifications\AdminNotification;
 use Fastleo\Publishing\Delivery;
 use Fastleo\Publishing\Publication;
+use Fastleo\Publishing\PublicationDeliveries;
+use Fastleo\Publishing\PublicationSource;
+use Fastleo\Tests\Fixtures\Policies\NoViewArticlePolicy;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request as HttpRequest;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Illuminate\Testing\TestResponse;
+use Workbench\App\Models\Article;
 
 beforeEach(function (): void {
     $this->me = admin();
@@ -88,6 +93,14 @@ describe('section', function (): void {
 
         $this->get(route('fastleo.dashboard'))->assertDontSee(route('fastleo.resources.index', 'publications'), false);
         $this->get(route('fastleo.resources.index', 'publications'))->assertOk();
+    });
+
+    it('explains what the section is for under the title of the list', function (): void {
+        $this->get(route('fastleo.resources.index', 'publications'))->assertOk()->assertSee('Посты в каналы Telegram и Max и журнал их отправки.');
+    });
+
+    it('lets a draft pick its channels and images in the form', function (): void {
+        $this->get(route('fastleo.resources.create', 'publications'))->assertOk()->assertSee('name="channel_ids[]"', false)->assertSee('Новости (Telegram)');
     });
 
     it('saves a free post as a draft', function (): void {
@@ -194,6 +207,52 @@ describe('telegram', function (): void {
 
         Http::assertNothingSent();
         expect(Delivery::query()->sole()->error)->toBe('Нет файла картинки uploads/publications/gone.jpg.');
+    });
+});
+
+describe('image files', function (): void {
+    it('reports a missing image file when the disk throws instead of answering nothing', function (): void {
+        Storage::fake('public', ['throw' => true]);
+        Http::fake();
+        $publication = publication(['images' => ['uploads/publications/gone.jpg']]);
+
+        publicationAction($publication);
+
+        Http::assertNothingSent();
+        expect(Delivery::query()->sole()->error)->toBe('Нет файла картинки uploads/publications/gone.jpg.');
+    });
+});
+
+describe('source and deliveries on the page', function (): void {
+    it('links to the record the draft was made from', function (): void {
+        $article = Article::factory()->create();
+        $publication = publication(['source_resource' => 'articles', 'source_id' => (string) $article->id]);
+
+        expect((string) PublicationSource::make('source', 'Источник')->display($publication))->toContain(route('fastleo.resources.show', ['articles', $article->id]));
+    });
+
+    it('shows no source when there is none, the section is gone, the record is gone or the admin may not see it', function (): void {
+        $article = Article::factory()->create();
+        $source = PublicationSource::make('source', 'Источник');
+
+        expect($source->display(publication()))->toBeNull()
+            ->and($source->display(publication(['source_resource' => 'no-such-section', 'source_id' => '1'])))->toBeNull()
+            ->and($source->display(publication(['source_resource' => 'articles', 'source_id' => 'abc'])))->toBeNull()
+            ->and($source->display(publication(['source_resource' => 'articles', 'source_id' => '99999'])))->toBeNull();
+
+        Gate::policy(Article::class, NoViewArticlePolicy::class);
+
+        expect($source->display(publication(['source_resource' => 'articles', 'source_id' => (string) $article->id])))->toBeNull();
+        expect($source->display($article))->toBeNull();
+    });
+
+    it('shows deliveries only for a publication', function (): void {
+        expect(PublicationDeliveries::make('deliveries', 'Доставки')->display(Article::factory()->create()))->toBeNull();
+    });
+
+    it('keeps both out of exports', function (): void {
+        expect(PublicationSource::make('source', 'Источник')->isExportable())->toBeFalse()
+            ->and(PublicationDeliveries::make('deliveries', 'Доставки')->isExportable())->toBeFalse();
     });
 });
 

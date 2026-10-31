@@ -48,7 +48,39 @@ final readonly class FormSchema
             }
         }
 
+        foreach ($fields as $field) {
+            if ($field->isInlineEditable()) {
+                $this->assertInlineEditable($field, $fields);
+            }
+        }
+
         $this->fields = array_values($fields);
+    }
+
+    /**
+     * Поле с `inlineEditable()` не зависит от других полей формы и они от него.
+     *
+     * @param  array<string, Field>  $fields
+     *
+     * @throws InvalidArgumentException поле зависит от других или другие от него
+     */
+    private function assertInlineEditable(Field $field, array $fields): void
+    {
+        $reason = match (true) {
+            $field->getDependsOn() !== null || $field->getVisibleWhen() !== null => trans()->string('fastleo::exceptions.inline_reason_depends', [], Fastleo::LOCALE),
+            $field->isMultiple() || $field->isTranslatable() || $field->isFromQuery() => trans()->string('fastleo::exceptions.inline_reason_multiple', [], Fastleo::LOCALE),
+            default => null,
+        };
+
+        foreach ($fields as $other) {
+            if ($reason === null && ($other->getDependsOn() === $field->name || ($other->getVisibleWhen()['field'] ?? null) === $field->name)) {
+                $reason = trans()->string('fastleo::exceptions.inline_reason_controlling', ['other' => $other->name], Fastleo::LOCALE);
+            }
+        }
+
+        if ($reason !== null) {
+            throw new InvalidArgumentException(__('fastleo::exceptions.inline_conflict', ['field' => $field->name, 'reason' => $reason], Fastleo::LOCALE));
+        }
     }
 
     /**

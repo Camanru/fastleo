@@ -529,8 +529,9 @@ final class Importer
      */
     private function scalar(mixed $cell): ?string
     {
-        if (is_float($cell) && floor($cell) === $cell) {
-            return (string) (int) $cell;
+        if (is_float($cell) && is_finite($cell) && floor($cell) === $cell) {
+            // Целое больше int (ключ 1e19 из xlsx): цифрами, без приведения к int — в PHP 8.5 оно даёт предупреждение и мусор.
+            return abs($cell) < 1e15 ? (string) (int) $cell : number_format($cell, 0, '', '');
         }
 
         $value = is_scalar($cell) ? trim((string) $cell) : '';

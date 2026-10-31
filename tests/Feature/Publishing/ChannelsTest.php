@@ -10,6 +10,7 @@ use Fastleo\Publishing\Publication;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     $this->me = admin();
@@ -193,3 +194,13 @@ it('knows whether there is an enabled channel', function (): void {
     $channel->update(['enabled' => true]);
     expect(Channel::anyEnabled())->toBeTrue();
 });
+
+it('explains what the section is for under the title of the list', function (): void {
+    $this->get(route('fastleo.resources.index', 'channels'))->assertOk()->assertSee('Каналы Telegram и Max, куда публикуются записи сайта.');
+});
+
+it('has no channels while the migrations have not been run', function (): void {
+    Schema::drop('fastleo_channels');
+
+    expect(Channel::anyEnabled())->toBeFalse();
+})->skip(fn (): bool => DB::connection()->getDriverName() !== 'sqlite', 'DROP TABLE с зависимыми объектами: в PostgreSQL мешают внешние ключи, в MySQL он закрывает транзакцию теста');

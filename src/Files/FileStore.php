@@ -187,24 +187,23 @@ final class FileStore
             throw FileRejected::because('crop_not_image', ['name' => $name]);
         }
 
+        // Картинку не удалось прочитать или закодировать (битый файл, формат, который не умеет GD) — один отказ; диск, который не пишет, — другой.
         try {
             $image = Images::manager(animation: false)->decodeBinary($binary);
+
+            if ($x < 0 || $y < 0 || $width < 1 || $height < 1 || $x + $width > $image->width() || $y + $height > $image->height()) {
+                throw FileRejected::because('crop_bounds');
+            }
+
+            $image->crop($width, $height, $x, $y);
+            $extension = FileTypes::extension($path);
+            $target = FileName::unique($disk, dirname($path), pathinfo($path, PATHINFO_FILENAME).'-crop.'.$extension);
+
+            if (! $disk->put($target, Images::encode($image, $extension))) {
+                throw FileRejected::because('rejected_write', ['name' => $name]);
+            }
         } catch (ImageException) {
             throw FileRejected::because('crop_not_image', ['name' => $name]);
-        }
-
-        if ($x < 0 || $y < 0 || $width < 1 || $height < 1 || $x + $width > $image->width() || $y + $height > $image->height()) {
-            throw FileRejected::because('crop_bounds');
-        }
-
-        $image->crop($width, $height, $x, $y);
-        $extension = FileTypes::extension($path);
-        $target = FileName::unique($disk, dirname($path), pathinfo($path, PATHINFO_FILENAME).'-crop.'.$extension);
-
-        try {
-            $disk->put($target, Images::encode($image, $extension));
-        } catch (ImageException) {
-            throw FileRejected::because('rejected_write', ['name' => $name]);
         }
 
         return $target;

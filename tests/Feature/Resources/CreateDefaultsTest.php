@@ -7,6 +7,7 @@ use Fastleo\Fields\Number;
 use Fastleo\Support\ModelDefaults;
 use Fastleo\Support\RecordWriter;
 use Fastleo\Tests\Fixtures\Models\DefaultedThing;
+use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
     createDefaultedThingsTable();
@@ -83,4 +84,32 @@ it('leaves a field empty when the column default does not fit the cast of the mo
 
 it('does not take a zero date of an old MySQL table as a value', function (): void {
     expect(ModelDefaults::for(Fastleo::resources()->find('defaulted')))->not->toHaveKey('legacy_at');
+});
+
+it('takes only the defaults of the model when the table cannot be read', function (): void {
+    $withTable = ModelDefaults::for(Fastleo::resources()->find('defaulted'));
+    Schema::drop('defaulted_things');
+
+    $withoutTable = ModelDefaults::for(Fastleo::resources()->find('defaulted'));
+
+    expect($withTable)->toHaveKey('is_active')
+        ->and($withoutTable)->not->toHaveKey('is_active')
+        ->and($withoutTable)->toBe(['kind' => 'basic']);
+});
+
+it('takes only the defaults of the model when the database cannot be reached', function (): void {
+    $resource = Fastleo::resources()->find('defaulted');
+    $default = config('database.default');
+    config([
+        'database.connections.unreachable' => ['driver' => 'sqlite', 'database' => sys_get_temp_dir().'/fastleo-no-such-folder-'.uniqid().'/db.sqlite', 'prefix' => ''],
+        'database.default' => 'unreachable',
+    ]);
+
+    try {
+        $values = ModelDefaults::for($resource);
+    } finally {
+        config(['database.default' => $default]);
+    }
+
+    expect($values)->toBe(['kind' => 'basic']);
 });

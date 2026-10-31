@@ -123,6 +123,34 @@ describe('clearing', function (): void {
             ->and(file_get_contents($this->dir.'/worker.log'))->toBe('другой журнал');
     });
 
+    it('leaves a journal that cannot be opened for writing as it is and says nothing was cleared', function (): void {
+        file_put_contents($this->dir.'/laravel.log', 'нельзя трогать');
+        chmod($this->dir.'/laravel.log', 0444);
+
+        try {
+            expect(new LogReader($this->dir)->clear('laravel.log'))->toBeNull()
+                ->and(file_get_contents($this->dir.'/laravel.log'))->toBe('нельзя трогать');
+        } finally {
+            chmod($this->dir.'/laravel.log', 0644);
+        }
+    })->skip(fn (): bool => function_exists('posix_geteuid') && posix_geteuid() === 0, 'root открывает любой файл на запись');
+
+    it('says the journal could not be cleared when the file exists but is read-only', function (): void {
+        file_put_contents($this->dir.'/laravel.log', 'нельзя трогать');
+        chmod($this->dir.'/laravel.log', 0444);
+
+        try {
+            $this->post(route('fastleo.logs.clear'), ['file' => 'laravel.log'])
+                ->assertRedirect(route('fastleo.logs.index', ['file' => 'laravel.log']))
+                ->assertSessionHas('fastleo.error')
+                ->assertSessionMissing('fastleo.success');
+
+            expect(file_get_contents($this->dir.'/laravel.log'))->toBe('нельзя трогать');
+        } finally {
+            chmod($this->dir.'/laravel.log', 0644);
+        }
+    })->skip(fn (): bool => function_exists('posix_geteuid') && posix_geteuid() === 0, 'root открывает любой файл на запись');
+
     it('refuses files outside the journal folder', function (): void {
         $outside = dirname($this->dir).'/outside-'.basename($this->dir).'.log';
         file_put_contents($outside, 'не трогать');
@@ -181,4 +209,13 @@ it('has a reader that returns nothing for an unreadable file', function (): void
     expect(new LogReader($this->dir)->read($this->dir.'/missing.log', null, 10))->toBe(['entries' => [], 'next' => null, 'scanned' => 0])
         ->and(new LogReader($this->dir)->clear('missing.log'))->toBeNull()
         ->and(new LogReader($this->dir)->path('missing.log'))->toBeNull();
+});
+
+it('reads past an entry longer than one read chunk', function (): void {
+    file_put_contents($this->dir.'/laravel.log', logLine('2026-10-01 10:00:00', 'ERROR', 'Старая').logLine('2026-10-02 10:00:00', 'ERROR', 'Длинная', str_repeat('#0 trace line'.PHP_EOL, 12000)));
+
+    $result = new LogReader($this->dir)->read($this->dir.'/laravel.log', null, 10);
+
+    expect(array_map(fn (array $entry): string => $entry['message'], $result['entries']))->toBe(['Длинная', 'Старая'])
+        ->and($result['next'])->toBeNull();
 });

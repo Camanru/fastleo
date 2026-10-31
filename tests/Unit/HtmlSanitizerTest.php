@@ -49,6 +49,10 @@ it('keeps the structure of the text', function (): void {
     );
 });
 
+it('drops a style attribute without text alignment', function (): void {
+    expect(HtmlSanitizer::clean('<p style="color: red; font-size: 40px">x</p>'))->toBe('<p>x</p>');
+});
+
 it('keeps only the text alignment from styles', function (): void {
     expect(HtmlSanitizer::clean('<p style="color: red; TEXT-ALIGN: Center; font-size: 40px">x</p><td style="background:url(javascript:x)">y</td>'))
         ->toBe('<p style="text-align: center">x</p>y');
@@ -187,4 +191,11 @@ it('does not take a tag the site allowed for an empty text', function (): void {
 
 it('still treats an empty div as an empty text when the site did not allow it', function (): void {
     expect(HtmlSanitizer::clean('<div class="x" data-lpu="1"></div>'))->toBeNull();
+});
+
+it('skips empty and malformed declarations when styles is enabled', function (): void {
+    config()->set('fastleo.rich_text', ['tags' => ['div'], 'styles' => true]);
+
+    expect(HtmlSanitizer::clean('<div style="color: red;; just words; 12px; display: none;">x</div>'))
+        ->toBe('<div style="color: red; display: none">x</div>');
 });

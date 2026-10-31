@@ -3,7 +3,9 @@
 declare(strict_types=1);
 
 use Fastleo\Activity\Activity;
+use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
+use Fastleo\Tests\Fixtures\Activity\QuietTopicResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -90,6 +92,25 @@ describe('recording', function (): void {
 
         Topic::factory()->create();
         Topic::query()->first()?->update(['title' => 'Из кода сайта']);
+
+        expect(Activity::query()->count())->toBe(0);
+    });
+
+    it('still writes the journal when the section left the registry after the sections were mapped', function (): void {
+        $this->post(route('fastleo.resources.store', 'topics'), ['title' => 'Первая']);
+        useFixtureResources('Registry/TakenBuiltIn');
+        Activity::query()->delete();
+
+        $recorder = resolve(ActivityRecorder::class);
+        $recorder->start();
+        Topic::factory()->create(['title' => 'Вторая']);
+        $recorder->stop();
+
+        expect(Activity::query()->sole()->resource)->toBe('topics');
+    });
+
+    it('does not write an import summary for a section that keeps no journal', function (): void {
+        resolve(ActivityRecorder::class)->importFinished(new QuietTopicResource, ['created' => 1, 'updated' => 0, 'skipped' => 0, 'file' => 'topics.xlsx']);
 
         expect(Activity::query()->count())->toBe(0);
     });
@@ -255,6 +276,37 @@ describe('revert', function (): void {
         $this->assertNotSoftDeleted($article);
 
         expect(Article::query()->find($article->id)?->title)->toBe('Навсегда');
+    });
+
+    it('says so when a record to return from the trash is gone for good', function (): void {
+        $article = Article::factory()->create();
+        $this->delete(route('fastleo.resources.destroy', ['articles', $article->id]));
+        $entry = Activity::query()->where('event', 'deleted')->sole();
+        Article::withTrashed()->findOrFail($article->id)->forceDelete();
+
+        $this->post(route('fastleo.activity.revert', $entry->id))->assertSessionHas('fastleo.error', 'Записи уже нет (или она в корзине).');
+    });
+
+    it('reports a revert the model cancelled when recreating a record', function (): void {
+        $topic = Topic::factory()->create(['title' => 'Вернись']);
+        $this->delete(route('fastleo.resources.destroy', ['topics', $topic->id]));
+        $entry = Activity::query()->where('event', 'deleted')->sole();
+        Topic::creating(fn (): bool => false);
+
+        $this->post(route('fastleo.activity.revert', $entry->id))->assertSessionHas('fastleo.error', 'Сайт отменил возврат.');
+
+        expect(Topic::query()->find($topic->id))->toBeNull();
+    });
+
+    it('reports a revert the model cancelled when restoring from the trash', function (): void {
+        $article = Article::factory()->create();
+        $this->delete(route('fastleo.resources.destroy', ['articles', $article->id]));
+        $entry = Activity::query()->where('event', 'deleted')->sole();
+        Article::restoring(fn (): bool => false);
+
+        $this->post(route('fastleo.activity.revert', $entry->id))->assertSessionHas('fastleo.error', 'Сайт отменил возврат.');
+
+        $this->assertSoftDeleted($article);
     });
 
     it('writes the return of a deleted record as a creation that cannot be reverted', function (): void {

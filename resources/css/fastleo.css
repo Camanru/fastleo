@@ -271,6 +271,32 @@ select:not([multiple]):not([size]) {
     @apply rounded-card border border-line bg-surface shadow-card;
 }
 
+/* Подсветка строки таблицы и карточки на телефоне (Resource::rowTone()): полупрозрачный слой поверх ячейки или карточки, чтобы работали наведение и выбор. */
+tr[data-tone] > td,
+li[data-tone] {
+    background-image: linear-gradient(var(--row-tone), var(--row-tone));
+}
+
+:is(tr, li)[data-tone="success"] {
+    --row-tone: var(--fl-success-soft);
+}
+
+:is(tr, li)[data-tone="warning"] {
+    --row-tone: var(--fl-warning-soft);
+}
+
+:is(tr, li)[data-tone="danger"] {
+    --row-tone: var(--fl-danger-soft);
+}
+
+:is(tr, li)[data-tone="info"] {
+    --row-tone: var(--fl-info-soft);
+}
+
+:is(tr, li)[data-tone="neutral"] {
+    --row-tone: var(--fl-sunken);
+}
+
 /*
  * Сетка дашборда: 4 колонки (на планшете 2, на телефоне 1). Размер виджета — data-cols / data-rows на карточке
  * (1–4): ширина в колонках и высота в строках. Скрытые виджеты видны только в режиме «Настроить».
@@ -290,7 +316,9 @@ select:not([multiple]):not([size]) {
 
         & > [data-cols="2"],
         & > [data-cols="3"],
-        & > [data-cols="4"] {
+        & > [data-cols="4"],
+        & > [data-cols="5"],
+        & > [data-cols="6"] {
             grid-column: span 2;
         }
 
@@ -316,6 +344,19 @@ select:not([multiple]):not([size]) {
 
         & > [data-cols="4"] {
             grid-column: span 4;
+        }
+
+        /* Отчёт с шестью колонками (Page::$columns = 6): шесть плиток в ряд. */
+        &[data-columns="6"] {
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+
+            & > [data-cols="5"] {
+                grid-column: span 5;
+            }
+
+            & > [data-cols="6"] {
+                grid-column: span 6;
+            }
         }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Files\FileStore;
 use Fastleo\Support\SeoTags;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Testing\TestResponse;
 use Workbench\App\Models\Article;
@@ -122,5 +123,24 @@ describe('values', function (): void {
         $article->setRawAttributes(['seo' => 'не json']);
 
         expect(SeoTags::resolve($article)['title'])->toBe('Клиника');
+    });
+
+    it('decodes the field of a model that keeps it as a raw JSON column without a cast', function (): void {
+        $page = new class extends Model {};
+        $page->setRawAttributes(['seo' => '{"title":"Из колонки","noindex":true}']);
+
+        expect(SeoTags::resolve($page))->toMatchArray(['title' => 'Из колонки', 'noindex' => true]);
+
+        $page->setRawAttributes(['seo' => 'не json']);
+
+        expect(SeoTags::resolve($page))->toMatchArray(['title' => 'Клиника', 'noindex' => false]);
+    });
+});
+
+describe('an absolute address', function (): void {
+    it('keeps an address with a protocol as it is and puts a path on the main domain', function (): void {
+        expect(SeoTags::absolute('https://cdn.test/a.jpg'))->toBe('https://cdn.test/a.jpg')
+            ->and(SeoTags::absolute('HTTP://cdn.test/a.jpg'))->toBe('HTTP://cdn.test/a.jpg')
+            ->and(SeoTags::absolute('/storage/a.jpg'))->toBe('https://site.test/storage/a.jpg');
     });
 });

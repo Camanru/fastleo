@@ -102,18 +102,27 @@ final readonly class LogReader
     }
 
     /**
+     * Журнал с таким именем есть в папке (имя точно как у файла из `files()`).
+     */
+    public function has(string $name): bool
+    {
+        return in_array($name, array_column($this->files(), 'name'), true);
+    }
+
+    /**
      * Очистить журнал: файл обнуляется, а не удаляется — приложение продолжает писать в него с теми же правами.
-     * Только файл из `files()` с точно таким именем; возвращает прежний размер или null, если такого файла нет.
+     * Только файл из `files()` с точно таким именем; возвращает прежний размер или null, если файла нет или он закрыт для записи
+     * (различить — `has()`).
      */
     public function clear(string $name): ?int
     {
-        if (! in_array($name, array_column($this->files(), 'name'), true)) {
+        if (! $this->has($name)) {
             return null;
         }
 
         $path = $this->directory.'/'.$name;
         $size = (int) filesize($path);
-        $handle = fopen($path, 'r+');
+        $handle = @fopen($path, 'r+');
 
         if ($handle === false) {
             return null;

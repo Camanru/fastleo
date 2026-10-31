@@ -55,6 +55,25 @@ it('explains a mistake in a resource description', function (string $folder, str
     'no model' => ['NoModel', 'не указана модель'],
 ]);
 
+it('explains a manual order column with forbidden characters', function (): void {
+    useFixtureResources('Registry/BadColumn');
+
+    expect(fn (): array => Fastleo::resources()->all())->toThrow(LogicException::class, 'Колонка «sort order; drop»');
+});
+
+it('explains a custom page with a bad address', function (): void {
+    useFixtureResources('Registry/BadPageSlug');
+
+    expect(fn (): array => Fastleo::resources()->pages())->toThrow(LogicException::class, 'Адрес «Bad_Page»');
+});
+
+it('refuses a class from the container that is not a resource', function (): void {
+    $class = Fastleo::resources()->all()['articles'];
+    $this->app->bind($class, fn (): stdClass => new stdClass);
+
+    expect(fn (): ?\Fastleo\Resource => Fastleo::resources()->find('articles'))->toThrow(LogicException::class, 'не найден или не наследует');
+});
+
 describe('cache', function (): void {
     beforeEach(function (): void {
         // Кеш — во временной папке: общий каркас Testbench читают параллельные процессы тестов.

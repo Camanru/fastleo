@@ -1,5 +1,5 @@
 {{-- Repeater на странице просмотра: таблица элементов. --}}
-<div class="overflow-x-auto whitespace-normal">
+<div class="relative overflow-x-auto whitespace-normal">
     <table class="w-full text-left text-sm">
         <thead class="text-xs text-ink-2">
             <tr>
