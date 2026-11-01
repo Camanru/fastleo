@@ -7,7 +7,6 @@ use Fastleo\Page;
 use Fastleo\Tests\Fixtures\Pages\SecretPage;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\View;
-use Override;
 
 beforeEach(function (): void {
     useFixtureResources('Pages');
