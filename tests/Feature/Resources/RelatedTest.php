@@ -13,6 +13,7 @@ use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Fastleo\Tests\Fixtures\Related\ArticleResource as ChildArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
 use Fastleo\Tests\Fixtures\RelatedColumns\CategoryResource as ColumnsCategoryResource;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -402,7 +403,12 @@ describe('the relation conditions', function (): void {
             ->assertDontSee('Черновик')
             ->assertDontSee('Чужая опубликованная');
 
-        $this->get($url.'?q=Черновик')->assertOk()->assertDontSee('Черновик');
+        $this->get($url.'?'.http_build_query(['q' => 'Черновик']))
+            ->assertOk()
+            ->assertViewHas('records', fn (LengthAwarePaginator $records): bool => $records->total() === 0);
+        $this->get($url.'?'.http_build_query(['q' => 'Опубликованная']))
+            ->assertOk()
+            ->assertViewHas('records', fn (LengthAwarePaginator $records): bool => $records->total() === 1);
     });
 
     it('stay in brackets: an orWhere of the relation does not open other parents or what the child section hides', function (): void {

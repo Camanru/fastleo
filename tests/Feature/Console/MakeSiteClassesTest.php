@@ -110,7 +110,7 @@ it('creates a report page with a period filter and no own view', function (): vo
     require $this->sandbox.'/Fastleo/LeadsReportPage.php';
 
     $this->actingAs(admin(), 'fastleo')
-        ->get(route('fastleo.pages.show', ['page' => 'leads-report', 'period' => ['from' => '2026-10-01', 'to' => '2026-10-31']]))
+        ->get(route('fastleo.pages.show', ['page' => 'leads-report', 'filter' => ['period' => ['from' => '2026-10-01', 'to' => '2026-10-31']]]))
         ->assertOk()
         ->assertSeeInOrder(['Дней в периоде', '31']);
 });
