@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Fields\Email;
+use Fastleo\Fields\Tel;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Settings;
+use Override;
+
+/**
+ * Настройки «Контакты»: телефон, почта, адрес. На сайте значения читает `fastleo_setting('contacts.phone')`.
+ */
+final class ContactsSettings extends Settings
+{
+    protected static ?string $label = 'Контакты';
+
+    protected static string $icon = 'phone';
+
+    protected static int $position = 10;
+
+    /**
+     * Поля страницы.
+     */
+    #[Override]
+    public function fields(): array
+    {
+        return [
+            Tel::make('phone', 'Телефон'),
+            Email::make('email', 'Почта'),
+            Text::make('address', 'Адрес'),
+            Textarea::make('working_hours', 'Часы работы')->help('Каждая строка — отдельная строка на сайте.'),
+        ];
+    }
+}

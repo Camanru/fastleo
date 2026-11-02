@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use {{ appNamespace }}\Enums\LeadStatus;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Заявка с сайта.
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $phone
+ * @property string|null $email
+ * @property string|null $message
+ * @property string|null $source
+ * @property LeadStatus $status
+ * @property \Illuminate\Support\Carbon|null $read_at
+ */
+class Lead extends Model
+{
+    use HasFactory;
+
+    /** Заполняемые поля. Статус и источник задаёт LeadController, отметку «просмотрено» — админка; с формы берутся только имя, телефон, почта и сообщение. */
+    protected $fillable = ['name', 'phone', 'email', 'message', 'source', 'status'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => LeadStatus::class,
+            'read_at' => 'datetime',
+        ];
+    }
+}

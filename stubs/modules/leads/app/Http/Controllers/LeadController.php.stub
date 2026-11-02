@@ -1,0 +1,65 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Enums\LeadStatus;
+use {{ appNamespace }}\Http\Requests\StoreLeadRequest;
+use {{ appNamespace }}\Models\Lead;
+use Fastleo\Fastleo;
+use Fastleo\Notifications\FastleoMessage;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Str;
+use Throwable;
+
+/**
+ * Приём заявок с форм сайта.
+ */
+class LeadController extends Controller
+{
+    /**
+     * Сохранить заявку и сообщить администраторам. Бот получает тот же ответ, но заявка не сохраняется;
+     * живой посетитель, отправивший форму слишком быстро или с устаревшей страницы, видит ошибку и может повторить.
+     */
+    public function store(StoreLeadRequest $request): RedirectResponse
+    {
+        if (! $request->isBot() && $request->isOutOfTime()) {
+            return back()->withInput()->withErrors(['form_token' => 'Форма отправлена слишком быстро или страница устарела. Подождите пару секунд и нажмите «Отправить» ещё раз.']);
+        }
+
+        if (! $request->isBot()) {
+            $lead = Lead::query()->create([
+                ...$request->safe()->only(['name', 'phone', 'email', 'message']),
+                'status' => LeadStatus::New,
+                'source' => $this->sourcePath($request),
+            ]);
+
+            // Заявка уже сохранена: сбой уведомления (почта, бот) не должен показывать посетителю ошибку.
+            try {
+                Fastleo::notifyAdmins(
+                    FastleoMessage::make('Новая заявка')
+                        ->body($lead->name.', '.$lead->phone)
+                        ->url(route('fastleo.resources.show', ['leads', $lead->id]))
+                        ->icon('inbox')
+                        ->level('success'),
+                );
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return back()->with('lead_sent', true);
+    }
+
+    /**
+     * Путь страницы, с которой отправлена форма (из заголовка Referer); не путь или не UTF-8 — null.
+     */
+    private function sourcePath(StoreLeadRequest $request): ?string
+    {
+        $path = parse_url((string) $request->headers->get('referer'), PHP_URL_PATH);
+
+        return is_string($path) && $path !== '' && mb_check_encoding($path, 'UTF-8') ? Str::limit($path, 250, '') : null;
+    }
+}

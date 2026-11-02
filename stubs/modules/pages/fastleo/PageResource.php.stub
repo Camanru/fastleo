@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\Page;
+use Fastleo\Fields\Block;
+use Fastleo\Fields\Blocks;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Страницы»: дерево страниц сайта, каждая собирается из блоков. Показ страниц на сайте — ваши маршруты и шаблоны
+ * (блоки выводит `<x-fastleo::blocks :blocks="$page->content" />`, SEO — `<x-fastleo::seo :model="$page" />`).
+ */
+final class PageResource extends Resource
+{
+    protected static string $model = Page::class;
+
+    /** Адрес pages занят самой админкой. */
+    protected static ?string $slug = 'site-pages';
+
+    protected static ?string $label = 'Страницы';
+
+    protected static ?string $singular = 'Страница';
+
+    protected static string $icon = 'file-text';
+
+    protected static ?string $group = 'Содержимое';
+
+    protected static int $position = 10;
+
+    protected static ?string $treeColumn = 'parent_id';
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля страницы.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Заголовок')->required()->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('title'),
+            BelongsTo::make('parent_id', 'Родитель')->hideInList(),
+            Toggle::make('is_published', 'Опубликована')->default(true)->quickToggle(),
+            Toggle::make('show_in_menu', 'В меню сайта')->help('Отметка для меню вашего сайта.'),
+            Toggle::make('is_home', 'Главная')->help('Отметка главной страницы для вашего сайта; отметьте одну.'),
+            Blocks::make('content', 'Содержимое')->blocks([
+                Block::make('text', 'Текст')->icon('text')->fields([RichText::make('body', 'Текст')->required()]),
+                Block::make('image', 'Картинка')->icon('image')->fields([
+                    Image::make('src', 'Картинка')->directory('pages')->required(),
+                    Text::make('caption', 'Подпись'),
+                ]),
+                Block::make('gallery', 'Галерея')->icon('images')->fields([
+                    Gallery::make('photos', 'Фотографии')->directory('pages')->max(12),
+                ]),
+                Block::make('cta', 'Призыв')->icon('megaphone')->fields([
+                    Text::make('title', 'Заголовок')->required(),
+                    Text::make('text', 'Текст'),
+                    Text::make('button', 'Кнопка'),
+                    Text::make('url', 'Ссылка')->help('Адрес вида /contacts или https://…'),
+                ]),
+            ])->max(50),
+            Seo::make('seo')->directory('pages'),
+        ];
+    }
+}

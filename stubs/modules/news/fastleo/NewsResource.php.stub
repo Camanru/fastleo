@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\News;
+use Fastleo\Fields\DateTime;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Новости»: обложка, анонс, текст, дата публикации и SEO.
+ * Показ новостей на сайте — ваши маршруты и шаблоны: `News::query()->published()->paginate(10)`.
+ */
+final class NewsResource extends Resource
+{
+    protected static string $model = News::class;
+
+    protected static ?string $label = 'Новости';
+
+    protected static ?string $singular = 'Новость';
+
+    protected static string $icon = 'newspaper';
+
+    protected static ?string $group = 'Содержимое';
+
+    protected static int $position = 20;
+
+    protected static ?array $defaultOrder = ['published_at', 'desc'];
+
+    /**
+     * Поля новости.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Заголовок')->required()->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('title'),
+            DateTime::make('published_at', 'Дата публикации')->help('Дата в будущем отложит показ новости на сайте до этого дня.')->sortable(),
+            Toggle::make('is_published', 'Опубликована')->default(true)->quickToggle(),
+            Image::make('cover', 'Обложка')->directory('news')->hideInList(),
+            Textarea::make('excerpt', 'Анонс')->rows(3)->hideInList(),
+            RichText::make('body', 'Текст'),
+            Seo::make('seo')->directory('news'),
+        ];
+    }
+}

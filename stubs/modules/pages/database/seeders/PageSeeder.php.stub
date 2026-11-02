@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\Page;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры страниц: главная и «О компании» (php artisan db:seed --class=PageSeeder).
+ */
+class PageSeeder extends Seeder
+{
+    /**
+     * Создать примеры, если страниц с такими адресами ещё нет.
+     */
+    public function run(): void
+    {
+        Page::query()->firstOrCreate(['slug' => 'home'], [
+            'title' => 'Главная',
+            'is_home' => true,
+            'is_published' => true,
+            'content' => [['type' => 'text', 'data' => ['body' => '<p>Добро пожаловать!</p>']]],
+        ]);
+
+        Page::query()->firstOrCreate(['slug' => 'about'], [
+            'title' => 'О компании',
+            'show_in_menu' => true,
+            'sort' => 1,
+            'is_published' => true,
+            'content' => [['type' => 'text', 'data' => ['body' => '<p>Расскажите о себе в админке: раздел «Страницы».</p>']]],
+        ]);
+    }
+}

@@ -165,6 +165,7 @@ class DoctorsAdminTest extends TestCase
 | Плитки и числа на главной | `Dashboard` и виджеты | [dashboard.md](dashboard.md) |
 | «Только свои записи», права по ролям | Policy модели + `query()` ресурса | [authorization.md](authorization.md), [recipes.md](recipes.md) |
 | Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](recipes.md) |
+| Готовый раздел «Страницы», «Новости», «Заявки» или «Контакты» в админке (без вёрстки сайта) | `php artisan fastleo:module pages` (или `news`, `leads`, `contacts`) | [modules.md](modules.md) |
 | Выгрузка и загрузка Excel | `$exportable`, `$importable` | [import-export.md](import-export.md) |
 
 ## Частые ошибки
@@ -289,6 +290,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | `fastleo:make-field Phone` | `Fields/Phone.php` + шаблон | `fields()` ресурса: [fields/custom.md](fields/custom.md) |
 | `fastleo:make-settings Contacts` | `ContactsSettings.php` со страницей настроек | находится сама: [settings.md](settings.md) |
 | `fastleo:make-dashboard` | `Dashboard.php` с набором виджетов | находится сам: [dashboard.md](dashboard.md) |
+| `fastleo:module news` | готовые разделы админки: `contacts`, `pages`, `news`, `leads` — миграции, модель, раздел, виджеты и тесты копируются в сайт (код сайта, не пакета); публичную часть (шаблоны, маршруты страниц) модули не создают | находятся сами: [modules.md](modules.md) |
 | `fastleo:make-policy Doctor [--model=…]` | `app/Policies/DoctorPolicy.php` со всеми способностями, которые спрашивает админка (везде `true`) | находится по правилам Laravel: [authorization.md](authorization.md) |
 
 ## MCP-сервер

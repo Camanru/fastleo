@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Enums\LeadStatus;
+use {{ appNamespace }}\Models\Lead;
+use Fastleo\Fields\Email;
+use Fastleo\Fields\Enum;
+use Fastleo\Fields\Tel;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Заявки»: заявки с формы сайта. Непросмотренные выделены, их число стоит в меню; о новой заявке
+ * администраторы узнают из колокольчика (в LeadController). Форма на сайте — ваша: см. StoreLeadRequest.
+ */
+final class LeadResource extends Resource
+{
+    protected static string $model = Lead::class;
+
+    protected static ?string $label = 'Заявки';
+
+    protected static ?string $singular = 'Заявка';
+
+    protected static string $icon = 'inbox';
+
+    protected static ?string $group = 'Содержимое';
+
+    protected static int $position = 30;
+
+    protected static ?string $readColumn = 'read_at';
+
+    protected static ?array $defaultOrder = ['created_at', 'desc'];
+
+    /**
+     * Поля заявки.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('name', 'Имя')->required()->maxLength(100)->searchable()->sortable(),
+            Tel::make('phone', 'Телефон')->required()->searchable(),
+            Email::make('email', 'Почта')->searchable()->hideInList(),
+            Textarea::make('message', 'Сообщение')->rows(4)->hideInList(),
+            Text::make('source', 'Страница')->readonly()->hideInList(),
+            Enum::make('status', 'Статус')->enum(LeadStatus::class)->badges()->default(LeadStatus::New->value)->sortable(),
+        ];
+    }
+}

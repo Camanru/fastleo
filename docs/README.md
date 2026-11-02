@@ -9,6 +9,7 @@
 3. [Поля](fields/README.md) — все типы полей и общие методы.
 4. [Права доступа](authorization.md) — Policy моделей: кто что может в разделе.
 5. [Работа с Claude](claude.md) — раздел одной фразой и команды `fastleo:doctor`, `fastleo:inspect`, `fastleo:make-*`.
+6. [Готовые модули сайта](modules.md) — `fastleo:module`: готовые разделы админки (контакты, страницы, новости, заявки) копируются в проект.
 
 ## FAQ
 

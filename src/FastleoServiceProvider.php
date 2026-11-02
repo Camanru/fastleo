@@ -23,6 +23,7 @@ use Fastleo\Console\MakeResourceCommand;
 use Fastleo\Console\MakeSettingsCommand;
 use Fastleo\Console\MakeWidgetCommand;
 use Fastleo\Console\McpCommand;
+use Fastleo\Console\ModuleCommand;
 use Fastleo\Console\PruneCommand;
 use Fastleo\Console\SkillCommand;
 use Fastleo\Console\SoftNeticaSyncCommand;
@@ -172,6 +173,7 @@ final class FastleoServiceProvider extends ServiceProvider
             MakeResourceCommand::class,
             MakeWidgetCommand::class,
             McpCommand::class,
+            ModuleCommand::class,
             PruneCommand::class,
             SkillCommand::class,
             SoftNeticaSyncCommand::class,

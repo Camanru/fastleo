@@ -153,6 +153,7 @@ class DoctorsAdminTest extends TestCase
 | Плитки и числа на главной | `Dashboard` и виджеты | [dashboard.md](vendor/camanru/fastleo/docs/dashboard.md) |
 | «Только свои записи», права по ролям | Policy модели + `query()` ресурса | [authorization.md](vendor/camanru/fastleo/docs/authorization.md), [recipes.md](vendor/camanru/fastleo/docs/recipes.md) |
 | Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](vendor/camanru/fastleo/docs/recipes.md) |
+| Готовый раздел «Страницы», «Новости», «Заявки» или «Контакты» в админке (без вёрстки сайта) | `php artisan fastleo:module pages` (или `news`, `leads`, `contacts`) | [modules.md](vendor/camanru/fastleo/docs/modules.md) |
 | Выгрузка и загрузка Excel | `$exportable`, `$importable` | [import-export.md](vendor/camanru/fastleo/docs/import-export.md) |
 
 ## Частые ошибки
@@ -277,6 +278,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | `fastleo:make-field Phone` | `Fields/Phone.php` + шаблон | `fields()` ресурса: [fields/custom.md](vendor/camanru/fastleo/docs/fields/custom.md) |
 | `fastleo:make-settings Contacts` | `ContactsSettings.php` со страницей настроек | находится сама: [settings.md](vendor/camanru/fastleo/docs/settings.md) |
 | `fastleo:make-dashboard` | `Dashboard.php` с набором виджетов | находится сам: [dashboard.md](vendor/camanru/fastleo/docs/dashboard.md) |
+| `fastleo:module news` | готовые разделы админки: `contacts`, `pages`, `news`, `leads` — миграции, модель, раздел, виджеты и тесты копируются в сайт (код сайта, не пакета); публичную часть (шаблоны, маршруты страниц) модули не создают | находятся сами: [modules.md](vendor/camanru/fastleo/docs/modules.md) |
 | `fastleo:make-policy Doctor [--model=…]` | `app/Policies/DoctorPolicy.php` со всеми способностями, которые спрашивает админка (везде `true`) | находится по правилам Laravel: [authorization.md](vendor/camanru/fastleo/docs/authorization.md) |
 
 ## MCP-сервер
@@ -400,6 +402,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 - [Раскладка формы](vendor/camanru/fastleo/docs/layout.md) — Поля в `fields()` можно группировать: вкладки, секции, колонки, боковая панель. Раскладка влияет только на форму — список и запись в базу от неё не зависят.
 - [Список записей](vendor/camanru/fastleo/docs/list.md) — Список раздела строится из тех же полей, что и форма. Столбец — каждое поле, видимое в списке.
 - [Переезд с другой админки](vendor/camanru/fastleo/docs/migrating.md) — Памятка для сайта, который уже работает с прежней админкой (MoonShine, самописной или другой) и переходит на fastleo. Разделы описываются классами…
+- [Готовые модули сайта](vendor/camanru/fastleo/docs/modules.md) — Команда `fastleo:module` копирует в сайт готовый раздел админки: страницу настроек, модель, миграцию, ресурс, виджеты главной страницы. **Публичную часть…
 - [Уведомления: колокольчик, Telegram и Max](vendor/camanru/fastleo/docs/notifications.md) — Колокольчик в шапке админки показывает уведомления администратору: новая заявка, импорт завершён, что-то сломалось. Дополнительно сообщение уходит в чаты…
 - [Свои страницы и журнал ошибок](vendor/camanru/fastleo/docs/pages.md) — Страница без модели: отчёт, инструкция для редакторов, панель управления. Класс наследует `Fastleo\Page`, лежит рядом с ресурсами, а шаблон — в…
 - [Публикации в Telegram и Max](vendor/camanru/fastleo/docs/publishing.md) — Записи сайта (новости, статьи, акции) можно публиковать в каналы Telegram и Max прямо из админки: боты пакета отправляют пост с текстом, картинками и…

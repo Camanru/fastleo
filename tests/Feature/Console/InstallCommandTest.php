@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Auth\FastleoUser;
 use Fastleo\Auth\HasFastleoAccess;
 use Fastleo\FastleoServiceProvider;
+use Fastleo\Installer\ChildArtisan;
 use Fastleo\Support\Assets;
 use Illuminate\Database\Migrations\MigrationRepositoryInterface;
 use Illuminate\Foundation\Auth\User as PlainUser;
@@ -30,7 +31,7 @@ afterEach(function (): void {
 it('publishes the config and assets and lists the next steps', function (): void {
     DB::table('migrations')->where('migration', '2026_10_28_000000_add_fastleo_admin_to_users_table')->delete();
 
-    $exitCode = Artisan::call('fastleo:install', ['--skill-path' => $this->sandbox.'/skill']);
+    $exitCode = Artisan::call('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true]);
 
     expect($exitCode)->toBe(0)
         ->and(Artisan::output())
@@ -43,7 +44,7 @@ it('publishes the config and assets and lists the next steps', function (): void
 });
 
 it('does not suggest migrate once the migrations of the package have run', function (): void {
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->doesntExpectOutputToContain('php artisan migrate')
         ->expectsOutputToContain('php artisan fastleo:user')
         ->assertSuccessful();
@@ -54,26 +55,26 @@ it('suggests migrate when the database cannot be read', function (): void {
         $repository->shouldReceive('repositoryExists')->andThrow(new RuntimeException('Нет соединения с базой.'));
     }));
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('php artisan migrate');
 });
 
 it('reminds about storage:link only while public/storage is missing', function (): void {
     config(['fastleo.files.disk' => 'public', 'filesystems.disks.public.driver' => 'local']);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('php artisan storage:link')
         ->assertSuccessful();
 
     File::ensureDirectoryExists(public_path('storage'));
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->doesntExpectOutputToContain('php artisan storage:link')
         ->assertSuccessful();
 });
 
 it('puts the Claude skill next to the site and refreshes it on a repeat run', function (): void {
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])->assertSuccessful();
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])->assertSuccessful();
 
     expect($this->sandbox.'/skill/SKILL.md')->toBeFile();
     expect(File::get($this->sandbox.'/skill/SKILL.md'))->toContain('name: fastleo');
@@ -89,7 +90,7 @@ it('puts the Claude skill next to the site and refreshes it on a repeat run', fu
 it('does not overwrite a config the site already has', function (): void {
     File::put(config_path('fastleo.php'), "<?php\n\nreturn ['path' => 'admin'];\n");
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])->assertSuccessful();
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])->assertSuccessful();
 
     expect(File::get(config_path('fastleo.php')))->toContain("'path' => 'admin'");
 });
@@ -97,7 +98,7 @@ it('does not overwrite a config the site already has', function (): void {
 it('warns when the queue runs synchronously', function (): void {
     config(['queue.default' => 'sync']);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('Очередь работает в режиме sync')
         ->assertSuccessful();
 });
@@ -105,7 +106,7 @@ it('warns when the queue runs synchronously', function (): void {
 it('does not warn when a queue worker is used', function (): void {
     config(['queue.default' => 'database']);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->doesntExpectOutputToContain('Очередь работает в режиме sync')
         ->assertSuccessful();
 });
@@ -131,6 +132,8 @@ function sandboxUserModel(string $sandbox): array
         class {$class} extends Authenticatable
         {
             use Notifiable;
+
+            protected \$table = 'users';
         }
 
         PHP);
@@ -143,8 +146,9 @@ function sandboxUserModel(string $sandbox): array
 
 it('connects a plain user model of the site to the admin panel', function (): void {
     $model = sandboxUserModel($this->sandbox);
+    fakeChildArtisan();
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('Модель '.$model['class'].' подключена к админке')
         ->assertSuccessful();
 
@@ -155,12 +159,67 @@ it('connects a plain user model of the site to the admin panel', function (): vo
         ->toContain('use HasFastleoAccess, Notifiable;');
 });
 
+/**
+ * Подмена дочернего процесса artisan: запоминает команды и отвечает заданным кодом.
+ */
+function fakeChildArtisan(int $exitCode = 0): object
+{
+    $fake = new class extends ChildArtisan
+    {
+        /** @var list<array{string, array<string, string|bool|null>, bool}> */
+        public array $calls = [];
+
+        public int $exitCode = 0;
+
+        #[Override]
+        public function run(string $command, array $arguments = [], bool $interactive = false, ?callable $output = null): int
+        {
+            $this->calls[] = [$command, $arguments, $interactive];
+
+            return $this->exitCode;
+        }
+    };
+    $fake->exitCode = $exitCode;
+    app()->instance(ChildArtisan::class, $fake);
+
+    return $fake;
+}
+
+it('creates the administrator and runs the check in a separate process in the run that has just connected the user model', function (): void {
+    sandboxUserModel($this->sandbox);
+    $child = fakeChildArtisan();
+
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true, '--no-modules' => true, '--admin-email' => 'own@example.com', '--admin-password' => 'secret-pass-1'])
+        ->assertSuccessful();
+
+    expect($child->calls)->toBe([
+        ['fastleo:user', ['email' => 'own@example.com', '--name' => 'Администратор', '--password' => 'secret-pass-1'], false],
+        ['fastleo:doctor', [], false],
+    ]);
+});
+
+it('does not start a separate process when the user model was connected earlier', function (): void {
+    $child = fakeChildArtisan();
+
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])->assertSuccessful();
+
+    expect($child->calls)->toBe([]);
+});
+
+it('fails when the separate process could not create the administrator', function (): void {
+    sandboxUserModel($this->sandbox);
+    fakeChildArtisan(1);
+
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true, '--no-modules' => true, '--admin-email' => 'own@example.com', '--admin-password' => 'secret-pass-1'])
+        ->assertFailed();
+});
+
 it('does not touch a user model file it cannot write and asks to connect it by hand', function (): void {
     $model = sandboxUserModel($this->sandbox);
     $original = File::get($model['file']);
     chmod($model['file'], 0o444);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('не подключена к админке')
         ->assertFailed();
 
@@ -176,7 +235,7 @@ it('does not connect a user model whose own file does not compile', function ():
     // Класс уже загружен, поэтому в песочнице подменяется только содержимое файла.
     File::put($model['file'], $broken);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain('не подключена к админке')
         ->assertFailed();
 
@@ -188,7 +247,7 @@ it('does not touch the user model when the site app folder is missing', function
     $original = File::get($model['file']);
     app()->useAppPath($this->sandbox.'/missing');
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])->assertFailed();
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])->assertFailed();
 
     expect(File::get($model['file']))->toBe($original);
 });
@@ -196,7 +255,7 @@ it('does not touch the user model when the site app folder is missing', function
 it('does not touch a user model outside the site app folder', function (string $model): void {
     config(['auth.providers.users.model' => $model]);
 
-    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill'])
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
         ->expectsOutputToContain(FastleoUser::class)
         ->assertFailed();
 })->with([
