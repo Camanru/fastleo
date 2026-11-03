@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Sleep;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Topic;
 
@@ -72,7 +73,7 @@ it('moves a branch root with its descendants by dragging in a tree', function ()
             // страница как раз перезагружается
         }
 
-        usleep(100_000);
+        Sleep::usleep(100_000);
     }
 
     $page->assertSeeIn('tbody tr:nth-child(1)', 'Второй')->assertSeeIn('tbody tr:nth-child(3)', 'Вложенный');
