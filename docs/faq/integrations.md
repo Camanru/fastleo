@@ -30,7 +30,7 @@ Route::post('leads', function (Request $request) {
     $lead = Lead::create($data);
 
     Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)
-        ->url(route('fastleo.resources.show', ['leads', $lead->id], false))->icon('inbox')->level('success'));
+        ->url(Fastleo::recordUrl($lead, false))->icon('inbox')->level('success'));
 
     return response()->json(['id' => $lead->id], 201);
 })->middleware('throttle:60,1');
@@ -146,7 +146,7 @@ Route::post('webhooks/calls', function (Request $request) {
 
     if ($call->wasRecentlyCreated && $call->status === 'missed') {
         Fastleo::notifyAdmins(FastleoMessage::make('Пропущенный звонок')->body($call->phone)
-            ->url(route('fastleo.resources.show', ['calls', $call->id], false))->icon('phone-missed')->level('warning'));
+            ->url(Fastleo::recordUrl($call, false))->icon('phone-missed')->level('warning'));
     }
 
     return response()->noContent();
@@ -281,7 +281,7 @@ Fastleo::notifyAdmins('Закончились остатки «Фильтр А-1
 Fastleo::notifyAdmins(
     FastleoMessage::make('Возврат оплаты')
         ->body("Заказ №{$order->number}, {$order->total} ₽")
-        ->url(route('fastleo.resources.show', ['orders', $order->id], false))
+        ->url(Fastleo::recordUrl($order, false))
         ->icon('undo-2')
         ->level('warning'), // info, success, warning, danger
 );
@@ -605,7 +605,7 @@ final class SendInvoice extends Action
 ```php
 use Fastleo\Fastleo;
 
-$url = Fastleo::mailUrl('fastleo.resources.show', ['orders', $order->id]);
+$url = Fastleo::recordUrl($order);
 // https://site.ru/fastleo/orders/42
 ```
 

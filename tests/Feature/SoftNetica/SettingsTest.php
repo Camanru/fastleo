@@ -8,6 +8,7 @@ use Fastleo\SoftNetica\SoftNeticaSettings;
 use Fastleo\SoftNetica\SyncState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,29 @@ beforeEach(function (): void {
 });
 
 describe('the page', function (): void {
+    it('can be closed with the manageFastleoSoftNetica gate', function (): void {
+        Gate::define('manageFastleoSoftNetica', fn (): bool => false);
+
+        $this->get(route('fastleo.dashboard'))->assertDontSee(route('fastleo.settings.edit', 'softnetica'), false);
+        $this->get(route('fastleo.settings.edit', 'softnetica'))->assertForbidden();
+
+        Gate::define('manageFastleoSoftNetica', fn (): bool => true);
+        $this->get(route('fastleo.settings.edit', 'softnetica'))->assertOk();
+    });
+
+    it('hides the dashboard widget from an administrator the gate closes, though the site is connected', function (): void {
+        useFixtureResources('Menu');
+        config(['fastleo.softnetica.enabled' => true]);
+        Fastleo::resources()->flush();
+        connectSoftNeticaWith();
+
+        Gate::define('manageFastleoSoftNetica', fn (): bool => true);
+        $this->get(route('fastleo.dashboard'))->assertSee('data-widget="SoftNetica"', false);
+
+        Gate::define('manageFastleoSoftNetica', fn (): bool => false);
+        $this->get(route('fastleo.dashboard'))->assertOk()->assertDontSee('data-widget="SoftNetica"', false);
+    });
+
     it('is in the menu and explains who gets the token', function (): void {
         $this->get(route('fastleo.dashboard'))->assertSee(route('fastleo.settings.edit', 'softnetica'), false);
 

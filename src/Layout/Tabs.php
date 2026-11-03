@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Fastleo\Layout;
 
+use Fastleo\Fastleo;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 use Override;
 
 /**
@@ -21,9 +23,21 @@ final class Tabs extends Layout
 {
     /**
      * Вкладки по порядку. Не-вкладка внутри — ошибка типа PHP (поле не потеряется молча).
+     *
+     * @throws InvalidArgumentException у двух вкладок одинаковый ключ адреса (`SEO` и `Seo`, названия из одних эмодзи)
      */
     public function __construct(Tab ...$tabs)
     {
+        $keys = [];
+
+        foreach ($tabs as $tab) {
+            if (isset($keys[$tab->key()])) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.tab_duplicate', ['first' => $keys[$tab->key()], 'second' => $tab->label, 'key' => $tab->key()], Fastleo::LOCALE));
+            }
+
+            $keys[$tab->key()] = $tab->label;
+        }
+
         parent::__construct(array_values($tabs));
     }
 

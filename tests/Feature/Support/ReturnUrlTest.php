@@ -16,6 +16,8 @@ it('keeps an address of the admin and drops everything else', function (string $
     'an encoded way out' => ['/%2e%2e/go', false],
     'an encoded way out in capitals' => ['/%2E%2E/go', false],
     'a dot in the query only' => ['/articles?q=a..b', true],
+    'a tab of the record page' => ['/products/5/edit#otzyvy', true],
+    'a way out hidden before the tab' => ['/../go#otzyvy', false],
 ]);
 
 it('drops addresses that are not strings or lead to another site', function (mixed $url): void {

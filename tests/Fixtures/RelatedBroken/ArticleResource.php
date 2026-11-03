@@ -17,11 +17,14 @@ final class ArticleResource extends Resource
 
     protected static ?string $slug = 'articles';
 
+    /** Описать раздел с ошибкой: два поля с одним именем. */
+    public static bool $duplicate = false;
+
     /**
      * Заголовок.
      */
     public function fields(): array
     {
-        return [Text::make('title')->required()];
+        return self::$duplicate ? [Text::make('title'), Text::make('title')] : [Text::make('title')->required()];
     }
 }

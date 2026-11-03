@@ -13,7 +13,7 @@ Fastleo::notifyAdmins('Новая заявка');
 Fastleo::notifyAdmins(
     FastleoMessage::make('Новая заявка')
         ->body('Иван, +7 900 000-00-00')
-        ->url(route('fastleo.resources.show', ['leads', $lead->id], false))
+        ->url(Fastleo::recordUrl($lead, false))
         ->icon('inbox')
         ->level('success'),
 );

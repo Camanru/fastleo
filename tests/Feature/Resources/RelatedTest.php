@@ -314,6 +314,18 @@ describe('a failed action form', function (): void {
     });
 });
 
+describe('a related table next to a section described wrongly', function (): void {
+    it('still gets the failed action form of its own table', function (): void {
+        useFixtureResources('RelatedNeighbour');
+        $article = categoryArticle($this->category);
+        $page = route('fastleo.resources.show', ['categories', $this->category->id]);
+
+        $this->from($page)->post(route('fastleo.resources.action', ['articles', 'stamp-articles']), ['ids' => [(string) $article->id], 'data' => ['code' => 'ошибка-ввода'], '_related' => 'articles', '_related_parent' => (string) $this->category->id])
+            ->assertRedirect($page)
+            ->assertSessionHas(RelatedController::pendingKey('articles', (string) $this->category->id));
+    });
+});
+
 describe('the way back', function (): void {
     it('keeps the way back in the form and drops "save and create"', function (): void {
         $page = route('fastleo.resources.show', ['categories', $this->category->id]);

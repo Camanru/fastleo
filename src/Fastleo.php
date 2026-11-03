@@ -28,6 +28,7 @@ use Fastleo\Support\UserModel;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Contracts\Auth\Factory as AuthFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use LogicException;
@@ -212,7 +213,7 @@ final class Fastleo
      *
      * ```php
      * Fastleo::notifyAdmins('Новая заявка');
-     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body('Иван')->url(route('fastleo.resources.show', ['leads', 7]))->icon('inbox'));
+     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body('Иван')->url(Fastleo::recordUrl($lead))->icon('inbox'));
      * ```
      */
     public static function notifyAdmins(FastleoMessage|string $message): void
@@ -254,6 +255,36 @@ final class Fastleo
                 rescue(fn () => Notification::route('mail', $email)->notify(new MessageMailNotification($message)));
             }
         }
+    }
+
+    /**
+     * У записи есть страница просмотра (`fastleo.record_view` не `false`; по умолчанию просмотр открывается в окне).
+     */
+    public static function recordView(): bool
+    {
+        return config('fastleo.record_view', 'modal') !== false;
+    }
+
+    /**
+     * Просмотр записи открывается в окне поверх страницы (`fastleo.record_view` = `'modal'`, по умолчанию), а не переходом на страницу.
+     */
+    public static function recordViewInModal(): bool
+    {
+        return config('fastleo.record_view', 'modal') === 'modal';
+    }
+
+    /**
+     * Адрес, по которому администратору открыть запись (для уведомлений, писем, ссылок сайта): страница просмотра, если она
+     * включена (`fastleo.record_view`), иначе форма правки; null — у модели нет раздела. Права не проверяются (ссылку строят и там,
+     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. `$absolute = false` — путь без хоста.
+     *
+     * ```php
+     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->url(Fastleo::recordUrl($lead)));
+     * ```
+     */
+    public static function recordUrl(Model $record, bool $absolute = true): ?string
+    {
+        return self::resources()->forModel($record::class)?->recordAddress($record, $absolute);
     }
 
     /**

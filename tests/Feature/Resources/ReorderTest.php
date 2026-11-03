@@ -148,7 +148,7 @@ describe('rights', function (): void {
         $this->post(route('fastleo.resources.reorder', 'open-topics'), ['id' => $hidden->id, 'direction' => 'down'])->assertNotFound();
         $this->post(route('fastleo.resources.reorder', 'open-topics'), ['id' => $open->id, 'direction' => 'up'])->assertRedirect();
 
-        expect($hidden->fresh()?->sort)->toBe(1)->and($open->fresh()?->sort)->toBe(1);
+        expect($hidden->fresh()?->sort)->toBe(1)->and($open->fresh()?->sort)->toBe(2);
     });
 });
 

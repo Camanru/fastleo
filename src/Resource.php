@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo;
 
+use Closure;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\DeleteRecords;
 use Fastleo\Actions\ForceDeleteRecords;
@@ -13,6 +14,7 @@ use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\Image;
 use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\Authorization;
@@ -24,6 +26,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Str;
+use Illuminate\Support\Uri;
 use LogicException;
 
 /**
@@ -216,7 +219,8 @@ abstract class Resource
 
     /**
      * Связанные таблицы на странице записи (просмотр и правка), под формой: записи других разделов, чей внешний
-     * ключ ведёт на эту запись. Не обязательно.
+     * ключ ведёт на эту запись. Не обязательно. Таблицу можно положить и во вкладку формы: `Tab::make('Отзывы', [Related::make(...)])`
+     * в `fields()` — тогда она показывается во вкладке, а не под формой.
      *
      * ```php
      * public function relations(): array
@@ -468,6 +472,110 @@ abstract class Resource
     public function showsRelations(Model $record): bool
     {
         return ! method_exists($record, 'trashed') || ! $record->trashed();
+    }
+
+    /**
+     * Адрес записи для списков и поиска: форма правки, если запись можно менять (и она не в корзине), иначе страница
+     * просмотра (если она включена: `fastleo.record_view`, и можно `view`), иначе null.
+     *
+     * Список с сотнями строк передаёт `$can` — свою проверку прав с запоминанием ответов, чтобы не спрашивать Policy
+     * по нескольку раз на строку.
+     *
+     * ```php
+     * $resource->recordUrl($article);                       // /fastleo/articles/5/edit
+     * $resource->recordUrl($article, ['return' => $back]);  // с адресом возврата
+     * ```
+     *
+     * @param  array<string, mixed>  $query
+     * @param  (Closure(string, Model): bool)|null  $can  проверка права (`'update'`, запись); по умолчанию — `Authorization`
+     */
+    public function recordUrl(Model $record, array $query = [], bool $absolute = true, ?Closure $can = null): ?string
+    {
+        $can ??= fn (string $ability, Model $model): bool => Authorization::allows($ability, $this, $model);
+
+        if (! $this->isTrashed($record) && $can('update', $record)) {
+            return route('fastleo.resources.edit', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute);
+        }
+
+        return Fastleo::recordView() && $can('view', $record)
+            ? route('fastleo.resources.show', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute)
+            : null;
+    }
+
+    /**
+     * Адрес записи для чтения (ссылки на связанную запись, уведомления, виджеты): страница просмотра, если она включена
+     * и можно `view`; без неё — форма правки, если запись можно менять; иначе null.
+     *
+     * @param  array<string, mixed>  $query
+     */
+    public function viewUrl(Model $record, array $query = [], bool $absolute = true): ?string
+    {
+        if (Fastleo::recordView()) {
+            return $this->showUrl($record, $query, $absolute);
+        }
+
+        return ! $this->isTrashed($record) && Authorization::allows('update', $this, $record)
+            ? route('fastleo.resources.edit', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute)
+            : null;
+    }
+
+    /**
+     * Адрес записи для уведомлений, писем и ссылок сайта: страница просмотра, если она включена (`fastleo.record_view`),
+     * иначе форма правки. Права не проверяются: ссылку строят там, где администратора нет (вебхук, очередь, команда),
+     * а открывшаяся страница проверит права сама.
+     *
+     * ```php
+     * $resource->recordAddress($lead);         // http://site.test/fastleo/leads/5
+     * $resource->recordAddress($lead, false);  // /fastleo/leads/5
+     * ```
+     */
+    public function recordAddress(Model $record, bool $absolute = true): string
+    {
+        return route(Fastleo::recordView() ? 'fastleo.resources.show' : 'fastleo.resources.edit', [static::slug(), $record->getKey()], $absolute);
+    }
+
+    /**
+     * Адрес для окна (страница без меню в iframe) по адресу страницы просмотра из `viewUrl()`: null, если окно не
+     * включено (`fastleo.record_view` не `'modal'`) или страницы нет. Права уже учтены в `viewUrl()`, Policy второй раз не зовётся.
+     *
+     * ```php
+     * Resource::viewModalUrl($resource->viewUrl($article));   // http://site.test/fastleo/articles/5?frame=1
+     * ```
+     */
+    public static function viewModalUrl(?string $viewUrl): ?string
+    {
+        return Fastleo::recordViewInModal() && $viewUrl !== null ? (string) Uri::of($viewUrl)->withQuery(['frame' => 1]) : null;
+    }
+
+    /**
+     * Страница просмотра записи (null — выключена или нельзя `view`).
+     *
+     * @param  array<string, mixed>  $query
+     */
+    private function showUrl(Model $record, array $query, bool $absolute): ?string
+    {
+        return Fastleo::recordView() && Authorization::allows('view', $this, $record)
+            ? route('fastleo.resources.show', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute)
+            : null;
+    }
+
+    /**
+     * Параметры адреса без пустых значений.
+     *
+     * @param  array<string, mixed>  $query
+     * @return array<string, mixed>
+     */
+    private function cleanQuery(array $query): array
+    {
+        return array_filter($query, fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * Запись в корзине.
+     */
+    private function isTrashed(Model $record): bool
+    {
+        return method_exists($record, 'trashed') && $record->trashed();
     }
 
     /**
@@ -754,7 +862,7 @@ abstract class Resource
      */
     public function schema(): FormSchema
     {
-        return $this->schema ??= new FormSchema($this->fields(), static::model());
+        return $this->schema ??= new FormSchema($this->fields(), static::model(), inResource: true);
     }
 
     /**
@@ -797,8 +905,21 @@ abstract class Resource
         }
 
         $relations = [];
+        $placed = [];
 
-        foreach ($this->relations() as $related) {
+        foreach ($this->schema()->tabTables() as ['related' => $related, 'key' => $key, 'topLevel' => $topLevel]) {
+            if (! $topLevel) {
+                throw new LogicException(__('fastleo::exceptions.related_tab_nested', ['relation' => $related->name], Fastleo::LOCALE));
+            }
+
+            if ($related->isAside()) {
+                throw new LogicException(__('fastleo::exceptions.related_tab_aside', ['relation' => $related->name], Fastleo::LOCALE));
+            }
+
+            $placed[] = $related->placeInTab($key);
+        }
+
+        foreach ([...$this->relations(), ...$placed] as $related) {
             if (isset($relations[$related->name])) {
                 throw new LogicException(__('fastleo::exceptions.related_duplicate', ['relation' => $related->name, 'resource' => static::class], Fastleo::LOCALE));
             }
@@ -806,7 +927,7 @@ abstract class Resource
             $relations[$related->name] = $related->bind($this);
 
             // Раскрывать нечего: у дочернего раздела нет своих связанных таблиц.
-            if ($related->isExpandable() && $related->child()->relations() === []) {
+            if ($related->isExpandable() && $related->child()->relations() === [] && $related->child()->schema()->tabTables() === []) {
                 throw new LogicException(__('fastleo::exceptions.related_expandable', ['relation' => $related->name, 'class' => $related->resource], Fastleo::LOCALE));
             }
         }
@@ -917,6 +1038,48 @@ abstract class Resource
     public function listFields(): array
     {
         return array_values(array_filter($this->schema()->fields(), fn (Field $field): bool => $field->isVisibleInList()));
+    }
+
+    /**
+     * Столбцы таблицы списка: поля списка без картинки, которая стоит в ячейке заголовка (`Image::inTitle()`),
+     * и без столбцов с `hideWhenEmpty()`, где на показанной странице (`$records`) все значения пустые.
+     * Первый столбец и столбец сортировки `$sorted` остаются всегда.
+     *
+     * ```php
+     * $resource->listColumns($records, 'phone2');
+     * ```
+     *
+     * @param  iterable<Model>  $records  записи страницы; пустая страница ничего не скрывает
+     * @return list<Field>
+     */
+    public function listColumns(iterable $records = [], ?string $sorted = null): array
+    {
+        $image = $this->titleImage();
+        $columns = array_values(array_filter($this->listFields(), fn (Field $field): bool => $field !== $image));
+        $records = is_array($records) ? $records : iterator_to_array($records, false);
+
+        if ($records === []) {
+            return $columns;
+        }
+
+        return array_values(array_filter($columns, fn (Field $field, int $index): bool => $index === 0
+            || $field->name === $sorted
+            || ! $field->isHiddenWhenEmpty()
+            || array_any($records, fn (Model $record): bool => ! $field->isEmptyInList($record)), ARRAY_FILTER_USE_BOTH));
+    }
+
+    /**
+     * Картинка, миниатюра которой стоит перед заголовком в первой ячейке списка (`Image::inTitle()`), или null.
+     */
+    public function titleImage(): ?Image
+    {
+        foreach ($this->listFields() as $field) {
+            if ($field instanceof Image && $field->isInTitle()) {
+                return $field;
+            }
+        }
+
+        return null;
     }
 
     /**

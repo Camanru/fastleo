@@ -17,7 +17,7 @@ use InvalidArgumentException;
  * Фильтр списка раздела: значение приходит из адреса `?filter[имя]=…`, недопустимое значение
  * не применяется (фильтр считается выключенным).
  *
- * Готовые фильтры: `SelectFilter`, `BooleanFilter`, `BelongsToFilter`, `BelongsToManyFilter`, `DateRangeFilter`.
+ * Готовые фильтры: `SelectFilter`, `BooleanFilter`, `BelongsToFilter`, `BelongsToManyFilter`, `DateRangeFilter`, `NumberRangeFilter`.
  * Свой запрос вместо условия по колонке — `using()`:
  *
  * ```php
@@ -111,7 +111,7 @@ abstract class Filter
      * в глобальном поиске и в MCP.
      *
      * Значение — то же, что приходит из адреса: строка варианта, `'1'`/`'0'` у «Да/Нет», у дат —
-     * `['from' => 'ГГГГ-ММ-ДД', 'to' => 'ГГГГ-ММ-ДД']`. Число (`auth()->id()`), `BackedEnum` и `bool` приводятся к строке сами.
+     * `['from' => 'ГГГГ-ММ-ДД', 'to' => 'ГГГГ-ММ-ДД']`, у чисел — `['from' => 100, 'to' => 500]`. Число (`auth()->id()`), `BackedEnum` и `bool` приводятся к строке сами.
      *
      * ```php
      * SelectFilter::make('status')->default('new');

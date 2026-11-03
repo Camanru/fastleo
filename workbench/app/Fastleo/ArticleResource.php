@@ -38,6 +38,7 @@ use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Filters\BelongsToManyFilter;
 use Fastleo\Filters\BooleanFilter;
 use Fastleo\Filters\DateRangeFilter;
+use Fastleo\Filters\NumberRangeFilter;
 use Fastleo\Filters\SelectFilter;
 use Fastleo\Layout\Aside;
 use Fastleo\Layout\Grid;
@@ -95,7 +96,7 @@ final class ArticleResource extends Resource
                     Textarea::make('excerpt', 'Анонс')->rows(4)->maxLength(1000)->searchable(),
                     Grid::make(3, [
                         Enum::make('status', 'Статус')->enum(ArticleStatus::class)->badges()->required()->sortable(),
-                        Number::make('views', 'Просмотры')->integer()->min(0)->default(0)->sortable(),
+                        Number::make('views', 'Просмотры')->integer()->min(0)->default(0)->sortable()->inlineEditable(),
                         Number::make('price', 'Цена, ₽')->min(0)->step(0.01)->hideInList(),
                     ]),
                     Select::make('tags', 'Метки')->multiple()->options([
@@ -111,7 +112,7 @@ final class ArticleResource extends Resource
                     Code::make('head_code', 'Код в <head>')->rows(6)->help('Вставляется на страницу статьи без изменений')->hideInList(),
                 ]),
                 Tab::make('Медиа', [
-                    Image::make('cover', 'Обложка')->directory('articles')->crop('16:9')->variants('card'),
+                    Image::make('cover', 'Обложка')->directory('articles')->crop('16:9')->variants('card')->inTitle(),
                     Gallery::make('gallery', 'Фотогалерея')->directory('articles')->max(20)->variants('photo')->hideInList(),
                     File::make('attachment', 'Файл для скачивания')->extensions(['pdf', 'docx', 'xlsx'])->directory('documents')->hideInList(),
                 ]),
@@ -137,8 +138,8 @@ final class ArticleResource extends Resource
                 Tab::make('Контакты', [
                     Section::make('Автор', [
                         Grid::make(2, [
-                            Email::make('author_email', 'Email автора')->searchable()->hideInList(),
-                            Tel::make('phone', 'Телефон')->placeholder('+7 900 000-00-00')->hideInList(),
+                            Email::make('author_email', 'Email автора')->searchable()->hideWhenEmpty(),
+                            Tel::make('phone', 'Телефон')->placeholder('+7 900 000-00-00')->hideWhenEmpty(),
                         ]),
                         Url::make('source_url', 'Источник')->help('Адрес страницы, откуда взят материал')->hideInList(),
                     ])->description('Не показывается на сайте'),
@@ -151,7 +152,7 @@ final class ArticleResource extends Resource
                 ]),
             ]),
             Aside::make([
-                Toggle::make('is_published', 'Опубликовано')->sortable()->hideInList(),
+                Toggle::make('is_published', 'Опубликовано')->sortable()->quickToggle(),
                 Radio::make('layout', 'Вид страницы')->options(['wide' => 'Широкий', 'narrow' => 'Узкий'])->default('wide')->hideInList(),
                 Range::make('rating', 'Оценка редакции')->max(10)->default(0)->hideInList(),
                 Checkbox::make('is_featured', 'На главной')->hideInList(),
@@ -174,6 +175,7 @@ final class ArticleResource extends Resource
             BooleanFilter::make('is_published'),
             SelectFilter::make('tags'),
             DateRangeFilter::make('published_on'),
+            NumberRangeFilter::make('views', 'Просмотры'),
             SelectFilter::make('popularity', 'Популярность')
                 ->options(['popular' => 'Больше 1000 просмотров', 'quiet' => 'До 100 просмотров'])
                 ->using(fn (Builder $query, string $value) => $value === 'popular' ? $query->where('views', '>', 1000) : $query->where('views', '<=', 100)),
@@ -192,6 +194,19 @@ final class ArticleResource extends Resource
                 ->images([$article->cover])
                 ->button('Читать на сайте', route('articles.show', $article->id))),
         ];
+    }
+
+    /**
+     * Цвет строки по статусу: черновик серый, на проверке жёлтый, опубликовано зелёное.
+     */
+    public function rowTone(Model $record): ?string
+    {
+        return match ($record->getAttribute('status')) {
+            ArticleStatus::Draft => 'neutral',
+            ArticleStatus::Review => 'warning',
+            ArticleStatus::Published => 'success',
+            default => null,
+        };
     }
 
     /**

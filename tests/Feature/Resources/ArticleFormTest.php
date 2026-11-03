@@ -152,7 +152,7 @@ it('opens the tab that has an error', function (): void {
     $response = $this->withSession(['errors' => (new ViewErrorBag)->put('default', new MessageBag(['author_email' => 'Ошибка']))])
         ->get(route('fastleo.resources.create', 'articles'));
 
-    $response->assertOk()->assertSee('x-data="{ tab: 4 }"', false);
+    $response->assertOk()->assertSee('active: 4, failed: true', false);
 });
 
 it('shows list values formatted by field type', function (): void {

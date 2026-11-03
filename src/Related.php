@@ -8,6 +8,7 @@ use Closure;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\Nested;
+use Fastleo\Support\Authorization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany as HasManyRelation;
@@ -36,6 +37,10 @@ use LogicException;
  */
 final class Related
 {
+    public const string EDIT_PAGE = 'page';
+
+    public const string EDIT_MODAL = 'modal';
+
     /**
      * Связь родителя, привязанная к ресурсу (после `bind()`).
      *
@@ -46,9 +51,18 @@ final class Related
     /** Дочерний раздел (после `bind()`). */
     private ?Resource $child = null;
 
+    /** Раздел-родитель (после `bind()`). */
+    private ?Resource $parent = null;
+
     private bool $expandable = false;
 
     private bool $aside = false;
+
+    /** Ключ вкладки, в которую таблица положена в `fields()` (null — таблица из `relations()`, под формой). */
+    private ?string $tabKey = null;
+
+    /** Правка и «Добавить»: `page` — страница раздела с возвратом, `modal` — форма раздела в окне. */
+    private string $editIn = self::EDIT_PAGE;
 
     /** @var list<string> */
     private array $quickAdd = [];
@@ -248,6 +262,77 @@ final class Related
     }
 
     /**
+     * Где править запись из таблицы и добавлять новую: `page` (по умолчанию) — страница дочернего раздела с возвратом сюда,
+     * `modal` — форма дочернего раздела в окне, после сохранения окно закрывается и таблица обновляется. Окно всегда
+     * показывает полную форму раздела: для раздела с вкладками, файлами и своими связанными таблицами лучше `page`.
+     *
+     * ```php
+     * Related::make('reviews', ReviewResource::class)->editIn('modal');
+     * ```
+     *
+     * @throws InvalidArgumentException неизвестное место
+     */
+    public function editIn(string $place): self
+    {
+        if (! in_array($place, [self::EDIT_PAGE, self::EDIT_MODAL], true)) {
+            throw new InvalidArgumentException(__('fastleo::exceptions.related_edit_in', ['relation' => $this->name, 'place' => $place], Fastleo::LOCALE));
+        }
+
+        $this->editIn = $place;
+
+        return $this;
+    }
+
+    /**
+     * Запись правится в окне.
+     */
+    public function editsInModal(): bool
+    {
+        return $this->editIn === self::EDIT_MODAL;
+    }
+
+    /**
+     * Таблица лежит во вкладке формы (описана в `fields()`), а не в `relations()`.
+     */
+    public function isInTab(): bool
+    {
+        return $this->tabKey !== null;
+    }
+
+    /**
+     * Ключ вкладки (для адреса `#ключ`) или null.
+     */
+    public function tabKey(): ?string
+    {
+        return $this->tabKey;
+    }
+
+    /**
+     * Пометить таблицу как лежащую во вкладке с этим ключом.
+     *
+     * @internal вызывает `Resource::listRelations()`
+     */
+    public function placeInTab(string $key): self
+    {
+        $this->tabKey = $key;
+
+        return $this;
+    }
+
+    /**
+     * Таблицу можно показать на странице этой записи: запись есть (не создание) и не в корзине, администратору разрешено
+     * открыть запись родителя и список дочернего раздела.
+     */
+    public function isVisibleFor(?Model $record): bool
+    {
+        return $record instanceof Model
+            && $this->parent instanceof Resource
+            && $this->parent->showsRelations($record)
+            && Authorization::allows('view', $this->parent, $record)
+            && Authorization::allows('viewAny', $this->child());
+    }
+
+    /**
      * Сколько записей показывать на странице таблицы (по умолчанию — как в списке дочернего раздела), от 1 до 100.
      *
      * ```php
@@ -285,6 +370,13 @@ final class Related
             throw new LogicException(__('fastleo::exceptions.related_resource', ['relation' => $this->name, 'class' => $this->resource], Fastleo::LOCALE));
         }
 
+        // Ошибка в описании дочернего раздела всплывает у родителя: называем таблицу и класс, иначе виноватым выглядит родитель.
+        try {
+            $child->schema();
+        } catch (InvalidArgumentException|LogicException $exception) {
+            throw new LogicException(__('fastleo::exceptions.related_child_broken', ['relation' => $this->name, 'class' => $this->resource, 'message' => $exception->getMessage()], Fastleo::LOCALE), 0, $exception);
+        }
+
         if (! $relation->getRelated() instanceof ($child::model())) {
             throw new LogicException(__('fastleo::exceptions.related_model', [
                 'relation' => $this->name, 'model' => $relation->getRelated()::class, 'class' => $this->resource, 'other' => $child::model(),
@@ -298,6 +390,7 @@ final class Related
         }
 
         $this->child = $child;
+        $this->parent = $parent;
         $this->relation = $relation;
         $this->assertColumns();
         $this->assertQuickAdd();

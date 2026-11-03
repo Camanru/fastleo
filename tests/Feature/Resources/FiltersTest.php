@@ -107,6 +107,57 @@ it('ignores dates that do not exist', function (mixed $range): void {
     'not a range' => '2026-03-08',
 ]);
 
+it('keeps both ends of a number range', function (): void {
+    foreach ([99 => 'Меньше', 100 => 'Начало', 500 => 'Конец', 501 => 'Больше'] as $views => $title) {
+        Article::factory()->create(['title' => $title, 'views' => $views]);
+    }
+
+    expect(filteredTitles(['views' => ['from' => '100', 'to' => '500']]))->toBe(['Конец', 'Начало'])
+        ->and(filteredTitles(['views' => ['from' => '500']]))->toBe(['Больше', 'Конец'])
+        ->and(filteredTitles(['views' => ['to' => '99']]))->toBe(['Меньше'])
+        ->and(filteredTitles(['views' => ['from' => '100,5', 'to' => '500.0']]))->toBe(['Конец']);
+});
+
+it('rounds a fractional end inwards for an integer column and keeps it for a decimal one', function (): void {
+    foreach ([[99, '10.00'], [100, '10.50'], [101, '10.51'], [500, '11.00']] as [$views, $price]) {
+        Article::factory()->create(['title' => "Просмотры $views", 'views' => $views, 'price' => $price]);
+    }
+
+    expect(filteredTitles(['views' => ['from' => '99.5', 'to' => '500.5']]))->toBe(['Просмотры 100', 'Просмотры 101', 'Просмотры 500'])
+        ->and(filteredTitles(['views' => ['from' => '100.0', 'to' => '100.9']]))->toBe(['Просмотры 100'])
+        ->and(filteredTitles(['price' => ['from' => '10.5', 'to' => '10.505']]))->toBe(['Просмотры 100']);
+});
+
+it('does not fail on a bound wider than the integer column', function (): void {
+    Article::factory()->create(['title' => 'Обычная', 'views' => 10]);
+
+    expect(filteredTitles(['views' => ['from' => '3000000000']]))->toBe([])
+        ->and(filteredTitles(['views' => ['to' => '-3000000000']]))->toBe([])
+        ->and(filteredTitles(['views' => ['from' => '-3000000000', 'to' => '99999999999']]))->toBe(['Обычная'])
+        ->and(filteredTitles(['views' => ['from' => '2147483648.5']]))->toBe([]);
+});
+
+it('ignores a number range that is not a number', function (mixed $range): void {
+    Article::factory()->count(2)->create();
+
+    expect(filteredTitles(['views' => $range]))->toHaveCount(2);
+})->with([
+    'letters' => [['from' => 'abc', 'to' => '1e5']],
+    'sql' => [['from' => '1 OR 1=1']],
+    'too long' => [['from' => str_repeat('9', 40)]],
+    'empty ends' => [['from' => '', 'to' => '']],
+    'array ends' => [['from' => ['1'], 'to' => ['2']]],
+    'not a range' => '100',
+]);
+
+it('shows the number range in the filter panel with the chosen ends', function (): void {
+    $this->get(route('fastleo.resources.index', ['resource' => 'articles', 'filter' => ['views' => ['from' => '10', 'to' => '20']]]))
+        ->assertOk()
+        ->assertSee('data-filters-count>1</span>', false)
+        ->assertSee('name="filter[views][from]" value="10"', false)
+        ->assertSee('name="filter[views][to]" value="20"', false);
+});
+
 it('runs the own query of a filter', function (): void {
     Article::factory()->create(['title' => 'Популярная', 'views' => 5000]);
     Article::factory()->create(['title' => 'Тихая', 'views' => 10]);

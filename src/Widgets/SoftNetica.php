@@ -27,12 +27,12 @@ use Override;
 final class SoftNetica extends Widget
 {
     /**
-     * Виден администратору, если сайт подключён к SoftNetica.
+     * Виден администратору, если сайт подключён к SoftNetica и Gate `manageFastleoSoftNetica` разрешает ему раздел.
      */
     #[Override]
     public function isVisible(): bool
     {
-        return Connection::connected() && parent::isVisible();
+        return Connection::canManage() && Connection::connected() && parent::isVisible();
     }
 
     #[Override]

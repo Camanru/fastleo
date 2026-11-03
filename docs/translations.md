@@ -61,6 +61,10 @@ DB::table('pages')->whereNotNull('title')->orderBy('id')->each(fn (object $page)
 Schema::table('pages', fn (Blueprint $table) => $table->json('title')->change());
 ```
 
+## Что не переводится
+
+`translatable()` работает у полей разделов (`Text`, `Textarea`, `RichText`, `Seo`). Не переводятся поля внутри блоков [конструктора](blocks.md), поля страниц настроек ([settings.md](settings.md)) и значения `Select`: двуязычный лендинг делайте разделами с переводимыми полями (оффер, преимущества, FAQ) или двумя наборами блоков с полем «Язык». Если колонка переводимая (`json`), поле `BelongsTo` другого раздела, которое берёт название из неё (`titleColumn('name')`), показывает название на основном языке (`fastleo.locales[0]`), а при его отсутствии — на первом заполненном.
+
 ## Языки
 
 - Список — `fastleo.locales` ([configuration.md](configuration.md#языки-содержимого)); `null` — один язык сайта (`app.locale`), вкладок нет, значение всё равно хранится объектом `{"ru": "…"}`.

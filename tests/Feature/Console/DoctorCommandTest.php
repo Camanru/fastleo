@@ -12,6 +12,7 @@ use Fastleo\Support\SchedulerPulse;
 use Fastleo\Tests\Fixtures\Fields\StrictRichText;
 use Fastleo\Tests\Fixtures\QuickAdd\CategoryResource as QuickAddCategoryResource;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
+use Fastleo\Tests\Fixtures\RelatedBroken\ArticleResource as BrokenArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
@@ -33,6 +34,7 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     File::deleteDirectory($this->sandbox);
+    BrokenArticleResource::$duplicate = false;
 });
 
 /**
@@ -92,6 +94,57 @@ it('reports a read column that cannot hold the time of reading', function (): vo
         ->and(collect(diagnosed()['problems'])->firstWhere('scope', 'read-flag')['hint'] ?? null)->toBe("\$table->timestamp('is_published')->nullable()->index();");
 });
 
+it('reports a record_view value that is none of modal, page and false', function (): void {
+    foreach (['modal', 'page', false] as $value) {
+        config(['fastleo.record_view' => $value]);
+
+        expect(implode("\n", messages('site', 'error')))->not->toContain('fastleo.record_view');
+    }
+
+    config(['fastleo.record_view' => true]);
+
+    expect(implode("\n", messages('site', 'error')))->toContain("Настройка fastleo.record_view принимает 'modal', 'page' или false, а задано true");
+});
+
+it('reports an icon that is not in the set, before it breaks every page of the admin', function (): void {
+    useFixtureResources('DoctorIcon');
+
+    expect(implode("\n", messages('bad-icon', 'error')))->toContain('Иконки «message-square-star» нет в наборе пакета')
+        ->and(collect(diagnosed()['problems'])->firstWhere('scope', 'bad-icon')['hint'] ?? null)->toContain('lucide.dev/icons');
+});
+
+it('reports an icon of an action that is not in the set', function (): void {
+    useFixtureResources('DoctorIcon');
+
+    expect(implode("\n", messages('bad-action-icon', 'error')))->toContain('Иконки «message-square-star» нет в наборе пакета');
+});
+
+it('reports an icon of a settings page that is not in the set', function (): void {
+    useFixtureResources('DoctorIcon');
+
+    expect(implode("\n", messages('bad-settings-icon', 'error')))->toContain('Иконки «message-square-star» нет в наборе пакета');
+});
+
+it('reports an icon of a custom page that is not in the set', function (): void {
+    useFixtureResources('DoctorIcon');
+
+    expect(implode("\n", messages('bad-page-icon', 'error')))->toContain('Иконки «message-square-star» нет в наборе пакета');
+});
+
+it('reports a text field over a column that is cast to an enum', function (): void {
+    useFixtureResources('DoctorEnumText');
+
+    expect(implode("\n", messages('status-text', 'error')))->toContain('Поле «status» — текст, а в модели его колонка приводится к enum');
+});
+
+it('does not report a text field over an enum column that the form does not write', function (): void {
+    useFixtureResources('DoctorEnumText');
+
+    expect(messages('status-readonly', 'error'))->toBe([])
+        ->and(messages('status-in-list', 'error'))->toBe([])
+        ->and(messages('status-readonly-section', 'error'))->toBe([]);
+});
+
 it('warns about a NOT NULL column without required()', function (): void {
     useFixtureResources('Doctor');
 
@@ -118,6 +171,14 @@ it('reports a related table that is described wrongly', function (): void {
     BrokenCategoryResource::$mode = 'conflict';
 
     expect(implode("\n", messages('categories', 'error')))->toContain('перезапишет');
+});
+
+it('names the related table when its section is described wrongly', function (): void {
+    useFixtureResources('RelatedBroken');
+    BrokenCategoryResource::$mode = 'conflict';
+    BrokenArticleResource::$duplicate = true;
+
+    expect(implode("\n", messages('categories', 'error')))->toContain('Связанная таблица «articles»')->toContain('описано в ресурсе дважды');
 });
 
 it('finds no problems in a properly described related table', function (): void {
@@ -369,12 +430,15 @@ it('warns that the queue hands an import to a second worker while the first stil
 it('says when a relation list switches to the search on the server', function (): void {
     Category::factory()->count(3)->create();
 
-    expect(implode("\n", messages('articles', 'warning')))->not->toContain('relations.preload');
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('relations.preload');
 
     config(['fastleo.relations.preload' => 2]);
 
-    expect(implode("\n", messages('articles', 'warning')))
-        ->toContain('Поле «category_id»: связанных записей больше 2 (fastleo.relations.preload) — вместо списка вариантов форма и фильтр показывают поиск по серверу');
+    // Одно сводное предупреждение на сайт, а не по строке на каждое поле.
+    expect(implode("\n", messages('site', 'warning')))
+        ->toContain('Связанных записей больше 2 (fastleo.relations.preload) — вместо списка вариантов форма и фильтр показывают поиск по серверу')
+        ->toContain('articles.category_id');
+    expect(implode("\n", messages('articles', 'warning')))->not->toContain('relations.preload');
 });
 
 it('does not check the queue timeout on a site without imports', function (): void {
@@ -450,6 +514,17 @@ describe('columns against the rules of the fields', function (): void {
 
     it('counts every chosen value of a multiple list as a field of the form', function (): void {
         expect(implode("\n", messages('wide-select', 'warning')))->toContain('Форма раздела может отправить до 1106 полей, а PHP принимает 1000');
+    });
+
+    it('does not count a relation with server search as all its records against max_input_vars', function (): void {
+        DB::table('topics')->insert(array_map(fn (int $number): array => ['title' => 'Тема '.$number, 'sort' => 0, 'created_at' => now(), 'updated_at' => now()], range(1, 1100)));
+
+        expect(implode("\n", messages('wide-tags', 'warning')))->not->toContain('Форма раздела может отправить');
+
+        config(['fastleo.relations.preload' => 2000]);
+        Fastleo::resources()->flush();
+
+        expect(implode("\n", messages('wide-tags', 'warning')))->toContain('Форма раздела может отправить до 1106 полей, а PHP принимает 1000');
     });
 });
 
@@ -766,7 +841,7 @@ describe('relations and blocks that do not work', function (): void {
     });
 
     it('does not count the options of a relation whose table does not exist', function (): void {
-        expect(implode("\n", messages('broken-relations', 'warning')))->not->toContain('поиск по серверу');
+        expect(implode("\n", messages('site', 'warning')))->not->toContain('broken-relations');
     });
 
     it('warns that a computed column is not read when the query of the resource fails', function (): void {

@@ -16,6 +16,7 @@ use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Filters\BelongsToManyFilter;
 use Fastleo\Filters\BooleanFilter;
 use Fastleo\Filters\DateRangeFilter;
+use Fastleo\Filters\NumberRangeFilter;
 use Fastleo\Filters\SelectFilter;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
@@ -60,6 +61,8 @@ final class ArticleResource extends Resource
             DateRangeFilter::make('published_on'),
             DateRangeFilter::make('starts_at'),
             DateRangeFilter::make('created_at', 'Создано'),
+            NumberRangeFilter::make('views', 'Просмотры'),
+            NumberRangeFilter::make('price', 'Цена'),
             SelectFilter::make('popular', 'Популярность')
                 ->options(['yes' => 'Больше 1000 просмотров'])
                 ->using(fn (Builder $query, string $value) => $query->where('views', '>', 1000)),

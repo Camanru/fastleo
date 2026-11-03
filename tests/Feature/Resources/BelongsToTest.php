@@ -3,13 +3,84 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Tests\Fixtures\Policies\ViewlessCategoryPolicy;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Js;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 
 beforeEach(function (): void {
     $this->actingAs(admin(), Fastleo::GUARD);
+});
+
+describe('list', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('Filters');
+    });
+
+    it('shows the category as a link to its page', function (): void {
+        config(['fastleo.record_view' => 'page']);
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id]);
+
+        $this->get(route('fastleo.resources.index', 'articles'))
+            ->assertOk()
+            ->assertSee('<a href="'.route('fastleo.resources.show', ['categories', $news->id]).'" class="hover:text-primary-text hover:underline" data-related-link>Новости</a>', false);
+    });
+
+    it('does not make a link of a category the administrator may not view', function (): void {
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id]);
+        Gate::policy(Category::class, ViewlessCategoryPolicy::class);
+
+        $this->get(route('fastleo.resources.index', 'articles'))
+            ->assertOk()
+            ->assertSee('Новости')
+            ->assertDontSee(route('fastleo.resources.show', ['categories', $news->id]), false);
+    });
+
+    it('leaves the title of a category plain when the model has no section', function (): void {
+        useFixtureResources('LinkNone');
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id]);
+
+        $this->get(route('fastleo.resources.index', 'articles'))
+            ->assertOk()
+            ->assertSee('Новости')
+            ->assertDontSee('data-related-link', false);
+    });
+
+    it('does not link a category that is edited in the cell', function (): void {
+        useFixtureResources('LinkInline');
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id]);
+
+        $this->get(route('fastleo.resources.index', 'articles'))->assertOk()->assertDontSee('data-related-link', false);
+    });
+
+    it('does not wrap a category rendered as HTML into another link', function (): void {
+        useFixtureResources('LinkHtml');
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id]);
+
+        $this->get(route('fastleo.resources.index', 'articles'))->assertOk()->assertSee('<b>', false)->assertDontSee('data-related-link', false);
+    });
+
+    it('does not link an empty value', function (): void {
+        $article = Article::factory()->create(['title' => 'Без категории', 'category_id' => null]);
+
+        $this->get(route('fastleo.resources.index', 'articles'))->assertOk()->assertSee('Без категории')->assertDontSee('data-related-link', false);
+        expect(Fastleo::resources()->find('articles')?->schema()->field('category_id')?->linkUrl($article))->toBeNull();
+    });
+
+    it('does not link the category in the trash', function (): void {
+        $news = Category::factory()->create(['title' => 'Новости']);
+        Article::factory()->create(['title' => 'Статья', 'category_id' => $news->id])->delete();
+
+        $this->get(route('fastleo.resources.index', ['resource' => 'articles', 'trashed' => 1]))->assertOk()->assertDontSee('data-related-link', false);
+    });
 });
 
 describe('form', function (): void {
@@ -153,4 +224,20 @@ describe('options', function (): void {
         'unknown field' => ['scoped-articles', 'nothing'],
         'readonly relation' => ['locked-articles', 'category_id'],
     ]);
+});
+
+it('names a related record by the main language even when another language comes first in the array', function (): void {
+    config(['fastleo.locales' => ['ru', 'en']]);
+    $field = BelongsTo::make('category_id')->titleColumn('title');
+
+    expect($field->titleOf(new Category(['title' => ['en' => 'News', 'ru' => 'Новости']])))->toBe('Новости');
+});
+
+it('names a related record by the main language when its title column is translatable', function (): void {
+    config(['fastleo.locales' => ['ru', 'en']]);
+    $field = BelongsTo::make('category_id')->titleColumn('title');
+
+    expect($field->titleOf(new Category(['title' => ['ru' => 'Новости', 'en' => 'News']])))->toBe('Новости')
+        ->and($field->titleOf(new Category(['title' => ['ru' => '', 'en' => 'News']])))->toBe('News')
+        ->and($field->titleOf(new Category(['title' => ['ru' => '']])))->toBe('');
 });

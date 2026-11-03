@@ -23,7 +23,7 @@ it('shows the unread count, lists notifications in the bell and marks them as re
         ->assertSee('Новая заявка')
         ->assertSee('Иван')
         ->assertSee('Вторая')
-        ->click('[data-bell-list] li:nth-child(2) a')
+        ->click('[data-bell-list] a:has-text("Новая заявка")')
         ->assertPathIs('/fastleo/profile')
         ->assertSeeIn('[data-bell-count]', '1')
         ->assertNoJavaScriptErrors();

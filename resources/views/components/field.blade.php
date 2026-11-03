@@ -8,7 +8,7 @@
     $duplicate = $error ? $field->duplicateRecord(old($path)) : null;
     $duplicateResource = $duplicate ? \Fastleo\Fastleo::resources()->find((string) request()->route('resource')) : null;
     // Ссылка — только на запись этого же раздела, видимую в его `query()`, иначе название чужой записи выдавало бы себя.
-    $duplicateUrl = $duplicate && $duplicateResource && $duplicate instanceof ($duplicateResource::model()) && $duplicateResource->newQuery()->whereKey($duplicate->getKey())->exists() && \Fastleo\Support\Authorization::allows('view', $duplicateResource, $duplicate) ? route('fastleo.resources.show', [$duplicateResource::slug(), $duplicate->getKey()]) : null;
+    $duplicateUrl = $duplicate && $duplicateResource && $duplicate instanceof ($duplicateResource::model()) && $duplicateResource->newQuery()->whereKey($duplicate->getKey())->exists() ? $duplicateResource->viewUrl($duplicate) : null;
 @endphp
 <div {{ $attributes->class(['flex flex-col gap-1.5']) }} data-field="{{ $path }}">
     {{-- У многоязычного поля подпись — над вкладками языков (form.translatable). --}}

@@ -305,11 +305,16 @@ trait QueriesRelatedRecords
     }
 
     /**
-     * Подпись связанной записи.
+     * Подпись связанной записи. Многоязычная колонка (`translatable()` у связанного раздела) — название на основном
+     * языке, а если его нет — на первом заполненном.
      */
     public function titleOf(Model $record): string
     {
         $title = $record->getAttribute($this->getTitleColumn());
+
+        if (is_array($title)) {
+            $title = array_find([$title[Fastleo::locales()[0]] ?? null, ...array_values($title)], fn (mixed $text): bool => is_string($text) && $text !== '');
+        }
 
         return is_scalar($title) || $title instanceof \Stringable ? (string) $title : self::key($record);
     }

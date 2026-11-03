@@ -123,6 +123,7 @@ Route::group([
                 Route::get('{id}/history', [ActivityController::class, 'history'])->name('history');
                 Route::get('{id}/related/{relation}', RelatedController::class)->where('relation', '[A-Za-z_]\w*')->name('related');
                 Route::post('{id}/related/{relation}', [RelatedController::class, 'store'])->where('relation', '[A-Za-z_]\w*')->name('related.store');
+                Route::post('{id}/related/{relation}/reorder', [RelatedController::class, 'reorder'])->where('relation', '[A-Za-z_]\w*')->name('related.reorder');
                 Route::get('{id}/expand', ExpandController::class)->name('expand');
                 Route::patch('{id}/inline/{field}', InlineController::class)->where('field', '[A-Za-z_]\w*')->name('inline');
                 Route::post('{id}/toggle/{field}', ToggleController::class)->where('field', '[A-Za-z_]\w*')->name('toggle');

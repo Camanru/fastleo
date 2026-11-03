@@ -12,8 +12,8 @@
     $iconButton = $buttonBase.'size-8 justify-center rounded-[8px] text-ink-2 hover:bg-hover hover:text-ink';
     $dangerButton = $buttonBase.'size-8 justify-center rounded-[8px] text-ink-2 hover:bg-danger-soft hover:text-danger';
     $icon = fn (string $name, string $class = 'shrink-0 size-4') => \Fastleo\Support\Icons::render($name, new \Illuminate\View\ComponentAttributeBag(['class' => $class]));
-    $link = fn (string $url, string $iconName, string $label) => new \Illuminate\Support\HtmlString(
-        '<a href="'.e($url).'" title="'.e($label).'" class="'.$iconButton.'">'.$icon($iconName).'<span class="sr-only">'.e($label).'</span></a>'
+    $link = fn (string $url, string $iconName, string $label, ?string $modalUrl = null, string $modalAttribute = 'data-record-modal') => new \Illuminate\Support\HtmlString(
+        '<a href="'.e($url).'"'.($modalUrl === null ? '' : ' '.$modalAttribute.'="'.e($modalUrl).'"').' title="'.e($label).'" class="'.$iconButton.'">'.$icon($iconName).'<span class="sr-only">'.e($label).'</span></a>'
     );
     $formStart = fn (string $url, string $method, string $confirm) => new \Illuminate\Support\HtmlString(
         '<form method="POST" action="'.e($url).'" x-data="fastleoConfirm" data-confirm="'.e($confirm).'" @submit.prevent="ask" class="inline">'
@@ -26,8 +26,8 @@
 @endphp
 <div class="flex items-center justify-end gap-0.5">
     @if ($trashed)
-        @if ($allows('view', $record))
-            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show')) }}
+        @if (\Fastleo\Fastleo::recordView() && $allows('view', $record))
+            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), \Fastleo\Fastleo::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
         @endif
         @if ($allows('restore', $record))
             <x-fastleo::action-form :action="route('fastleo.resources.restore', [$slug, $record->getKey()])">
@@ -40,8 +40,8 @@
             </form>
         @endif
     @else
-        @if ($allows('view', $record))
-            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show')) }}
+        @if (\Fastleo\Fastleo::recordView() && $allows('view', $record))
+            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), \Fastleo\Fastleo::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
         @endif
         @if (($tree ?? null) && $allows('create'))
             <x-fastleo::button variant="ghost" size="sm" icon="plus" class="text-primary-text opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100" :href="route('fastleo.resources.create', ['resource' => $slug, 'parent' => $record->getKey()])" title="{{ __('fastleo::resources.tree_add_child') }}">
@@ -49,7 +49,7 @@
             </x-fastleo::button>
         @endif
         @if ($allows('update', $record))
-            {{ $link(route('fastleo.resources.edit', [$slug, $record->getKey(), ...$returnQuery]), 'pencil', __('fastleo::resources.edit')) }}
+            {{ $link(route('fastleo.resources.edit', [$slug, $record->getKey(), ...$returnQuery]), 'pencil', __('fastleo::resources.edit'), $modalEditUrl ?? null) }}
         @endif
         @if ($childCount === 0 && $allows('delete', $record))
             {{ $formStart(route('fastleo.resources.destroy', [$slug, $record->getKey()]), 'DELETE', __($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')) }}

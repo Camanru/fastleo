@@ -37,7 +37,7 @@ final class ExpandController
         return view('fastleo::resources.expand', [
             'resource' => $resource,
             'record' => $record,
-            'returnUrl' => ReturnUrl::from($request) ?? route('fastleo.resources.show', [$resource::slug(), $record->getKey()]),
+            'returnUrl' => ReturnUrl::from($request) ?? $resource->viewUrl($record) ?? route('fastleo.resources.index', $resource::slug()),
         ]);
     }
 }

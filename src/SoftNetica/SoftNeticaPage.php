@@ -70,11 +70,11 @@ final class SoftNeticaPage extends Page
     }
 
     /**
-     * Доступ — всем администраторам, пока функция включена в конфиге.
+     * Доступ — всем администраторам, пока функция включена в конфиге; закрыть по ролям можно Gate `manageFastleoSoftNetica`.
      */
     #[Override]
     public function canAccess(?Authenticatable $user): bool
     {
-        return Connection::enabled();
+        return Connection::canManage();
     }
 }

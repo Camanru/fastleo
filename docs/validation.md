@@ -45,6 +45,59 @@ Text::make('slug', 'Адрес')
 Date::make('ends_on', 'Окончание')->rules(['after_or_equal:starts_on']);
 ```
 
+**Правило, которому нужны другие поля формы.** Замыкание `rules()` получает только запись. Если проверка зависит от значений других полей (даты брони не пересекаются, пара «склад + запчасть» уникальна), возьмите правило-объект с `DataAwareRule`: оно получает все данные формы и работает одинаково в форме, импорте и MCP.
+
+```php
+namespace App\Rules;
+
+use App\Models\Booking;
+use Closure;
+use Illuminate\Contracts\Validation\DataAwareRule;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Database\Eloquent\Model;
+
+final class ApartmentIsFree implements DataAwareRule, ValidationRule
+{
+    /** @var array<string, mixed> */
+    private array $data = [];
+
+    public function __construct(private readonly ?Model $record) {}
+
+    public function setData(array $data): static
+    {
+        $this->data = $data;
+
+        return $this;
+    }
+
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        $busy = Booking::query()
+            ->where('apartment_id', $this->data['apartment_id'] ?? null)
+            ->whereKeyNot($this->record?->getKey())
+            ->where('check_in', '<', $value)
+            ->where('check_out', '>', $this->data['check_in'] ?? $value)
+            ->exists();
+
+        if ($busy) {
+            $fail('Квартира уже занята на эти даты.');
+        }
+    }
+}
+```
+
+В ресурсе:
+
+```php
+use App\Rules\ApartmentIsFree;
+use Fastleo\Fields\Date;
+use Illuminate\Database\Eloquent\Model;
+
+Date::make('check_out', 'Выезд')->rules(fn (?Model $record) => ['after:check_in', new ApartmentIsFree($record)]);
+```
+
+Не читайте `request()->input(...)` в правиле: при импорте и из MCP запроса формы нет. Правило, зависящее от другого поля, пишите под тем полем, чья ошибка должна появиться в форме. Уникальность внутри блока `HasMany` пишется так же, но `Rule::unique` в блоке не знает `id` соседней вложенной записи: для таких данных ставьте уникальный индекс в базе, ошибка базы показывается над формой ([Ошибки базы данных](#ошибки-базы-данных)).
+
 **Многоязычные поля.** Свои правила `Rule::unique` для поля с `translatable()` сравнивают колонку целиком (весь JSON). Уникальность по одному языку задавайте путём в JSON: `Rule::unique('pages', 'title->ru')`.
 
 Поля, скрытые в форме (`hidden()`, `hideOnCreate()`/`hideOnEdit()`), `readonly()` и `disabled()` не проверяются и не записываются.

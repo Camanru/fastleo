@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Layout;
 
 use Fastleo\Fields\Field;
+use Fastleo\Related;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -14,14 +15,14 @@ use Illuminate\Database\Eloquent\Model;
 abstract class Layout
 {
     /**
-     * @param  list<Field|Layout>  $children  поля и вложенные контейнеры
+     * @param  list<Field|Layout|Related>  $children  поля, вложенные контейнеры и (только во вкладке) связанные таблицы
      */
     public function __construct(protected array $children = []) {}
 
     /**
-     * Вложенные поля и контейнеры.
+     * Вложенные поля, контейнеры и связанные таблицы.
      *
-     * @return list<Field|Layout>
+     * @return list<Field|Layout|Related>
      */
     public function children(): array
     {
@@ -29,12 +30,16 @@ abstract class Layout
     }
 
     /**
-     * Есть ли внутри хотя бы одно поле, видимое в форме для этой записи (null — создание).
-     * Пустые контейнеры не выводятся.
+     * Есть ли внутри хотя бы одно поле, видимое в форме для этой записи (null — создание), или связанная таблица,
+     * которую можно показать. Пустые контейнеры не выводятся.
      */
     public function hasVisibleFields(?Model $record): bool
     {
-        return array_any($this->children, fn (\Fastleo\Fields\Field|Layout $child): bool => $child instanceof Field ? $child->isVisibleInForm($record) : $child->hasVisibleFields($record));
+        return array_any($this->children, fn (Field|Layout|Related $child): bool => match (true) {
+            $child instanceof Field => $child->isVisibleInForm($record),
+            $child instanceof Related => $child->isVisibleFor($record),
+            default => $child->hasVisibleFields($record),
+        });
     }
 
     /**

@@ -9,6 +9,7 @@ use Fastleo\Closing\SiteClosing;
 use Fastleo\Fastleo;
 use Fastleo\Page;
 use Fastleo\Resource;
+use Fastleo\Resources\UserResource;
 use Fastleo\Settings;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\SoftNeticaPage;
@@ -364,7 +365,10 @@ final class ResourceRegistry
             }
 
             if (isset($resources[$slug])) {
-                throw new LogicException($this->message('resource_slug_duplicate', ['class' => $class, 'other' => $resources[$slug], 'slug' => $slug]));
+                // Наследник встроенного «Администраторы» подключается настройкой, а не новым адресом.
+                $custom = array_find([$class, $resources[$slug]], fn (string $candidate): bool => is_subclass_of($candidate, UserResource::class));
+
+                throw new LogicException($this->message($custom === null ? 'resource_slug_duplicate' : 'resource_slug_users', ['class' => $class, 'other' => $resources[$slug], 'slug' => $slug, 'custom' => $custom.'::class']));
             }
 
             $resources[$slug] = $class;
@@ -406,6 +410,26 @@ final class ResourceRegistry
         }
 
         return $result;
+    }
+
+    /**
+     * Первый зарегистрированный раздел модели или null: куда вести ссылку на связанную запись.
+     *
+     * ```php
+     * Fastleo::resources()->forModel(Category::class);   // CategoryResource
+     * ```
+     *
+     * @param  class-string<Model>  $model
+     */
+    public function forModel(string $model): ?Resource
+    {
+        foreach ($this->all() as $slug => $class) {
+            if ($class::model() === $model) {
+                return $this->find($slug);
+            }
+        }
+
+        return null;
     }
 
     /**

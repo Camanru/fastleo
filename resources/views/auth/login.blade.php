@@ -18,10 +18,7 @@
         </label>
 
         <div class="flex flex-col gap-1.5">
-            <div class="flex items-baseline justify-between gap-3">
-                <label for="login-password" class="text-sm font-medium text-ink-2">{{ __('fastleo::auth.password') }}</label>
-                <a href="{{ route('fastleo.password.request') }}" class="text-sm font-medium text-primary-text hover:underline">{{ __('fastleo::auth.forgot_link') }}</a>
-            </div>
+            <label for="login-password" class="text-sm font-medium text-ink-2">{{ __('fastleo::auth.password') }}</label>
             <div class="relative" x-data="{ shown: false }">
                 <input type="password" :type="shown ? 'text' : 'password'" id="login-password" name="password" required autocomplete="current-password" @class(['fastleo-input h-10 pr-10 text-md', 'fastleo-input-invalid' => $errors->has('password')])>
                 <button type="button" class="absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-2 hover:text-ink" @click="shown = ! shown" :aria-pressed="shown" title="{{ __('fastleo::auth.password_toggle') }}">
@@ -30,6 +27,8 @@
                     <x-fastleo::icon name="eye-off" class="size-4" x-cloak x-show="shown" />
                 </button>
             </div>
+            {{-- Ссылка после поля пароля: Tab из email попадает в пароль, а не на восстановление. --}}
+            <a href="{{ route('fastleo.password.request') }}" class="self-end text-sm font-medium text-primary-text hover:underline">{{ __('fastleo::auth.forgot_link') }}</a>
         </div>
 
         <label class="flex items-center gap-2 text-base">

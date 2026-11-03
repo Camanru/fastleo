@@ -11,7 +11,7 @@
     ];
     $tones = array_map(fn (string $tone): string => $toneClasses[$tone] ?? $toneClasses['neutral'], $inline['tones']);
     $width = match ($inline['kind']) {
-        'number' => 'min-w-24',
+        'number' => 'w-32 min-w-32',
         'select' => 'min-w-32',
         default => 'min-w-40',
     };
@@ -50,5 +50,5 @@
             @class(['fastleo-input h-8 py-0 text-sm', 'text-right tabular-nums' => $inline['kind'] === 'number'])
         >
     @endif
-    <span x-show="error" x-text="error" role="alert" class="mt-0.5 block text-xs text-danger" style="display: none"></span>
+    <span x-show="error" x-text="error" role="alert" class="mt-0.5 block text-xs break-words whitespace-normal text-danger" style="display: none"></span>
 </div>

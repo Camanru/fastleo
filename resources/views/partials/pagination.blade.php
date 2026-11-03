@@ -1,10 +1,14 @@
 {{-- Страницы списка: «Записи 1–25 из 120», назад/вперёд, номера, «Все» / «Постранично».
      $sizes — варианты числа записей на странице (по умолчанию нет выбора; только полный список — таблицы внутри карточки их не показывают).
      $inline (по умолчанию нет) — подгружаемый кусок страницы (связанная таблица): выбор размера не переходит по адресу сам, его подхватывает fastleoRelated.
+     $byRoots (по умолчанию нет) — страница дерева: считаются записи одного уровня, а не строки со вложенными; $branch — открыта ветка (прямые дети, а не верхний уровень); $truncated — вложенных записей больше предела страницы, хвост не показан.
      $bordered (по умолчанию да) — линия сверху, когда строка внутри карточки таблицы; иначе строка сама в рамке (карточки на телефоне). --}}
 @php
     $showToggle = $paginator->total() > $paginator->perPage() || $all;
     $bordered ??= true;
+    $byRoots ??= false;
+    $branch ??= false;
+    $truncated ??= false;
     $inline ??= false;
     $sizes = ($sizes ?? []) !== [] && ($paginator->total() > min($sizes) || $all) ? $sizes : [];
     $pageLink = 'flex size-[30px] items-center justify-center rounded-[7px]';
@@ -12,8 +16,14 @@
 @if ($paginator->total() > 0)
     <nav @class(['flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2.5 text-sm text-ink-2', 'border-t border-line' => $bordered, 'rounded-card border border-line bg-surface' => ! $bordered]) aria-label="{{ __('fastleo::resources.list') }}">
         <span class="tabular-nums">
-            {{ __('fastleo::resources.shown', ['from' => $paginator->firstItem(), 'to' => $paginator->lastItem(), 'total' => $paginator->total()]) }}
+            {{ $byRoots
+                ? __($branch ? 'fastleo::resources.shown_branch' : 'fastleo::resources.shown_roots', ['from' => min(($paginator->currentPage() - 1) * $paginator->perPage() + 1, $paginator->total()), 'to' => min($paginator->currentPage() * $paginator->perPage(), $paginator->total()), 'total' => $paginator->total()])
+                : __('fastleo::resources.shown', ['from' => $paginator->firstItem(), 'to' => $paginator->lastItem(), 'total' => $paginator->total()]) }}
         </span>
+
+        @if ($truncated)
+            <span class="text-warning" data-tree-truncated>{{ __('fastleo::resources.tree_truncated', ['max' => config('fastleo.list.max_all', 1000)]) }}</span>
+        @endif
 
         <div class="flex-1"></div>
 

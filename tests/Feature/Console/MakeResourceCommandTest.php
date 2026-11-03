@@ -72,6 +72,8 @@ it('builds fields from the table columns', function (): void {
     expect(File::get($this->sandbox.'/ArticleResource.php'))
         ->toContain("Text::make('title', 'Title')->required()")
         ->toContain("protected static ?string \$label = 'Articles';")
+        ->toContain("Enum::make('status', 'Status')->enum(\\Workbench\\App\\Enums\\ArticleStatus::class)")
+        ->and($fields['status'])->toStartWith('Enum:')
         ->and($fields['type'])->toStartWith('Text: nullable|string|max:')
         ->and(substr_count(File::get($this->sandbox.'/ArticleResource.php'), '->searchable()->sortable()'))->toBe(1);
 

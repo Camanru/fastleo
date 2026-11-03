@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Filters\BooleanFilter;
 use Fastleo\Filters\DateRangeFilter;
+use Fastleo\Filters\NumberRangeFilter;
 use Fastleo\Filters\SelectFilter;
 use Fastleo\Tests\Fixtures\FilterDefaults\CategoryDefaultResource;
 use Workbench\App\Enums\ArticleStatus;
@@ -90,6 +91,8 @@ describe('a default value', function (): void {
             ->and(BooleanFilter::make('is_active')->default(true)->defaultInput())->toBe('1')
             ->and(BooleanFilter::make('is_active')->default(false)->defaultInput())->toBe('0')
             ->and(DateRangeFilter::make('created_at')->default(['from' => '2026-03-01', 'to' => null])->defaultInput())->toBe(['from' => '2026-03-01', 'to' => null])
+            ->and(NumberRangeFilter::make('views')->default(['from' => 100, 'to' => 2.5])->defaultInput())->toBe(['from' => '100', 'to' => '2.5'])
+            ->and(NumberRangeFilter::make('views')->default(['from' => 100])->value(['from' => '100']))->toBe(['from' => '100', 'to' => null])
             ->and(SelectFilter::make('status')->defaultInput())->toBeNull();
     });
 

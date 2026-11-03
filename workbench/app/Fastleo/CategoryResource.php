@@ -6,11 +6,14 @@ namespace Workbench\App\Fastleo;
 
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Text;
+use Fastleo\Layout\Tab;
+use Fastleo\Layout\Tabs;
+use Fastleo\Related;
 use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Раздел «Категории» демо-сайта: простой справочник.
+ * Раздел «Категории» демо-сайта: дерево, вкладки с таблицами статей и товаров.
  */
 final class CategoryResource extends Resource
 {
@@ -31,14 +34,25 @@ final class CategoryResource extends Resource
     protected static ?string $sortColumn = 'sort';
 
     /**
-     * Название, родитель и код категории.
+     * Вкладки: поля категории, затем таблицы связанных записей. Статьи правятся на своей странице (`editIn('page')`),
+     * товары — в окне (`editIn('modal')`); таблицы вне формы и не сохраняются вместе с ней.
      */
     public function fields(): array
     {
         return [
-            Text::make('title', 'Название')->required()->searchable()->sortable(),
-            BelongsTo::make('parent_id', 'Родитель')->hideInList(),
-            Text::make('code', 'Код')->maxLength(50)->help('Латиница и дефис, например news')->searchable()->sortable(),
+            Tabs::make([
+                Tab::make('Основное', [
+                    Text::make('title', 'Название')->required()->searchable()->sortable(),
+                    BelongsTo::make('parent_id', 'Родитель')->hideInList(),
+                    Text::make('code', 'Код')->maxLength(50)->help('Латиница и дефис, например news')->searchable()->sortable(),
+                ]),
+                Tab::make('Статьи', [
+                    Related::make('articles', ArticleResource::class)->perPage(5)->columns(['title', 'status'])->editIn('page'),
+                ]),
+                Tab::make('Товары', [
+                    Related::make('products', ProductResource::class)->perPage(5)->editIn('modal'),
+                ]),
+            ]),
         ];
     }
 }

@@ -1,7 +1,7 @@
 @props(['title' => null, 'description' => null, 'count' => null, 'heading' => null, 'back' => null, 'crumbs' => null])
 {{-- Страницы админки после входа: боковое меню, шапка, заголовок страницы, содержимое.
      title — название страницы (вкладка браузера, крошки), heading — заголовок на странице, если он другой (название записи); description и count — пояснение и счётчик рядом с ним; back — ['url' => …, 'label' => …], ссылка «назад» над заголовком;
-     crumbs — хлебные крошки [['label' => …, 'url' => …|null], …] (по умолчанию группа меню и title); слоты actions — кнопки справа на одной линии с заголовком (или x-teleport="#fastleo-page-actions" из содержимого страницы), badge — бейдж у заголовка. --}}
+     crumbs — хлебные крошки [['label' => …, 'url' => …|null], …] (по умолчанию группа меню и title); слоты actions — кнопки справа на одной линии с заголовком (или x-teleport="#fastleo-page-actions" из содержимого страницы), badge — бейдж под заголовком, рядом с пояснением. --}}
 @php
     $menuGroups = \Fastleo\Support\Menu::groups();
     $crumb = null;
@@ -256,17 +256,23 @@
                     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                         <div class="flex min-w-0 flex-wrap items-center gap-2.5">
                             <h1 class="hidden truncate text-2xl font-[650] tracking-[-0.022em] lg:block">{{ $heading ?? $title }}</h1>
-                            @isset($badge)
-                                {{ $badge }}
-                            @endisset
                             @if ($count !== null)
                                 <span class="rounded-full bg-sunken px-2 py-px text-sm font-semibold text-ink-2 tabular-nums" data-count>{{ $count }}</span>
                             @endif
                         </div>
                         <div id="fastleo-page-actions" class="flex flex-wrap items-center gap-2 empty:hidden">@isset($actions){{ $actions }}@endisset</div>
                     </div>
-                    @if ($description)
-                        <p class="hidden text-base text-ink-2 lg:block">{{ $description }}</p>
+                    {{-- Бейдж (например, «Есть несохранённые изменения») стоит рядом с пояснением, а не в строке заголовка:
+                         там он при появлении теснил кнопки страницы на вторую строку. --}}
+                    @if ($description || isset($badge))
+                        <div class="flex min-h-6 flex-wrap items-center gap-x-3 gap-y-1">
+                            @if ($description)
+                                <p class="hidden text-base text-ink-2 lg:block">{{ $description }}</p>
+                            @endif
+                            @isset($badge)
+                                {{ $badge }}
+                            @endisset
+                        </div>
                     @endif
                 </div>
 
@@ -277,6 +283,7 @@
 
     @include('fastleo::partials.confirm-dialog')
     @include('fastleo::partials.file-picker')
+    @include('fastleo::partials.record-modal')
     @stack('fastleo-scripts')
 </body>
 </html>

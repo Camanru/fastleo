@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use LogicException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -130,7 +131,14 @@ final class ActionsController
     private function isRelationOf(Resource $child, string $relation): bool
     {
         foreach (array_keys(Fastleo::resources()->all()) as $slug) {
-            foreach (Fastleo::resources()->find($slug)?->relations() ?? [] as $related) {
+            try {
+                $relations = Fastleo::resources()->find($slug)?->listRelations() ?? [];
+            } catch (LogicException) {
+                // Ошибка описания чужого раздела не должна ломать действия этой таблицы: её покажет fastleo:doctor у того раздела.
+                continue;
+            }
+
+            foreach ($relations as $related) {
                 if ($related->name === $relation && $related->resource === $child::class) {
                     return true;
                 }

@@ -60,6 +60,9 @@ final class ResourceQuery
      */
     private readonly array $defaults;
 
+    /** Страница дерева обрезана: вложенных записей больше `fastleo.list.max_all` (после `paginate()`). */
+    public private(set) bool $treeTruncated = false;
+
     /** Дерево записей раздела (строится один раз на запрос). */
     private ?Tree $tree = null;
 
@@ -144,16 +147,17 @@ final class ResourceQuery
             return $this->query()->paginate($perPage)->withQueryString();
         }
 
-        // Дерево: страница — отрезок порядка обхода; записи отрезка загружаются одним запросом.
-        $order = $this->tree()->order($this->parent);
+        // Дерево: страница — `$perPage` записей одного уровня (корней дерева или ветки) со всеми вложенными,
+        // как в списке страниц WordPress; свёрнутые на экране ветки не растягивают число страниц.
+        $roots = $this->tree()->roots($this->parent);
         $page = Paginator::resolveCurrentPage();
-        $keys = array_slice($order, ($page - 1) * $perPage, $perPage);
+        ['keys' => $keys, 'truncated' => $this->treeTruncated] = $this->tree()->page(array_slice($roots, ($page - 1) * $perPage, $perPage), max(1, config()->integer('fastleo.list.max_all', 1000)));
         $position = array_flip($keys);
         $records = $keys === [] ? new Collection : $this->query()->whereKey($keys)->get()
             ->sortBy(fn (Model $record): int => $position[$this->key($record)] ?? 0)
             ->values();
 
-        return new LengthAwarePaginator($records, count($order), $perPage, $page, [
+        return new LengthAwarePaginator($records, count($roots), $perPage, $page, [
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => 'page',
         ])->withQueryString();

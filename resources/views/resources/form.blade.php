@@ -1,18 +1,34 @@
 {{-- Создание ($record = null) и редактирование записи. --}}
 @php
     $slug = $resource::slug();
+    // Форма в окне (iframe) связанной таблицы: без меню и шапки, только «Сохранить»; связанных таблиц нет.
+    $framed = $framed ?? false;
     $editing = $record !== null;
     $title = __($editing ? 'fastleo::resources.edit_title' : 'fastleo::resources.create_title', ['name' => $resource::singular()]);
+    // Привязывает связанные таблицы (в том числе из вкладок): без этого вкладка с таблицей не знает, можно ли её показать.
+    $editing && $resource->listRelations();
     $items = $resource->schema()->items();
     $asideItems = array_values(array_filter($items, fn ($item) => $item instanceof \Fastleo\Layout\Aside));
     $mainItems = array_values(array_filter($items, fn ($item) => ! $item instanceof \Fastleo\Layout\Aside));
+    // Раскладка вкладок с таблицами связанных записей: только её событие fastleo-tab прячет «Сохранить» и Aside.
+    $tabsGroup = null;
+    foreach ($items as $item) {
+        if ($item instanceof \Fastleo\Layout\Tabs && array_filter($item->visibleTabs($record), fn ($tab) => $tab->isTable()) !== []) {
+            $tabsGroup = spl_object_id($item);
+
+            break;
+        }
+    }
     $siteUrl = $editing ? $resource->url($record) : null;
     $canDelete = $editing && \Fastleo\Support\Authorization::allows('delete', $resource, $record);
     $recordActions = $editing ? array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record)) : [];
     $recordTitle = $editing ? $resource->title($record) : '';
     $updatedAt = $editing && $record->getAttribute('updated_at') instanceof \Carbon\CarbonInterface ? $record->getAttribute('updated_at') : null;
 @endphp
-<x-fastleo::layouts.app
+<x-dynamic-component
+    :component="$framed ? 'fastleo::layouts.frame' : 'fastleo::layouts.app'"
+    :picker="$framed"
+    :closable="$framed"
     :title="$title"
     :heading="$recordTitle !== '' ? $recordTitle : null"
     :description="$updatedAt ? __('fastleo::resources.updated_at', ['time' => $updatedAt->timezone(\Fastleo\Fastleo::timezone())->format('d.m.Y H:i')]) : null"
@@ -55,8 +71,12 @@
 
     <x-fastleo::flash />
 
+    @if ($framed)
+        <h1 class="mb-3 pr-12 text-lg font-semibold tracking-[-0.01em]">{{ $recordTitle !== '' ? $recordTitle : $title }}</h1>
+    @endif
+
     @php
-        $hasSide = $editing && $resource->hasSideColumn($record);
+        $hasSide = $editing && ! $framed && $resource->hasSideColumn($record);
     @endphp
     <div @class(['grid items-start gap-5', 'lg:grid-cols-[minmax(0,1fr)_24rem]' => $hasSide])>
         <div class="flex min-w-0 flex-col gap-5">
@@ -78,6 +98,9 @@
                 @if ($returnUrl ?? null)
                     <input type="hidden" name="_return" value="{{ $returnUrl }}">
                 @endif
+                @if ($framed)
+                    <input type="hidden" name="_frame" value="1">
+                @endif
 
                 @if ($errors->any())
                     <div role="alert" class="flex gap-3 rounded-card bg-danger-soft px-4 py-3.5 text-danger">
@@ -87,24 +110,28 @@
                 @endif
 
                 <div class="flex flex-wrap items-start gap-4">
-                    <div class="flex min-w-0 flex-[999_1_520px] flex-col gap-4">
+                    {{-- Рядом боковая колонка карточки (история, таблицы aside): форме остаётся меньше места, и Aside не должен уезжать под неё. --}}
+                    <div @class(['flex min-w-0 flex-col gap-4', 'flex-[999_1_520px]' => ! $hasSide, 'flex-[999_1_320px]' => $hasSide])>
                         @include('fastleo::form.cards', ['items' => $mainItems, 'record' => $record])
                     </div>
                     @if ($asideItems !== [])
-                        <div class="flex min-w-0 flex-[1_1_300px] flex-col gap-4 lg:max-w-sm">
+                        {{-- На вкладке с таблицей связанных записей поля Aside прячутся вместе с кнопкой «Сохранить»: с неё форму не сохранить. --}}
+                        <div x-data="{ visible: true }" x-show="visible" @fastleo-tab.window="if ($event.detail.group === {{ $tabsGroup ?? 'null' }}) visible = ! $event.detail.table" @class(['flex min-w-0 flex-col gap-4 lg:max-w-sm', 'flex-[1_1_300px]' => ! $hasSide, 'flex-[1_1_240px]' => $hasSide])>
                             @include('fastleo::form.items', ['items' => $asideItems, 'record' => $record])
                         </div>
                     @endif
                 </div>
 
-                <div class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-[1.8] lg:-mx-8 lg:px-8">
+                <div x-data="{ visible: true }" x-show="visible" @fastleo-tab.window="if ($event.detail.group === {{ $tabsGroup ?? 'null' }}) visible = ! $event.detail.table" class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-[1.8] lg:-mx-8 lg:px-8">
                     <x-fastleo::button type="submit" variant="primary" icon="save" name="_after" value="edit" data-save title="{{ __('fastleo::resources.save_hint') }}">
                         {{ __('fastleo::resources.save') }}
                     </x-fastleo::button>
-                    <x-fastleo::button type="submit" name="_after" value="index">
-                        {{ __('fastleo::resources.save_and_exit') }}
-                    </x-fastleo::button>
-                    @unless ($editing || ($returnUrl ?? null))
+                    @unless ($framed)
+                        <x-fastleo::button type="submit" name="_after" value="index">
+                            {{ __('fastleo::resources.save_and_exit') }}
+                        </x-fastleo::button>
+                    @endunless
+                    @unless ($editing || ($returnUrl ?? null) || $framed)
                         <x-fastleo::button type="submit" name="_after" value="create">
                             {{ __('fastleo::resources.save_and_create') }}
                         </x-fastleo::button>
@@ -113,8 +140,9 @@
                 </div>
                 <input type="hidden" name="_fl_end" value="1">
             </form>
-            @if ($editing)
+            @if ($editing && ! $framed)
                 @include('fastleo::resources.related-sections', ['only' => 'main'])
+                @include('fastleo::resources.related-tabs')
             @endif
         </div>
         @if ($hasSide)
@@ -126,4 +154,4 @@
             </aside>
         @endif
     </div>
-</x-fastleo::layouts.app>
+</x-dynamic-component>

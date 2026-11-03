@@ -258,12 +258,18 @@ select:not([multiple]):not([size]) {
 
 /* Поле ввода формы: текст, число, дата, список. */
 @utility fastleo-input {
-    @apply min-h-9 w-full rounded-field border border-line-strong bg-surface px-3 py-1.5 text-base font-normal text-ink outline-none transition placeholder:text-ink-3 focus:border-primary focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-ink-3 [&:is(input,textarea):read-only]:bg-surface-2;
+    @apply min-h-9 w-full rounded-field border border-line-strong bg-surface px-3 py-1.5 text-base font-normal text-ink outline-none transition placeholder:text-ink-3 focus:border-primary focus:shadow-[0_0_0_3px_var(--color-ring)] disabled:cursor-not-allowed disabled:border-line disabled:bg-sunken disabled:text-ink-3 aria-invalid:border-danger aria-invalid:shadow-[0_0_0_3px_var(--color-danger-soft)] [&:is(input,textarea):read-only]:bg-surface-2;
 }
 
 /* Поле с ошибкой валидации. */
 @utility fastleo-input-invalid {
     @apply border-danger shadow-[0_0_0_3px_var(--color-danger-soft)] focus:border-danger focus:shadow-[0_0_0_3px_var(--color-danger-soft)];
+}
+
+/* Окно записи открыто: страница под ним не прокручивается; место полосы прокрутки остаётся, содержимое не сдвигается. */
+html:has(#fastleo-record-modal[open]) {
+    overflow: hidden;
+    scrollbar-gutter: stable;
 }
 
 /* Карточка содержимого. */

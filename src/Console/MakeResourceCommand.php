@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Console;
 
+use BackedEnum;
 use Fastleo\Fastleo;
 use Fastleo\Resource;
 use Illuminate\Console\Attributes\Description;
@@ -222,8 +223,13 @@ final class MakeResourceCommand extends Command
         // Переводимый атрибут модели spatie/laravel-translatable — многоязычный текст.
         $translatable = method_exists($model, 'isTranslatableAttribute') && $model->isTranslatableAttribute($name);
 
+        // Каст в enum: значение принимает только Enum-поле, Text пропустил бы любую строку и упал бы 500 при записи.
+        $enum = $model->getCasts()[$name] ?? null;
+        $enum = is_string($enum) && enum_exists($enum) && is_subclass_of($enum, BackedEnum::class) ? $enum : null;
+
         $class = match (true) {
             $relation instanceof BelongsTo => 'BelongsTo',
+            $enum !== null => 'Enum',
             $translatable => in_array($name, self::RICH_TEXT_NAMES, true) ? 'RichText' : 'Text',
             $name === 'slug' && ! in_array($typeName, ['json', 'jsonb'], true) => 'Slug',
             in_array($typeName, ['bool', 'boolean'], true) || $type === 'tinyint(1)' => 'Toggle',
@@ -264,6 +270,10 @@ final class MakeResourceCommand extends Command
 
         if ($class === 'Slug') {
             return [$class, $code.'{{ from }}', $name];
+        }
+
+        if ($class === 'Enum') {
+            return [$class, $code.'->enum(\\'.$enum.'::class)'.(! $column['nullable'] && $column['default'] === null ? '->required()' : ''), $name];
         }
 
         if ($translatable) {

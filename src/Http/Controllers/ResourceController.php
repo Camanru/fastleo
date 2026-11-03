@@ -9,6 +9,7 @@ use Fastleo\Fields\Password;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
+use Fastleo\Support\ManualOrder;
 use Fastleo\Support\ModelDefaults;
 use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\RecordKey;
@@ -78,13 +79,13 @@ final class ResourceController
             $defaults[$tree] = $parent;
         }
 
-        return view('fastleo::resources.form', ['resource' => $resource, 'record' => null, 'defaults' => $defaults, 'returnUrl' => ReturnUrl::from($request)]);
+        return $this->formView($request, ['resource' => $resource, 'record' => null, 'defaults' => $defaults, 'returnUrl' => ReturnUrl::from($request)]);
     }
 
     /**
      * Сохранить новую запись.
      */
-    public function store(Request $request, string $resource): RedirectResponse
+    public function store(Request $request, string $resource): RedirectResponse|View
     {
         $resource = $this->resource($resource);
         Authorization::authorize('create', $resource);
@@ -99,12 +100,14 @@ final class ResourceController
      */
     public function show(Request $request, string $resource, string $id): View
     {
+        abort_unless(Fastleo::recordView(), 404);
+
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id, $resource::usesSoftDeletes());
         Authorization::authorize('view', $resource, $record);
         $this->markRead($resource, $record);
 
-        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
+        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request), 'framed' => $this->framed($request)]);
     }
 
     /**
@@ -117,13 +120,13 @@ final class ResourceController
         Authorization::authorize('update', $resource, $record);
         $this->markRead($resource, $record);
 
-        return view('fastleo::resources.form', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
+        return $this->formView($request, ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request)]);
     }
 
     /**
      * Сохранить изменения записи.
      */
-    public function update(Request $request, string $resource, string $id): RedirectResponse
+    public function update(Request $request, string $resource, string $id): RedirectResponse|View
     {
         $resource = $this->resource($resource);
         $record = $this->record($resource, $id);
@@ -204,19 +207,39 @@ final class ResourceController
     }
 
     /**
+     * Страница формы. Форма в окне (`?frame=1`) — без меню и шапки.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function formView(Request $request, array $data): View
+    {
+        return view('fastleo::resources.form', $this->framed($request) ? [...$data, 'framed' => true] : $data);
+    }
+
+    /**
+     * Форма открыта в окне связанной таблицы: `frame=1` в адресе или `_frame` в форме.
+     */
+    private function framed(Request $request): bool
+    {
+        return $request->query('frame') === '1' || $request->input('_frame') === '1';
+    }
+
+    /**
      * Проверить форму и записать поля ресурса в модель в одной транзакции.
      *
      * В модель попадают только видимые и не «только для чтения» поля ресурса, через `fill()` модели;
      * поле вне `$fillable` — ошибка разработчика (ресурс разошёлся с моделью). Остальное из запроса
      * игнорируется. Ошибка БД, которую не поймала валидация, показывается понятным текстом над формой.
      */
-    private function save(Request $request, Resource $resource, Model $record, ?Model $existing): RedirectResponse
+    private function save(Request $request, Resource $resource, Model $record, ?Model $existing): RedirectResponse|View
     {
         // После ошибки — всегда обратно на форму, а не на «предыдущий адрес» из Referer.
         $return = ReturnUrl::from($request);
+        $framed = $this->framed($request);
+        $query = array_filter(['return' => $return, 'frame' => $framed ? '1' : null], fn (mixed $value): bool => $value !== null);
         $formUrl = $existing instanceof Model
-            ? route('fastleo.resources.edit', array_filter([$resource::slug(), $existing->getKey(), 'return' => $return], fn (mixed $value): bool => $value !== null))
-            : route('fastleo.resources.create', array_filter([$resource::slug(), 'return' => $return], fn (mixed $value): bool => $value !== null));
+            ? route('fastleo.resources.edit', [$resource::slug(), $existing->getKey(), ...$query])
+            : route('fastleo.resources.create', [$resource::slug(), ...$query]);
 
         // Сервер получил форму не целиком (лимит PHP max_input_vars): без отказа хвост вложенных записей удалился бы.
         if ($request->has('_fl_begin') && ! $request->has('_fl_end')) {
@@ -245,6 +268,12 @@ final class ResourceController
             return redirect($formUrl)->withInput($request->except($this->secretInputs($resource)))->with('fastleo.error', __('fastleo::resources.save_cancelled'));
         }
 
+        // Форма в окне: после сохранения — страница «сохранено» (она просит окно закрыться), а не выбор следующего шага.
+        // Отвечаем сразу, без перехода: запись, вышедшая из выборки раздела, не даст 404, а признак не потеряется по пути.
+        if ($framed) {
+            return view('fastleo::resources.frame-saved');
+        }
+
         $after = $request->input('_after');
         $after = is_string($after) && in_array($after, self::AFTER_SAVE, true) ? $after : 'edit';
 
@@ -264,54 +293,22 @@ final class ResourceController
     }
 
     /**
-     * Ресурс по адресу раздела или 404.
-     */
-    /**
      * Ручной порядок: `POST /fastleo/{resource}/reorder` с `id` и `direction=up|down` (стрелки)
      * или `before`/`after` = ключ соседа (перетаскивание). Двигается только среди соседей
-     * (тот же родитель в дереве, записи в рамках `query()` ресурса); соседи перенумеровываются 1..n.
+     * (тот же родитель в дереве, записи в рамках `query()` ресурса); соседи получают свои прежние значения порядка по возрастанию.
      */
     public function reorder(Request $request, string $resource): JsonResponse|RedirectResponse
     {
         $resource = $this->resource($resource);
-        $column = $resource::sortColumn();
-        abort_if($column === null, 404);
+        abort_if($resource::sortColumn() === null, 404);
 
         $id = $request->input('id');
         abort_unless(is_string($id) || is_int($id), 404);
         $record = $this->record($resource, (string) $id);
         abort_unless(Authorization::allowsReorder($resource, $record), 403);
 
-        $siblings = $this->siblings($resource, $record)->keyBy(fn (Model $sibling): string => $this->key($sibling));
-        $keys = array_map(strval(...), $siblings->keys()->all());
-        $key = $this->key($record);
-        $current = (int) array_search($key, $keys, true);
-        array_splice($keys, $current, 1);
-
-        $target = match (true) {
-            $request->input('direction') === 'up' => max(0, $current - 1),
-            $request->input('direction') === 'down' => min(count($keys), $current + 1),
-            is_scalar($request->input('before')) => array_search((string) $request->input('before'), $keys, true),
-            is_scalar($request->input('after')) => ($position = array_search((string) $request->input('after'), $keys, true)) === false ? false : $position + 1,
-            default => false,
-        };
-        abort_if($target === false, 422);
-        array_splice($keys, $target, 0, [$key]);
-
         try {
-            DB::connection($record->getConnectionName())->transaction(function () use ($keys, $siblings, $column): void {
-                foreach ($keys as $index => $siblingKey) {
-                    $sibling = $siblings->get($siblingKey);
-
-                    if ($sibling instanceof Model) {
-                        $sibling->setAttribute($column, $index + 1);
-
-                        if ($sibling->isDirty($column)) {
-                            $sibling->save();
-                        }
-                    }
-                }
-            });
+            abort_unless(ManualOrder::move($resource, $record, $this->siblings($resource, $record), $request), 422);
         } catch (QueryException $exception) {
             return $request->expectsJson()
                 ? response()->json(['message' => DatabaseErrors::explain($exception)], 422)
@@ -356,16 +353,6 @@ final class ResourceController
     }
 
     /**
-     * Ключ записи строкой.
-     */
-    private function key(Model $record): string
-    {
-        $key = $record->getKey();
-
-        return is_scalar($key) ? (string) $key : '';
-    }
-
-    /**
      * Переход на страницу, с которой пришли в связанную таблицу (`return` в адресе или `_return` в форме), или null.
      */
     private function returnTo(Request $request): ?RedirectResponse
@@ -375,6 +362,9 @@ final class ResourceController
         return $url === null ? null : redirect()->to($url);
     }
 
+    /**
+     * Ресурс по адресу раздела или 404.
+     */
     private function resource(string $slug): Resource
     {
         $resource = Fastleo::resources()->find($slug);

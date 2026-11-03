@@ -86,3 +86,46 @@ public function can(string $ability, ?Model $record): bool
 - Варианты связей ([BelongsTo](fields/belongs-to.md), [BelongsToMany](fields/belongs-to-many.md)) видит тот, у кого есть `viewAny` раздела. Policy связанной модели здесь не спрашивается — ограничьте варианты методом поля `query()`; сохранить запись вне вариантов нельзя.
 - [Связанная таблица](related.md) на странице записи видна при `view` родителя и `viewAny` дочернего раздела; «Добавить» — при `update` родителя и `create` дочернего. Изменяются и удаляются записи таблицы по Policy дочернего раздела.
 - Вложенные записи ([HasMany](fields/has-many.md), [HasOne](fields/has-one.md)) создаются, меняются и удаляются в рамках права `update` (или `create`) **родителя**; Policy модели блоков не спрашивается. Блок чужой записи изменить или удалить нельзя — его `id` из запроса игнорируется.
+
+## Сайт с ролями: что закрыть
+
+Права по умолчанию открытые (нет Policy — можно всё), поэтому на сайте с ролями (владелец, менеджер, редактор) закройте всё, что должно быть недоступно:
+
+| Что | Чем закрыть |
+|---|---|
+| Свои разделы | Policy модели (`php artisan fastleo:make-policy Lead`) или `can()` ресурса |
+| «Администраторы» (`/fastleo/users`) | Policy модели пользователя. Без неё любой администратор открывает раздел и может выдать себе роль или доступ другому; если разделом пользуется только владелец, закройте его Policy на `User` |
+| Готовые модули (заявки, страницы, новости) | Policy их моделей: код модулей лежит в вашем сайте. Страница настроек «Контакты» закрывается методом `canAccess()` своего класса ([настройки](settings.md)) |
+| Журнал изменений | Gate `viewFastleoActivity` ([activity.md](activity.md)) |
+| Журналы ошибок | Gate `viewFastleoLogs` ([журнал ошибок](pages.md#журнал-ошибок)) |
+| Файлы | Gate `manageFastleoFiles` ([files.md](files.md)) |
+| Очистка кеша | Gate `clearFastleoCache` |
+| Страница SoftNetica | Gate `manageFastleoSoftNetica` ([softnetica.md](softnetica.md)) |
+| Страницы настроек и свои страницы | метод `canAccess(?Authenticatable $user): bool` страницы (`Settings`, `Page`) |
+| Виджеты дашборда (например, «Состояние сервера») | `->visible(fn ($user) => $user->is_owner)` |
+
+```php
+// app/Providers/AppServiceProvider.php
+Gate::define('viewFastleoLogs', fn (User $user) => $user->role === 'owner');
+Gate::define('manageFastleoFiles', fn (User $user) => in_array($user->role, ['owner', 'editor'], true));
+Gate::define('clearFastleoCache', fn (User $user) => $user->role === 'owner');
+Gate::define('manageFastleoSoftNetica', fn (User $user) => $user->role === 'owner');
+```
+
+Роль хранит ваша колонка `users.role` (`Select::make('role')` в наследнике `UserResource`, [auth.md](auth.md#администраторы)). Колонка должна быть в `#[Fillable]` модели, иначе роль не сохранится, и именно поэтому раздел «Администраторы» нужно закрыть: через него роль и меняют.
+
+**Одна Policy на несколько моделей.** Не нужно создавать файл на каждую модель: напишите базовый класс по ролям и привяжите его циклом.
+
+```php
+use Illuminate\Support\Facades\Gate;
+
+foreach ([Lead::class, Client::class, Deal::class] as $model) {
+    Gate::policy($model, ManagerPolicy::class);
+}
+
+foreach ([Product::class, Brand::class] as $model) {
+    Gate::policy($model, OwnerOnlyPolicy::class);
+}
+```
+
+Методы такой Policy принимают запись необязательной: `public function update(User $user, ?Model $record = null): bool`. Админка вызывает их и без записи, например при проверке права на раздел.

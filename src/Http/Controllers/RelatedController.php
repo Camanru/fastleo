@@ -10,6 +10,7 @@ use Fastleo\Related;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
+use Fastleo\Support\ManualOrder;
 use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\RecordKey;
 use Fastleo\Support\RecordWriter;
@@ -42,15 +43,7 @@ final class RelatedController
      */
     public function __invoke(Request $request, string $resource, string $id, string $relation): View|Response
     {
-        $parent = Fastleo::resources()->find($resource);
-        abort_unless($parent instanceof Resource, 404);
-
-        $related = $parent->listRelations()[$relation] ?? null;
-        abort_unless($related instanceof Related, 404);
-
-        abort_unless(RecordKey::valid($parent->newModel(), $id), 404);
-        $record = $parent->newQuery()->whereKey($id)->first();
-        abort_unless($record instanceof Model, 404);
+        [$parent, $related, $record] = $this->locate($resource, $id, $relation);
 
         Authorization::authorize('view', $parent, $record);
 
@@ -71,7 +64,7 @@ final class RelatedController
             'list' => $list,
             'records' => $list->paginate($related->getPerPage()),
             'trashed' => false,
-            'returnUrl' => ReturnUrl::from($request) ?? route('fastleo.resources.show', [$parent::slug(), $record->getKey()]),
+            'returnUrl' => ReturnUrl::from($request) ?? $parent->viewUrl($record) ?? route('fastleo.resources.index', $parent::slug()),
             'canAdd' => Authorization::allows('update', $parent, $record) && Authorization::allows('create', $child),
         ]);
 
@@ -87,6 +80,45 @@ final class RelatedController
     }
 
     /**
+     * Ручной порядок записей таблицы: `POST /fastleo/{resource}/{id}/related/{relation}/reorder` с `id` дочерней записи и
+     * `before` или `after` = ключ соседа (перетаскивание). Соседи — записи этой таблицы этого родителя, они получают свои
+     * прежние значения порядка по возрастанию. Нужны право `view` родителя, `viewAny` дочернего раздела, `$sortColumn`
+     * дочернего раздела (без дерева) и право `reorder` (или `update`) на запись по Policy дочернего раздела.
+     * Ответ — `{"ok": true}` или `{"message": "…"}` (422).
+     */
+    public function reorder(Request $request, string $resource, string $id, string $relation): JsonResponse
+    {
+        [$parent, $related, $record] = $this->locate($resource, $id, $relation);
+        Authorization::authorize('view', $parent, $record);
+
+        $child = $related->child();
+        Authorization::authorize('viewAny', $child);
+        $column = $child::sortColumn();
+        abort_if($column === null || $child::treeColumn() !== null, 404);
+
+        $key = $request->input('id');
+        abort_unless(is_string($key) || is_int($key), 404);
+        $key = (string) $key;
+        abort_unless(RecordKey::valid($child->newModel(), $key), 404);
+
+        $query = $child->newQuery();
+        $related->scopeFor($record)($query);
+        $model = $query->getModel();
+        $siblings = $query->orderBy($model->qualifyColumn($column))->orderBy($model->getQualifiedKeyName())->get();
+        $moved = $siblings->firstWhere($model->getKeyName(), $key);
+        abort_unless($moved instanceof Model, 404);
+        abort_unless(Authorization::allowsReorder($child, $moved), 403);
+
+        try {
+            abort_unless(ManualOrder::move($child, $moved, $siblings, $request), 422);
+        } catch (QueryException $exception) {
+            return response()->json(['message' => DatabaseErrors::explain($exception)], 422);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
      * Быстрое добавление (`Related::quickAdd()`): `POST /fastleo/{resource}/{id}/related/{relation}` со значениями
      * в `data[поле]` создаёт дочернюю запись с внешним ключом этого родителя. Нужны права `update` родителя и `create`
      * дочернего раздела — те же, что у кнопки «Добавить». Из ввода берутся только поля быстрого добавления; остальные поля
@@ -96,15 +128,8 @@ final class RelatedController
      */
     public function store(Request $request, string $resource, string $id, string $relation): JsonResponse
     {
-        $parent = Fastleo::resources()->find($resource);
-        abort_unless($parent instanceof Resource, 404);
-
-        $related = $parent->listRelations()[$relation] ?? null;
-        abort_unless($related instanceof Related && $related->hasQuickAdd(), 404);
-
-        abort_unless(RecordKey::valid($parent->newModel(), $id), 404);
-        $record = $parent->newQuery()->whereKey($id)->first();
-        abort_unless($record instanceof Model, 404);
+        [$parent, $related, $record] = $this->locate($resource, $id, $relation);
+        abort_unless($related->hasQuickAdd(), 404);
 
         $child = $related->child();
         Authorization::authorize('update', $parent, $record);
@@ -177,5 +202,25 @@ final class RelatedController
         view()->share('errors', new ViewErrorBag()->put('default', $errors));
 
         return [$pending['action'], array_values(array_filter((array) ($pending['ids'] ?? []), is_string(...)))];
+    }
+
+    /**
+     * Родитель, его связанная таблица и запись родителя по адресу или 404.
+     *
+     * @return array{Resource, Related, Model}
+     */
+    private function locate(string $resource, string $id, string $relation): array
+    {
+        $parent = Fastleo::resources()->find($resource);
+        abort_unless($parent instanceof Resource, 404);
+
+        $related = $parent->listRelations()[$relation] ?? null;
+        abort_unless($related instanceof Related, 404);
+
+        abort_unless(RecordKey::valid($parent->newModel(), $id), 404);
+        $record = $parent->newQuery()->whereKey($id)->first();
+        abort_unless($record instanceof Model, 404);
+
+        return [$parent, $related, $record];
     }
 }

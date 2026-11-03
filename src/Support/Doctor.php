@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Support;
 
 use BackedEnum;
+use Fastleo\Actions\Action;
 use Fastleo\Actions\SetToggle;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
@@ -93,6 +94,13 @@ final class Doctor
     private array $problems = [];
 
     /**
+     * Поля с поиском по серверу вместо списка вариантов (`раздел.поле`): об этом одно сводное предупреждение на сайт.
+     *
+     * @var list<string>
+     */
+    private array $remoteFields = [];
+
+    /**
      * Таблицы пакета, которых нет (не выполнен `migrate`): о них уже есть одна общая ошибка,
      * у встроенных разделов на этих таблицах вторая не нужна.
      *
@@ -108,6 +116,7 @@ final class Doctor
     public function run(): array
     {
         $this->problems = [];
+        $this->remoteFields = [];
         $this->missingPackageTables = [];
 
         $this->site();
@@ -117,7 +126,7 @@ final class Doctor
             $registry = Fastleo::resources();
             $resources = $registry->all();
             $settings = $registry->settings();
-            $registry->pages();
+            $pages = $registry->pages();
         } catch (Throwable $e) {
             $this->add('error', 'registry', 'registry', ['message' => $e->getMessage()]);
 
@@ -159,6 +168,14 @@ final class Doctor
             }
         }
 
+        foreach ($pages as $class) {
+            $this->icon($class::icon(), $class::slug());
+        }
+
+        if ($this->remoteFields !== []) {
+            $this->add('warning', 'site', 'relation_remote', ['fields' => implode(', ', $this->remoteFields), 'limit' => (string) config()->integer('fastleo.relations.preload', 100)], 'relation_remote_hint');
+        }
+
         return $this->problems;
     }
 
@@ -190,6 +207,13 @@ final class Doctor
 
         if (UserModel::fastleoClassName() === null) {
             $this->add('error', 'site', 'user_model', hint: 'user_model_hint');
+        }
+
+        // Опечатка вроде 'modall' молча работала бы как страница просмотра.
+        $view = config('fastleo.record_view', 'modal');
+
+        if (! in_array($view, ['modal', 'page', false], true)) {
+            $this->add('error', 'site', 'record_view_unknown', ['value' => is_scalar($view) ? var_export($view, true) : gettype($view)], 'record_view_unknown_hint');
         }
 
         $this->tables();
@@ -485,6 +509,11 @@ final class Doctor
             return;
         }
 
+        // Неизвестная иконка роняет каждую страницу админки (меню рисует иконку раздела), поэтому ловим её здесь.
+        foreach ([$resource::icon(), ...array_map(fn (Action $action): string => $action->getIcon(), $resource->listActions())] as $icon) {
+            $this->icon($icon, $scope);
+        }
+
         $columns = $this->columns($model, $scope);
 
         if ($columns === null) {
@@ -638,7 +667,8 @@ final class Doctor
             $field instanceof Gallery => $field->getMax() ?? 100,
             $field instanceof Tags => Tags::MAX_TAGS,
             $field instanceof KeyValue => $field->getMax() * 2,
-            $field instanceof BelongsToMany => max(1, $field->relatedModel()->newQuery()->count()),
+            // С поиском по серверу форма отправляет только выбранное, а не все варианты.
+            $field instanceof BelongsToMany => $field->isRemote() ? Tags::MAX_TAGS : max(1, $field->relatedModel()->newQuery()->count()),
             $field instanceof Select && $field->isMultiple() => max(1, count($field->getOptions())),
             default => 1,
         };
@@ -653,6 +683,18 @@ final class Doctor
             $settings->schema();
         } catch (Throwable $e) {
             $this->add('error', $settings::slug(), 'resource', ['message' => $e->getMessage()]);
+        }
+
+        $this->icon($settings::icon(), $settings::slug());
+    }
+
+    /**
+     * Иконка есть в наборе Lucide пакета.
+     */
+    private function icon(string $icon, string $scope): void
+    {
+        if (! Icons::exists($icon)) {
+            $this->add('error', $scope, 'icon_unknown', ['icon' => $icon], 'icon_unknown_hint');
         }
     }
 
@@ -731,7 +773,7 @@ final class Doctor
                 $this->add('error', $scope, 'field_not_fillable', ['field' => $field->name, 'model' => $model::class], 'field_not_fillable_hint');
             }
 
-            $this->casts($field, $model, $scope);
+            $this->casts($field, $model, $scope, $editable);
 
             if ($field instanceof RichText && $editable && $field->isWritable()) {
                 $this->richTextLoss($field, $model, $scope);
@@ -839,7 +881,7 @@ final class Doctor
         }
 
         if ($remote) {
-            $this->add('warning', $scope, 'relation_remote', ['field' => $field->name, 'limit' => (string) config()->integer('fastleo.relations.preload', 100)], 'relation_remote_hint');
+            $this->remoteFields[] = $scope.'.'.$field->name;
         }
     }
 
@@ -881,12 +923,20 @@ final class Doctor
     /**
      * Касты, без которых поле не сохранит значение: массив для JSON-полей, enum для Enum.
      */
-    private function casts(Field $field, Model $model, string $scope): void
+    private function casts(Field $field, Model $model, string $scope, bool $editable): void
     {
         $cast = $model->getCasts()[$field->name] ?? null;
 
         if ($field instanceof Enum && ! (is_string($cast) && enum_exists($cast) && is_a($cast, BackedEnum::class, true))) {
             $this->add('error', $scope, 'enum_cast', ['field' => $field->name, 'model' => $model::class], 'enum_cast_hint');
+        }
+
+        // Текст на колонке с enum-кастом: любая строка из формы не станет значением enum, и запись упадёт ошибкой 500.
+        // Поле, которое из формы не пишется (readonly, onlyInList, раздел только для чтения), этой ошибки не даёт.
+        $written = $editable && $field->isWritable() && $field->isInForm();
+
+        if ($written && ($field instanceof Text || $field instanceof Textarea) && is_string($cast) && enum_exists($cast) && is_a($cast, BackedEnum::class, true)) {
+            $this->add('error', $scope, 'text_on_enum', ['field' => $field->name, 'enum' => $cast], 'text_on_enum_hint');
         }
 
         $spatie = method_exists($model, 'isTranslatableAttribute') && $model->isTranslatableAttribute($field->name);

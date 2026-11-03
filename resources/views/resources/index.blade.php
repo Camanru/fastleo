@@ -16,7 +16,8 @@
     };
     $canReorder = fn ($record): bool => $manual && ($memo['reorder|'.$record->getKey()] ??= \Fastleo\Support\Authorization::allowsReorder($resource, $record));
     $parentOf = fn ($record): string => $treeColumn === null ? '' : (string) $record->getAttribute($treeColumn);
-    $fields = $resource->listFields();
+    $fields = $resource->listColumns($records, $list->sort);
+    $titleImage = $resource->titleImage();
     $canCreate = ! $trashed && $allows('create');
     $sortUrl = function (string $name) use ($list): string {
         $direction = $list->sort === $name && $list->direction === 'asc' ? 'desc' : 'asc';
@@ -38,17 +39,9 @@
     $formActions = $bulkActions + $singleActions;
     $selectable = $bulkActions !== [];
     $pageIds = $records->map(fn ($record) => (string) $record->getKey())->values()->all();
-    $recordUrl = function ($record) use ($allows, $slug, $trashed): ?string {
-        if (! $trashed && $allows('update', $record)) {
-            return route('fastleo.resources.edit', [$slug, $record->getKey()]);
-        }
-
-        return $allows('view', $record)
-            ? route('fastleo.resources.show', [$slug, $record->getKey()])
-            : null;
-    };
+    $recordUrl = fn ($record): ?string => $resource->recordUrl($record, can: $allows);
 @endphp
-<x-fastleo::layouts.app :title="$resource::label()" :description="$resource::description()" :count="$records->total()">
+<x-fastleo::layouts.app :title="$resource::label()" :description="$resource::description()" :count="$tree ? count($tree->order($list->parent)) : $records->total()">
     <x-slot:actions>
         @if ($resource::isExportable() && \Fastleo\Support\Authorization::allowsOwnOr('export', 'viewAny', $resource))
             @php
@@ -134,6 +127,25 @@
                     <x-fastleo::icon name="chevrons-up-down" class="size-4 shrink-0" x-cloak x-show="! expanded" />
                     <span class="max-lg:sr-only" x-text="expanded ? @js(__('fastleo::resources.tree_collapse_all')) : @js(__('fastleo::resources.tree_expand_all'))">{{ __('fastleo::resources.tree_collapse_all') }}</span>
                 </x-fastleo::button>
+            </div>
+        @endif
+
+        @if (count($fields) > 1)
+            {{-- Выбор столбцов: что скрыто, помнит браузер; первый столбец (название) скрыть нельзя. --}}
+            <div x-data="fastleoColumns({ key: @js('fastleo.columns.'.$slug), first: @js($fields[0]->name) })" @keydown.escape="menu = false; $refs.button.focus()" @click.outside="menu = false" @scroll.window="place()" @fastleo-list-refreshed.window="apply()">
+                <x-fastleo::button variant="icon" x-ref="button" x-on:click="toggle()" x-bind:aria-expanded="menu" title="{{ __('fastleo::resources.columns') }}" data-columns-button>
+                    <span class="sr-only">{{ __('fastleo::resources.columns') }}</span>
+                    <x-fastleo::icon name="columns-3" class="size-[17px]" />
+                </x-fastleo::button>
+                <div x-show="menu" x-ref="menu" x-cloak :style="style" class="fixed z-40 max-h-80 w-56 overflow-y-auto rounded-[10px] border border-line bg-surface p-1 text-base shadow-pop">
+                    @foreach (array_slice($fields, 1) as $field)
+                        <label class="flex h-8 cursor-pointer items-center gap-2 rounded-[6px] px-2 hover:bg-hover">
+                            <input type="checkbox" class="size-4 rounded accent-primary" x-bind:checked="! hidden.includes(@js($field->name))" x-on:change="column(@js($field->name))" data-column-toggle="{{ $field->name }}">
+                            <span class="truncate">{{ $field->getLabel() }}</span>
+                        </label>
+                    @endforeach
+                    <button type="button" class="flex h-8 w-full items-center rounded-[6px] px-2 text-primary-text hover:bg-hover" x-show="hidden.length > 0" x-on:click="showAll()">{{ __('fastleo::resources.columns_show_all') }}</button>
+                </div>
             </div>
         @endif
 
@@ -262,7 +274,7 @@
                             <th scope="col" class="w-px !px-2"><span class="sr-only">{{ __('fastleo::resources.order_drag') }}</span></th>
                         @endif
                         @foreach ($fields as $field)
-                            <th scope="col" @class(['!text-right' => $field instanceof \Fastleo\Fields\Number]) @if ($list->sort === $field->name) aria-sort="{{ $list->direction === 'asc' ? 'ascending' : 'descending' }}" @endif>
+                            <th scope="col" data-column="{{ $field->name }}" @class(['!text-right' => $field instanceof \Fastleo\Fields\Number]) @if ($list->sort === $field->name) aria-sort="{{ $list->direction === 'asc' ? 'ascending' : 'descending' }}" @endif>
                                 @if ($field->isSortable())
                                     <a href="{{ $sortUrl($field->name) }}" @class(['inline-flex items-center gap-1 hover:text-ink', 'font-[650] text-ink' => $list->sort === $field->name])>
                                         {{ $field->getLabel() }}
@@ -300,13 +312,16 @@
                                 <td class="!px-2 whitespace-nowrap">@include('fastleo::resources.order-controls', ['handle' => true, 'arrows' => false, 'position' => $tree ? null : $records->firstItem() + $loop->index])</td>
                             @endif
                             @foreach ($fields as $field)
-                                <td data-field="{{ $field->name }}" @class(['max-w-xs truncate', 'text-right tabular-nums' => $field instanceof \Fastleo\Fields\Number]) @if ($loop->first && $tree) style="padding-left: {{ 1 + $depth($record) * 1.5 }}rem" @endif>
+                                <td data-field="{{ $field->name }}" data-column="{{ $field->name }}" @class(['max-w-xs truncate', 'text-right tabular-nums' => $field instanceof \Fastleo\Fields\Number]) @if ($loop->first && $tree) style="padding-left: {{ 1 + $depth($record) * 1.5 }}rem" @endif>
                                     @if ($loop->first && $tree)
                                         @include('fastleo::resources.tree-toggle')
                                         <x-fastleo::icon :name="$childCount > 0 ? 'folder' : 'file-text'" class="mr-1.5 inline size-4 align-middle text-ink-3" />
                                     @endif
+                                    @if ($loop->first && $titleImage)
+                                        <span class="mr-2.5">{{ $titleImage->titleThumbnail($record) }}</span>
+                                    @endif
                                     @if ($loop->first && $url && ! ($field instanceof \Fastleo\Fields\Checkbox && $field->isQuickToggle()) && ! $field->isInlineEditable())
-                                        <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true])</a>
+                                        <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true, 'linked' => false])</a>
                                     @else
                                         @include('fastleo::resources.cell', ['inList' => true])
                                     @endif
@@ -315,7 +330,7 @@
                                     @endif
                                 </td>
                             @endforeach
-                            <td class="sticky right-0 z-[1] bg-surface has-[[aria-expanded=true]]:z-[2] !px-2 !py-1.5 group-hover/row:bg-hover group-aria-selected/row:bg-primary-soft">
+                            <td class="sticky right-0 z-[1] bg-surface has-[[aria-expanded=true]]:z-[2] !px-2 !py-1.5 group-hover/row:shadow-[inset_0_0_0_999px_var(--color-hover)] group-aria-selected/row:shadow-[inset_0_0_0_999px_var(--color-primary-soft)]">
                                 <div class="flex items-center justify-end gap-0.5">
                                     @if ($manual)
                                         @include('fastleo::resources.order-controls', ['handle' => false, 'first' => ! $tree && $loop->first && $records->onFirstPage(), 'last' => ! $tree && $loop->last && ! $records->hasMorePages()])
@@ -328,7 +343,7 @@
                 </tbody>
             </table>
             </div>
-            @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions()])
+            @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions(), 'byRoots' => $tree !== null, 'branch' => $list->parent !== null, 'truncated' => $list->treeTruncated])
         </div>
 
         {{-- Карточки: телефон --}}
@@ -356,11 +371,14 @@
                     @endif
                     <dl class="flex flex-col gap-1.5 text-sm">
                         @foreach ($fields as $field)
-                            <div class="flex gap-3">
+                            <div class="flex gap-3" data-column="{{ $field->name }}">
                                 <dt class="w-1/3 shrink-0 text-ink-2">{{ $field->getLabel() }}</dt>
                                 <dd class="min-w-0 flex-1 break-words" data-field="{{ $field->name }}">
+                                    @if ($loop->first && $titleImage)
+                                        <span class="mr-2.5">{{ $titleImage->titleThumbnail($record) }}</span>
+                                    @endif
                                     @if ($loop->first && $url && ! ($field instanceof \Fastleo\Fields\Checkbox && $field->isQuickToggle()) && ! $field->isInlineEditable())
-                                        <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true])</a>
+                                        <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true, 'linked' => false])</a>
                                     @else
                                         @include('fastleo::resources.cell', ['inList' => true])
                                     @endif
@@ -384,7 +402,7 @@
     @endif
 
     <div class="md:hidden">
-        @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions(), 'bordered' => false])
+        @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions(), 'bordered' => false, 'byRoots' => $tree !== null, 'branch' => $list->parent !== null, 'truncated' => $list->treeTruncated])
     </div>
     </div>
     </div>

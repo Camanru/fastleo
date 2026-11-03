@@ -10,6 +10,7 @@ use Fastleo\Widgets\Table;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Gate;
+use Workbench\App\Fastleo\ArticleResource;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Feedback;
 
@@ -196,6 +197,18 @@ describe('a widget without a title and a table without a section', function (): 
         expect($table->getTitle())->toBe('')
             ->and($table->isVisible())->toBeFalse()
             ->and($table->resolve())->toBe(['failed' => true]);
+    });
+});
+
+describe('Table', function (): void {
+    it('narrows the records with a closure', function (): void {
+        Article::factory()->create(['title' => 'Черновик', 'status' => 'draft']);
+        Article::factory()->create(['title' => 'Выпущена', 'status' => 'published']);
+
+        $rows = Table::make()->resource(ArticleResource::class)->query(fn ($query) => $query->where('status', 'draft'))->resolve()['rows'];
+
+        expect($rows)->toHaveCount(1)
+            ->and((string) $rows[0]['cells'][0])->toContain('Черновик');
     });
 });
 

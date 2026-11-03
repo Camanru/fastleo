@@ -28,6 +28,9 @@ final class FeedbackResource extends Resource
 
     protected static bool $readonly = true;
 
+    /** Новые обращения появляются в списке сами раз в 30 секунд. */
+    protected static ?int $poll = 30;
+
     /** Новые обращения выделены в списке, число в меню — непросмотренные. */
     protected static ?string $readColumn = 'read_at';
 

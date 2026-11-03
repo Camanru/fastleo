@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\SoftNetica;
 
 use Fastleo\Fastleo;
+use Illuminate\Support\Facades\Gate;
 use Throwable;
 
 /**
@@ -24,6 +25,19 @@ final class Connection
     public static function enabled(): bool
     {
         return config()->boolean('fastleo.softnetica.enabled', true);
+    }
+
+    /**
+     * Администратору можно открывать страницу SoftNetica: функция включена и Gate `manageFastleoSoftNetica`, если сайт его описал,
+     * иначе можно любому администратору.
+     *
+     * ```php
+     * Gate::define('manageFastleoSoftNetica', fn (User $user) => $user->is_owner);
+     * ```
+     */
+    public static function canManage(): bool
+    {
+        return self::enabled() && (! Gate::has('manageFastleoSoftNetica') || Gate::forUser(Fastleo::guard()->user())->allows('manageFastleoSoftNetica'));
     }
 
     /**

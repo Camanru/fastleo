@@ -53,10 +53,8 @@ final class PublicationSource extends Field
             ? $resource->newQuery()->whereKey($record->source_id)->first()
             : null;
 
-        if (! $resource instanceof Resource || ! $source instanceof Model || ! Authorization::allows('view', $resource, $source)) {
-            return null;
-        }
+        $url = $resource instanceof Resource && $source instanceof Model && Authorization::allows('view', $resource, $source) ? $resource->viewUrl($source) : null;
 
-        return new HtmlString('<a class="text-primary-text hover:underline" href="'.e(route('fastleo.resources.show', [$resource::slug(), $record->source_id])).'">'.e($resource::singular().' #'.$record->source_id).'</a>');
+        return $url === null ? null : new HtmlString('<a class="text-primary-text hover:underline" href="'.e($url).'">'.e($resource::singular().' #'.$record->source_id).'</a>');
     }
 }

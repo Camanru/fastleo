@@ -4,7 +4,7 @@
 
 ## Администратор в тесте
 
-Администратор — пользователь, у которого `canAccessFastleo()` возвращает `true` (по умолчанию — колонка `fastleo_admin`). Колонки `fastleo_admin` нет в `$fillable`, поэтому ставьте её через `forceFill()` или состояние фабрики:
+Администратор — пользователь, у которого `canAccessFastleo()` возвращает `true` (по умолчанию — колонка `fastleo_admin`). Колонки `fastleo_admin` нет в `$fillable`, поэтому ставьте её через `forceFill()` или состояние фабрики. Состояния `admin()` в новом сайте нет (его не создаёт `fastleo:install`): добавьте его в `UserFactory` или пишите `$admin = tap(User::factory()->create())->forceFill(['fastleo_admin' => true])->save();` (`tap` возвращает пользователя, сам `save()` — только `true`/`false`):
 
 ```php
 // database/factories/UserFactory.php
@@ -95,7 +95,7 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 | `fastleo.resources.index` | GET | список (`?q=…` — поиск; фильтры и сортировка — как в адресной строке браузера) |
 | `fastleo.resources.create` | GET | форма создания |
 | `fastleo.resources.store` | POST | создать |
-| `fastleo.resources.show` | GET | просмотр |
+| `fastleo.resources.show` | GET | просмотр (если не выключен `record_view`: тогда 404) |
 | `fastleo.resources.edit` | GET | форма изменения |
 | `fastleo.resources.update` | PUT | сохранить |
 | `fastleo.resources.destroy` | DELETE | удалить (в корзину при `SoftDeletes`) |
@@ -104,6 +104,7 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 | `fastleo.resources.action` | POST | действие: `route(…, ['doctors', 'publish-doctors'])`, в теле `ids` и поля мини-формы под ключом `data` |
 | `fastleo.resources.toggle` | POST | быстрый переключатель поля с `quickToggle()`: `route(…, ['doctors', $id, 'is_active'])`, в теле `value` = `1` или `0` (JSON → `{"value": true}`) |
 | `fastleo.resources.export` | GET | выгрузка xlsx/csv |
+| `fastleo.resources.related.store` | POST | быстрое добавление из [связанной таблицы](related.md#быстрое-добавление) (`quickAdd`): `route(…, ['products', $id, 'reviews'])`, поля в теле под ключом `data`, ответ JSON (201 или 422); отправляйте `postJson` |
 
 Полный список — `php artisan route:list --name=fastleo`.
 
@@ -154,6 +155,13 @@ $this->post(route('fastleo.resources.action', ['doctors', 'schedule-doctors']), 
     'data' => ['published_on' => '2026-11-01'],
 ])->assertRedirect();
 ```
+
+Тело запросов `related.store` и мини-формы действия — всегда `data[поле]`. Поля, отправленные плоско, не попадут в проверку. Ошибка проверки отвечает по-разному: `related.store` (быстрое добавление) — 422 в JSON с `errors`; `assertSessionHasNoErrors()` такой ответ не заметит, поэтому проверяйте код ответа и запись в базе. Мини-форма действия отвечает редиректом с ошибками в сессии: `assertSessionHasErrors()` их видит.
+
+## Уведомления и настройки сайта
+
+- Уведомления администраторам (`Fastleo::notifyAdmins()`) лежат в таблице `fastleo_notifications`, содержимое — в JSON-колонке `data`: `DB::table('fastleo_notifications')->count()` или `\Fastleo\Notifications\AdminNotification::query()->latest('id')->first()->data['title']`.
+- Настройки сайта в сидере и тесте записывает `app(\Fastleo\Support\SettingsStore::class)->save(new SiteSettings, ['phone' => '+7 900 000-00-00'])`.
 
 ## Проверка описания разделов
 

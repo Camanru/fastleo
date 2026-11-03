@@ -17,8 +17,8 @@ it('runs a bulk action on the selected rows after confirmation', function (): vo
 
     $page = signInAndVisit(route('fastleo.resources.index', 'articles'));
 
-    $page->click("table input[value=\"{$first->id}\"]")
-        ->click("table input[value=\"{$second->id}\"]")
+    $page->click("table input[type=\"checkbox\"][value=\"{$first->id}\"]")
+        ->click("table input[type=\"checkbox\"][value=\"{$second->id}\"]")
         ->assertSeeIn('[data-bulk-bar]', 'Выбрано: 2')
         ->click('[data-bulk-bar] button:has-text("Опубликовать")')
         ->assertSeeIn('#fastleo-confirm', 'Опубликовать статьи на сайте?')

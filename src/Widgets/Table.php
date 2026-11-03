@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Fastleo\Widgets;
 
+use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Override;
@@ -18,6 +20,7 @@ use Override;
  *
  * ```php
  * Table::make('Последние заявки')->resource(LeadResource::class)->limit(5)->columnSpan(2);
+ * Table::make('На модерации')->resource(CommentResource::class)->query(fn ($query) => $query->where('status', 'pending'));
  * ```
  */
 final class Table extends Widget
@@ -27,6 +30,9 @@ final class Table extends Widget
 
     private int $limit = 5;
 
+    /** @var (Closure(Builder<Model>): mixed)|null */
+    private ?Closure $scope = null;
+
     /**
      * Раздел, записи которого показывает таблица.
      *
@@ -35,6 +41,18 @@ final class Table extends Widget
     public function resource(string $resource): static
     {
         $this->resource = $resource;
+
+        return $this;
+    }
+
+    /**
+     * Сузить записи: замыканию передаётся запрос раздела (с его `query()`), например очередь модерации.
+     *
+     * @param  Closure(Builder<Model>): mixed  $scope
+     */
+    public function query(Closure $scope): static
+    {
+        $this->scope = $scope;
 
         return $this;
     }
@@ -82,14 +100,25 @@ final class Table extends Widget
         $eager = array_values(array_unique(array_merge(...array_map(fn (Field $field): array => $field->eagerLoad(), $fields))));
         $key = $resource->newModel()->getKeyName();
 
-        $records = $resource->newQuery()->with($eager)->orderByDesc($key)->limit($this->limit)->get();
+        $query = $resource->newQuery();
+
+        if ($this->scope instanceof Closure) {
+            ($this->scope)($query);
+        }
+
+        $records = $query->with($eager)->orderByDesc($key)->limit($this->limit)->get();
 
         return [
             'fields' => $fields,
-            'rows' => $records->map(fn (Model $record): array => [
-                'cells' => array_map(fn (Field $field): string|\Illuminate\Contracts\Support\Htmlable|null => $field->listDisplay($record), $fields),
-                'url' => Authorization::allows('view', $resource, $record) ? route('fastleo.resources.show', [$resource::slug(), $record->getKey()]) : null,
-            ])->all(),
+            'rows' => $records->map(function (Model $record) use ($resource, $fields): array {
+                $url = $resource->viewUrl($record);
+
+                return [
+                    'cells' => array_map(fn (Field $field): string|\Illuminate\Contracts\Support\Htmlable|null => $field->listDisplay($record), $fields),
+                    'url' => $url,
+                    'modalUrl' => Resource::viewModalUrl($url),
+                ];
+            })->all(),
             'allUrl' => route('fastleo.resources.index', $resource::slug()),
         ];
     }

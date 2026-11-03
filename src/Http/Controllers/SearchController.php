@@ -126,12 +126,10 @@ final class SearchController
     }
 
     /**
-     * Ссылка на запись: форма, если можно менять, иначе просмотр.
+     * Ссылка на запись: форма, если можно менять, иначе просмотр; записи, которую открыть нельзя, — список раздела.
      */
     private function url(Resource $resource, Model $record): string
     {
-        return Authorization::allows('update', $resource, $record)
-            ? route('fastleo.resources.edit', [$resource::slug(), $record->getKey()])
-            : route('fastleo.resources.show', [$resource::slug(), $record->getKey()]);
+        return $resource->recordUrl($record) ?? route('fastleo.resources.index', $resource::slug());
     }
 }

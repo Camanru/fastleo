@@ -165,8 +165,15 @@ Alpine.data('fastleoForm', () => ({
 
         window.addEventListener('keydown', (event) => {
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-                event.preventDefault();
                 const save = this.$el.querySelector('[data-save]');
+
+                event.preventDefault();
+
+                // Кнопка спрятана (вкладка с таблицей связанных записей): сохранять здесь нечего.
+                if (save !== null && save.offsetParent === null) {
+                    return;
+                }
+
                 this.$el.requestSubmit(save || undefined);
             }
         });
@@ -409,6 +416,25 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
     },
 
     navigate(event) {
+        const viewLink = event.target instanceof Element ? event.target.closest('a[data-record-view]') : null;
+        const modalLink = event.target instanceof Element ? event.target.closest('a[data-record-modal]') : null;
+
+        // Просмотр («глаз») в окне: карточка записи; editIn('modal') — форма раздела в окне. Без скриптов и с Ctrl/Cmd
+        // или средней кнопкой работает обычная ссылка.
+        if (viewLink !== null && this.owns(viewLink) && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) {
+            event.preventDefault();
+            openRecordView(viewLink.dataset.recordView, viewLink.href);
+
+            return;
+        }
+
+        if (modalLink !== null && this.owns(modalLink) && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) {
+            event.preventDefault();
+            openRecordModal(modalLink.dataset.recordModal).then((saved) => (saved ? this.load(this.url) : null));
+
+            return;
+        }
+
         const toggle = event.target instanceof Element ? event.target.closest('button[data-expand]') : null;
 
         if (toggle !== null && this.owns(toggle)) {
@@ -510,6 +536,7 @@ Alpine.data('fastleoQuickAdd', ({ url, failed }) => ({
 
         this.busy = true;
         this.errors = [];
+        this.mark(event.target, []);
 
         try {
             await requestJson(url, 'POST', new FormData(event.target));
@@ -518,9 +545,32 @@ Alpine.data('fastleoQuickAdd', ({ url, failed }) => ({
             const messages = Object.values(error.data?.errors ?? {}).flat();
 
             this.errors = messages.length > 0 ? messages : [error.data?.message || failed];
+            this.mark(event.target, Object.keys(error.data?.errors ?? {}));
         } finally {
             this.busy = false;
         }
+    },
+
+    /** Подсветить поля с ошибками (ключ `author` → поле `data[author]`, `tags.0` → `data[tags][0]`) и поставить фокус на первое. */
+    mark(form, keys) {
+        const names = keys.map((key) => `data[${key.split('.').join('][')}]`);
+        let first = null;
+
+        for (const element of form.elements) {
+            const invalid = names.some((name) => element.name === name || element.name.startsWith(`${name}[`));
+
+            if (invalid) {
+                element.setAttribute('aria-invalid', 'true');
+            } else {
+                element.removeAttribute('aria-invalid');
+            }
+
+            if (invalid && element.type !== 'hidden') {
+                first ??= element;
+            }
+        }
+
+        first?.focus();
     },
 }));
 
@@ -557,16 +607,17 @@ Alpine.data('fastleoImport', ({ url, state }) => ({
 }));
 
 /**
- * Выпадающее меню (действия записи, экспорт, добавить блок): открывается под кнопкой или над ней, если внизу мало места;
+ * Состояние выпадающего меню: открывается под кнопкой или над ней, если внизу мало места;
  * position: fixed — таблица с прокруткой его не обрезает.
  */
-Alpine.data('fastleoMenu', () => ({
+const dropdownMenu = () => ({
     menu: false,
     style: '',
 
     toggle() {
         this.menu = !this.menu;
-        this.place();
+        // Ширина меню известна, только когда оно показано.
+        this.$nextTick(() => this.place());
     },
 
     // Положение меню у кнопки; при прокрутке страницы меню едет вместе с ней.
@@ -576,10 +627,112 @@ Alpine.data('fastleoMenu', () => ({
         }
 
         const rect = this.$refs.button.getBoundingClientRect();
-        const right = Math.max(8, window.innerWidth - rect.right);
+        // Меню с x-ref="menu" не уходит за левый край экрана (телефон).
+        const width = this.$refs.menu?.offsetWidth ?? 0;
+        const right = Math.max(8, Math.min(window.innerWidth - rect.right, window.innerWidth - width - 8));
         // Внизу экрана мало места — меню открывается вверх.
         const vertical = window.innerHeight - rect.bottom < 280 ? `bottom: ${window.innerHeight - rect.top + 4}px` : `top: ${rect.bottom + 4}px`;
         this.style = `${vertical}; right: ${right}px`;
+    },
+});
+
+/**
+ * Выпадающее меню (действия записи, экспорт, добавить блок).
+ */
+Alpine.data('fastleoMenu', dropdownMenu);
+
+/**
+ * Скрытые столбцы раздела из localStorage; повреждённое значение или закрытое хранилище — ничего не скрыто.
+ */
+function storedColumns(key) {
+    try {
+        const stored = JSON.parse(localStorage.getItem(key) ?? '[]');
+
+        return Array.isArray(stored) ? stored.filter((name) => typeof name === 'string') : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Выбор столбцов списка: скрытые столбцы запоминаются в браузере (localStorage, по разделу) и прячут ячейки
+ * с data-column — и в таблице, и в карточках на телефоне. Первый столбец (название) скрыть нельзя.
+ * <div x-data="fastleoColumns({ key: 'fastleo.columns.articles', first: 'title' })">
+ */
+Alpine.data('fastleoColumns', ({ key, first }) => ({
+    ...dropdownMenu(),
+    hidden: storedColumns(key),
+
+    init() {
+        this.apply();
+    },
+
+    // Показать или скрыть столбец.
+    column(name) {
+        this.hidden = this.hidden.includes(name) ? this.hidden.filter((item) => item !== name) : [...this.hidden, name];
+        this.save();
+    },
+
+    showAll() {
+        this.hidden = [];
+        this.save();
+    },
+
+    save() {
+        try {
+            localStorage.setItem(key, JSON.stringify(this.hidden));
+        } catch {
+            // Хранилище закрыто: столбцы скрыты до перезагрузки страницы.
+        }
+
+        this.apply();
+    },
+
+    apply() {
+        document.querySelectorAll('[data-column]').forEach((cell) => {
+            // Первый столбец не прячется, даже если имя осталось в сохранённом выборе от прежнего порядка полей.
+            cell.hidden = cell.dataset.column !== first && this.hidden.includes(cell.dataset.column);
+        });
+    },
+}));
+
+/**
+ * Вкладки формы: открыта вкладка из адреса (#ключ), если нет ошибки проверки; выбор пишется в адрес и сообщается событием
+ * fastleo-tab — по нему показываются панели с таблицами связанных записей (они вне формы) и прячется строка «Сохранить»
+ * у вкладки без полей.
+ * <div x-data="fastleoTabs({ keys, tables, active, failed, group })">
+ */
+Alpine.data('fastleoTabs', ({ keys, tables, active, failed, group }) => ({
+    tab: active,
+
+    init() {
+        // Адрес (#ключ) и его запись — только у верхней раскладки: у вложенной одинаковый ключ открыл бы не ту вкладку.
+        const nested = this.$el.parentElement?.closest('[data-tabs]') != null;
+        const index = keys.indexOf(window.location.hash.slice(1));
+
+        if (!failed && !nested && index >= 0) {
+            this.tab = index;
+        }
+
+        this.$watch('tab', () => {
+            if (!nested) {
+                window.history.replaceState(null, '', `#${keys[this.tab]}`);
+            }
+            this.announce();
+        });
+
+        if (tables.includes(true)) {
+            this.$nextTick(() => this.announce());
+        }
+    },
+
+    // Событие уходит только у раскладки с вкладками-таблицами: остальным панель и «Сохранить» не нужны.
+    announce() {
+        if (!tables.includes(true)) {
+            return;
+        }
+
+        window.dispatchEvent(new CustomEvent('fastleo-tab', { detail: { group, tab: this.tab, table: tables[this.tab] } }));
     },
 }));
 
@@ -977,6 +1130,188 @@ function requestErrors(error, messages) {
 
     return { errors: validation.length > 0 ? validation : [messages.error], expired: false };
 }
+
+// Номер последнего запроса окна записи: ответ более раннего клика (просмотр) не должен накрыть более поздний.
+let recordWindowRequest = 0;
+// Обработчики окна просмотра навешаны (снимаются при закрытии окна).
+let viewListening = false;
+// Кнопку мыши нажали на фоне за окном: клик мимо закрывает окно, только если и нажатие было на фоне
+// (выделение текста, которое закончили за границей окна, его не закрывает).
+let pressedOnBackdrop = false;
+document.addEventListener('mousedown', (event) => (pressedOnBackdrop = event.target instanceof Element && event.target.id === 'fastleo-record-modal'));
+
+/**
+ * Клик по крестику или по фону за окном записи.
+ */
+function isCloseClick(event, dialog) {
+    return event.target instanceof Element && (event.target.closest('[data-modal-close]') !== null || (event.target === dialog && pressedOnBackdrop));
+}
+
+/**
+ * Название окна для экранных читалок: заголовок открытой записи, а если его нет — общее название.
+ */
+function titleRecordWindow(dialog, root) {
+    dialog.setAttribute('aria-label', root?.querySelector('h1')?.textContent.trim() || dialog.dataset.title);
+}
+
+/**
+ * Открыть форму записи в окне (iframe) → Promise: true, если запись сохранили (страница «сохранено» прислала
+ * fastleo:saved), false — окно закрыли. Сообщения принимаются только от своего iframe и своего сайта.
+ */
+export function openRecordModal(url) {
+    const dialog = document.getElementById('fastleo-record-modal');
+    const frame = dialog.querySelector('iframe');
+    const card = dialog.querySelector('[data-record-card]');
+
+    // Адрес приходит с сервера, но чужой сайт в окне не открываем никогда.
+    if (new URL(url, window.location.href).origin !== window.location.origin) {
+        return Promise.resolve(false);
+    }
+
+    recordWindowRequest++;
+
+    return new Promise((resolve) => {
+        card.classList.add('hidden');
+        frame.classList.remove('hidden');
+        // Форма в iframe — на 85% высоты экрана (карточка просмотра занимает по содержимому).
+        dialog.dataset.frame = '';
+        frame.addEventListener('load', () => titleRecordWindow(dialog, frame.contentDocument));
+
+        let saved = false;
+        // Закрыть окно по просьбе человека (Esc, крестик, сообщение из формы): с несохранёнными изменениями — после вопроса.
+        const requestClose = () => {
+            if (frame.contentWindow?.Alpine?.store('fastleoForm')?.dirty !== true || window.confirm(dialog.dataset.unsaved)) {
+                dialog.close();
+            }
+        };
+        const onMessage = (event) => {
+            if (event.origin !== window.location.origin || event.source !== frame.contentWindow) {
+                return;
+            }
+
+            if (event.data?.type === 'fastleo:saved') {
+                saved = true;
+                dialog.close();
+            } else if (event.data?.type === 'fastleo:close') {
+                requestClose();
+            }
+        };
+        const onCancel = (event) => {
+            event.preventDefault();
+            requestClose();
+        };
+        const onCloseButton = (event) => {
+            if (isCloseClick(event, dialog)) {
+                requestClose();
+            }
+        };
+        const onClose = () => {
+            delete dialog.dataset.frame;
+            titleRecordWindow(dialog, null);
+            window.removeEventListener('message', onMessage);
+            dialog.removeEventListener('cancel', onCancel);
+            dialog.removeEventListener('click', onCloseButton);
+            dialog.removeEventListener('close', onClose);
+            // Новый пустой iframe вместо смены адреса: у старого форма с несохранёнными изменениями спросила бы «Покинуть сайт?» второй раз.
+            const blank = frame.cloneNode(false);
+            blank.src = 'about:blank';
+            frame.replaceWith(blank);
+            resolve(saved);
+        };
+
+        window.addEventListener('message', onMessage);
+        dialog.addEventListener('cancel', onCancel);
+        dialog.addEventListener('click', onCloseButton);
+        dialog.addEventListener('close', onClose);
+        frame.src = url;
+        dialog.showModal();
+    });
+}
+
+/**
+ * Просмотр записи в окне: карточка с сервера (`?frame=1`) вставляется в окно без iframe. Окно открывается сразу
+ * с «Загрузка…»; крестик и Esc закрывают его; правки здесь нет — её делают через карандаш. Ответ старого клика
+ * отбрасывается (последний клик главный). Ошибка, обрыв связи или редирект (истёкшая сессия → вход) — переход на
+ * обычную страницу просмотра pageUrl: она сама приведёт ко входу и вернёт после него на себя, а не на кусок окна.
+ */
+export async function openRecordView(url, pageUrl) {
+    const dialog = document.getElementById('fastleo-record-modal');
+    const card = dialog.querySelector('[data-record-card]');
+
+    if (new URL(url, window.location.href).origin !== window.location.origin) {
+        return;
+    }
+
+    const request = ++recordWindowRequest;
+
+    delete dialog.dataset.frame;
+    dialog.querySelector('iframe').classList.add('hidden');
+    card.classList.remove('hidden');
+    card.replaceChildren(Object.assign(document.createElement('p'), { className: 'p-5 text-ink-2', textContent: dialog.dataset.loading ?? '' }));
+    card.scrollTop = 0;
+
+    if (!viewListening) {
+        const onCloseButton = (event) => {
+            if (isCloseClick(event, dialog)) {
+                dialog.close();
+            }
+        };
+        const onClose = () => {
+            dialog.removeEventListener('click', onCloseButton);
+            dialog.removeEventListener('close', onClose);
+            viewListening = false;
+            recordWindowRequest++;
+            titleRecordWindow(dialog, null);
+            card.replaceChildren();
+            card.classList.add('hidden');
+        };
+
+        viewListening = true;
+        dialog.addEventListener('click', onCloseButton);
+        dialog.addEventListener('close', onClose);
+    }
+
+    if (!dialog.open) {
+        dialog.showModal();
+    }
+
+    try {
+        const response = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+
+        if (request !== recordWindowRequest) {
+            return;
+        }
+
+        if (!response.ok || response.redirected) {
+            window.location.href = pageUrl;
+
+            return;
+        }
+
+        const html = await response.text();
+
+        if (request === recordWindowRequest) {
+            card.innerHTML = html;
+            card.scrollTop = 0;
+            titleRecordWindow(dialog, card);
+        }
+    } catch {
+        if (request === recordWindowRequest) {
+            window.location.href = pageUrl;
+        }
+    }
+}
+
+// Просмотр записи в окне (fastleo.record_view = 'modal'): ссылка «глаз», BelongsTo и строка виджета — data-record-view.
+// Ctrl/Cmd, Shift и средняя кнопка — обычная ссылка.
+document.addEventListener('click', (event) => {
+    const link = event.target instanceof Element ? event.target.closest('a[data-record-view]') : null;
+
+    if (link !== null && !event.defaultPrevented && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0 && document.getElementById('fastleo-record-modal') !== null) {
+        event.preventDefault();
+        openRecordView(link.dataset.recordView, link.href);
+    }
+});
 
 /**
  * Настройки загрузки и окна выбора со страницы (<dialog id="fastleo-picker" data-...>).
@@ -2054,6 +2389,49 @@ Alpine.data('fastleoDashboard', ({ url }) => ({
 }));
 
 /**
+ * Сообщить серверу новое место строки ручного порядка: рядом с ближайшим соседом того же родителя (data-parent).
+ * Возвращает true, если сервер принял перенос.
+ */
+async function postMove(url, row) {
+    const sibling = (step) => {
+        let element = step < 0 ? row.previousElementSibling : row.nextElementSibling;
+
+        while (element && element.dataset.parent !== row.dataset.parent) {
+            element = step < 0 ? element.previousElementSibling : element.nextElementSibling;
+        }
+
+        return element;
+    };
+    const previous = sibling(-1);
+    const next = sibling(1);
+    const body = { id: row.dataset.record };
+
+    if (previous) {
+        body.after = previous.dataset.record;
+    } else if (next) {
+        body.before = next.dataset.record;
+    } else {
+        return true;
+    }
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify(body),
+        });
+
+        return response.ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
  * Список раздела: сворачивание веток дерева (localStorage) и перетаскивание строк ручного порядка.
  * <div x-data="fastleoList({ key, url, tree })">: строки — <tr data-record data-parent data-ancestors>.
  * Строку можно бросить только среди соседей (тот же родитель); сервер получает before/after.
@@ -2082,6 +2460,11 @@ Alpine.data('fastleoList', ({ key, url, tree }) => ({
             animation: 150,
             onMove: (event) => event.related.dataset.parent === event.dragged.dataset.parent,
             onEnd: (event) => {
+                // Строку бросили на то же место: ничего не меняем и не перезагружаем страницу.
+                if (event.oldIndex === event.newIndex && event.from === event.to) {
+                    return;
+                }
+
                 this.renumber();
                 this.moved(event.item);
             },
@@ -2142,44 +2525,34 @@ Alpine.data('fastleoList', ({ key, url, tree }) => ({
     },
 
     async moved(row) {
-        const sibling = (step) => {
-            let element = step < 0 ? row.previousElementSibling : row.nextElementSibling;
+        const ok = await postMove(url, row);
 
-            while (element && element.dataset.parent !== row.dataset.parent) {
-                element = step < 0 ? element.previousElementSibling : element.nextElementSibling;
-            }
-
-            return element;
-        };
-        const previous = sibling(-1);
-        const next = sibling(1);
-        const body = { id: row.dataset.record };
-
-        if (previous) {
-            body.after = previous.dataset.record;
-        } else if (next) {
-            body.before = next.dataset.record;
-        } else {
-            return;
-        }
-
-        try {
-            const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
-                },
-                body: JSON.stringify(body),
-            });
-
-            if (!response.ok || tree) {
-                window.location.reload();
-            }
-        } catch {
+        if (!ok || tree) {
             window.location.reload();
         }
+    },
+}));
+
+/**
+ * Ручной порядок строк связанной таблицы: <tbody x-data="fastleoReorder({ url })">, строки — <tr data-record>, ручка — [data-reorder-handle].
+ * Таблица подгружается заново целиком, поэтому после неудачи просим её перезагрузиться (fastleo-reload).
+ */
+Alpine.data('fastleoReorder', ({ url }) => ({
+    init() {
+        Sortable.create(this.$el, {
+            handle: '[data-reorder-handle]',
+            animation: 150,
+            onEnd: async (event) => {
+                // Строку бросили на то же место: запрос не нужен.
+                if (event.oldIndex === event.newIndex) {
+                    return;
+                }
+
+                if (!(await postMove(url, event.item))) {
+                    this.$dispatch('fastleo-reload');
+                }
+            },
+        });
     },
 }));
 

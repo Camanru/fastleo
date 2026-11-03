@@ -137,10 +137,15 @@ class DoctorsAdminTest extends TestCase
 | Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](vendor/camanru/fastleo/docs/related.md) |
 | Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`; история — в ресурсе `$historyPanel = true` и `'activity' => ['enabled' => true]` в `config/fastleo.php` (журнал выключен по умолчанию) | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
 | Добавить дочернюю запись прямо под таблицей, без перехода на другую страницу (задача, комментарий) | `Related::make(…)->quickAdd(['title', 'due_at'])`, подпись кнопки — `->addLabel()` | [related.md](vendor/camanru/fastleo/docs/related.md#быстрое-добавление) |
+| Связанные записи таблицей в отдельной вкладке формы (отзывы товара); правка записи в окне или на странице раздела | `Tab::make('Отзывы', [Related::make(…)->editIn('modal')])` в `fields()` внутри `Tabs`; вкладка — либо поля, либо таблицы | [related.md](vendor/camanru/fastleo/docs/related.md#таблица-во-вкладке-формы) |
+| Вложенные записи блоками в форме (ссылки статьи, цены услуги, до десятков штук) | поле `HasMany` во вкладке; для сотен записей — таблица `Related` | [fields/has-many.md](vendor/camanru/fastleo/docs/fields/has-many.md) |
+| Просмотр записи: окно (по умолчанию `'modal'`), отдельная страница (`'page'`) или без просмотра, только форма | `'record_view' => 'modal'\|'page'\|false` в `config/fastleo.php`; ссылку на запись в уведомлениях — `Fastleo::recordUrl($запись)` | [configuration.md](vendor/camanru/fastleo/docs/configuration.md#страница-просмотра-записи) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](vendor/camanru/fastleo/docs/related.md#раскрывающиеся-строки) |
 | Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](vendor/camanru/fastleo/docs/fields/select.md) |
 | Подсветить строку списка по состоянию записи (просрочено, выполнено) | `rowTone(Model $record): ?string` в ресурсе — `success`/`warning`/`danger`/`info`/`neutral` | [list.md](vendor/camanru/fastleo/docs/list.md#подсветка-строк) |
 | Правка значения прямо в списке | `->inlineEditable()` (текст, число, список, `BelongsTo`); галочка — `->quickToggle()` | [list.md](vendor/camanru/fastleo/docs/list.md#правка-в-ячейке) |
+| Столбец прячется, пока у всех записей страницы пуст (второй телефон, комментарий) | `->hideWhenEmpty()` у поля | [list.md](vendor/camanru/fastleo/docs/list.md#какие-поля-видны) |
+| Обложка миниатюрой рядом с названием, без отдельного столбца | `Image::make(...)->inTitle()` | [fields/image.md](vendor/camanru/fastleo/docs/fields/image.md) |
 | Столбец из подсчёта, суммы, подзапроса | `->fromQuery()` + `query(Builder $query)` ресурса | [list.md](vendor/camanru/fastleo/docs/list.md#вычисляемые-столбцы) |
 | Отчёт с плитками по шесть в ряд | `protected static int $columns = 6;` в странице-отчёте, `columnSpan(1–6)` у виджетов | [reports.md](vendor/camanru/fastleo/docs/reports.md#шесть-плиток-в-ряд) |
 | Фильтр списка, в том числе по умолчанию («менеджер — я») | `filters()`, `->default(fn () => …)` | [list.md](vendor/camanru/fastleo/docs/list.md) |
@@ -229,6 +234,9 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | связь поля без метода в модели | добавить метод связи |
 | JSON-поле (Gallery, Tags, KeyValue, Repeater, Blocks, Seo, `Select::multiple()`, `translatable()`) без каста `array` | добавить каст в модель |
 | `Enum` без enum-каста | добавить каст в модель |
+| `Text` или `Textarea`, которое пишет в колонку с enum-кастом: неверное значение даёт 500 | `Enum::make(...)->enum(Статус::class)` или `Select` с вариантами enum |
+| иконки нет в наборе Lucide пакета (`$icon` раздела, действия, страницы настроек или своей страницы) — роняет каждую страницу админки | имя из [lucide.dev/icons](https://lucide.dev/icons) |
+| `fastleo.record_view` — не `'modal'`, `'page'` и не `false` | одно из трёх значений ([configuration.md](vendor/camanru/fastleo/docs/configuration.md#страница-просмотра-записи)) |
 | колонка `$sortColumn`, `$treeColumn` или `$readColumn` не найдена | исправить имя или миграцию |
 | колонка `$readColumn` — не дата со временем или NOT NULL | `$table->timestamp('read_at')->nullable()` |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |

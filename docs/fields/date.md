@@ -8,7 +8,7 @@ use Fastleo\Fields\Date;
 Date::make('published_on', 'Дата публикации')->default(fn () => now()->toDateString());
 ```
 
-**Колонка:** `$table->date('published_on')->nullable()`. **Модель:** каст `'published_on' => 'date'` (необязательно).
+**Колонка:** `$table->date('published_on')->nullable()`. **Модель:** каст `'published_on' => 'date:Y-m-d'` (необязательно). Не `'date'`: он записывает в колонку `2026-11-03 00:00:00`, и на SQLite строковое сравнение дат (`date_to > '2026-11-03'`) даёт неверный ответ; `date:Y-m-d` пишет ровно дату.
 
 **Проверка:** формат `ГГГГ-ММ-ДД`.
 

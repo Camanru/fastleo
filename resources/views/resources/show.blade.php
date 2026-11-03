@@ -1,22 +1,25 @@
-{{-- Просмотр записи: подписи и значения полей. --}}
+{{-- Просмотр записи: подписи и значения полей. $framed — карточка для окна просмотра (без меню, кнопок и связанных таблиц). --}}
 @php
+    $framed = $framed ?? false;
     $slug = $resource::slug();
     $siteUrl = $resource->url($record);
     $trashed = method_exists($record, 'trashed') && $record->trashed();
-    $recordActions = $trashed ? [] : array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record));
+    $recordActions = $trashed || $framed ? [] : array_filter($resource->actionsFor(false, false), fn ($action) => $action->allows($record) && $action->visibleFor($record));
 @endphp
 @php
     $recordTitle = $resource->title($record);
     $updatedAt = $record->getAttribute('updated_at') instanceof \Carbon\CarbonInterface ? $record->getAttribute('updated_at') : null;
     $listUrl = route('fastleo.resources.index', $trashed ? ['resource' => $slug, 'trashed' => 1] : $slug);
 @endphp
-<x-fastleo::layouts.app
+<x-dynamic-component
+    :component="$framed ? 'fastleo::layouts.card' : 'fastleo::layouts.app'"
     :title="__('fastleo::resources.show_title', ['name' => $resource::singular()])"
     :heading="$recordTitle !== '' ? $recordTitle : null"
     :description="$updatedAt ? __('fastleo::resources.updated_at', ['time' => $updatedAt->timezone(\Fastleo\Fastleo::timezone())->format('d.m.Y H:i')]) : null"
     :back="['url' => $returnUrl ?? $listUrl, 'label' => ($returnUrl ?? null) ? __('fastleo::resources.back') : $resource::label()]"
     :crumbs="array_values(array_filter([$resource::group() !== null ? ['label' => $resource::group()] : null, ['label' => $resource::label(), 'url' => $listUrl], ['label' => $recordTitle !== '' ? $recordTitle : __('fastleo::resources.show_title', ['name' => $resource::singular()])]]))"
 >
+    @unless ($framed)
     <x-slot:actions>
         <div class="flex flex-wrap items-center gap-2" x-data="fastleoActions({ open: @js($recordActions !== [] ? session('fastleo.action') : null), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
             @if ($recordActions !== [])
@@ -38,11 +41,16 @@
             @endif
         </div>
     </x-slot:actions>
+    @endunless
 
     <x-fastleo::flash />
 
+    @if ($framed)
+        <h1 class="mb-3 pr-12 text-lg font-semibold tracking-[-0.01em]">{{ $recordTitle !== '' ? $recordTitle : __('fastleo::resources.show_title', ['name' => $resource::singular()]) }}</h1>
+    @endif
+
     @php
-        $hasSide = $resource->hasSideColumn($record);
+        $hasSide = ! $framed && $resource->hasSideColumn($record);
     @endphp
     <div @class(['grid items-start gap-5', 'lg:grid-cols-[minmax(0,1fr)_24rem]' => $hasSide])>
         <div class="flex min-w-0 flex-col gap-5">
@@ -73,7 +81,9 @@
                 <div class="max-w-[68ch] min-w-0 text-base leading-[1.6] break-words whitespace-pre-line">@include('fastleo::resources.cell')</div>
             </x-fastleo::card>
         @endforeach
-            @include('fastleo::resources.related-sections', ['only' => 'main'])
+            @unless ($framed)
+                @include('fastleo::resources.related-sections', ['only' => 'main', 'withTab' => true])
+            @endunless
         </div>
         @if ($hasSide)
             <aside class="flex min-w-0 flex-col gap-5" data-card-aside>
@@ -84,4 +94,4 @@
             </aside>
         @endif
     </div>
-</x-fastleo::layouts.app>
+</x-dynamic-component>

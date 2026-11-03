@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Artisan;
-use Workbench\App\Models\Article;
+use Workbench\App\Models\Topic;
 
 beforeEach(function (): void {
     Artisan::call('vendor:publish', ['--tag' => 'fastleo-assets', '--force' => true]);
@@ -24,9 +24,9 @@ it('collapses the side menu to a narrow strip and remembers the choice', functio
 });
 
 it('switches the table to compact rows and remembers the choice', function (): void {
-    Article::factory()->create();
+    Topic::factory()->create();
 
-    $page = signInAndVisit(route('fastleo.resources.index', 'articles'));
+    $page = signInAndVisit(route('fastleo.resources.index', 'topics'));
 
     $page->assertScript("document.documentElement.classList.contains('fl-compact')", false)
         ->click('[title="Плотность таблицы"]')

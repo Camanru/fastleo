@@ -210,6 +210,7 @@ use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Filters\BelongsToManyFilter;
 use Fastleo\Filters\BooleanFilter;
 use Fastleo\Filters\DateRangeFilter;
+use Fastleo\Filters\NumberRangeFilter;
 use Fastleo\Filters\SelectFilter;
 
 public function filters(): array
@@ -220,6 +221,7 @@ public function filters(): array
         BelongsToManyFilter::make('tags', 'Метка'),    // поле BelongsToMany tags
         BooleanFilter::make('is_active', 'Показывается'),
         DateRangeFilter::make('created_at', 'Создан'), // колонка без поля в форме
+        NumberRangeFilter::make('price', 'Цена'),      // «от … до …» для числовой колонки
     ];
 }
 ```
@@ -250,7 +252,7 @@ BooleanFilter::make('has_photo', 'С фото')
 
 ### Как сделать фильтр со своим полем ввода («Цена от»)?
 
-Создайте заготовку командой и поправьте проверку значения, условие и шаблон.
+Для диапазона «от … до …» по числовой колонке хватает готового `NumberRangeFilter::make('price', 'Цена')` ([фильтры](../list.md#фильтры)). Свой фильтр нужен для нестандартного поля или условия: создайте заготовку командой и поправьте проверку значения, условие и шаблон.
 
 ```bash
 php artisan fastleo:make-filter PriceFrom
@@ -630,7 +632,7 @@ final class ExportInvoices extends Action
     }
 }
 
-// переход: return ActionResult::redirect(route('fastleo.resources.show', ['clients', $clientId], false), 'Клиент открыт');
+// переход: return ActionResult::redirect(route('fastleo.resources.edit', ['clients', $clientId], false), 'Клиент открыт');
 ```
 
 Долгую работу (рассылку) отправьте из `handle()` в очередь: `SendNewsletter::dispatch($records->modelKeys())` — [FAQ: расчёты и очереди](algorithms.md).

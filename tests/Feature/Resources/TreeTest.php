@@ -62,12 +62,67 @@ describe('list', function (): void {
             ->assertDontSee('data-ancestors', false);
     });
 
-    it('splits the tree into pages in tree order', function (): void {
-        config(['fastleo.list.per_page' => 2]);
+    it('splits the tree into pages of top-level records with everything inside them', function (): void {
+        config(['fastleo.list.per_page' => 1]);
         categoryTree();
 
-        expect($this->get(route('fastleo.resources.index', ['resource' => 'categories', 'page' => 2]))->viewData('records')->pluck('title')->all())
-            ->toBe(['Осевые', 'Кондиционеры']);
+        $first = $this->get(route('fastleo.resources.index', 'categories'))->assertOk();
+        $second = $this->get(route('fastleo.resources.index', ['resource' => 'categories', 'page' => 2]))->assertOk();
+
+        expect($first->viewData('records')->pluck('title')->all())->toBe(['Каталог', 'Вентиляция', 'Осевые', 'Кондиционеры'])
+            ->and($second->viewData('records')->pluck('title')->all())->toBe(['Новости']);
+        $first->assertSee('Записи верхнего уровня 1–1 из 2')->assertSee('data-ancestors', false);
+        $second->assertSee('Записи верхнего уровня 2–2 из 2');
+    });
+
+    it('counts all the records of the tree in the header, not the top-level ones', function (): void {
+        config(['fastleo.list.per_page' => 1]);
+        categoryTree();
+
+        $this->get(route('fastleo.resources.index', 'categories'))->assertOk()->assertSee('data-count>5</span>', false);
+    });
+
+    it('splits a branch into pages of its direct children', function (): void {
+        config(['fastleo.list.per_page' => 1]);
+        $tree = categoryTree();
+
+        $page = fn (int $number): array => $this->get(route('fastleo.resources.index', ['resource' => 'categories', 'parent' => $tree['catalog']->id, 'page' => $number]))->viewData('records')->pluck('title')->all();
+
+        expect($page(1))->toBe(['Вентиляция', 'Осевые'])
+            ->and($page(2))->toBe(['Кондиционеры']);
+    });
+
+    it('names the records of a branch in the caption and keeps the range inside the total', function (): void {
+        config(['fastleo.list.per_page' => 1]);
+        $tree = categoryTree();
+
+        $this->get(route('fastleo.resources.index', ['resource' => 'categories', 'parent' => $tree['catalog']->id]))
+            ->assertOk()
+            ->assertSee('Записи ветки 1–1 из 2 (со всеми вложенными)');
+        $this->get(route('fastleo.resources.index', ['resource' => 'categories', 'page' => 7]))
+            ->assertOk()
+            ->assertSee('Записи верхнего уровня 2–2 из 2');
+    });
+
+    it('stops a page of the tree at the limit of rows and tells where the rest is', function (): void {
+        config(['fastleo.list.max_all' => 4]);
+        $tree = categoryTree();
+        Category::factory()->count(6)->create(['parent_id' => $tree['news']->id, 'sort' => 9]);
+
+        $page = $this->get(route('fastleo.resources.index', 'categories'))->assertOk();
+
+        expect($page->viewData('records'))->toHaveCount(4)
+            ->and($page->viewData('records')->pluck('title')->first())->toBe('Каталог');
+        $page->assertSee('data-tree-truncated', false)->assertSee('Показаны не все вложенные записи (не больше 4 строк на странице)');
+        $this->get(route('fastleo.resources.index', ['resource' => 'categories', 'parent' => $tree['news']->id]))->assertOk()->assertDontSee('data-tree-truncated', false);
+    });
+
+    it('shows the whole tree on one page with the "all" button', function (): void {
+        config(['fastleo.list.per_page' => 1]);
+        categoryTree();
+
+        expect($this->get(route('fastleo.resources.index', ['resource' => 'categories', 'per_page' => 'all']))->viewData('records')->pluck('title')->all())
+            ->toBe(['Каталог', 'Вентиляция', 'Осевые', 'Кондиционеры', 'Новости']);
     });
 });
 

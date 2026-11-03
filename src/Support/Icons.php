@@ -45,6 +45,14 @@ final class Icons
     }
 
     /**
+     * Есть ли иконка с таким именем в наборе пакета.
+     */
+    public static function exists(string $name): bool
+    {
+        return preg_match('/^[a-z0-9]+(-[a-z0-9]+)*$/', $name) === 1 && is_file(dirname(__DIR__, 2).'/resources/icons/'.$name.'.svg');
+    }
+
+    /**
      * Содержимое SVG-файла иконки как есть.
      *
      * @throws InvalidArgumentException неизвестное или недопустимое имя иконки

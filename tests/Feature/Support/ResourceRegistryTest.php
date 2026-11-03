@@ -6,6 +6,7 @@ use Fastleo\Fastleo;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\Publishing\ChannelResource;
 use Fastleo\Publishing\PublicationResource;
+use Fastleo\Resources\UserResource;
 use Fastleo\Tests\Fixtures\Registry\Duplicate\FirstResource;
 use Fastleo\Tests\Fixtures\Registry\Duplicate\SecondResource;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
@@ -54,6 +55,21 @@ it('explains a mistake in a resource description', function (string $folder, str
     'slug with forbidden characters' => ['BadSlug', 'Адрес раздела «Bad_Slug»'],
     'no model' => ['NoModel', 'не указана модель'],
 ]);
+
+it('tells to set fastleo.users.resource for a subclass of the administrators section', function (): void {
+    useFixtureResources('Registry/UsersSubclass');
+    config(['fastleo.users.resource' => UserResource::class]);
+    Fastleo::resources()->flush();
+
+    expect(fn (): array => Fastleo::resources()->all())->toThrow(LogicException::class, "'users' => ['resource' => Fastleo\\Tests\\Fixtures\\Registry\\UsersSubclass\\AdminResource::class]");
+});
+
+it('names the subclass of the administrators section when it comes after the section that takes its address', function (): void {
+    useFixtureResources('Registry/UsersSubclassSecond');
+    Fastleo::resources()->flush();
+
+    expect(fn (): array => Fastleo::resources()->all())->toThrow(LogicException::class, "'users' => ['resource' => Fastleo\\Tests\\Fixtures\\Registry\\UsersSubclassSecond\\SubAdminResource::class]");
+});
 
 it('explains a manual order column with forbidden characters', function (): void {
     useFixtureResources('Registry/BadColumn');

@@ -44,6 +44,16 @@ final class Category extends Model
     }
 
     /**
+     * Товары категории.
+     *
+     * @return HasMany<Product, $this>
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
+
+    /**
      * Опубликованные статьи категории: связь со своим условием (для связанных таблиц админки).
      *
      * @return HasMany<Article, $this>

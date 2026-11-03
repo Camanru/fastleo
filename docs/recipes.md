@@ -58,7 +58,7 @@ final class OpenClient extends Action
         $client = ClientPhone::query()->where('phone', ClientPhone::normalize($lead->phone))->first()?->client;
 
         return ActionResult::redirect($client
-            ? route('fastleo.resources.show', ['clients', $client->id], false)
+            ? Fastleo::recordUrl($client, false)
             : route('fastleo.resources.create', ['resource' => 'clients', 'prefill' => ['name' => (string) $lead->name]], false));
     }
 }
@@ -187,7 +187,7 @@ Route::post('leads', function (Request $request) {
     $data = $request->validate(['phone' => ['required', 'string', 'max:30'], 'text' => ['nullable', 'string', 'max:2000']]);
     $lead = Lead::create($data);
 
-    Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)->url(route('fastleo.resources.show', ['leads', $lead->id], false))->level('success'));
+    Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)->url(Fastleo::recordUrl($lead, false))->level('success'));
 
     return response()->json(['id' => $lead->id], 201);
 })->middleware('throttle:60,1');
@@ -239,6 +239,41 @@ Tel::make('client_phone', 'Телефон')->fromQuery(),
 ```
 
 Кодировку и разделитель csv определяет экспорт раздела ([import-export.md](import-export.md)); для русского Excel это UTF-8 с BOM и «;».
+
+## Позиции заказа и строки документа
+
+Состав заказа, строки накладной, позиции сделки: у каждой записи нужен выбор из другого раздела (товар) и зависимый список (его вариант). В `HasMany`-блоках это невозможно (`BelongsTo` и `dependsOn()` в них не работают), поэтому позиция — отдельный раздел, а родитель показывает её таблицей во вкладке:
+
+```php
+// app/Fastleo/OrderItemResource.php — раздел без пункта меню; в начале файла: use Illuminate\Database\Eloquent\Builder;
+public static function inMenu(): bool
+{
+    return false;
+}
+
+public function fields(): array
+{
+    return [
+        BelongsTo::make('order_id', 'Заказ')->required(),
+        BelongsTo::make('product_id', 'Товар')->titleColumn('title')->required(),
+        BelongsTo::make('variant_id', 'Вариант')
+            ->dependsOn('product_id', fn (Builder $query, mixed $product) => $query->where('product_id', $product))
+            ->required(),
+        Number::make('quantity', 'Количество')->integer()->min(1)->required(),
+        Number::make('price', 'Цена')->min(0)->required(),
+    ];
+}
+
+// app/Fastleo/OrderResource.php
+Tabs::make([
+    Tab::make('Заказ', [/* поля заказа */]),
+    Tab::make('Позиции', [
+        Related::make('items', OrderItemResource::class)->editIn('modal'),
+    ]),
+]);
+```
+
+Все поля формы позиции (`order_id`, `product_id`, `variant_id`, `quantity`, `price`) должны быть в `$fillable` модели `OrderItem`, иначе `fastleo:doctor` покажет ошибку. Итог заказа пересчитывает observer модели `OrderItem` (`saved`, `deleted`): форма заказа с таблицей позиций не сохраняется вместе с позициями, итог не зависит от неё. Поле `total` заказа сделайте `readonly()`.
 
 ## Старые пароли при переезде
 

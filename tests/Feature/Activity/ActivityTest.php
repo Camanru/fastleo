@@ -7,6 +7,7 @@ use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Activity\QuietTopicResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
+use Fastleo\Tests\Fixtures\Policies\StrictTopicPolicy;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Topic;
@@ -388,6 +389,15 @@ describe('pages', function (): void {
 
         $this->get(route('fastleo.activity.index'))->assertOk()->assertDontSee('Секретная тема');
         $this->get(route('fastleo.resources.history', ['topics', Topic::query()->firstOrFail()->id]))->assertForbidden();
+    });
+
+    it('checks the right to revert against the record, so a policy that needs the record does not fail', function (): void {
+        $topic = Topic::factory()->create(['title' => 'Было']);
+        $this->put(route('fastleo.resources.update', ['topics', $topic->id]), ['title' => 'Стало']);
+        Gate::policy(Topic::class, StrictTopicPolicy::class);
+
+        $this->get(route('fastleo.activity.index'))->assertOk()->assertSee('Стало');
+        $this->get(route('fastleo.resources.history', ['topics', $topic->id]))->assertOk()->assertSee('Стало');
     });
 
     it('can be closed with the viewFastleoActivity gate', function (): void {

@@ -156,6 +156,7 @@ namespace App\Fastleo\Actions;
 use App\Models\ClientPhone;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\ActionResult;
+use Fastleo\Fastleo;
 use Illuminate\Database\Eloquent\Collection;
 
 final class OpenClient extends Action
@@ -173,9 +174,10 @@ final class OpenClient extends Action
         $lead = $records->firstOrFail();
         $client = ClientPhone::query()->where('phone', ClientPhone::normalize($lead->phone))->first()?->client;
 
-        return ActionResult::redirect($client
-            ? route('fastleo.resources.show', ['clients', $client->id], false)
-            : route('fastleo.resources.create', ['resource' => 'clients', 'prefill' => ['name' => (string) $lead->name, 'phone' => (string) $lead->phone]], false));
+        // recordUrl() возвращает null, если у модели нет раздела
+        $clientUrl = $client ? Fastleo::recordUrl($client, false) : null;
+
+        return ActionResult::redirect($clientUrl ?? route('fastleo.resources.create', ['resource' => 'clients', 'prefill' => ['name' => (string) $lead->name, 'phone' => (string) $lead->phone]], false));
     }
 }
 
@@ -283,7 +285,7 @@ Route::post('leads', function (Request $request) {
     $lead = Lead::create($data + ['source' => 'site']);
 
     Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)
-        ->url(route('fastleo.resources.show', ['leads', $lead->id], false))->icon('inbox')->level('success'));
+        ->url(Fastleo::recordUrl($lead, false))->icon('inbox')->level('success'));
 
     return response()->json(['id' => $lead->id], 201);
 })->middleware('throttle:60,1');
@@ -729,7 +731,7 @@ final class RemindTasks extends Command
             ->lazyById(500)
             ->each(function (Task $task): void {
                 Fastleo::notify($task->manager, FastleoMessage::make('Срок задачи: '.$task->title)
-                    ->url(route('fastleo.resources.show', ['tasks', $task->id], false))
+                    ->url(Fastleo::recordUrl($task, false))
                     ->icon('alarm-clock')->level('warning'));
 
                 $task->forceFill(['reminded_at' => now()])->saveQuietly();
@@ -921,7 +923,7 @@ final class LeadObserver
 
         Fastleo::notify($lead->manager, FastleoMessage::make('Вам назначена заявка')
             ->body((string) $lead->phone)
-            ->url(route('fastleo.resources.show', ['leads', $lead->id], false))
+            ->url(Fastleo::recordUrl($lead, false))
             ->icon('user-check'));
     }
 }
@@ -1020,7 +1022,7 @@ use Fastleo\Fastleo;
 use Fastleo\Notifications\FastleoMessage;
 
 Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body("{$lead->name}, {$lead->phone}")
-    ->url(route('fastleo.resources.show', ['leads', $lead->id], false))->level('success'));
+    ->url(Fastleo::recordUrl($lead, false))->level('success'));
 ```
 
 Шаги:

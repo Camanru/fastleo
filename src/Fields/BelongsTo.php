@@ -7,6 +7,7 @@ namespace Fastleo\Fields;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\QueriesRelatedRecords;
 use Fastleo\Fields\Contracts\SearchesOptions;
+use Fastleo\Resource;
 use Fastleo\Support\OptionRule;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
@@ -147,6 +148,27 @@ class BelongsTo extends Field implements SearchesOptions
         $related = $record->getRelationValue($this->getRelationName());
 
         return $related instanceof Model ? $this->titleOf($related) : $this->format($record->getAttribute($this->name));
+    }
+
+    /**
+     * Адрес страницы связанной записи в её разделе (для ссылки в списке) или null: записи нет, у модели нет раздела
+     * или администратору не разрешён просмотр (Policy `view` и `Resource::can()`).
+     *
+     * ```php
+     * BelongsTo::make('category_id')->linkUrl($article);   // /fastleo/categories/5
+     * ```
+     */
+    public function linkUrl(Model $record): ?string
+    {
+        $related = $record->getRelationValue($this->getRelationName());
+
+        if (! $related instanceof Model) {
+            return null;
+        }
+
+        $resource = Fastleo::resources()->forModel($related::class);
+
+        return $resource?->viewUrl($related);
     }
 
     /**

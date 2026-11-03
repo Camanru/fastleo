@@ -15,29 +15,38 @@
         return $memo['action|'.spl_object_id($action).'|'.$record->getKey()] ??= $action->allows($record);
     };
     $expandable = $related->isExpandable();
-    $columns = count($fields) + 1 + ($expandable ? 1 : 0);
+    $tree = null;
+    // Ручной порядок ($sortColumn дочернего раздела): ручка перетаскивания у записей, которые можно двигать. Только в обычном виде
+    // (без поиска и сортировки столбца), без дерева и раскрывающихся строк; соседи — записи этой таблицы этого родителя.
+    $canReorder = function ($record) use ($resource, &$memo): bool {
+        return $memo['reorder|'.$record->getKey()] ??= \Fastleo\Support\Authorization::allowsReorder($resource, $record);
+    };
+    $manual = $list->isManualOrder() && ! $resource::isReadonly() && ! $expandable && $resource::treeColumn() === null && $records->contains($canReorder);
+    $reorderUrl = $manual ? route('fastleo.resources.related.reorder', [$parent::slug(), $parentRecord->getKey(), $related->name]) : null;
+    $columns = count($fields) + 1 + ($expandable ? 1 : 0) + ($manual ? 1 : 0);
     $singleActions = $resource->actionsFor(false, false);
     $formActions = array_filter($resource->listActions(), fn ($action) => ! $action->isForTrash());
-    $tree = null;
     $sortUrl = function (string $name) use ($list): string {
         $direction = $list->sort === $name && $list->direction === 'asc' ? 'desc' : 'asc';
 
         return request()->fullUrlWithQuery(['sort' => $name, 'direction' => $direction, 'page' => null]);
     };
-    $recordUrl = function ($record) use ($allows, $slug, $returnUrl): ?string {
-        if ($allows('update', $record)) {
-            return route('fastleo.resources.edit', [$slug, $record->getKey(), 'return' => $returnUrl]);
-        }
-
-        return $allows('view', $record) ? route('fastleo.resources.show', [$slug, $record->getKey(), 'return' => $returnUrl]) : null;
-    };
+    $recordUrl = fn ($record): ?string => $resource->recordUrl($record, ['return' => $returnUrl], can: $allows);
     $createUrl = route('fastleo.resources.create', ['resource' => $slug, 'prefill' => [$related->foreignKey() => $related->foreignValue($parentRecord)], 'return' => $returnUrl]);
+    // editIn('modal'): «Изменить» и «Добавить» открывают форму раздела в окне (data-record-modal — адрес формы для окна);
+    // обычный href остаётся запасным (открыть в новой вкладке, без скриптов).
+    $modal = $related->editsInModal();
+    $createModalUrl = $modal ? route('fastleo.resources.create', ['resource' => $slug, 'prefill' => [$related->foreignKey() => $related->foreignValue($parentRecord)], 'frame' => 1]) : null;
+    $editModalUrl = fn ($record): ?string => $modal && $allows('update', $record) ? route('fastleo.resources.edit', [$slug, $record->getKey(), 'frame' => 1]) : null;
 @endphp
 <div x-data="fastleoActions({ ids: @js($records->map(fn ($record) => (string) $record->getKey())->values()->all()), open: @js($openAction), openIds: @js($openIds) })" class="flex flex-col gap-3" data-related-table="{{ $related->name }}">
     @include('fastleo::actions.forms', ['actions' => $formActions, 'relation' => $related->name, 'relationParent' => $parentRecord->getKey()])
     <div class="flex flex-wrap items-center gap-2">
-        <h2 class="text-lg font-semibold tracking-[-0.01em]">{{ $related->getLabel() }}</h2>
-        <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sunken px-1.5 text-xs font-medium text-ink-2 tabular-nums">{{ $records->total() }}</span>
+        @unless ($related->isInTab() && request()->boolean('panel'))
+            {{-- В панели вкладки формы название таблицы и число записей даёт сама вкладка (число без названия ничего не говорит); на странице просмотра заголовок нужен. --}}
+            <h2 class="text-lg font-semibold tracking-[-0.01em]">{{ $related->getLabel() }}</h2>
+            <span class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-sunken px-1.5 text-xs font-medium text-ink-2 tabular-nums">{{ $records->total() }}</span>
+        @endunless
         <div class="flex-1"></div>
         @if ($list->hasSearch())
             <form method="GET" action="{{ route('fastleo.resources.related', [$parent::slug(), $parentRecord->getKey(), $related->name]) }}" role="search" data-related-search class="relative w-full min-w-0 sm:w-64">
@@ -57,7 +66,7 @@
             </form>
         @endif
         @if ($canAdd)
-            <x-fastleo::button variant="primary" size="sm" icon="plus" :href="$createUrl">{{ $related->getAddLabel() }}</x-fastleo::button>
+            <x-fastleo::button variant="primary" size="sm" icon="plus" :href="$createUrl" :data-record-modal="$createModalUrl">{{ $related->getAddLabel() }}</x-fastleo::button>
         @endif
     </div>
 
@@ -71,6 +80,9 @@
                 <table class="w-full border-separate border-spacing-0 text-left text-base">
                     <thead data-related-nav>
                         <tr class="[&>th]:h-10 [&>th]:border-b [&>th]:border-line [&>th]:bg-surface-2 [&>th]:px-3 [&>th]:text-xs [&>th]:font-[550] [&>th]:whitespace-nowrap [&>th]:text-ink-2">
+                            @if ($manual)
+                                <th scope="col" class="w-px !px-2"><span class="sr-only">{{ __('fastleo::resources.order_drag') }}</span></th>
+                            @endif
                             @if ($expandable)
                                 <th scope="col" class="w-px"><span class="sr-only">{{ __('fastleo::resources.expand') }}</span></th>
                             @endif
@@ -89,11 +101,14 @@
                             <th scope="col" class="sticky right-0 z-[1]"><span class="sr-only">{{ __('fastleo::resources.actions') }}</span></th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody @if ($manual) x-data="fastleoReorder({ url: @js($reorderUrl) })" @endif>
                         @foreach ($records as $record)
                             @php($url = $recordUrl($record))
                             @php($tone = $resource->rowToneFor($record))
                             <tr class="group/row hover:bg-hover [&:last-child>td]:border-b-0 [&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 compact:[&>td]:py-1.5" data-record="{{ $record->getKey() }}" @if ($tone) data-tone="{{ $tone }}" @endif @if ($resource->isUnread($record)) data-unread @endif>
+                                @if ($manual)
+                                    <td class="w-px !px-2 whitespace-nowrap">@include('fastleo::resources.order-controls', ['handle' => true, 'arrows' => false])</td>
+                                @endif
                                 @if ($expandable)
                                     <td class="w-px !pr-0">
                                         @if ($allows('view', $record))
@@ -107,13 +122,13 @@
                                 @foreach ($fields as $field)
                                     <td data-field="{{ $field->name }}" @class(['max-w-xs truncate', 'text-right tabular-nums' => $field instanceof \Fastleo\Fields\Number])>
                                         @if ($loop->first && $url && ! ($field instanceof \Fastleo\Fields\Checkbox && $field->isQuickToggle()) && ! $field->isInlineEditable())
-                                            <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text">@include('fastleo::resources.cell', ['inList' => true])</a>
+                                            <a href="{{ $url }}" class="font-medium text-ink hover:text-primary-text" @if ($editModalUrl($record)) data-record-modal="{{ $editModalUrl($record) }}" @endif>@include('fastleo::resources.cell', ['inList' => true, 'linked' => false])</a>
                                         @else
                                             @include('fastleo::resources.cell', ['inList' => true])
                                         @endif
                                     </td>
                                 @endforeach
-                                <td class="sticky right-0 z-[1] w-px bg-surface has-[[aria-expanded=true]]:z-[2] whitespace-nowrap group-hover/row:bg-hover">@include('fastleo::resources.row-actions', ['childCount' => 0])</td>
+                                <td class="sticky right-0 z-[1] w-px bg-surface has-[[aria-expanded=true]]:z-[2] whitespace-nowrap group-hover/row:shadow-[inset_0_0_0_999px_var(--color-hover)]">@include('fastleo::resources.row-actions', ['childCount' => 0, 'modalEditUrl' => $editModalUrl($record)])</td>
                             </tr>
                             @if ($expandable && $allows('view', $record))
                                 <tr data-expansion data-url="{{ route('fastleo.resources.expand', [$slug, $record->getKey(), 'return' => $returnUrl]) }}" hidden>

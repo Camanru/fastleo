@@ -12,6 +12,9 @@ use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Feedback;
 use Workbench\App\Models\Page;
+use Workbench\App\Models\Product;
+use Workbench\App\Models\ProductReview;
+use Workbench\App\Models\Supplier;
 use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
 
@@ -43,6 +46,10 @@ final class DatabaseSeeder extends Seeder
         Article::factory()->published()->count(10)->create(['category_id' => fn () => $categories->random()->id]);
         Feedback::factory()->count(5)->create();
 
+        $suppliers = Supplier::factory()->count(6)->create();
+        $products = Product::factory()->count(30)->create(['category_id' => fn () => $categories->random()->id, 'supplier_id' => fn () => $suppliers->random()->id]);
+        $products->each(fn (Product $product) => ProductReview::factory()->count(random_int(0, 4))->create(['product_id' => $product->id]));
+
         $topics = Topic::factory()->count(15)->sequence(fn (Sequence $sequence): array => ['sort' => $sequence->index + 1])->create();
         Article::query()->each(fn (Article $article) => $article->topics()->attach($topics->random(2)->pluck('id')));
 
@@ -70,6 +77,11 @@ final class DatabaseSeeder extends Seeder
 
         Article::query()->orderBy('id')->limit(6)->get()->each(function (Article $article, int $index) use ($paths): void {
             $article->update(['cover' => $paths[$index], 'gallery' => array_values(array_diff($paths, [$paths[$index]]))]);
+        });
+
+        Product::query()->orderBy('id')->limit(6)->get()->each(function (Product $product, int $index) use ($disk, $colors): void {
+            $disk->put($path = 'uploads/products/demo-'.($index + 1).'.jpg', $this->picture(800, 600, $colors[$index], 'Товар '.($index + 1)));
+            $product->update(['photo' => $path]);
         });
 
         Page::factory()->count(3)->create();

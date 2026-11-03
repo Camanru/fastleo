@@ -74,6 +74,9 @@ abstract class Field
     /** Показывать в списке записей. */
     protected bool $showInList = true;
 
+    /** Столбец исчезает из списка, если на странице у всех записей значение пустое. */
+    protected bool $hideWhenEmpty = false;
+
     /** Показывать в форме и на странице просмотра. */
     protected bool $showInForm = true;
 
@@ -542,6 +545,21 @@ abstract class Field
     }
 
     /**
+     * Убирать столбец из списка, пока на показанной странице у всех записей значение пустое (второй телефон,
+     * менеджер, комментарий). Первый столбец, столбец текущей сортировки и пустая страница не скрываются.
+     *
+     * ```php
+     * Tel::make('phone2', 'Второй телефон')->hideWhenEmpty();
+     * ```
+     */
+    public function hideWhenEmpty(bool $hide = true): static
+    {
+        $this->hideWhenEmpty = $hide;
+
+        return $this;
+    }
+
+    /**
      * Показывать только в списке: в форме поля нет, и оно не записывается.
      *
      * ```php
@@ -950,6 +968,29 @@ abstract class Field
     public function isVisibleInList(): bool
     {
         return $this->showInList && ! $this->isHidden();
+    }
+
+    /**
+     * Столбец убирается, когда на странице все значения пустые (`hideWhenEmpty()`).
+     */
+    public function isHiddenWhenEmpty(): bool
+    {
+        return $this->hideWhenEmpty;
+    }
+
+    /**
+     * В ячейке списка у записи нет значения (стоит прочерк). Поле со своим шаблоном или правкой на месте пустым не считается:
+     * в ячейке остаётся что нажать.
+     */
+    public function isEmptyInList(Model $record): bool
+    {
+        if ($this->getListView() !== null || $this->isInlineEditable()) {
+            return false;
+        }
+
+        $display = $this->listDisplay($this->shownRecord($record));
+
+        return $display === null || ($display instanceof Htmlable ? $display->toHtml() : $display) === '';
     }
 
     /**

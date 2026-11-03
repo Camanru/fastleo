@@ -31,9 +31,9 @@
                 }
             }
             $canRevert = ! $restricted && $resource !== null && $entry->isRevertable() && match (true) {
-                in_array($entry->event, ['updated', 'reverted'], true) => \Fastleo\Support\Authorization::allows('update', $resource),
+                in_array($entry->event, ['updated', 'reverted'], true) => $subject !== null && \Fastleo\Support\Authorization::allows('update', $resource, $subject),
                 $entry->snapshot !== null => \Fastleo\Support\Authorization::allows('create', $resource),
-                default => \Fastleo\Support\Authorization::allows('restore', $resource),
+                default => $subject !== null && \Fastleo\Support\Authorization::allows('restore', $resource, $subject),
             };
             $revertsValues = in_array($entry->event, ['updated', 'reverted'], true);
         @endphp

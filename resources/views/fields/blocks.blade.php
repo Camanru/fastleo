@@ -40,7 +40,7 @@
                     @include('fastleo::fields.blocks-block', ['key' => '__KEY__', 'type' => $type, 'item' => null])
                 </template>
             @endforeach
-            <div x-data="fastleoMenu" class="relative" @keydown.escape="menu = false" @click.outside="menu = false" @scroll.window="place()" x-show="max === null || count < max">
+            <div x-data="fastleoMenu" class="relative" @keydown.escape="if (menu) { $event.preventDefault(); $event.stopPropagation(); menu = false; }" @click.outside="menu = false" @scroll.window="place()" x-show="max === null || count < max">
                 <x-fastleo::button variant="dashed" icon="plus" x-ref="button" x-on:click="toggle()" x-bind:aria-expanded="menu" aria-haspopup="menu" data-block-add>
                     {{ __('fastleo::resources.blocks_add') }}
                 </x-fastleo::button>

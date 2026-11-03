@@ -145,7 +145,7 @@ final class SendDelivery implements ShouldQueue
         if ($author instanceof Authenticatable) {
             Fastleo::notify($author, FastleoMessage::make(__('fastleo::publishing.notify_failed', [], Fastleo::LOCALE))
                 ->body(__('fastleo::publishing.status_'.$publication->status, [], Fastleo::LOCALE))
-                ->url($resource instanceof \Fastleo\Resource ? route('fastleo.resources.show', [$resource::slug(), $publication->id], false) : null)
+                ->url($resource instanceof \Fastleo\Resource ? $resource->recordAddress($publication, false) : null)
                 ->icon('send')
                 ->level('danger'));
         }

@@ -62,6 +62,6 @@ final class SoftNeticaSettings extends Settings
     #[Override]
     public function canAccess(?Authenticatable $user): bool
     {
-        return Connection::enabled();
+        return Connection::canManage();
     }
 }

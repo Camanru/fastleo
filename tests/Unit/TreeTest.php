@@ -47,6 +47,44 @@ it('keeps records with a lost parent, a self parent or a cycle', function (): vo
         ->and($tree->depth('4'))->toBe(1);
 });
 
+it('hands out the records of one level and each of them with all its descendants', function (): void {
+    $tree = new Tree(['1' => null, '2' => '1', '3' => '2', '4' => '1', '5' => null, '6' => '5']);
+
+    expect($tree->roots())->toBe(['1', '5'])
+        ->and($tree->roots('1'))->toBe(['2', '4'])
+        ->and($tree->roots('3'))->toBe([])
+        ->and($tree->subtrees(['1']))->toBe(['1', '2', '3', '4'])
+        ->and($tree->subtrees(['5', '1']))->toBe(['5', '6', '1', '2', '3', '4'])
+        ->and($tree->subtrees($tree->roots()))->toBe($tree->order())
+        ->and($tree->subtrees(['2', '4']))->toBe(['2', '3', '4'])
+        ->and($tree->subtrees(['9']))->toBe([]);
+});
+
+it('counts records with a lost parent or a cycle among the roots', function (): void {
+    $tree = new Tree(['1' => '9', '2' => '2', '3' => '4', '4' => '3']);
+
+    expect($tree->roots())->toBe(['1', '2', '3'])
+        ->and($tree->subtrees($tree->roots()))->toBe(['1', '2', '3', '4']);
+});
+
+it('cuts the tail of a big branch so that a page does not exceed the limit and every record of the level stays on it', function (): void {
+    $tree = new Tree(['1' => null, '2' => '1', '3' => '1', '4' => '1', '5' => '1', '6' => null, '7' => '6', '8' => null]);
+
+    expect($tree->page(['1', '6', '8'], 100))->toBe(['keys' => ['1', '2', '3', '4', '5', '6', '7', '8'], 'truncated' => false])
+        ->and($tree->page(['1', '6', '8'], 5))->toBe(['keys' => ['1', '2', '3', '6', '8'], 'truncated' => true])
+        ->and($tree->page(['1', '6', '8'], 1))->toBe(['keys' => ['1', '6', '8'], 'truncated' => true])
+        ->and($tree->page(['1'], 3))->toBe(['keys' => ['1', '2', '3'], 'truncated' => true])
+        ->and($tree->page([], 3))->toBe(['keys' => [], 'truncated' => false]);
+});
+
+it('shows a branch of a record in a cycle without the record itself, its ancestor and duplicates', function (): void {
+    $tree = new Tree(['1' => '2', '2' => '1', '3' => '2']);
+
+    expect($tree->roots('2'))->toBe(['3'])
+        ->and($tree->subtrees($tree->roots('2')))->toBe(['3'])
+        ->and($tree->roots('1'))->toBe(['2']);
+});
+
 it('knows the record itself and its descendants', function (): void {
     $tree = new Tree(['1' => null, '2' => '1', '3' => '2', '4' => null]);
 

@@ -6,7 +6,10 @@ namespace Fastleo\Fields;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\HasImageVariants;
+use Fastleo\Files\FileTypes;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use InvalidArgumentException;
 use Override;
 
@@ -25,6 +28,9 @@ class Image extends File
 
     /** Пропорция рамки обрезки `ширина:высота` или null — без кнопки «Обрезать». */
     protected ?string $crop = null;
+
+    /** Миниатюра в ячейке заголовка списка вместо отдельного столбца. */
+    protected bool $inTitle = false;
 
     #[Override]
     public function onlyImages(): bool
@@ -63,6 +69,44 @@ class Image extends File
         if (is_string($value) && ($record->wasRecentlyCreated || $record->wasChanged($this->name))) {
             $this->queueVariants([$value]);
         }
+    }
+
+    /**
+     * Миниатюра перед заголовком в первой ячейке списка вместо отдельного столбца «Обложка». Работает для первой
+     * такой картинки раздела; в форме и на странице просмотра поле остаётся как было.
+     *
+     * ```php
+     * Image::make('cover', 'Обложка')->inTitle();
+     * ```
+     */
+    public function inTitle(bool $inTitle = true): static
+    {
+        $this->inTitle = $inTitle;
+
+        return $this;
+    }
+
+    /**
+     * Картинка показывается в ячейке заголовка, а не отдельным столбцом.
+     */
+    public function isInTitle(): bool
+    {
+        return $this->inTitle;
+    }
+
+    /**
+     * Миниатюра 40×30 для ячейки заголовка; у записи без картинки — пустая рамка того же размера, чтобы заголовки стояли ровно.
+     */
+    public function titleThumbnail(Model $record): Htmlable
+    {
+        $path = self::path($record->getAttribute($this->name));
+
+        if ($path === null || ! FileTypes::isImage($path)) {
+            return new HtmlString('<span class="inline-block h-[30px] w-10 rounded-md bg-sunken align-middle" data-title-thumb></span>');
+        }
+
+        // Рамка лежит под картинкой: если файла нет на диске, битая картинка прячется и остаётся пустая рамка.
+        return new HtmlString('<span class="inline-block h-[30px] w-10 overflow-hidden rounded-md bg-sunken align-middle"><img src="'.e(route('fastleo.files.thumb', ['path' => $path])).'" alt="" loading="lazy" class="size-full object-cover" onerror="this.hidden = true" data-title-thumb></span>');
     }
 
     /**

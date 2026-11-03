@@ -41,7 +41,7 @@ class LeadController extends Controller
                 Fastleo::notifyAdmins(
                     FastleoMessage::make('Новая заявка')
                         ->body($lead->name.', '.$lead->phone)
-                        ->url(route('fastleo.resources.show', ['leads', $lead->id]))
+                        ->url(Fastleo::recordUrl($lead))
                         ->icon('inbox')
                         ->level('success'),
                 );

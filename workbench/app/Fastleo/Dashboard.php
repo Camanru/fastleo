@@ -6,6 +6,7 @@ namespace Workbench\App\Fastleo;
 
 use Fastleo\Dashboard as BaseDashboard;
 use Fastleo\Widgets\Chart;
+use Fastleo\Widgets\Rows;
 use Fastleo\Widgets\Sections;
 use Fastleo\Widgets\ServerStatus;
 use Fastleo\Widgets\SoftNetica;
@@ -15,6 +16,7 @@ use Override;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Feedback;
+use Workbench\App\Models\Product;
 
 /**
  * Демо-дашборд: плитки друг под другом рядом с графиком (ширина и высота), графики, последние обращения, плитки разделов и состояние сервера.
@@ -44,6 +46,12 @@ final class Dashboard extends BaseDashboard
                 ->all())->columnSpan(2),
             Table::make('Последние обращения')->resource(FeedbackResource::class)->limit(5)->columnSpan(2),
             Sections::make()->columnSpan(2),
+            Rows::make('Товары по статусам')
+                ->columns(['Статус', 'Товаров', 'Остаток, шт.'])
+                ->rows(fn (): array => Product::query()->selectRaw('status, count(*) as total, sum(stock) as stock')->groupBy('status')->get()
+                    ->map(fn (Product $product): array => [['active' => 'В продаже', 'draft' => 'Черновик', 'archived' => 'Архив'][(string) $product->status] ?? $product->status, $product->getAttribute('total'), $product->getAttribute('stock')])->all())
+                ->footer(fn (): array => ['Итого', Product::query()->count(), (int) Product::query()->sum('stock')])
+                ->columnSpan(2),
             ServerStatus::make()->columnSpan(4),
             SoftNetica::make()->columnSpan(2),
         ];

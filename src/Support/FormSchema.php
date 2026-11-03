@@ -7,6 +7,9 @@ namespace Fastleo\Support;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Layout\Layout;
+use Fastleo\Layout\Tab;
+use Fastleo\Layout\Tabs;
+use Fastleo\Related;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
 
@@ -23,16 +26,19 @@ final readonly class FormSchema
     private array $fields;
 
     /**
-     * @param  list<Field|Layout>  $items  результат `Resource::fields()`
+     * @param  list<Field|Layout|Related>  $items  результат `Resource::fields()`
      * @param  class-string<Model>|null  $model  модель ресурса: к ней привязываются все поля (null — без привязки)
+     * @param  bool  $inResource  схема `fields()` раздела: только там связанные таблицы показываются (в настройках, действиях
+     *                            и вложенных полях их некому вывести)
      *
-     * @throws InvalidArgumentException два поля с одним именем или условие показа по полю с несколькими значениями
+     * @throws InvalidArgumentException два поля с одним именем, условие показа по полю с несколькими значениями
+     *                                  или связанная таблица вне раздела или вне вкладки
      */
-    public function __construct(private array $items, ?string $model = null)
+    public function __construct(private array $items, ?string $model = null, bool $inResource = false)
     {
         $fields = [];
 
-        foreach (self::flatten($items) as $field) {
+        foreach (self::flatten($items, $inResource) as $field) {
             if (isset($fields[$field->name])) {
                 throw new InvalidArgumentException(__('fastleo::exceptions.field_duplicate', ['name' => $field->name], Fastleo::LOCALE));
             }
@@ -86,11 +92,43 @@ final readonly class FormSchema
     /**
      * Дерево полей и контейнеров как в `fields()`.
      *
-     * @return list<Field|Layout>
+     * @return list<Field|Layout|Related>
      */
     public function items(): array
     {
         return $this->items;
+    }
+
+    /**
+     * Связанные таблицы, положенные во вкладки, с ключом своей вкладки.
+     *
+     * @return list<array{related: Related, key: string, topLevel: bool}>
+     */
+    public function tabTables(): array
+    {
+        $tables = [];
+
+        $walk = function (array $items, bool $topLevel) use (&$walk, &$tables): void {
+            foreach ($items as $item) {
+                if ($item instanceof Tabs) {
+                    foreach ($item->children() as $tab) {
+                        if ($tab instanceof Tab) {
+                            foreach ($tab->tables() as $related) {
+                                $tables[] = ['related' => $related, 'key' => $tab->key(), 'topLevel' => $topLevel];
+                            }
+                        }
+                    }
+                }
+
+                if ($item instanceof Layout) {
+                    $walk($item->children(), $topLevel && $item instanceof Tabs);
+                }
+            }
+        };
+
+        $walk($this->items, true);
+
+        return $tables;
     }
 
     /**
@@ -120,18 +158,24 @@ final readonly class FormSchema
     /**
      * Поля из дерева по порядку.
      *
-     * @param  list<Field|Layout>  $items
+     * @param  list<Field|Layout|Related>  $items
      * @return list<Field>
+     *
+     * @throws InvalidArgumentException связанная таблица вне раздела или не во вкладке
      */
-    private static function flatten(array $items): array
+    private static function flatten(array $items, bool $inResource, bool $inTab = false): array
     {
         $fields = [];
 
         foreach ($items as $item) {
             if ($item instanceof Field) {
                 $fields[] = $item;
-            } else {
-                $fields = [...$fields, ...self::flatten($item->children())];
+            } elseif ($item instanceof Related && ! $inResource) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.related_not_in_resource', ['relation' => $item->name], Fastleo::LOCALE));
+            } elseif ($item instanceof Related && ! $inTab) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.related_outside_tab', ['relation' => $item->name], Fastleo::LOCALE));
+            } elseif ($item instanceof Layout) {
+                $fields = [...$fields, ...self::flatten($item->children(), $inResource, $item instanceof Tab)];
             }
         }
 
