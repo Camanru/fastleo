@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Storage;
  */
 function truncatedPng(): string
 {
-    return substr((string) base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true), 0, 33).'broken';
+    return substr(base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true), 0, 33).'broken';
 }
 
 beforeEach(function (): void {

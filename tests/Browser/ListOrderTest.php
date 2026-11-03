@@ -62,7 +62,9 @@ it('moves a branch root with its descendants by dragging in a tree', function ()
     expect(Category::query()->whereNull('parent_id')->orderBy('sort')->pluck('title')->all())->toBe(['Второй', 'Первый'])
         ->and($child->refresh()->parent_id)->toBe($first->id);
 
-    $page->refresh()->assertSeeIn('tbody tr:nth-child(1)', 'Второй')->assertSeeIn('tbody tr:nth-child(3)', 'Вложенный');
+    $page->waitForEvent('networkidle')
+        ->refresh()
+        ->assertSeeIn('tbody tr:nth-child(1)', 'Второй')->assertSeeIn('tbody tr:nth-child(3)', 'Вложенный');
 });
 
 it('does not let a nested record leave its branch by dragging', function (): void {
