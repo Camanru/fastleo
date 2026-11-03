@@ -605,9 +605,11 @@ final class SendInvoice extends Action
 ```php
 use Fastleo\Fastleo;
 
-$url = Fastleo::recordUrl($order);
-// https://site.ru/fastleo/orders/42
+$url = Fastleo::mailUrl('fastleo.resources.edit', ['orders', $order->id]);
+// https://site.ru/fastleo/orders/42/edit
 ```
+
+`Fastleo::recordUrl($order)` для письма не подходит: абсолютный адрес он строит от хоста запроса, а не от `APP_URL`.
 
 В `FastleoMessage::url()` абсолютный адрес не нужен: копия на почту сама достроит относительную ссылку от `APP_URL`. Подробнее — [копия на почту](../notifications.md#копия-на-почту).
 

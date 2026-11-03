@@ -213,7 +213,7 @@ final class Fastleo
      *
      * ```php
      * Fastleo::notifyAdmins('Новая заявка');
-     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body('Иван')->url(Fastleo::recordUrl($lead))->icon('inbox'));
+     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body('Иван')->url(Fastleo::recordUrl($lead, false))->icon('inbox'));
      * ```
      */
     public static function notifyAdmins(FastleoMessage|string $message): void
@@ -276,10 +276,12 @@ final class Fastleo
     /**
      * Адрес, по которому администратору открыть запись (для уведомлений, писем, ссылок сайта): страница просмотра, если она
      * включена (`fastleo.record_view`), иначе форма правки; null — у модели нет раздела. Права не проверяются (ссылку строят и там,
-     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. `$absolute = false` — путь без хоста.
+     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. `$absolute = false` — путь без хоста
+     * (в уведомлении берите его: `FastleoMessage` достроит адрес от `APP_URL`, а абсолютный адрес строится от хоста запроса).
+     * Адрес с проверкой прав для списков и поиска — `Resource::openUrl()`.
      *
      * ```php
-     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->url(Fastleo::recordUrl($lead)));
+     * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->url(Fastleo::recordUrl($lead, false)));
      * ```
      */
     public static function recordUrl(Model $record, bool $absolute = true): ?string

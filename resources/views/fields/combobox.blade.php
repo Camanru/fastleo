@@ -29,7 +29,7 @@
             x-data="fastleoCombobox(@js($combobox))"
             class="relative"
             @click.outside="close()"
-            @keydown.escape.prevent.stop="close()"
+            @keydown.escape="if (open) { $event.preventDefault(); $event.stopPropagation(); close(); }"
             data-combobox="{{ $path }}"
         >
             @if ($field->isMultiple())

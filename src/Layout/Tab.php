@@ -22,6 +22,8 @@ use Override;
  */
 final class Tab extends Layout
 {
+    private int $number = 0;
+
     /**
      * @param  list<Field|Layout|Related>  $children
      *
@@ -67,11 +69,20 @@ final class Tab extends Layout
     }
 
     /**
-     * Ключ вкладки для адреса (`#otzyvy`): из названия, запасной — `tab`.
+     * Ключ вкладки для адреса (`#otzyvy`): из названия; если в названии нет букв и цифр (одни эмодзи) — `tab-2` по номеру
+     * вкладки в `Tabs`.
      */
     public function key(): string
     {
-        return Str::slug($this->label) ?: 'tab';
+        return Str::slug($this->label) ?: 'tab'.($this->number > 0 ? '-'.$this->number : '');
+    }
+
+    /**
+     * Номер вкладки в `Tabs` (с единицы) для запасного ключа адреса; вызывает `Tabs`.
+     */
+    public function numbered(int $number): void
+    {
+        $this->number = $number;
     }
 
     #[Override]

@@ -47,6 +47,10 @@ Date::make('ends_on', 'Окончание')->rules(['after_or_equal:starts_on'])
 
 **Правило, которому нужны другие поля формы.** Замыкание `rules()` получает только запись. Если проверка зависит от значений других полей (даты брони не пересекаются, пара «склад + запчасть» уникальна), возьмите правило-объект с `DataAwareRule`: оно получает все данные формы и работает одинаково в форме, импорте и MCP.
 
+```bash
+php artisan make:rule ApartmentIsFree     # app/Rules/ApartmentIsFree.php
+```
+
 ```php
 namespace App\Rules;
 

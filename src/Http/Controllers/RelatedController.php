@@ -105,7 +105,7 @@ final class RelatedController
         $related->scopeFor($record)($query);
         $model = $query->getModel();
         $siblings = $query->orderBy($model->qualifyColumn($column))->orderBy($model->getQualifiedKeyName())->get();
-        $moved = $siblings->firstWhere($model->getKeyName(), $key);
+        $moved = $siblings->first(fn (Model $sibling): bool => ManualOrder::key($sibling) === $key);
         abort_unless($moved instanceof Model, 404);
         abort_unless(Authorization::allowsReorder($child, $moved), 403);
 

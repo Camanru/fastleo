@@ -24,13 +24,16 @@ final class Tabs extends Layout
     /**
      * Вкладки по порядку. Не-вкладка внутри — ошибка типа PHP (поле не потеряется молча).
      *
-     * @throws InvalidArgumentException у двух вкладок одинаковый ключ адреса (`SEO` и `Seo`, названия из одних эмодзи)
+     * @throws InvalidArgumentException у двух вкладок одинаковый ключ адреса (`SEO` и `Seo`)
      */
     public function __construct(Tab ...$tabs)
     {
         $keys = [];
+        $number = 0;
 
         foreach ($tabs as $tab) {
+            $tab->numbered(++$number);
+
             if (isset($keys[$tab->key()])) {
                 throw new InvalidArgumentException(__('fastleo::exceptions.tab_duplicate', ['first' => $keys[$tab->key()], 'second' => $tab->label, 'key' => $tab->key()], Fastleo::LOCALE));
             }

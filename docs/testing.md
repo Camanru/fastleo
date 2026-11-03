@@ -4,7 +4,7 @@
 
 ## Администратор в тесте
 
-Администратор — пользователь, у которого `canAccessFastleo()` возвращает `true` (по умолчанию — колонка `fastleo_admin`). Колонки `fastleo_admin` нет в `$fillable`, поэтому ставьте её через `forceFill()` или состояние фабрики. Состояния `admin()` в новом сайте нет (его не создаёт `fastleo:install`): добавьте его в `UserFactory` или пишите `$admin = tap(User::factory()->create())->forceFill(['fastleo_admin' => true])->save();` (`tap` возвращает пользователя, сам `save()` — только `true`/`false`):
+Администратор — пользователь, у которого `canAccessFastleo()` возвращает `true` (по умолчанию — колонка `fastleo_admin`). Колонки `fastleo_admin` нет в `$fillable`, поэтому ставьте её через `forceFill()` или состояние фабрики. Состояния `admin()` в новом сайте нет (его не создаёт `fastleo:install`): добавьте его в `UserFactory` или пишите `$admin = tap(User::factory()->create(), fn (User $user) => $user->forceFill(['fastleo_admin' => true])->save());` (`tap` с функцией возвращает пользователя, а не результат `save()`):
 
 ```php
 // database/factories/UserFactory.php

@@ -88,7 +88,7 @@ final class ManualOrder
     /**
      * Ключ записи строкой.
      */
-    private static function key(Model $record): string
+    public static function key(Model $record): string
     {
         $key = $record->getKey();
 

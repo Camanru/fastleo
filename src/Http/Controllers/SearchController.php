@@ -130,6 +130,6 @@ final class SearchController
      */
     private function url(Resource $resource, Model $record): string
     {
-        return $resource->recordUrl($record) ?? route('fastleo.resources.index', $resource::slug());
+        return $resource->openUrl($record) ?? route('fastleo.resources.index', $resource::slug());
     }
 }

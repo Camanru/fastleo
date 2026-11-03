@@ -8,6 +8,7 @@ use Fastleo\Tests\Fixtures\Policies\NoUpdateLinkPolicy;
 use Fastleo\Tests\Fixtures\Policies\NoViewArticlePolicy;
 use Fastleo\Tests\Fixtures\RelatedOrder\ArticleLinkResource;
 use Fastleo\Tests\Fixtures\RelatedOrder\ArticleResource;
+use Fastleo\Tests\Fixtures\RelatedOrder\ReadonlyLinkResource;
 use Fastleo\Tests\Fixtures\RelatedOrder\TreedLinkResource;
 use Fastleo\Tests\Fixtures\RelatedOrder\UnsortedLinkResource;
 use Illuminate\Database\QueryException;
@@ -191,6 +192,16 @@ describe('moving a record', function (): void {
         $first = articleLink($this->article, 'А', 1);
         $second = articleLink($this->article, 'Б', 2);
         Gate::policy(Article::class, NoViewArticlePolicy::class);
+
+        $this->postJson($this->reorderUrl, ['id' => $first, 'after' => $second])->assertForbidden();
+
+        expect(linkTitles($this->article))->toBe(['А', 'Б']);
+    });
+
+    it('is forbidden for a read-only child section', function (): void {
+        $first = articleLink($this->article, 'А', 1);
+        $second = articleLink($this->article, 'Б', 2);
+        ArticleResource::$child = ReadonlyLinkResource::class;
 
         $this->postJson($this->reorderUrl, ['id' => $first, 'after' => $second])->assertForbidden();
 

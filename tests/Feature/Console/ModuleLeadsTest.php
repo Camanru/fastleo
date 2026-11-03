@@ -245,7 +245,7 @@ it('gives the administrator a leads section with unread marks that passes fastle
     expect($problems->all())->toBe([]);
 });
 
-it('keeps only a valid path of the page as the source and links the admin to the lead by an absolute address', function (): void {
+it('keeps only a valid path of the page as the source and links the admin to the lead by a path without the host of the request', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
     bootCopiedLeads($this);
     $admin = admin();
@@ -257,5 +257,7 @@ it('keeps only a valid path of the page as the source and links the admin to the
     expect(Lead::query()->where('name', 'Иван')->value('source'))->toBe('/about')
         ->and(Lead::query()->where('name', 'Пётр')->value('source'))->toBeNull();
 
-    Notification::assertSentTo($admin, MessageNotification::class, fn (MessageNotification $notification): bool => str_starts_with((string) $notification->toFastleo($admin)->toArray()['url'], 'http'));
+    $lead = Lead::query()->where('name', 'Иван')->firstOrFail();
+
+    Notification::assertSentTo($admin, MessageNotification::class, fn (MessageNotification $notification): bool => $notification->toFastleo($admin)->toArray()['url'] === Fastleo::recordUrl($lead, false));
 });

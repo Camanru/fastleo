@@ -212,6 +212,34 @@ it('closes the window with Escape and ignores a message from another site', func
         ->assertNoJavaScriptErrors();
 });
 
+it('closes the window with Escape pressed in a field with a list, and the list takes the key only while it is open', function (): void {
+    ProductReview::factory()->create(['product_id' => $this->product->id, 'author' => 'Старый автор']);
+    $form = "document.querySelector('#fastleo-record-modal iframe').contentDocument";
+    $input = "{$form}.querySelector('[data-combobox=product_id] input:not([type=hidden])')";
+    $escape = "{$input}.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))";
+
+    $page = signInAndVisit(route('fastleo.resources.edit', ['products', $this->product->id]));
+
+    $page->click('[role=tab]:has-text("Отзывы")')
+        ->click('[data-related-table="reviews"] a[title="Изменить"]');
+
+    waitUntil($page, "{$form}?.body?._x_dataStack !== undefined");
+
+    $page->assertScript("{$input} !== null", true);
+
+    // Список открыт: Escape закрывает только его, окно остаётся.
+    $page->script("(() => { const input = {$input}; input.focus(); input.click(); })()");
+    waitUntil($page, "Alpine.\$data({$form}.querySelector('[data-combobox=product_id]')).open === true");
+    $page->script($escape);
+    $page->assertScript("Alpine.\$data({$form}.querySelector('[data-combobox=product_id]')).open", false)
+        ->assertScript("document.getElementById('fastleo-record-modal').open", true);
+
+    // Список закрыт: Escape доходит до окна и закрывает его.
+    $page->script($escape);
+    $page->assertScript("document.getElementById('fastleo-record-modal').open", false)
+        ->assertNoJavaScriptErrors();
+});
+
 it('asks before closing the window with unsaved changes', function (): void {
     ProductReview::factory()->create(['product_id' => $this->product->id, 'author' => 'Старый автор']);
     $form = "document.querySelector('#fastleo-record-modal iframe').contentDocument";

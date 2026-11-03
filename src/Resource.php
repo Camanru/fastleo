@@ -482,14 +482,16 @@ abstract class Resource
      * по нескольку раз на строку.
      *
      * ```php
-     * $resource->recordUrl($article);                       // /fastleo/articles/5/edit
-     * $resource->recordUrl($article, ['return' => $back]);  // с адресом возврата
+     * $resource->openUrl($article);                    // /fastleo/articles/5/edit
+     * $resource->openUrl($article, ['return' => $back]);  // с адресом возврата
      * ```
+     *
+     * Права проверяются (в отличие от `Fastleo::recordUrl()` и `recordAddress()`), поэтому адреса может не быть.
      *
      * @param  array<string, mixed>  $query
      * @param  (Closure(string, Model): bool)|null  $can  проверка права (`'update'`, запись); по умолчанию — `Authorization`
      */
-    public function recordUrl(Model $record, array $query = [], bool $absolute = true, ?Closure $can = null): ?string
+    public function openUrl(Model $record, array $query = [], bool $absolute = true, ?Closure $can = null): ?string
     {
         $can ??= fn (string $ability, Model $model): bool => Authorization::allows($ability, $this, $model);
 

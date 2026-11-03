@@ -112,6 +112,10 @@ public function relations(): array
 
 Если у дочернего раздела задан `$sortColumn` ([resources.md](resources.md)), у записей таблицы появляется ручка перетаскивания: товары в подборке, шаги инструкции, фото галереи как отдельные записи. Порядок меняется только среди записей этой таблицы этого родителя; остальные записи раздела не затрагиваются.
 
+```bash
+php artisan fastleo:make-resource ProductCollectionItem    # app/Fastleo/ProductCollectionItemResource.php
+```
+
 ```php
 // ProductCollectionItemResource: колонка sort задаёт порядок записей подборки
 protected static ?string $sortColumn = 'sort';

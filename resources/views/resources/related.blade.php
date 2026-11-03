@@ -31,7 +31,7 @@
 
         return request()->fullUrlWithQuery(['sort' => $name, 'direction' => $direction, 'page' => null]);
     };
-    $recordUrl = fn ($record): ?string => $resource->recordUrl($record, ['return' => $returnUrl], can: $allows);
+    $openUrl = fn ($record): ?string => $resource->openUrl($record, ['return' => $returnUrl], can: $allows);
     $createUrl = route('fastleo.resources.create', ['resource' => $slug, 'prefill' => [$related->foreignKey() => $related->foreignValue($parentRecord)], 'return' => $returnUrl]);
     // editIn('modal'): «Изменить» и «Добавить» открывают форму раздела в окне (data-record-modal — адрес формы для окна);
     // обычный href остаётся запасным (открыть в новой вкладке, без скриптов).
@@ -103,7 +103,7 @@
                     </thead>
                     <tbody @if ($manual) x-data="fastleoReorder({ url: @js($reorderUrl) })" @endif>
                         @foreach ($records as $record)
-                            @php($url = $recordUrl($record))
+                            @php($url = $openUrl($record))
                             @php($tone = $resource->rowToneFor($record))
                             <tr class="group/row hover:bg-hover [&:last-child>td]:border-b-0 [&>td]:border-b [&>td]:border-line [&>td]:px-3 [&>td]:py-2.5 compact:[&>td]:py-1.5" data-record="{{ $record->getKey() }}" @if ($tone) data-tone="{{ $tone }}" @endif @if ($resource->isUnread($record)) data-unread @endif>
                                 @if ($manual)

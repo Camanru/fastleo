@@ -194,6 +194,13 @@ it('keeps the window on validation errors', function (): void {
     expect($article->refresh()->title)->toBe('Приточная');
 });
 
+it('keeps the window on validation errors when creating', function (): void {
+    $this->post(route('fastleo.resources.store', 'articles'), ['_frame' => '1', 'title' => '', 'status' => 'draft', 'category_id' => $this->category->id])
+        ->assertRedirect(route('fastleo.resources.create', ['articles', 'frame' => '1']))
+        ->assertSessionHasErrors('title');
+    expect(Article::query()->count())->toBe(0);
+});
+
 it('leaves the tab with a table out of the form in the window', function (): void {
     $url = route('fastleo.resources.edit', ['categories', $this->category->id]);
 

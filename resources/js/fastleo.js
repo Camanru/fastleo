@@ -1239,6 +1239,8 @@ export async function openRecordView(url, pageUrl) {
     const card = dialog.querySelector('[data-record-card]');
 
     if (new URL(url, window.location.href).origin !== window.location.origin) {
+        window.location.href = pageUrl;
+
         return;
     }
 
@@ -1247,7 +1249,7 @@ export async function openRecordView(url, pageUrl) {
     delete dialog.dataset.frame;
     dialog.querySelector('iframe').classList.add('hidden');
     card.classList.remove('hidden');
-    card.replaceChildren(Object.assign(document.createElement('p'), { className: 'p-5 text-ink-2', textContent: dialog.dataset.loading ?? '' }));
+    card.replaceChildren(Object.assign(document.createElement('p'), { className: 'p-5 text-ink-2', role: 'status', textContent: dialog.dataset.loading ?? '' }));
     card.scrollTop = 0;
 
     if (!viewListening) {

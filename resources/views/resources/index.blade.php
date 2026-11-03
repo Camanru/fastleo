@@ -39,7 +39,7 @@
     $formActions = $bulkActions + $singleActions;
     $selectable = $bulkActions !== [];
     $pageIds = $records->map(fn ($record) => (string) $record->getKey())->values()->all();
-    $recordUrl = fn ($record): ?string => $resource->recordUrl($record, can: $allows);
+    $openUrl = fn ($record): ?string => $resource->openUrl($record, can: $allows);
 @endphp
 <x-fastleo::layouts.app :title="$resource::label()" :description="$resource::description()" :count="$tree ? count($tree->order($list->parent)) : $records->total()">
     <x-slot:actions>
@@ -291,7 +291,7 @@
                 <tbody x-ref="rows" data-start="{{ $records->firstItem() }}" data-first-page="{{ $records->onFirstPage() ? '1' : '0' }}" data-last-page="{{ $records->hasMorePages() ? '0' : '1' }}">
                     @foreach ($records as $record)
                         @php
-                            $url = $recordUrl($record);
+                            $url = $openUrl($record);
                             $childCount = $children($record);
                             $tone = $resource->rowToneFor($record);
                         @endphp
@@ -350,7 +350,7 @@
         <ul class="flex flex-col gap-2.5 md:hidden" data-cards>
             @foreach ($records as $record)
                 @php
-                    $url = $recordUrl($record);
+                    $url = $openUrl($record);
                     $childCount = $children($record);
                     $tone = $resource->rowToneFor($record);
                 @endphp

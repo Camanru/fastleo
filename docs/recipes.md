@@ -57,9 +57,10 @@ final class OpenClient extends Action
         $lead = $records->firstOrFail();
         $client = ClientPhone::query()->where('phone', ClientPhone::normalize($lead->phone))->first()?->client;
 
-        return ActionResult::redirect($client
-            ? Fastleo::recordUrl($client, false)
-            : route('fastleo.resources.create', ['resource' => 'clients', 'prefill' => ['name' => (string) $lead->name]], false));
+        return ActionResult::redirect(
+            ($client ? Fastleo::recordUrl($client, false) : null)
+                ?? route('fastleo.resources.create', ['resource' => 'clients', 'prefill' => ['name' => (string) $lead->name]], false),
+        );
     }
 }
 ```
@@ -243,6 +244,10 @@ Tel::make('client_phone', 'Телефон')->fromQuery(),
 ## Позиции заказа и строки документа
 
 Состав заказа, строки накладной, позиции сделки: у каждой записи нужен выбор из другого раздела (товар) и зависимый список (его вариант). В `HasMany`-блоках это невозможно (`BelongsTo` и `dependsOn()` в них не работают), поэтому позиция — отдельный раздел, а родитель показывает её таблицей во вкладке:
+
+```bash
+php artisan fastleo:make-resource OrderItem    # app/Fastleo/OrderItemResource.php
+```
 
 ```php
 // app/Fastleo/OrderItemResource.php — раздел без пункта меню; в начале файла: use Illuminate\Database\Eloquent\Builder;

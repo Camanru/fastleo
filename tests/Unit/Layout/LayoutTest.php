@@ -48,6 +48,21 @@ it('skips containers without visible fields', function (): void {
         ->and(Section::make('С', [Text::make('a')->hidden()])->hasVisibleFields(null))->toBeFalse();
 });
 
+it('numbers the key of a tab with no letters in the title', function (): void {
+    $tabs = Tabs::make([
+        Tab::make('Основное', [Text::make('a')]),
+        Tab::make('📦', [Text::make('b')]),
+        Tab::make('📞', [Text::make('c')]),
+    ]);
+
+    expect(array_map(fn (Tab $tab): string => $tab->key(), $tabs->visibleTabs(null)))->toBe(['osnovnoe', 'tab-2', 'tab-3'])
+        ->and(Tab::make('📦', [])->key())->toBe('tab');
+});
+
+it('refuses two tabs with the same key', function (): void {
+    Tabs::make([Tab::make('SEO', [Text::make('a')]), Tab::make('Seo', [Text::make('b')])]);
+})->throws(InvalidArgumentException::class);
+
 it('makes a collapsed section collapsible', function (): void {
     $section = Section::make('С', [])->description('Пояснение')->collapsed();
 

@@ -6,7 +6,7 @@
 <head>
     @include('fastleo::partials.head', ['title' => $title])
 </head>
-<body class="min-h-full bg-bg p-4 text-ink antialiased" @if ($closable) x-data @keydown.escape.window="if (! document.querySelector('dialog[open]')) window.parent.postMessage({ type: 'fastleo:close' }, window.location.origin)" @endif>
+<body class="min-h-full bg-bg p-4 text-ink antialiased" @if ($closable) x-data @keydown.escape.window="if (! $event.defaultPrevented && ! document.querySelector('dialog[open]')) window.parent.postMessage({ type: 'fastleo:close' }, window.location.origin)" @endif>
     @include('fastleo::partials.assets-warning')
     {{ $slot }}
 

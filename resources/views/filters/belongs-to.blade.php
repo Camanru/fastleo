@@ -18,7 +18,7 @@
         x-data="fastleoCombobox(@js($combobox))"
         class="relative"
         @click.outside="close()"
-        @keydown.escape.prevent.stop="close()"
+        @keydown.escape="if (open) { $event.preventDefault(); $event.stopPropagation(); close(); }"
         x-on:input="$event.target.type === 'hidden' && $event.target.form?.requestSubmit()"
     >
         <input type="hidden" name="filter[{{ $filter->name }}]" form="{{ $form }}" :value="selected[0]?.value ?? ''">
