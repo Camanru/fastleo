@@ -62,9 +62,20 @@ it('moves a branch root with its descendants by dragging in a tree', function ()
     expect(Category::query()->whereNull('parent_id')->orderBy('sort')->pluck('title')->all())->toBe(['Второй', 'Первый'])
         ->and($child->refresh()->parent_id)->toBe($first->id);
 
-    $page->waitForEvent('networkidle')
-        ->refresh()
-        ->assertSeeIn('tbody tr:nth-child(1)', 'Второй')->assertSeeIn('tbody tr:nth-child(3)', 'Вложенный');
+    // В дереве страница после переноса перезагружается сама: ждём её, а не перезагружаем второй раз (иначе запросы обрывают друг друга).
+    for ($attempt = 0; $attempt < 100; $attempt++) {
+        try {
+            if ($page->script("document.querySelector('tbody tr:nth-child(3)')?.textContent.includes('Вложенный') === true") === true) {
+                break;
+            }
+        } catch (Throwable) {
+            // страница как раз перезагружается
+        }
+
+        usleep(100_000);
+    }
+
+    $page->assertSeeIn('tbody tr:nth-child(1)', 'Второй')->assertSeeIn('tbody tr:nth-child(3)', 'Вложенный');
 });
 
 it('does not let a nested record leave its branch by dragging', function (): void {
