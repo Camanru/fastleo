@@ -30,7 +30,7 @@ final class Dashboard extends BaseDashboard
             Stat::make('Опасная ссылка')->value('1 234')->url('javascript:alert(1)'),
             Stat::make('Чужой хост')->value(2)->url('//evil.example/a'),
             Stat::make('Обратная косая')->value(3)->url('/\\evil.example/b'),
-            Stat::make('Сломанный')->value(fn () => throw new RuntimeException('boom')),
+            Stat::make('Сломанный')->value(fn (): never => throw new RuntimeException('boom')),
             Chart::make('Статьи по дням')->line()->data(fn (): array => Chart::countByDay(Article::query(), 'created_at', 7)),
             Chart::make('Пустой график')->bar()->data(fn (): array => []),
             Table::make('Последние обращения')->resource(FeedbackResource::class)->limit(2),

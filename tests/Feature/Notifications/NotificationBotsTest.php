@@ -181,7 +181,7 @@ describe('job', function (): void {
     });
 
     it('does not repeat a message that may have already arrived', function (): void {
-        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+        Http::fake(['api.telegram.org/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')]);
         $job = new SendAdminMessage(notificationBot(), '12345', 'Заявка')->withFakeQueueInteractions();
 
         $job->handle();

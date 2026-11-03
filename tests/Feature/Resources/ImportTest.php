@@ -434,7 +434,7 @@ it('fails an import that crashed and reports the error', function (): void {
     Queue::fake();
     importFile(xlsxFile([['Заголовок'], ['Одна']]));
     $import = lastImport();
-    Article::saving(fn () => throw new RuntimeException('сбой'));
+    Article::saving(fn (): never => throw new RuntimeException('сбой'));
     Exceptions::fake();
 
     new ImportRecords($import->id)->handle();

@@ -189,7 +189,7 @@ describe('telegram', function (): void {
     });
 
     it('does not retry by itself when the connection broke after sending and tells the author', function (): void {
-        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out')]);
+        Http::fake(['api.telegram.org/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')]);
         $publication = publication();
 
         publicationAction($publication);

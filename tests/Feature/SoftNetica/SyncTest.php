@@ -69,7 +69,7 @@ describe('a failure while building the report or saving the answer', function ()
         connectSoftNetica();
         Log::spy();
         Http::fake([SOFTNETICA_URL => acceptedResponse()]);
-        Fastleo::resolveAdminsUsing(fn () => throw new RuntimeException('нет таблицы'));
+        Fastleo::resolveAdminsUsing(fn (): never => throw new RuntimeException('нет таблицы'));
 
         try {
             $result = syncNow();
@@ -126,7 +126,7 @@ describe('a broken database', function (): void {
 
     it('treats a big error answer as no connection without a report in the log', function (): void {
         connectSoftNetica();
-        Http::fake([SOFTNETICA_URL => fn () => throw new RequestException(new HttpResponse(new Psr7Response(500, [], 'x')))]);
+        Http::fake([SOFTNETICA_URL => fn (): never => throw new RequestException(new HttpResponse(new Psr7Response(500, [], 'x')))]);
         Exceptions::fake();
 
         expect(syncNow())->toBe(SyncResult::Offline);
@@ -414,7 +414,7 @@ describe('the answer of the panel', function (): void {
 
     it('does not throw when the connection fails', function (): void {
         connectSoftNetica();
-        Http::fake(fn () => throw new ConnectionException('cURL error 28: timed out'));
+        Http::fake(fn (): never => throw new ConnectionException('cURL error 28: timed out'));
 
         expect(syncNow())->toBe(SyncResult::Offline);
     });

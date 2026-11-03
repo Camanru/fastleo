@@ -67,7 +67,7 @@ describe('telegram', function (): void {
     });
 
     it('does not leak the token when the connection breaks and says whether the message could have arrived', function (string $error, bool $uncertain): void {
-        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException($error.' for https://api.telegram.org/bot'.TELEGRAM_TOKEN.'/sendMessage')]);
+        Http::fake(['api.telegram.org/*' => fn (): never => throw new ConnectionException($error.' for https://api.telegram.org/bot'.TELEGRAM_TOKEN.'/sendMessage')]);
 
         $failure = messengerFailure(fn (): string => new TelegramBot(TELEGRAM_TOKEN)->sendText('1', 'Привет'));
 
@@ -205,7 +205,7 @@ describe('telegram posts', function (): void {
     });
 
     it('does not leak the token when the connection breaks while a photo is uploaded', function (): void {
-        Http::fake(['api.telegram.org/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out for https://api.telegram.org/bot'.TELEGRAM_TOKEN.'/sendPhoto')]);
+        Http::fake(['api.telegram.org/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out for https://api.telegram.org/bot'.TELEGRAM_TOKEN.'/sendPhoto')]);
 
         $failure = messengerFailure(fn () => new TelegramBot(TELEGRAM_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null));
 
@@ -296,7 +296,7 @@ describe('max posts', function (): void {
     it('reports a broken connection while a picture is uploaded as a message that surely did not go', function (): void {
         Http::fake([
             'platform-api2.max.ru/uploads*' => Http::response(['url' => 'https://iu.oneme.ru/upload?id=1']),
-            'iu.oneme.ru/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out'),
+            'iu.oneme.ru/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out'),
         ]);
 
         $failure = messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null));
@@ -305,7 +305,7 @@ describe('max posts', function (): void {
     });
 
     it('does not leak the token when the connection breaks and says whether the message could have arrived', function (): void {
-        Http::fake(['platform-api2.max.ru/*' => fn () => throw new ConnectionException('cURL error 28: Operation timed out, token '.MAX_TOKEN)]);
+        Http::fake(['platform-api2.max.ru/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out, token '.MAX_TOKEN)]);
 
         $failure = messengerFailure(fn (): string => new MaxBot(MAX_TOKEN)->sendText('1', 'Привет'));
 
