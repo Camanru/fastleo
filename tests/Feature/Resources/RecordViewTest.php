@@ -166,9 +166,9 @@ describe('switched off', function (): void {
         $article = Article::factory()->create();
         $feedback = Feedback::factory()->create();
 
-        expect(Fastleo::recordUrl($article))->toBe(route('fastleo.resources.edit', ['articles', $article->id]))
+        expect(Fastleo::recordUrl($article))->toBe(Fastleo::adminUrl(route('fastleo.resources.edit', ['articles', $article->id], false)))
             ->and(Fastleo::recordUrl($article, false))->toBe(route('fastleo.resources.edit', ['articles', $article->id], false))
-            ->and(Fastleo::recordUrl($feedback))->toBe(route('fastleo.resources.edit', ['feedback', $feedback->id]))
+            ->and(Fastleo::recordUrl($feedback))->toBe(Fastleo::adminUrl(route('fastleo.resources.edit', ['feedback', $feedback->id], false)))
             ->and(Fastleo::recordUrl(new class extends Model {}))->toBeNull();
     });
 
@@ -199,5 +199,5 @@ describe('switched off', function (): void {
 it('gives the page of a record for notifications while the page exists', function (): void {
     $article = Article::factory()->create();
 
-    expect(Fastleo::recordUrl($article))->toBe(route('fastleo.resources.show', ['articles', $article->id]));
+    expect(Fastleo::recordUrl($article))->toBe(Fastleo::adminUrl(route('fastleo.resources.show', ['articles', $article->id], false)));
 });

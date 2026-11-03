@@ -42,7 +42,7 @@ final class LeadResource extends Resource
     {
         return [
             Text::make('name', 'Имя')->required()->maxLength(100)->searchable()->sortable(),
-            Tel::make('phone', 'Телефон')->required()->searchable(),
+            Tel::make('phone', 'Телефон')->required()->maxLength(50)->searchable(),
             Email::make('email', 'Почта')->searchable()->hideInList(),
             Textarea::make('message', 'Сообщение')->rows(4)->hideInList(),
             Text::make('source', 'Страница')->readonly()->hideInList(),

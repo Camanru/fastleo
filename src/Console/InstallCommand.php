@@ -286,6 +286,12 @@ final class InstallCommand extends Command
             return $this->runStep('fastleo:user', ['email' => $email, '--name' => 'Администратор', '--password' => $this->option('admin-password')], $interactive, $child) === self::SUCCESS;
         }
 
+        if ($interactive && $child instanceof ChildArtisan && ! $child->canAsk()) {
+            $this->components->warn(__('fastleo::console.install_admin_no_terminal'));
+
+            return false;
+        }
+
         return $interactive && confirm(__('fastleo::console.install_admin'), default: true) && $this->runStep('fastleo:user', [], $interactive, $child) === self::SUCCESS;
     }
 }

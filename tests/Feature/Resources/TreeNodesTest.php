@@ -85,3 +85,10 @@ it('leaves the cycle check to the other rules when the database cannot look the 
 
     expect($node->fresh()?->parent_id)->toBeNull();
 });
+
+it('answers an empty page, not an error, when the page number of a tree is as large as an integer can be', function (): void {
+    TreeNode::query()->create(['title' => 'Корень']);
+
+    $this->get(route('fastleo.resources.index', ['tree-nodes', 'page' => PHP_INT_MAX]))->assertOk()->assertDontSee('Корень');
+    $this->get(route('fastleo.resources.index', ['tree-nodes', 'page' => 1]))->assertOk()->assertSee('Корень');
+});

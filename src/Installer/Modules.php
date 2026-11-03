@@ -31,7 +31,7 @@ final class Modules
             'leads' => new Module('leads', 'Заявки', 'Приём заявок с сайта (POST /leads, защита от ботов без внешних сервисов) и раздел «Заявки» с отметкой «просмотрено» и уведомлением администраторам', $root.'leads', tables: ['leads'], uris: ['POST leads'], widgets: [
                 "\\Fastleo\\Widgets\\Stat::make('Новые заявки')->value(fn (): int => \\{{ appNamespace }}\\Models\\Lead::query()->whereNull('read_at')->count())->icon('inbox')->url(fn (): string => route('fastleo.resources.index', 'leads')),",
                 "\\Fastleo\\Widgets\\Chart::make('Заявки за 30 дней')->line()->data(fn (): array => \\Fastleo\\Widgets\\Chart::countByDay(\\{{ appNamespace }}\\Models\\Lead::class))->columnSpan(3),",
-            ], note: 'Заявки: лимит — 5 заявок за 10 минут с одного IP. За Cloudflare, nginx или другим прокси настройте trustProxies (vendor/camanru/fastleo/docs/security.md), иначе лимит станет общим для всего сайта.'),
+            ], note: 'Заявки: лимит — 5 заявок за 10 минут с одного IP. За Cloudflare, nginx или другим прокси настройте trustProxies (vendor/camanru/fastleo/docs/security.md), иначе лимит станет общим для всего сайта: пять запросов одного недоброжелателя закроют форму для всех на 10 минут.'),
         ];
     }
 

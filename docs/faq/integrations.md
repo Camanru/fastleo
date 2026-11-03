@@ -600,18 +600,17 @@ final class SendInvoice extends Action
 
 ### Как дать в письме ссылку на запись в админке?
 
-Стройте адрес через `Fastleo::mailUrl()`: он берёт домен из `APP_URL` (или `fastleo.domain`), а не из запроса — ссылка верна и в письме из очереди.
+Для записи раздела возьмите `Fastleo::recordUrl($запись)`, для любой другой страницы админки — `Fastleo::mailUrl()`: оба берут домен из `APP_URL` (или `fastleo.domain`), а не из запроса — ссылка верна и в письме из очереди.
 
 ```php
 use Fastleo\Fastleo;
 
-$url = Fastleo::mailUrl('fastleo.resources.edit', ['orders', $order->id]);
+$url = Fastleo::recordUrl($order);                          // страница записи, null — у модели нет раздела
+$url = Fastleo::mailUrl('fastleo.resources.edit', ['orders', $order->id]);   // любая страница админки по имени маршрута
 // https://site.ru/fastleo/orders/42/edit
 ```
 
-`Fastleo::recordUrl($order)` для письма не подходит: абсолютный адрес он строит от хоста запроса, а не от `APP_URL`.
-
-В `FastleoMessage::url()` абсолютный адрес не нужен: копия на почту сама достроит относительную ссылку от `APP_URL`. Подробнее — [копия на почту](../notifications.md#копия-на-почту).
+В `FastleoMessage::url()` абсолютный адрес не нужен: письмо и боты сами достроят относительную ссылку (`Fastleo::recordUrl($order, false)`) от `fastleo.domain` или `APP_URL`. Подробнее — [копия на почту](../notifications.md#копия-на-почту).
 
 ## Выгрузки и обмен
 

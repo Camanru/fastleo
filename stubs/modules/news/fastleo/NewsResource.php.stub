@@ -33,7 +33,8 @@ final class NewsResource extends Resource
 
     protected static int $position = 20;
 
-    protected static ?array $defaultOrder = ['published_at', 'desc'];
+    /** Новые сверху по дате создания: у новости без даты публикации (NULL) порядок зависел бы от базы. */
+    protected static ?array $defaultOrder = ['created_at', 'desc'];
 
     /**
      * Поля новости.

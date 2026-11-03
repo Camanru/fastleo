@@ -152,16 +152,29 @@ final class Fastleo
      */
     public static function mailUrl(string $route, array $parameters = []): string
     {
-        $path = route($route, $parameters, false);
+        return self::adminUrl(route($route, $parameters, false));
+    }
+
+    /**
+     * Полный адрес по пути внутри админки (`/fastleo/leads/5`): если задан `fastleo.domain` — на нём (схема от `APP_URL`),
+     * иначе от `APP_URL`. Заголовок Host запроса не используется: посетитель сайта не может подменить домен ссылки,
+     * а письмо из очереди и вебхук получают тот же адрес. Полный адрес (`https://…`) возвращается как есть.
+     *
+     * ```php
+     * Fastleo::adminUrl('/fastleo/leads/5');   // https://admin.site.ru/fastleo/leads/5
+     * ```
+     */
+    public static function adminUrl(string $path): string
+    {
         $domain = config('fastleo.domain');
 
-        if (is_string($domain) && $domain !== '') {
-            $scheme = parse_url(config()->string('app.url', ''), PHP_URL_SCHEME);
-
-            return (is_string($scheme) ? $scheme : 'https').'://'.$domain.$path;
+        if (preg_match('#^https?://#i', $path) === 1 || ! is_string($domain) || $domain === '') {
+            return SeoTags::absolute($path);
         }
 
-        return SeoTags::absolute($path);
+        $scheme = parse_url(config()->string('app.url', ''), PHP_URL_SCHEME);
+
+        return (is_string($scheme) ? $scheme : 'https').'://'.$domain.'/'.ltrim($path, '/');
     }
 
     /**
@@ -276,9 +289,9 @@ final class Fastleo
     /**
      * Адрес, по которому администратору открыть запись (для уведомлений, писем, ссылок сайта): страница просмотра, если она
      * включена (`fastleo.record_view`), иначе форма правки; null — у модели нет раздела. Права не проверяются (ссылку строят и там,
-     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. `$absolute = false` — путь без хоста
-     * (в уведомлении берите его: `FastleoMessage` достроит адрес от `APP_URL`, а абсолютный адрес строится от хоста запроса).
-     * Адрес с проверкой прав для списков и поиска — `Resource::openUrl()`.
+     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. Полный адрес строится через
+     * `adminUrl()` — от `fastleo.domain` или `APP_URL`, а не от хоста запроса; `$absolute = false` — путь без хоста
+     * (`FastleoMessage` достроит его так же). Адрес с проверкой прав для списков и поиска — `Resource::openUrl()`.
      *
      * ```php
      * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->url(Fastleo::recordUrl($lead, false)));
@@ -286,7 +299,9 @@ final class Fastleo
      */
     public static function recordUrl(Model $record, bool $absolute = true): ?string
     {
-        return self::resources()->forModel($record::class)?->recordAddress($record, $absolute);
+        $path = self::resources()->forModel($record::class)?->recordAddress($record, false);
+
+        return $path === null || ! $absolute ? $path : self::adminUrl($path);
     }
 
     /**

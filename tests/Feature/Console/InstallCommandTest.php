@@ -171,6 +171,14 @@ function fakeChildArtisan(int $exitCode = 0): object
 
         public int $exitCode = 0;
 
+        public bool $canAsk = true;
+
+        #[Override]
+        public function canAsk(): bool
+        {
+            return $this->canAsk;
+        }
+
         #[Override]
         public function run(string $command, array $arguments = [], bool $interactive = false, ?callable $output = null): int
         {
@@ -262,3 +270,15 @@ it('does not touch a user model outside the site app folder', function (string $
     'Laravel base user' => [PlainUser::class],
     'not an Eloquent model' => [stdClass::class],
 ]);
+
+it('does not start questions of the administrator in a separate process when the terminal cannot take them', function (): void {
+    sandboxUserModel($this->sandbox);
+    $child = fakeChildArtisan();
+    $child->canAsk = false;
+
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-modules' => true, '--setup' => true])
+        ->expectsOutputToContain('php artisan fastleo:user')
+        ->assertSuccessful();
+
+    expect(array_column($child->calls, 0))->not->toContain('fastleo:user');
+});

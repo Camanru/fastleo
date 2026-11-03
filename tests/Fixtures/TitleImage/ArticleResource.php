@@ -24,7 +24,7 @@ final class ArticleResource extends Resource
     {
         return [
             Text::make('title', 'Заголовок'),
-            Image::make('cover', 'Обложка')->inTitle(),
+            Image::make('cover', 'Обложка')->inTitle()->sortable(),
             File::make('attachment', 'Вложение'),
         ];
     }

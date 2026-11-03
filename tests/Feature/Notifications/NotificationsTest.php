@@ -50,11 +50,22 @@ describe('message', function (): void {
         expect(FastleoMessage::make('x')->icon('inbox')->level('danger')->toArray())->toMatchArray(['icon' => 'inbox', 'level' => 'danger']);
     });
 
-    it('builds the Telegram text with an absolute link', function (): void {
+    it('builds the Telegram text with a link from APP_URL, not from the host of the request', function (): void {
+        config(['app.url' => 'https://site.test']);
+
         $text = FastleoMessage::make('Новая заявка')->body('Иван')->url('/fastleo/leads/7')->toText();
 
-        expect($text)->toBe("Новая заявка\nИван\n".url('/fastleo/leads/7'))
-            ->and(FastleoMessage::make('Просто')->toText())->toBe('Просто');
+        expect($text)->toBe("Новая заявка\nИван\nhttps://site.test/fastleo/leads/7")
+            ->and(FastleoMessage::make('Просто')->toText())->toBe('Просто')
+            ->and(FastleoMessage::make('x')->url('https://other.test/x')->toText())->toBe("x\nhttps://other.test/x");
+    });
+
+    it('builds the links of the text and of the letter on the domain of the admin when the site has a separate one', function (): void {
+        config(['app.url' => 'https://site.test', 'fastleo.domain' => 'admin.site.test']);
+        $message = FastleoMessage::make('Заявка')->url('/fastleo/leads/7');
+
+        expect($message->toText())->toBe("Заявка\nhttps://admin.site.test/fastleo/leads/7")
+            ->and($message->toMail()->actionUrl)->toBe('https://admin.site.test/fastleo/leads/7');
     });
 });
 

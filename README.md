@@ -51,6 +51,8 @@ php artisan fastleo:user admin@example.com
 
 Open `https://example.com/fastleo` and log in.
 
+`fastleo:install` also asks what the site needs: a basic install (the admin panel only) or a custom one with ready-made modules (contacts, pages, news, leads — an admin section, model and migration copied into your project as your own code), and offers to run migrations and create the administrator. Pass the answers as flags to skip the questions (`--type=basic`, or `--modules=pages,news --setup --admin-email=…`); add a module later with `php artisan fastleo:module` ([modules](docs/modules.md)).
+
 ## Your first section
 
 A section is a class in `app/Fastleo` on top of an ordinary model and table. Create the model and the migration, migrate, then generate a stub with fields based on the table columns; adjust the labels and the icon — you will get something like this:
@@ -100,6 +102,7 @@ Check the result with `php artisan fastleo:doctor` — it reports mistakes in se
 Reading order with short descriptions (in Russian): [docs/README.md](docs/README.md). Practical answers with code: [FAQ](docs/faq/README.md).
 
 - [Installation and upgrading](docs/installation.md)
+- [Ready-made modules: contacts, pages, news, leads](docs/modules.md)
 - [Configuration: `config/fastleo.php`](docs/configuration.md)
 - [Sections (resources)](docs/resources.md)
 - [Fields](docs/fields/README.md)

@@ -33,6 +33,16 @@ it('keeps the rows aligned with an empty frame when the record has no picture', 
     expect(substr_count($page->getContent(), '<span class="inline-block h-[30px] w-10 rounded-md bg-sunken align-middle" data-title-thumb></span>'))->toBe(4); // две записи, каждая в таблице и в карточках для телефона
 });
 
+it('does not sort by a picture that has no column of its own', function (): void {
+    Article::factory()->create(['title' => 'Первая', 'cover' => 'uploads/articles/z.jpg']);
+    Article::factory()->create(['title' => 'Вторая', 'cover' => 'uploads/articles/a.jpg']);
+
+    // По умолчанию новые сверху; сортировка по скрытому столбцу картинки не применяется (иначе «Первая» была бы выше).
+    $this->get(route('fastleo.resources.index', ['articles', 'sort' => 'cover', 'direction' => 'desc']))
+        ->assertOk()
+        ->assertSeeInOrder(['Вторая', 'Первая']);
+});
+
 it('leaves the picture a column when it is not placed in the title', function (): void {
     useFixtureResources('Filters');
 

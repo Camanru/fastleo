@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Filters\NumberRangeFilter;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Models\Article;
@@ -116,6 +117,26 @@ it('keeps both ends of a number range', function (): void {
         ->and(filteredTitles(['views' => ['from' => '500']]))->toBe(['Больше', 'Конец'])
         ->and(filteredTitles(['views' => ['to' => '99']]))->toBe(['Меньше'])
         ->and(filteredTitles(['views' => ['from' => '100,5', 'to' => '500.0']]))->toBe(['Конец']);
+});
+
+it('takes the numbers the field of the browser sends: with no leading digit, with a trailing point or with an exponent', function (): void {
+    foreach ([0 => 'Ноль', 1 => 'Один', 1000 => 'Тысяча', 5000 => 'Пять тысяч'] as $views => $title) {
+        Article::factory()->create(['title' => $title, 'views' => $views]);
+    }
+
+    expect(filteredTitles(['views' => ['from' => '.5', 'to' => '1.']]))->toBe(['Один'])
+        ->and(filteredTitles(['views' => ['from' => '1e3', 'to' => '1E3']]))->toBe(['Тысяча'])
+        ->and(filteredTitles(['views' => ['from' => '-.5', 'to' => '5e-1']]))->toBe(['Ноль'])
+        ->and(filteredTitles(['views' => ['from' => '1e20']]))->toBe(['Ноль', 'Один', 'Пять тысяч', 'Тысяча']);
+});
+
+it('hands a decimal end with many digits to the database exactly as typed', function (): void {
+    $filter = NumberRangeFilter::make('price');
+    $query = Article::query();
+
+    $filter->apply($query, $filter->value(['from' => '1234567890.123456', 'to' => '5,5']));
+
+    expect($query->getQuery()->getBindings())->toBe(['1234567890.123456', '5.5']);
 });
 
 it('rounds a fractional end inwards for an integer column and keeps it for a decimal one', function (): void {

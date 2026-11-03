@@ -20,6 +20,15 @@ use Symfony\Component\Process\Process;
 class ChildArtisan
 {
     /**
+     * Может ли дочерний процесс задавать вопросы в терминале владельца. Без терминала (например, Windows) вопросы
+     * недоступны: команду, которой нужен ввод, нужно запустить отдельно.
+     */
+    public function canAsk(): bool
+    {
+        return Process::isTtySupported();
+    }
+
+    /**
      * Выполнить команду. С `$interactive` процесс получает терминал (вопросы команды видны и отвечаются как обычно),
      * без него вывод передаётся в `$output`, а вопросов нет (`--no-interaction`).
      *
@@ -38,7 +47,7 @@ class ChildArtisan
             $line[] = str_starts_with($name, '--') ? ($value === true ? $name : $name.'='.$value) : (string) $value;
         }
 
-        $tty = $interactive && Process::isTtySupported();
+        $tty = $interactive && $this->canAsk();
 
         if (! $interactive) {
             $line[] = '--no-interaction';

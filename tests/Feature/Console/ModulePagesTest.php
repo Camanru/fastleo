@@ -108,6 +108,18 @@ it('refuses to install over an existing pages table', function (): void {
     expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile();
 });
 
+it('refuses to install over a migration of the site that was not run yet and creates the same table', function (): void {
+    File::ensureDirectoryExists($this->sandbox.'/database/migrations');
+    File::put($this->sandbox.'/database/migrations/2024_01_01_000000_create_pages_table.php', '<?php');
+
+    $this->artisan('fastleo:module', ['modules' => ['pages']])
+        ->expectsOutputToContain('database/migrations/2024_01_01_000000_create_pages_table.php уже есть')
+        ->assertFailed();
+
+    expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile()
+        ->and(File::glob($this->sandbox.'/database/migrations/*'))->toHaveCount(1);
+});
+
 it('keeps the published pages and takes the sort column in strict mode', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['pages']])->assertSuccessful();
     bootCopiedPages($this);
@@ -142,3 +154,25 @@ it('gives the administrator a working pages section that passes fastleo:doctor',
 
     expect($problems->all())->toBe([]);
 });
+
+it('accepts only a path of the site or an http address in the link of the call block', function (string $url, bool $valid): void {
+    $this->artisan('fastleo:module', ['modules' => ['pages']])->assertSuccessful();
+    bootCopiedPages($this);
+    Fastleo::resources()->flush();
+    $this->actingAs(admin(), Fastleo::GUARD);
+
+    $response = $this->post(route('fastleo.resources.store', 'site-pages'), [
+        'title' => 'Контакты', 'slug' => 'contacts', 'is_published' => '1',
+        'content' => [['type' => 'cta', 'cta' => ['title' => 'Звоните', 'url' => $url]]],
+    ]);
+
+    $valid ? $response->assertSessionHasNoErrors() : $response->assertSessionHasErrors('content.0.cta.url');
+    expect(Page::query()->count())->toBe($valid ? 1 : 0);
+})->with([
+    'path' => ['/contacts', true],
+    'address' => ['https://example.com/x', true],
+    'empty' => ['', true],
+    'script' => ['javascript:alert(1)', false],
+    'protocol relative' => ['//evil.example', false],
+    'backslash' => ['/\\evil.example', false],
+]);

@@ -33,7 +33,9 @@ final class DashboardPatcher
             File::put($path, strtr(File::get(dirname(__DIR__, 2).'/stubs/dashboard.stub'), [...$replace, '{{ class }}' => 'Dashboard']));
         }
 
-        $source = File::get($path);
+        // Файл с переводами строк Windows (CRLF) правится как обычный и сохраняется с теми же CRLF.
+        $crlf = str_contains(File::get($path), "\r\n");
+        $source = str_replace("\r\n", "\n", File::get($path));
         $lines = [];
 
         foreach ($widgets as $widget) {
@@ -62,7 +64,7 @@ final class DashboardPatcher
             return false;
         }
 
-        File::put($path, $patched);
+        File::put($path, $crlf ? str_replace("\n", "\r\n", $patched) : $patched);
 
         return true;
     }

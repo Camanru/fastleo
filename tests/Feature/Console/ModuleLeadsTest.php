@@ -7,8 +7,10 @@ use App\Http\Requests\StoreLeadRequest;
 use App\Models\Lead;
 use Fastleo\Fastleo;
 use Fastleo\Notifications\MessageNotification;
+use Fastleo\Notifications\SendAdminMessage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\File;
@@ -115,10 +117,30 @@ it('keeps the lead and thanks the visitor when the notification to the admins fa
     expect(Lead::query()->count())->toBe(1);
 });
 
+it('does not put the host sent by the visitor into the link the bots of the admins get', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
+    bootCopiedLeads($this);
+    admin();
+    config(['app.url' => 'https://site.test']);
+    notificationBot();
+    Bus::fake();
+
+    $this->withServerVariables(['HTTP_HOST' => 'evil.example'])->post('http://evil.example/leads', leadInput())->assertSessionHas('lead_sent');
+
+    $lead = Lead::query()->sole();
+
+    Bus::assertDispatched(
+        SendAdminMessage::class,
+        fn (SendAdminMessage $job): bool => str_contains($job->text, 'https://site.test/fastleo/') && ! str_contains($job->text, 'evil.example'),
+    );
+    expect(Fastleo::recordUrl($lead))->toStartWith('https://site.test/fastleo/');
+});
+
 it('lets the administrator type a name no longer than the column holds', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
 
     expect(File::get($this->sandbox.'/app/Fastleo/LeadResource.php'))->toContain("Text::make('name', 'Имя')->required()->maxLength(100)")
+        ->and(File::get($this->sandbox.'/app/Fastleo/LeadResource.php'))->toContain("Tel::make('phone', 'Телефон')->required()->maxLength(50)")
         ->and(File::get(glob($this->sandbox.'/database/migrations/*_create_leads_table.php')[0]))->toContain("string('name', 100)");
 });
 

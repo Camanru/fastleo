@@ -1237,8 +1237,10 @@ export function openRecordModal(url) {
 export async function openRecordView(url, pageUrl) {
     const dialog = document.getElementById('fastleo-record-modal');
     const card = dialog.querySelector('[data-record-card]');
+    const target = new URL(url, window.location.href);
 
-    if (new URL(url, window.location.href).origin !== window.location.origin) {
+    // В окно вставляется только карточка своего сайта (`?frame=1`); любой другой адрес открывается страницей.
+    if (target.origin !== window.location.origin || target.searchParams.get('frame') !== '1') {
         window.location.href = pageUrl;
 
         return;

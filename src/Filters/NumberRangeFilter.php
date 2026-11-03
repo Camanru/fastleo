@@ -63,12 +63,12 @@ class NumberRangeFilter extends Filter
                 continue;
             }
 
-            $number = $this->numeric($value[$end]);
+            $text = $value[$end];
 
             if ($range !== null) {
                 // Целая колонка: PostgreSQL не принимает «100.5» и число шире типа (`integer`), поэтому граница
                 // округляется внутрь диапазона (от — вверх, до — вниз) и сжимается до значений типа колонки.
-                $number = $end === 'from' ? ceil($number) : floor($number);
+                $number = $end === 'from' ? ceil((float) $text) : floor((float) $text);
 
                 if (($end === 'from' && $number > $range[1]) || ($end === 'to' && $number < $range[0])) {
                     $query->whereRaw('0 = 1');
@@ -76,10 +76,13 @@ class NumberRangeFilter extends Filter
                     return;
                 }
 
-                $number = (int) max($range[0], min($range[1], $number));
+                $query->where($column, $operator, (int) max($range[0], min($range[1], $number)));
+
+                continue;
             }
 
-            $query->where($column, $operator, $number);
+            // Дробная граница уходит в базу строкой: PHP округлил бы число длиннее 14 значащих цифр.
+            $query->where($column, $operator, str_contains($text, '.') ? $text : (int) $text);
         }
     }
 
@@ -131,19 +134,18 @@ class NumberRangeFilter extends Filter
     }
 
     /**
-     * Проверенное число как int или float: база сравнивает значение с числовой колонкой, а не со строкой.
-     */
-    private function numeric(string $number): int|float
-    {
-        return str_contains($number, '.') ? (float) $number : (int) $number;
-    }
-
-    /**
      * Число из адреса в виде строки (точка — разделитель дробной части) или null: не число, слишком длинное.
+     * Записи `.5`, `5.` и `1e3` (их отправляет поле `type=number`) приводятся к `0.5`, `5` и `1000`.
      */
     private function number(mixed $input): ?string
     {
         $input = is_string($input) ? str_replace(',', '.', self::string($input) ?? '') : '';
+
+        if (preg_match('/^-?(\d+\.?\d*|\.\d+)[eE][+-]?\d{1,2}$/', $input) === 1) {
+            $input = rtrim(rtrim(number_format((float) $input, 10, '.', ''), '0'), '.');
+        }
+
+        $input = preg_replace(['/^(-?)\./', '/\.$/'], ['${1}0.', ''], $input) ?? '';
 
         return preg_match('/^-?\d{1,15}(\.\d{1,10})?$/', $input) === 1 ? $input : null;
     }

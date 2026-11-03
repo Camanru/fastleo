@@ -67,7 +67,7 @@ final class PageResource extends Resource
                     Text::make('title', 'Заголовок')->required(),
                     Text::make('text', 'Текст'),
                     Text::make('button', 'Кнопка'),
-                    Text::make('url', 'Ссылка')->help('Адрес вида /contacts или https://…'),
+                    Text::make('url', 'Ссылка')->help('Адрес вида /contacts или https://…')->rules(['nullable', 'regex:~^(/(?![/\\\\])|https?://)~i']),
                 ]),
             ])->max(50),
             Seo::make('seo')->directory('pages'),

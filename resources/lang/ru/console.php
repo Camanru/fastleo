@@ -34,6 +34,7 @@ return [
     'install_seed_production' => 'Примеры данных в боевом окружении (production) не добавляются, флаг --seed пропущен.',
     'install_migrate_failed' => 'Миграции не выполнены: :message',
     'install_seed_failed' => 'Примеры не добавлены (:seeder): :message',
+    'install_admin_no_terminal' => 'Вопросы администратору здесь недоступны (нет терминала). Создайте его командой: php artisan fastleo:user',
     'install_admin_existing' => 'Пользователь :email уже есть: ему выдаётся доступ в админку (и меняется пароль, если вы его указали).',
     'module_no_pest' => 'Тесты модулей не скопированы: на сайте нет Pest (pestphp/pest в composer.json и tests/Pest.php — его создаёт vendor/bin/pest --init). Они лежат в vendor/camanru/fastleo/stubs/modules/*/tests.',
     'module_created' => 'Файлы модулей добавлены в проект — теперь это код сайта:',

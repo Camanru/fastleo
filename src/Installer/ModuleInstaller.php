@@ -151,8 +151,10 @@ final class ModuleInstaller
             foreach ($this->files($module->directory) as $target => $source) {
                 $skipped = ! $this->hasPest() && str_starts_with($this->relative($target), 'tests/');
 
-                if (! $skipped && File::exists($target)) {
-                    $conflicts[$module->name][] = __('fastleo::console.module_conflict_file', ['module' => $module->name, 'path' => $this->relative($target)]);
+                $existing = $skipped ? null : $this->existing($target);
+
+                if ($existing !== null) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_conflict_file', ['module' => $module->name, 'path' => $this->relative($existing)]);
                 }
             }
 
@@ -277,6 +279,21 @@ final class ModuleInstaller
         $composer = base_path('composer.json');
 
         return File::exists(base_path('tests/Pest.php')) && File::exists($composer) && str_contains(File::get($composer), '"pestphp/pest"');
+    }
+
+    /**
+     * Занятый путь модуля или null. Миграция модуля называется с меткой `{timestamp}`: занятой считается любая своя миграция
+     * с тем же именем (`*_create_leads_table.php`) — иначе `migrate` потом упал бы на второй таблице с тем же названием.
+     */
+    private function existing(string $target): ?string
+    {
+        if (! str_contains($target, '{timestamp}')) {
+            return File::exists($target) ? $target : null;
+        }
+
+        $found = File::glob(str_replace('{timestamp}', '*', $target))[0] ?? null;
+
+        return is_string($found) ? $found : null;
     }
 
     /**

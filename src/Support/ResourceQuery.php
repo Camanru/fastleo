@@ -75,7 +75,7 @@ final class ResourceQuery
         $this->search = is_string($search) ? mb_substr(trim($search), 0, 255) : '';
 
         $sort = $request->query('sort');
-        $sortable = array_map(fn (Field $field): string => $field->name, array_filter($resource->listFields(), fn (Field $field): bool => $field->isSortable()));
+        $sortable = array_map(fn (Field $field): string => $field->name, array_filter($resource->listColumns(), fn (Field $field): bool => $field->isSortable()));
         $this->sort = is_string($sort) && in_array($sort, $sortable, true) ? $sort : null;
         $this->direction = $request->query('direction') === 'desc' ? 'desc' : 'asc';
         $this->all = $request->query('per_page') === 'all';
@@ -151,7 +151,9 @@ final class ResourceQuery
         // как в списке страниц WordPress; свёрнутые на экране ветки не растягивают число страниц.
         $roots = $this->tree()->roots($this->parent);
         $page = Paginator::resolveCurrentPage();
-        ['keys' => $keys, 'truncated' => $this->treeTruncated] = $this->tree()->page(array_slice($roots, ($page - 1) * $perPage, $perPage), max(1, config()->integer('fastleo.list.max_all', 1000)));
+        // Номер страницы из адреса может быть почти `PHP_INT_MAX`: произведение вышло бы за int, а такая страница пуста.
+        $offset = $page > intdiv(PHP_INT_MAX, $perPage) ? count($roots) : ($page - 1) * $perPage;
+        ['keys' => $keys, 'truncated' => $this->treeTruncated] = $this->tree()->page(array_slice($roots, $offset, $perPage), max(1, config()->integer('fastleo.list.max_all', 1000)));
         $position = array_flip($keys);
         $records = $keys === [] ? new Collection : $this->query()->whereKey($keys)->get()
             ->sortBy(fn (Model $record): int => $position[$this->key($record)] ?? 0)

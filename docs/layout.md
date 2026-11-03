@@ -56,6 +56,8 @@ Tabs::make([
 Во вкладке могут лежать **поля** или **таблицы связанных записей** (`Related`), но не вместе: таблица стоит вне формы и не сохраняется с ней. Над вкладкой с таблицей строки «Сохранить» нет. Подробнее — [related.md](related.md#таблица-во-вкладке-формы).
 
 ```php
+use Fastleo\Related;
+
 Tabs::make([
     Tab::make('Основное', [/* поля */]),
     Tab::make('Отзывы', [Related::make('reviews', ReviewResource::class)->editIn('modal')]),

@@ -110,6 +110,19 @@ it('adds a comma after the last widget of the site when it has none', function (
         ->and(UserModelPatcher::compiles(File::get($path)))->toBeTrue();
 });
 
+it('adds a widget to the dashboard of the site saved with Windows line breaks and keeps them', function (): void {
+    $path = siteDashboard($this->sandbox, "            \\Fastleo\\Widgets\\ServerStatus::make(),\n");
+    File::put($path, str_replace("\n", "\r\n", File::get($path)));
+
+    expect(new DashboardPatcher()->add(["\\Fastleo\\Widgets\\Stat::make('Один')->value(1),"]))->toBeTrue();
+
+    $patched = File::get($path);
+
+    expect($patched)->toContain("Stat::make('Один')")
+        ->and(str_replace("\r\n", '', $patched))->not->toContain("\n")
+        ->and(UserModelPatcher::compiles($patched))->toBeTrue();
+});
+
 it('adds a widget to an empty list of widgets', function (): void {
     $path = siteDashboard($this->sandbox, '');
 
@@ -179,4 +192,16 @@ it('gives the administrator a working news section that passes fastleo:doctor an
     $problems = collect(json_decode(Artisan::output(), true)['problems'])->where('scope', 'news')->where('level', 'error');
 
     expect($problems->all())->toBe([]);
+});
+
+it('lists the newest news first in the admin list, with or without a publication date', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
+    bootCopiedNews($this);
+    Fastleo::resources()->flush();
+    $this->actingAs(admin(), Fastleo::GUARD);
+    News::factory()->create(['title' => 'Старая без даты', 'published_at' => null, 'created_at' => now()->subDays(3)]);
+    News::factory()->create(['title' => 'Свежая с датой', 'published_at' => now()->subDays(10), 'created_at' => now()]);
+    News::factory()->create(['title' => 'Вчерашняя без даты', 'published_at' => null, 'created_at' => now()->subDay()]);
+
+    $this->get(route('fastleo.resources.index', 'news'))->assertOk()->assertSeeInOrder(['Свежая с датой', 'Вчерашняя без даты', 'Старая без даты']);
 });

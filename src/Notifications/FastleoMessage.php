@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Fastleo\Notifications;
 
 use Fastleo\Fastleo;
-use Fastleo\Support\SeoTags;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Str;
 
@@ -99,13 +98,13 @@ final class FastleoMessage
      */
     public function toText(): string
     {
-        $url = $this->url === null ? null : (str_starts_with($this->url, '/') ? url($this->url) : $this->url);
+        $url = $this->url === null ? null : (str_starts_with($this->url, '/') ? Fastleo::adminUrl($this->url) : $this->url);
 
         return implode("\n", array_filter([$this->title, $this->body, $url], fn (?string $line): bool => $line !== null && $line !== ''));
     }
 
     /**
-     * Письмо администратору: заголовок — тема, текст — абзац, ссылка — кнопка «Открыть» (адрес сайта — от `APP_URL`).
+     * Письмо администратору: заголовок — тема, текст — абзац, ссылка — кнопка «Открыть» (путь без хоста достраивается через `Fastleo::adminUrl()` — от `fastleo.domain` или `APP_URL`).
      * Уровень `success` даёт зелёную кнопку, `danger` — красную. Заголовок и текст выводятся как обычный текст:
      * Laravel разбирает строки письма как Markdown, а они нередко приходят от посетителя сайта (текст заявки) —
      * без этого он мог бы вставить в письмо администратору свою ссылку или картинку.
@@ -126,7 +125,7 @@ final class FastleoMessage
         }
 
         if ($this->url !== null) {
-            $mail->action(__('fastleo::notifications.mail_open', locale: Fastleo::LOCALE), str_starts_with($this->url, '/') ? SeoTags::absolute($this->url) : $this->url);
+            $mail->action(__('fastleo::notifications.mail_open', locale: Fastleo::LOCALE), str_starts_with($this->url, '/') ? Fastleo::adminUrl($this->url) : $this->url);
         }
 
         return $mail;
