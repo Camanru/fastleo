@@ -119,9 +119,7 @@ class Slug extends Text
             return;
         }
 
-        $source = method_exists($record, 'isTranslatableAttribute') && method_exists($record, 'getTranslations') && $record->isTranslatableAttribute($this->from)
-            ? $record->getTranslations($this->from)
-            : $record->getAttribute($this->from);
+        $source = $this->sourceOf($record);
         $empty = ! is_string($current) || $current === '';
 
         if (! $empty && ! $this->isAutomatic($current, $source)) {
@@ -145,6 +143,24 @@ class Slug extends Text
         }
 
         $record->fill([$this->name => $slug]);
+    }
+
+    /**
+     * Значение источника адреса в записи: строка, а у многоязычного поля — все переводы.
+     *
+     * ```php
+     * $field->sourceOf($article); // 'О компании'
+     * ```
+     */
+    public function sourceOf(Model $record): mixed
+    {
+        if ($this->from === null) {
+            return null;
+        }
+
+        return method_exists($record, 'isTranslatableAttribute') && method_exists($record, 'getTranslations') && $record->isTranslatableAttribute($this->from)
+            ? $record->getTranslations($this->from)
+            : $record->getAttribute($this->from);
     }
 
     /**

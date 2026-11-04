@@ -155,6 +155,9 @@ abstract class Resource
      */
     private ?array $filters = null;
 
+    /** @var array<string, Filter>|null фильтры, видимые администратору (после `hidden(fn …)`), на время запроса */
+    private ?array $visibleFilters = null;
+
     /** @var array<string, Related>|null */
     private ?array $relations = null;
 
@@ -734,7 +737,8 @@ abstract class Resource
      */
     public static function perPageOptions(): array
     {
-        $configured = config('fastleo.list.per_page_options');
+        // Опубликованный до появления опции конфиг ключа не содержит (вложенные массивы Laravel не сливает): умолчание пакета.
+        $configured = config('fastleo.list.per_page_options', [25, 50, 100]);
         $given = static::$perPageOptions ?? (is_array($configured) ? $configured : []);
         $max = max(1, config()->integer('fastleo.list.max_all', 1000));
         $sizes = array_values(array_filter(array_map(intval(...), array_filter($given, is_numeric(...))), fn (int $size): bool => $size > 0 && $size <= $max));
@@ -852,13 +856,32 @@ abstract class Resource
     }
 
     /**
-     * Фильтры списка, привязанные к ресурсу, по имени.
+     * Фильтры списка, привязанные к ресурсу, по имени, для администратора: без фильтров по полям, скрытым от него
+     * (`hidden(fn …)`). Иначе по числу найденных записей и вариантам можно было бы подобрать значение скрытого поля.
+     * Список для описания ресурса без пользователя (`fastleo:doctor`, `fastleo:inspect`) — `allFilters()`.
      *
      * @return array<string, Filter>
      *
      * @throws LogicException два фильтра с одним именем
      */
     public function listFilters(): array
+    {
+        return $this->visibleFilters ??= array_filter($this->allFilters(), fn (Filter $filter, string $name): bool => ! $this->schema()->field($name)?->isHidden(), ARRAY_FILTER_USE_BOTH);
+    }
+
+    /**
+     * Все фильтры списка, привязанные к ресурсу, по имени, независимо от того, кому скрыты их поля. Замыкание
+     * `hidden(fn …)` здесь не вызывается, поэтому описание ресурса работает и без вошедшего администратора.
+     *
+     * ```php
+     * array_keys($resource->allFilters()); // ['status', 'category_id']
+     * ```
+     *
+     * @return array<string, Filter>
+     *
+     * @throws LogicException два фильтра с одним именем
+     */
+    public function allFilters(): array
     {
         if ($this->filters !== null) {
             return $this->filters;

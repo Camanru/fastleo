@@ -104,6 +104,11 @@ Alpine.data('fastleoLoginCode', () => ({
     focused: false,
     recovery: false,
 
+    // Менеджер паролей мог подставить код до запуска Alpine: привязка :value затёрла бы его пустым значением.
+    init() {
+        this.digits = (this.$el.querySelector('#two-factor-code')?.value ?? '').replace(/\D/g, '').slice(0, 6);
+    },
+
     toggleRecovery() {
         this.recovery = !this.recovery;
         this.$nextTick(() => (this.recovery ? this.$refs.recoveryCode : this.$refs.code).focus());

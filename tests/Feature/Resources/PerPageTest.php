@@ -28,6 +28,12 @@ describe('the sizes', function (): void {
         expect(ArticleResource::perPageOptions())->toBe([10, 25, 50, 100]);
     });
 
+    it('are 25, 50 and 100 when the config published before the option appeared has no such key', function (): void {
+        config(['fastleo.list' => ['per_page' => 25, 'max_all' => 1000]]);
+
+        expect(ArticleResource::perPageOptions())->toBe([25, 50, 100]);
+    });
+
     it('are empty when nothing is configured', function (): void {
         config(['fastleo.list.per_page_options' => []]);
 

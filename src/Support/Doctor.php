@@ -614,7 +614,7 @@ final class Doctor
         try {
             $fields = $resource->schema()->fields();
             $this->assertLists($fields);
-            $resource->listFilters();
+            $resource->allFilters();
             $resource->listActions();
             $resource->listRelations();
             $model = $resource->newModel();

@@ -44,6 +44,32 @@ it('restores a record from the trash', function (): void {
     $this->assertNotSoftDeleted($article);
 });
 
+it('says so when the model refused to restore a record from the trash', function (): void {
+    $article = Article::factory()->create();
+    $article->delete();
+    Article::restoring(fn (): bool => false);
+
+    $this->post(route('fastleo.resources.restore', ['articles', $article->id]))
+        ->assertRedirect(route('fastleo.resources.index', ['resource' => 'articles', 'trashed' => 1]))
+        ->assertSessionHas('fastleo.error', 'Сайт отменил восстановление (обработчик модели вернул false). Запись осталась в корзине.')
+        ->assertSessionMissing('fastleo.success');
+    $this->assertSoftDeleted($article);
+});
+
+it('explains why the database refused to restore a record from the trash', function (): void {
+    $article = Article::factory()->create();
+    $article->delete();
+    Article::restoring(function (): never {
+        throw new QueryException('sqlite', 'update articles', [], new PDOException('UNIQUE constraint failed: articles.slug'));
+    });
+
+    $this->post(route('fastleo.resources.restore', ['articles', $article->id]))
+        ->assertRedirect(route('fastleo.resources.index', ['resource' => 'articles', 'trashed' => 1]))
+        ->assertSessionHas('fastleo.error')
+        ->assertSessionMissing('fastleo.success');
+    $this->assertSoftDeleted($article);
+});
+
 it('deletes a trashed record for good', function (): void {
     $article = Article::factory()->create();
     $article->delete();

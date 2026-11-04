@@ -294,3 +294,23 @@ it('does not ask again when every chosen module is taken', function (): void {
         ->expectsConfirmation('Создать администратора сейчас?', 'no')
         ->assertSuccessful();
 });
+
+it('does not ask about the administrator when the site already has one', function (): void {
+    User::factory()->create()->forceFill(['fastleo_admin' => true])->save();
+
+    $this->artisan('fastleo:install', $this->base)
+        ->expectsChoice('Какая установка?', 'basic', Modules::types())
+        ->assertSuccessful();
+});
+
+it('still asks about the administrator when the users table has no fastleo_admin column', function (): void {
+    Schema::table('users', function ($table): void {
+        $table->dropIndex(['fastleo_admin']);
+        $table->dropColumn('fastleo_admin');
+    });
+
+    $this->artisan('fastleo:install', $this->base)
+        ->expectsChoice('Какая установка?', 'basic', Modules::types())
+        ->expectsConfirmation('Создать администратора сейчас?', 'no')
+        ->assertFailed(); // doctor ругается на отсутствие колонки, вопрос об администраторе при этом задан
+});

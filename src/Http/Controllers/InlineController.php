@@ -57,10 +57,11 @@ final class InlineController
         // Значения остальных простых полей нужны правилам вроде `different:other`.
         $data = [...RecordWriter::currentValues($resource, $record), $field->name => $value];
 
+        $rules = RecordWriter::rules($resource, $record, [$field]);
         $validator = validator(
             $data,
-            RecordWriter::rules($resource, $record, [$field]),
-            ValidationMessages::all(),
+            $rules,
+            ValidationMessages::all($rules),
             $resource->validationAttributes($record),
         );
 

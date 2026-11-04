@@ -174,7 +174,7 @@ describe('edit and update', function (): void {
             ->put(route('fastleo.resources.update', ['categories', $category->id]), ['title' => 'Новое', 'code' => 'news']);
 
         $response->assertRedirect(route('fastleo.resources.edit', ['categories', $category->id]))
-            ->assertSessionHas('fastleo.error', 'Не удалось сохранить: такое значение уже есть у другой записи (адрес, код, email).')
+            ->assertSessionHas('fastleo.error', 'Не удалось сохранить: значение в поле «code» уже есть у другой записи.')
             ->assertSessionHasInput('title', 'Новое');
         expect($category->refresh()->title)->toBe('Старое');
     });

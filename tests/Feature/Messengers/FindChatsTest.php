@@ -42,7 +42,8 @@ it('lists the chats of the bot with the token typed into the form', function ():
         ->assertOk()
         ->assertExactJson(['chats' => [['id' => '-100200300', 'title' => 'Новости', 'type' => 'канал']]]);
 
-    Http::assertSent(fn (HttpRequest $request): bool => str_ends_with($request->url(), '/getUpdates'));
+    // Набор апдейтов бота Telegram запоминает навсегда: пакет его не трогает, чтобы не сломать сайт, который сам читает бота.
+    Http::assertSent(fn (HttpRequest $request): bool => str_ends_with($request->url(), '/getUpdates') && ! isset($request['allowed_updates']));
 });
 
 it('uses the saved token of the bot when the field is empty', function (): void {

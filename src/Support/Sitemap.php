@@ -12,6 +12,7 @@ use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 use XMLWriter;
 
 /**
@@ -36,6 +37,8 @@ final class Sitemap
     private const string MODELS_KEY = 'fastleo.sitemap.models';
 
     private const string PAGE_KEY = 'fastleo.sitemap.page.';
+
+    private const string REFUSED_KEY = 'fastleo.sitemap.refused';
 
     /**
      * XML карты по адресу `/sitemap.xml` (из кеша, если он включён): сама карта или, если адресов много, индекс файлов.
@@ -118,14 +121,31 @@ final class Sitemap
         if ($minutes > 0) {
             $until = now()->addMinutes($minutes);
 
+            $stored = true;
+
             foreach ($built['pages'] as $index => $xml) {
-                Cache::put(self::PAGE_KEY.($index + 1), $xml, $until);
+                $stored = Cache::put(self::PAGE_KEY.($index + 1), $xml, $until) && $stored;
             }
 
-            Cache::put(self::CACHE_KEY, ['main' => $built['main'], 'files' => count($built['pages'])], $until);
+            $stored = Cache::put(self::CACHE_KEY, ['main' => $built['main'], 'files' => count($built['pages'])], $until) && $stored;
+
+            if (! $stored) {
+                self::reportRefusedByCache();
+            }
         }
 
         return $built;
+    }
+
+    /**
+     * Кеш отказался хранить карту (Memcached не берёт значения больше 1 МБ): карта пересобирается при каждом запросе.
+     * Сообщить об этом в журнал, не чаще раза в сутки.
+     */
+    private static function reportRefusedByCache(): void
+    {
+        if (Cache::add(self::REFUSED_KEY, true, now()->addDay())) {
+            report(new RuntimeException(__('fastleo::seo.sitemap_cache_refused', [], Fastleo::LOCALE)));
+        }
     }
 
     /**

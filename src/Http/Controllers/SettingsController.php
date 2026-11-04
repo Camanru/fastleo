@@ -65,7 +65,7 @@ final readonly class SettingsController
             $attributes = [...$attributes, ...$field->validationAttributes()];
         }
 
-        $input = RecordWriter::inInputOrder(Validator::make($request->all(), $rules, ValidationMessages::all(), $attributes)->validate(), $request->all());
+        $input = RecordWriter::inInputOrder(Validator::make($request->all(), $rules, ValidationMessages::all($rules), $attributes)->validate(), $request->all());
         $dehydrated = [];
 
         foreach ($fields as $field) {

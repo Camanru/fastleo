@@ -637,7 +637,7 @@ it('explains a real database refusal of an action to the agent', function (): vo
     $article = Article::factory()->create(['type' => 'news']);
 
     mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'broken', 'ids' => [(string) $article->id]])
-        ->assertHasErrors(['такое значение уже есть']);
+        ->assertHasErrors(['уже есть у другой записи']);
 });
 
 it('gives out repeater and blocks values in the shape that update accepts, nested lists included', function (): void {

@@ -55,11 +55,11 @@ final class Importer
     private ?int $importKeyColumn = null;
 
     /**
-     * Тексты ошибок проверки: собираются один раз на файл, а не на каждую строку.
+     * Тексты ошибок проверки по набору полей строки: собираются один раз на набор, а не на каждую строку.
      *
-     * @var array<string, string|array<string, string>>|null
+     * @var array<string, array<string, string|array<string, string>>>
      */
-    private ?array $validationMessages = null;
+    private array $validationMessages = [];
 
     /**
      * Ячейки первой строки исходного файла.
@@ -458,7 +458,8 @@ final class Importer
         }
 
         $input = RecordWriter::controllingInput($this->resource, $existing, $data);
-        $validator = validator($input, RecordWriter::rules($this->resource, $existing, $fields), $this->validationMessages ??= ValidationMessages::all(), RecordWriter::attributes($fields));
+        $rules = RecordWriter::rules($this->resource, $existing, $fields);
+        $validator = validator($input, $rules, $this->validationMessages[implode(',', array_keys($rules))] ??= ValidationMessages::all($rules), RecordWriter::attributes($fields));
 
         if ($validator->fails()) {
             return (string) $validator->errors()->first();

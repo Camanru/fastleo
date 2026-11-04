@@ -3,8 +3,11 @@
 declare(strict_types=1);
 
 use Fastleo\Support\Sitemap;
+use Illuminate\Cache\ArrayStore;
+use Illuminate\Cache\Repository;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Route;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -240,6 +243,26 @@ describe('cache', function (): void {
 
         $this->get('/sitemap-2.xml')->assertOk()->assertSee('https://site.test/c');
         expect(Cache::has('fastleo.sitemap.page.2'))->toBeTrue();
+    });
+
+    it('warns once when the cache refuses a map file, instead of silently rebuilding at every request', function (): void {
+        // Как Memcached: большое значение не сохраняется, а `put` возвращает false.
+        Cache::extend('picky', fn (): Repository => new Repository(new class extends ArrayStore
+        {
+            public function put($key, $value, $seconds): bool
+            {
+                return strlen(serialize($value)) < 100 && parent::put($key, $value, $seconds);
+            }
+        }));
+        config(['cache.stores.picky' => ['driver' => 'picky'], 'cache.default' => 'picky']);
+        Exceptions::fake();
+        enableSitemap(['urls' => array_map(fn (int $number): string => '/page-'.$number, range(1, 20))]);
+
+        $this->get('/sitemap.xml')->assertOk();
+        $this->get('/sitemap.xml')->assertOk();
+
+        Exceptions::assertReportedCount(1);
+        Exceptions::assertReported(fn (RuntimeException $exception): bool => str_contains($exception->getMessage(), 'per_file'));
     });
 
     it('builds the map when only a numbered file is requested first', function (): void {

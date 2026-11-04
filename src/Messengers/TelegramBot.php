@@ -49,7 +49,7 @@ final class TelegramBot extends Bot
     #[Override]
     public function recentChats(): array
     {
-        $updates = $this->call('getUpdates', ['limit' => 100, 'timeout' => 0, 'allowed_updates' => ['message', 'channel_post', 'my_chat_member']]);
+        $updates = $this->call('getUpdates', ['limit' => 100, 'timeout' => 0]);
         $chats = [];
 
         foreach ($updates as $update) {

@@ -21,6 +21,9 @@ final class SiteClosing
     /** Группы маршрутов сайта, на которые вешается проверка. */
     private const array GROUPS = ['web', 'api'];
 
+    /** Отметка в атрибутах запроса: сбой чтения настроек в этом запросе уже записан в журнал. */
+    private const string REPORTED = 'fastleo.closing.reported';
+
     /**
      * Функция включена в конфиге.
      */
@@ -71,7 +74,8 @@ final class SiteClosing
     }
 
     /**
-     * Сохранённые значения страницы «Закрытие сайта»; при сбое чтения — пусто (сайт открыт), сбой попадает в журнал.
+     * Сохранённые значения страницы «Закрытие сайта»; при сбое чтения — пусто (сайт открыт), сбой попадает в журнал
+     * один раз за запрос: проверка читает настройки несколько раз, и без этого журнал заполнялся бы одной и той же ошибкой.
      *
      * @return array<string, mixed>
      */
@@ -80,9 +84,24 @@ final class SiteClosing
         try {
             return resolve(SettingsStore::class)->values('closing');
         } catch (Throwable $exception) {
-            report($exception);
+            self::reportOncePerRequest($exception);
 
             return [];
         }
+    }
+
+    /**
+     * Записать сбой чтения в журнал, если в этом запросе он ещё не записан.
+     */
+    private static function reportOncePerRequest(Throwable $exception): void
+    {
+        $attributes = request()->attributes;
+
+        if ($attributes->has(self::REPORTED)) {
+            return;
+        }
+
+        $attributes->set(self::REPORTED, true);
+        report($exception);
     }
 }

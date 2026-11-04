@@ -17,6 +17,10 @@ it('keeps only the tags messengers understand and escapes the rest', function (s
     'nested quote is flattened' => ["> раз\n> > два", "<blockquote>раз\n\nдва</blockquote>"],
     'code block' => ["```\n<b>\n```", '<pre>&lt;b&gt;</pre>'],
     'image becomes its caption' => ['![кот](https://x.ru/cat.png)', 'кот'],
+    'literal entity text stays text' => ['&amp;copy; и `&amp;lt;`', '&amp;copy; и <code>&amp;amp;lt;</code>'],
+    'literal entity in a code block' => ["```\n&amp;copy;\n```", '<pre>&amp;amp;copy;</pre>'],
+    'literal entity in a link address' => ['[сайт](https://site.ru/a?x=&amp;lt;)', '<a href="https://site.ru/a?x=&amp;lt;">сайт</a>'],
+    'literal entity in an image caption' => ['![&amp;copy;](https://x.ru/cat.png)', '&amp;copy;'],
     'table becomes text' => ["| a | b |\n|---|---|\n| 1 | 2 |", "a | b\n1 | 2"],
 ]);
 

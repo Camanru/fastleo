@@ -60,21 +60,21 @@ final class MessageHtml
     private static function node(DOMText|DOMElement $node, bool $quoted): string
     {
         if ($node instanceof DOMText) {
-            return e($node->wholeText, false);
+            return e($node->wholeText);
         }
 
         $tag = strtolower($node->tagName);
 
         return match (true) {
             isset(self::INLINE[$tag]) && ($tag !== 'code' || $node->parentNode?->nodeName !== 'pre') => '<'.self::INLINE[$tag].'>'.self::children($node, $quoted).'</'.self::INLINE[$tag].'>',
-            $tag === 'pre' => '<pre>'.e(rtrim($node->textContent), false).'</pre>'."\n\n",
+            $tag === 'pre' => '<pre>'.e(rtrim($node->textContent)).'</pre>'."\n\n",
             $tag === 'a' => self::link($node, $quoted),
             $tag === 'blockquote' => $quoted ? self::children($node, true) : '<blockquote>'.trim(self::children($node, true)).'</blockquote>'."\n\n",
             $tag === 'p' => self::children($node, $quoted)."\n\n",
             $tag === 'br' => "\n",
             in_array($tag, ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'], true) => '<b>'.self::children($node, $quoted).'</b>'."\n\n",
             $tag === 'ul', $tag === 'ol' => self::listItems($node, $tag === 'ol', $quoted)."\n",
-            $tag === 'img' => e($node->getAttribute('alt'), false),
+            $tag === 'img' => e($node->getAttribute('alt')),
             $tag === 'hr' => "\n",
             in_array($tag, ['table', 'thead', 'tbody'], true) => self::elements($node, $quoted),
             $tag === 'tr' => trim(self::cells($node, $quoted))."\n",
@@ -104,7 +104,7 @@ final class MessageHtml
         $href = $node->getAttribute('href');
         $text = self::children($node, $quoted);
 
-        return preg_match('#^https?://#i', $href) === 1 ? '<a href="'.e($href, false).'">'.$text.'</a>' : $text;
+        return preg_match('#^https?://#i', $href) === 1 ? '<a href="'.e($href).'">'.$text.'</a>' : $text;
     }
 
     /**

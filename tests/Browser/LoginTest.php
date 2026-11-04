@@ -89,6 +89,29 @@ it('shows the one-time code in six cells and switches to a backup code', functio
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps the code that a password manager put into the field before the script started', function (): void {
+    withTwoFactor(User::query()->where('email', 'admin@example.com')->firstOrFail());
+
+    $page = visit(route('fastleo.login'));
+
+    $page->fill('email', 'admin@example.com')
+        ->fill('password', 'password')
+        ->pressAndWaitFor('Войти')
+        // Как страница, в поле которой код уже подставлен до запуска Alpine: компонент собирается заново поверх готового поля.
+        ->script(<<<'JS'
+            const form = document.querySelector('form').cloneNode(true);
+            form.querySelector('#two-factor-code').setAttribute('value', '12ab34');
+            form.querySelector('#two-factor-code').value = '12ab34';
+            form.querySelectorAll('[data-code-cell]').forEach((cell) => cell.remove());
+            form.id = 'prefilled';
+            form.hidden = true;
+            document.body.append(form);
+            window.Alpine.initTree(form);
+            JS);
+    $page->assertScript("document.querySelector('#prefilled #two-factor-code').value === '1234'")
+        ->assertNoJavaScriptErrors();
+});
+
 it('shows the profile with devices and the two-factor setup', function (): void {
     $page = signInAndVisit(route('fastleo.profile.show'));
 

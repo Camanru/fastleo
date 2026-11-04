@@ -16,6 +16,7 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Schema;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Throwable;
 
@@ -194,7 +195,7 @@ final class InstallCommand extends Command
 
         $needsMigrate = $modules !== [] || Doctor::packageMigrationsPending();
 
-        if ($needsMigrate && ($setup || ($interactive && confirm(__('fastleo::console.install_migrate'), default: true)))) {
+        if ($needsMigrate && ($setup || ($interactive && confirm(__('fastleo::console.install_migrate'), default: ! app()->isProduction())))) {
             try {
                 $done['migrated'] = $this->call('migrate', ['--force' => true]) === self::SUCCESS;
             } catch (Throwable $e) {
@@ -270,6 +271,23 @@ final class InstallCommand extends Command
     }
 
     /**
+     * В таблице пользователей уже есть администратор (`fastleo_admin`): спрашивать про нового незачем. Своя
+     * `canAccessFastleo()` без этой колонки здесь не видна — тогда вопрос задаётся как обычно.
+     */
+    private function adminExists(): bool
+    {
+        $model = UserModel::className();
+
+        if ($model === null || ! is_a($model, Model::class, true)) {
+            return false;
+        }
+
+        $user = new $model;
+
+        return Schema::hasColumn($user->getTable(), 'fastleo_admin') && $user->newQuery()->where('fastleo_admin', true)->exists();
+    }
+
+    /**
      * Создать администратора: из флагов или по вопросу (email, имя и пароль спрашивает `fastleo:user`).
      */
     private function createAdmin(bool $interactive, ?ChildArtisan $child): bool
@@ -289,6 +307,10 @@ final class InstallCommand extends Command
         if ($interactive && $child instanceof ChildArtisan && ! $child->canAsk()) {
             $this->components->warn(__('fastleo::console.install_admin_no_terminal'));
 
+            return false;
+        }
+
+        if ($this->adminExists()) {
             return false;
         }
 

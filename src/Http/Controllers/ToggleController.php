@@ -59,10 +59,11 @@ final class ToggleController
             $data[$controlling] = $resource->controllingValue($controlling, $record, null);
         }
 
+        $rules = RecordWriter::rules($resource, $record, [$field]);
         $validator = validator(
             $data,
-            RecordWriter::rules($resource, $record, [$field]),
-            ValidationMessages::all(),
+            $rules,
+            ValidationMessages::all($rules),
             $resource->validationAttributes($record),
         );
 

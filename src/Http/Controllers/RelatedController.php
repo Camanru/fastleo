@@ -142,10 +142,11 @@ final class RelatedController
         $sent = $request->input('data');
         $given = array_intersect_key(is_array($sent) ? $sent : [], array_flip($asked));
         $input = RecordWriter::withDefaults($fields, [...$given, $related->foreignKey() => $related->foreignValue($record)]);
+        $rules = RecordWriter::rules($child, null, $fields);
         $validator = validator(
             RecordWriter::controllingInput($child, null, $input),
-            RecordWriter::rules($child, null, $fields),
-            ValidationMessages::all(),
+            $rules,
+            ValidationMessages::all($rules),
             $child->validationAttributes(null),
         );
 

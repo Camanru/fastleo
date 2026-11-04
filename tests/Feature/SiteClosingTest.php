@@ -6,6 +6,7 @@ use Fastleo\Closing\SiteClosing;
 use Fastleo\Fastleo;
 use Fastleo\Support\SettingsStore;
 use Illuminate\Contracts\Http\Kernel;
+use Illuminate\Http\Request;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Exceptions;
@@ -98,6 +99,21 @@ it('stays open when the settings cannot be read for any reason, and reports it',
 
     $this->get('/closing-page')->assertOk()->assertSee('открытый сайт');
     Exceptions::assertReported(LogicException::class);
+});
+
+it('reports an unreadable setting once per request, not at every read', function (): void {
+    enableClosing(closed: false);
+    Exceptions::fake();
+    app()->bind(SettingsStore::class, fn (): never => throw new LogicException('таблицы ещё нет'));
+
+    expect(SiteClosing::closed())->toBeFalse()
+        ->and(SiteClosing::closed())->toBeFalse()
+        ->and(SiteClosing::message())->toContain('Сайт временно не работает');
+    Exceptions::assertReportedCount(1);
+
+    app()->instance('request', Request::create('/next'));
+    SiteClosing::closed();
+    Exceptions::assertReportedCount(2);
 });
 
 it('keeps the site open for a signed-in administrator and tells the templates', function (): void {

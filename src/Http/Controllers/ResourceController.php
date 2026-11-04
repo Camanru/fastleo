@@ -178,11 +178,23 @@ final class ResourceController
         abort_unless($this->isTrashed($record), 404);
         Authorization::authorize('restore', $resource, $record);
 
-        $this->restoreRecord($record);
-        RecordWriter::moveToEnd($resource, $record);
+        $trash = to_route('fastleo.resources.index', ['resource' => $resource::slug(), 'trashed' => 1]);
 
-        return to_route('fastleo.resources.index', ['resource' => $resource::slug(), 'trashed' => 1])
-            ->with('fastleo.success', __('fastleo::resources.restored'));
+        try {
+            DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
+                if (! $this->restoreRecord($record)) {
+                    throw new OperationCancelled;
+                }
+
+                RecordWriter::moveToEnd($resource, $record);
+            });
+        } catch (QueryException $exception) {
+            return $trash->with('fastleo.error', DatabaseErrors::explain($exception));
+        } catch (OperationCancelled) {
+            return $trash->with('fastleo.error', __('fastleo::resources.restore_cancelled'));
+        }
+
+        return $trash->with('fastleo.success', __('fastleo::resources.restored'));
     }
 
     /**
@@ -260,10 +272,11 @@ final class ResourceController
 
         $fields = $resource->writableFields($existing);
         $input = $existing instanceof Model ? $request->all() : RecordWriter::withDefaults($fields, $request->all());
+        $rules = RecordWriter::rules($resource, $existing, $fields);
         $validator = validator(
             RecordWriter::controllingInput($resource, $existing, $input),
-            RecordWriter::rules($resource, $existing, $fields),
-            ValidationMessages::all(),
+            $rules,
+            ValidationMessages::all($rules),
             $resource->validationAttributes($existing),
         );
 
@@ -426,13 +439,11 @@ final class ResourceController
     }
 
     /**
-     * Вернуть запись из корзины.
+     * Вернуть запись из корзины; false — обработчик модели (`restoring`) отменил восстановление.
      */
-    private function restoreRecord(Model $record): void
+    private function restoreRecord(Model $record): bool
     {
-        if (method_exists($record, 'restore')) {
-            $record->restore();
-        }
+        return ! method_exists($record, 'restore') || (bool) $record->restore();
     }
 
     /**

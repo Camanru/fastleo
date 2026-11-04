@@ -9,6 +9,7 @@ use Closure;
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Nested;
+use Fastleo\Fields\Slug;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -164,7 +165,8 @@ final class RecordWriter
 
     /**
      * Ввод формы, в котором управляющие поля (`visibleWhen`, `dependsOn`), недоступные админу
-     * для изменения, заменены сохранённым значением (при создании — значением по умолчанию).
+     * для изменения, заменены сохранённым значением (при создании — значением по умолчанию). Так же поступает
+     * источник адреса `Slug::from()`: недоступный для записи, он берётся из записи (при создании — пусто).
      *
      * @param  array<array-key, mixed>  $input
      * @return array<array-key, mixed>
@@ -180,6 +182,13 @@ final class RecordWriter
                 }
 
                 $input[$controlling] = $resource->controllingValue($controlling, $existing, null);
+            }
+
+            // Источник адреса, который нельзя записать, остаётся таким, как в записи: `Slug::beforeSave()` берёт его оттуда же.
+            $source = $field instanceof Slug ? $field->getFrom() : null;
+
+            if ($source !== null && ! in_array($source, $writable, true)) {
+                $input[$source] = $existing instanceof Model ? $field->sourceOf($existing) : null;
             }
         }
 

@@ -85,7 +85,7 @@ final class ResourceInspector
                 'mcp' => $resource->isAvailableInMcp(),
                 'poll' => $resource::poll(),
                 'fields' => $this->fields($resource->schema()->fields()),
-                'filters' => array_values(array_map($this->filter(...), $resource->listFilters())),
+                'filters' => array_values(array_map($this->filter(...), $resource->allFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
                 'relations' => array_values(array_map($this->related(...), $resource->listRelations())),
             ];

@@ -71,7 +71,8 @@ final class RecordSaver
         }
 
         $input = RecordWriter::controllingInput($resource, $existing, $data);
-        $validator = validator($input, RecordWriter::rules($resource, $existing, $fields), ValidationMessages::all(), RecordWriter::attributes($fields));
+        $rules = RecordWriter::rules($resource, $existing, $fields);
+        $validator = validator($input, $rules, ValidationMessages::all($rules), RecordWriter::attributes($fields));
 
         if ($validator->fails()) {
             throw new ToolFailed(__('fastleo::mcp.validation', ['errors' => json_encode($validator->errors()->toArray(), JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)]));

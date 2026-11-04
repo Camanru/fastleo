@@ -158,11 +158,12 @@ final class ModelDefaults
     }
 
     /**
-     * Значение из текста DEFAULT (`'abc'`, `1`, `true`, `'x'::character varying`); выражение — null.
+     * Значение из текста DEFAULT (`'abc'`, `1`, `true`, `'x'::character varying`, у MySQL 8 строка без кавычек); выражение
+     * (`CURRENT_TIMESTAMP`, `uuid()`, `(datetime('now'))`, `-(1)`, `_utf8mb4\'x\'`, `ARRAY[]`, `b'0'`) — null.
      */
     public static function literal(string $default): ?string
     {
-        $value = trim((string) preg_replace('/::[A-Za-z_ ]+(\([0-9, ]+\))?(\[\])?$/', '', trim($default)));
+        $value = trim((string) preg_replace('/::[A-Za-z_0-9". ]+(\([0-9, ]+\))?(\[\])?$/', '', trim($default)));
 
         if (str_starts_with($value, '0000-00-00')) {
             return null; // нулевая дата старого MySQL — не значение
@@ -182,8 +183,12 @@ final class ModelDefaults
             return $value;
         }
 
-        $isWord = preg_match('/^[\p{L}\p{N} _.:-]+$/u', $value) === 1;
+        $isExpression = in_array(strtoupper($value), self::EXPRESSIONS, true)
+            || preg_match('/^[-+]?\(.*\)$/s', $value) === 1
+            || preg_match('/^[A-Za-z_][A-Za-z_0-9.]*\(.*\)$/s', $value) === 1
+            || preg_match('/^(ARRAY\[|_[A-Za-z0-9]+\\\\?\'|[bBxX]\')/', $value) === 1;
 
-        return $isWord && ! in_array(strtoupper($value), self::EXPRESSIONS, true) ? $value : null;
+        // MySQL 8 отдаёт строковый DEFAULT без кавычек (`#ffffff`, `a,b`, `x/y`): всё, что не выражение, — значение.
+        return $isExpression || $value === '' ? null : $value;
     }
 }

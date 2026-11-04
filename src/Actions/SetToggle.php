@@ -118,7 +118,8 @@ final class SetToggle extends Action
                 $input[$controlling] = $resource->controllingValue($controlling, $record, null);
             }
 
-            $validator = validator($input, RecordWriter::rules($resource, $record, [$field]), ValidationMessages::all(), $resource->validationAttributes($record));
+            $rules = RecordWriter::rules($resource, $record, [$field]);
+            $validator = validator($input, $rules, ValidationMessages::all($rules), $resource->validationAttributes($record));
 
             if ($validator->fails()) {
                 $rejected++;
