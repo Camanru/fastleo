@@ -144,7 +144,10 @@ final class ResourceQuery
         $perPage = $this->all ? max(1, config()->integer('fastleo.list.max_all', 1000)) : ($this->size ?? $perPage ?? $this->resource::perPage());
 
         if (! $this->isTree()) {
-            return $this->query()->paginate($perPage)->withQueryString();
+            $page = $this->query()->paginate($perPage)->withQueryString();
+            $this->prepare($page->items());
+
+            return $page;
         }
 
         // Дерево: страница — `$perPage` записей одного уровня (корней дерева или ветки) со всеми вложенными,
@@ -159,10 +162,24 @@ final class ResourceQuery
             ->sortBy(fn (Model $record): int => $position[$this->key($record)] ?? 0)
             ->values();
 
+        $this->prepare($records);
+
         return new LengthAwarePaginator($records, count($roots), $perPage, $page, [
             'path' => Paginator::resolveCurrentPath(),
             'pageName' => 'page',
         ])->withQueryString();
+    }
+
+    /**
+     * Поля списка готовятся к показу записей страницы (одна выборка на связь, а не запрос на строку).
+     *
+     * @param  iterable<Model>  $records
+     */
+    private function prepare(iterable $records): void
+    {
+        foreach ($this->resource->listFields() as $field) {
+            $field->prepareFor($records);
+        }
     }
 
     /**

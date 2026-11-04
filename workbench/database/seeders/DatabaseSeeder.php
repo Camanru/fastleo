@@ -14,6 +14,7 @@ use Workbench\App\Models\Feedback;
 use Workbench\App\Models\Page;
 use Workbench\App\Models\Product;
 use Workbench\App\Models\ProductReview;
+use Workbench\App\Models\Remark;
 use Workbench\App\Models\Supplier;
 use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
@@ -49,6 +50,9 @@ final class DatabaseSeeder extends Seeder
         $suppliers = Supplier::factory()->count(6)->create();
         $products = Product::factory()->count(30)->create(['category_id' => fn () => $categories->random()->id, 'supplier_id' => fn () => $suppliers->random()->id]);
         $products->each(fn (Product $product) => ProductReview::factory()->count(random_int(0, 4))->create(['product_id' => $product->id]));
+        Remark::factory()->count(3)->create();
+        Remark::factory()->create(['subject_type' => Product::class, 'subject_id' => $products->first()?->id]);
+        $products->take(3)->each(fn (Product $product) => $products->where('id', '!=', $product->id)->random(2)->values()->each(fn (Product $item, int $index) => $product->bundleItems()->create(['item_id' => $item->id, 'qty' => $index + 1, 'sort' => $index + 1])));
 
         $topics = Topic::factory()->count(15)->sequence(fn (Sequence $sequence): array => ['sort' => $sequence->index + 1])->create();
         Article::query()->each(fn (Article $article) => $article->topics()->attach($topics->random(2)->pluck('id')));

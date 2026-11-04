@@ -10,6 +10,7 @@ use Workbench\App\Fastleo\ContactsSettings;
 use Workbench\App\Fastleo\ReportPage;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\Product;
 use Workbench\App\Policies\ArticlePolicy;
 
 /**
@@ -40,21 +41,30 @@ it('describes a resource: model, policy, fields, filters and actions', function 
         ->and(array_column($articles['actions'], 'key'))->toContain('delete', 'publish-articles');
 });
 
+it('lists the sections of a MorphTo field', function (): void {
+    $subject = collect(inspected('remarks')['fields'])->keyBy('name')['subject'];
+
+    expect($subject)->toMatchArray(['type' => 'morph-to', 'writes_attribute' => false, 'types' => ['articles' => 'Статья', 'products' => 'Товар']]);
+});
+
+it('says why the sections of a MorphTo field cannot be listed', function (): void {
+    useFixtureResources('MorphLost');
+
+    expect(collect(inspected('remarks')['fields'])->keyBy('name')['subject']['types'])->toBeNull();
+});
+
+it('describes the chosen record of a block field with its relation', function (): void {
+    $bundle = collect(inspected('products')['fields'])->keyBy('name')['bundleItems'];
+    $item = collect($bundle['fields'])->keyBy('name')['item_id'];
+
+    expect($item)->toMatchArray(['type' => 'belongs-to', 'relation' => 'item', 'related_model' => Product::class]);
+});
+
 it('describes how the section sits in the menu: group, icon, position, a visible item and a counter', function (): void {
     $articles = inspected('articles');
 
     expect($articles)->toMatchArray(['group' => 'Контент', 'icon' => 'newspaper', 'position' => 10, 'in_menu' => true, 'has_badge' => false])
         ->and(inspected('feedback')['has_badge'])->toBeTrue();
-});
-
-it('says there is no history panel while the activity log is switched off', function (): void {
-    useFixtureResources('Aside');
-
-    expect(inspected('categories')['history_panel'])->toBeTrue();
-
-    config(['fastleo.activity.enabled' => false]);
-
-    expect(inspected('categories')['history_panel'])->toBeFalse();
 });
 
 it('describes fields: rules, relation, files and enum options', function (): void {

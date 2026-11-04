@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
 use Fastleo\Mcp\RecordData;
@@ -33,6 +31,8 @@ use Laravel\Mcp\Server\Testing\PendingTestResponse;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Page;
+use Workbench\App\Models\Product;
+use Workbench\App\Models\Remark;
 use Workbench\App\Models\User;
 
 /**
@@ -351,18 +351,12 @@ it('refuses every tool when no admin is signed in', function (): void {
     expect(Article::query()->count())->toBe(0);
 });
 
-it('writes changes made through MCP to the activity log under the admin', function (): void {
-    $admin = admin(['name' => 'Мария']);
-    resolve(ActivityRecorder::class)->start();
+it('creates records through MCP with Eloquent, so the observers of the model run', function (): void {
+    $created = modelEvents(Article::class, 'created');
 
-    mcp($admin)->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'Logged', 'status' => 'draft']])->assertHasNoErrors();
+    mcp(admin())->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'Logged', 'status' => 'draft']])->assertHasNoErrors();
 
-    $entry = Activity::query()->latest('id')->firstOrFail();
-
-    expect($entry->event)->toBe('created')
-        ->and((int) $entry->user_id)->toBe($admin->id);
-
-    resolve(ActivityRecorder::class)->stop();
+    expect($created)->toHaveCount(1);
 });
 
 it('gives out only the block fields of nested records, not their service columns', function (): void {
@@ -374,6 +368,61 @@ it('gives out only the block fields of nested records, not their service columns
         ->assertHasNoErrors()
         ->assertSee(['"links":[{"id":', '"title":"Docs"', '"banner":{"id":', '"title":"Promo"'])
         ->assertDontSee(['created_at', 'updated_at', 'article_id']);
+});
+
+it('gives out and takes the chosen records of the blocks', function (): void {
+    $item = Product::factory()->create();
+    $kit = Product::factory()->create();
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'products', 'id' => (string) $kit->id, 'values' => ['bundleItems' => [['item_id' => $item->id, 'qty' => 2]]]])
+        ->assertHasNoErrors();
+
+    expect($kit->bundleItems()->get()->map(fn ($row): array => [$row->item_id, $row->qty])->all())->toBe([[$item->id, 2]]);
+
+    mcp()->tool(GetRecord::class, ['resource' => 'products', 'id' => (string) $kit->id])
+        ->assertSee(['"bundleItems":[{"id":', '"item_id":"'.$item->id.'"']);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'products', 'id' => (string) $kit->id, 'values' => ['bundleItems' => [['id' => $kit->bundleItems()->value('id'), 'item_id' => 99999, 'qty' => 2]]]])
+        ->assertHasErrors();
+});
+
+it('gives out and takes the object of a record as a section and a key', function (): void {
+    $article = Article::factory()->create();
+    $product = Product::factory()->create(['is_visible' => true]);
+    $remark = Remark::query()->forceCreate(['body' => 'Заметка', 'subject_type' => Article::class, 'subject_id' => $article->id]);
+
+    mcp()->tool(GetRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id])
+        ->assertHasNoErrors()
+        ->assertSee('"subject":{"type":"articles","id":"'.$article->id.'"}');
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id, 'values' => ['subject' => ['type' => 'products', 'id' => $product->id]]])
+        ->assertHasNoErrors();
+
+    expect([$remark->fresh()?->subject_type, $remark->fresh()?->subject_id])->toBe([Product::class, $product->id]);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id, 'values' => ['subject' => ['type' => Product::class, 'id' => $product->id]]])
+        ->assertHasErrors();
+});
+
+it('shows the class of an object of an unknown type and changes the other fields without touching it', function (): void {
+    $remark = Remark::query()->forceCreate(['body' => 'Заметка', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 7]);
+
+    mcp()->tool(GetRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id])
+        ->assertSee(['"type":null', '"morph_class":"App\\\\Models\\\\Gone"']);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id, 'values' => ['body' => 'Новая']])->assertHasNoErrors();
+
+    expect([$remark->fresh()?->body, $remark->fresh()?->subject_type, $remark->fresh()?->subject_id])->toBe(['Новая', 'App\\Models\\Gone', 7]);
+});
+
+it('takes back the value of an unknown type exactly as it was given and refuses a made up one', function (): void {
+    $remark = Remark::query()->forceCreate(['body' => 'Заметка', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 7]);
+    $echo = ['type' => null, 'id' => '7', 'morph_class' => 'App\\Models\\Gone'];
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id, 'values' => ['body' => 'Эхо', 'subject' => $echo]])->assertHasNoErrors();
+    mcp()->tool(UpdateRecord::class, ['resource' => 'remarks', 'id' => (string) $remark->id, 'values' => ['subject' => [...$echo, 'id' => '8']]])->assertHasErrors();
+
+    expect([$remark->fresh()?->body, $remark->fresh()?->subject_type, $remark->fresh()?->subject_id])->toBe(['Эхо', 'App\\Models\\Gone', 7]);
 });
 
 it('keeps the other languages when one translation is updated', function (): void {

@@ -7,12 +7,12 @@ An admin panel for Laravel sites. Each admin section is described by a single re
 What's included:
 
 - **Sections**: a list with search, filters, sorting and pagination; a form with tabs and columns; a detail view, trash, manual ordering and trees; per-record and bulk actions; Excel/CSV export and import.
-- **35 field types and custom fields**: text, numbers, dates, choices, relations (BelongsTo, BelongsToMany, HasMany, HasOne), images with WebP variants, files, gallery, rich text editor, Markdown, JSON fields (Repeater, KeyValue, the Blocks page builder), SEO, translatable fields.
-- **Admin environment**: a dashboard with widgets, site settings, custom pages, an activity log with rollback, an error log, notifications with Telegram and Max bots, publishing to Telegram and Max channels, Ctrl+K search, sitemap and robots.txt, closing the site for visitors, a file manager, and an optional connection to the SoftNetica site maintenance service.
+- **37 field types and custom fields**: text, numbers, dates, choices, relations (BelongsTo, BelongsToMany, HasMany, HasOne), images with WebP variants, files, gallery, rich text editor, Markdown, JSON fields (Repeater, KeyValue, the Blocks page builder), SEO, translatable fields.
+- **Admin environment**: a dashboard with widgets, site settings, custom pages, an error log, notifications with Telegram and Max bots, publishing to Telegram and Max channels, Ctrl+K search, sitemap and robots.txt, closing the site for visitors, a file manager, and an optional connection to the SoftNetica site maintenance service.
 - **Security**: a separate login with rate limits, two-factor authentication, permissions via model Policies, only declared fields are written, upload protection ([details](docs/security.md)).
 - **Claude**: a skill and Laravel Boost guidelines, the `fastleo:doctor` and `fastleo:inspect` commands, an MCP server — you can ask for a section in a single sentence ([details](docs/claude.md)).
 
-Dark mode and mobile layout work out of the box. The activity log, the notification bots and publishing are off by default — [how to switch them on](docs/configuration.md).
+Dark mode and mobile layout work out of the box. The notification bots and publishing are off by default — [how to switch them on](docs/configuration.md).
 
 Coming from 2.x or 3.0? 4.0 is a new admin panel, not an upgrade of the old one — sections are described again as classes and data formats change; see the [migration guide](docs/upgrade-from-3.md). Moving from another admin panel (MoonShine, a hand-made one)? See [moving to fastleo](docs/migrating.md). What's new — [CHANGELOG](CHANGELOG.md).
 
@@ -119,7 +119,6 @@ Reading order with short descriptions (in Russian): [docs/README.md](docs/README
 - [Translatable fields](docs/translations.md)
 - [Authorization](docs/authorization.md)
 - [Login, profile, password reset](docs/auth.md)
-- [Activity log](docs/activity.md)
 - [Site settings](docs/settings.md)
 - [Closing the site for visitors](docs/site-closing.md)
 - [Custom pages and the error log](docs/pages.md)

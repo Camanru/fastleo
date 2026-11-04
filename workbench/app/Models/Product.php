@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Workbench\Database\Factories\ProductFactory;
 
 /**
@@ -63,6 +64,26 @@ final class Product extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /**
+     * Товар-спутник: первая строка состава (одиночный блок в форме).
+     *
+     * @return HasOne<ProductBundleItem, $this>
+     */
+    public function companion(): HasOne
+    {
+        return $this->hasOne(ProductBundleItem::class)->orderBy('sort');
+    }
+
+    /**
+     * Состав комплекта: товары и их количество (блоки в форме).
+     *
+     * @return HasMany<ProductBundleItem, $this>
+     */
+    public function bundleItems(): HasMany
+    {
+        return $this->hasMany(ProductBundleItem::class)->orderBy('sort');
     }
 
     /**

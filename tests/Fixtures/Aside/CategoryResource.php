@@ -11,15 +11,13 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Рубрики: справа от формы — панель истории и статьи рубрики, подрубрики — под формой.
+ * Рубрики: справа от формы — статьи рубрики, подрубрики — под формой.
  */
 final class CategoryResource extends Resource
 {
     protected static string $model = Category::class;
 
     protected static ?string $slug = 'categories';
-
-    protected static bool $historyPanel = true;
 
     /**
      * Название и родитель.

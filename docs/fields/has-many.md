@@ -19,7 +19,7 @@ HasMany::make('prices', 'Цены')
     ->max(50);
 ```
 
-Каждая запись — блок формы. В блоке нет `BelongsTo` и `dependsOn()`: если у записи нужен выбор из другого раздела (позиция заказа: товар и его вариант), делайте её отдельным разделом и показывайте [`Related` во вкладке](../recipes.md#позиции-заказа-и-строки-документа). Правило `unique` в блоке не знает `id` соседней вложенной записи — для уникальности внутри блоков ставьте уникальный индекс в базе. Блоки можно добавлять и удалять, а с `orderColumn()` — ещё и перетаскивать. Имя поля — **метод связи** `HasMany` модели.
+Каждая запись — блок формы. Выбрать запись другого раздела можно полем `BelongsTo` ([ниже](#выбор-записи-в-блоке)); зависимый список (`dependsOn()`) в блоке не работает — если нужен и он (позиция заказа: товар и его вариант), делайте запись отдельным разделом и показывайте [`Related` во вкладке](../recipes.md#позиции-заказа-и-строки-документа). Правило `unique` в блоке не знает `id` соседней вложенной записи — для уникальности внутри блоков ставьте уникальный индекс в базе. Блоки можно добавлять и удалять, а с `orderColumn()` — ещё и перетаскивать. Имя поля — **метод связи** `HasMany` модели.
 
 **Колонка:** своей колонки нет — записи блоков лежат в своей таблице с внешним ключом на родителя:
 
@@ -73,12 +73,14 @@ class Price extends Model {}
 **Внутри блока** работают:
 
 - простые поля: текст, числа, даты, списки, галочки, Tags, Markdown, Code, Color, KeyValue;
+- выбор записи другого раздела: BelongsTo;
 - файлы: Image, File, Gallery;
 - RichText.
 
 **Внутри блока нельзя** (ошибка описания):
 
-- связи: BelongsTo, BelongsToMany;
+- поле с именем внешнего ключа связи (`product_id` у `bundleItems()`): родитель ставит его сам;
+- связь BelongsToMany (BelongsTo можно, но без `dependsOn()`);
 - вложенные блоки: HasMany, HasOne, Repeater, Blocks;
 - Slug, Password, многоязычные поля (`translatable()`);
 - `hideOnCreate()`, `hideOnEdit()` и `hidden(fn ...)` — правила общие для всех блоков. Скрыть поле блока для части админов можно логическим значением: `->hidden(! auth()->user()->isAdmin())`.
@@ -87,6 +89,63 @@ class Price extends Model {}
 
 - подполя с `visibleWhen()` должны зависеть от поля того же блока, которое доступно всем администраторам (без `readonly()`, `disabled()`, `hidden()`);
 - свои правила, ссылающиеся на соседнее поле (`required_if`), пишите с полным путём: `required_if:prices.*.type,video`.
+
+## Выбор записи в блоке
+
+`BelongsTo` в блоке — товар в составе комплекта, услуга в записи на приём, автор в списке участников. Так же описываются **колонки связи «многие ко многим»** (количество, «главная», порядок): промежуточная таблица получает свой `id` и модель, а родитель — `HasMany` на неё. Поле `BelongsToMany` таких колонок не редактирует.
+
+```bash
+php artisan make:model ProductBundleItem -m    # модель строки комплекта и миграция
+```
+
+```php
+// database/migrations/…_create_product_bundle_items_table.php
+Schema::create('product_bundle_items', function (Blueprint $table) {
+    $table->id();
+    $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('item_id')->nullable()->constrained('products')->nullOnDelete();
+    $table->unsignedInteger('qty')->default(1);
+    $table->unsignedInteger('sort')->default(0);
+    $table->timestamps();
+});
+
+// app/Models/ProductBundleItem.php
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+#[Fillable(['item_id', 'qty'])]
+class ProductBundleItem extends Model
+{
+    public function item(): BelongsTo
+    {
+        return $this->belongsTo(Product::class, 'item_id');
+    }
+}
+
+// app/Models/Product.php
+public function bundleItems(): HasMany
+{
+    return $this->hasMany(ProductBundleItem::class)->orderBy('sort');
+}
+
+// app/Fastleo/ProductResource.php — в fields(); здесь BelongsTo — поле fastleo, а не связь Eloquent
+use Fastleo\Fields\BelongsTo;
+
+HasMany::make('bundleItems', 'Состав комплекта')
+    ->orderColumn('sort')
+    ->max(20)
+    ->fields([
+        BelongsTo::make('item_id', 'Товар')->required(),
+        Number::make('qty', 'Количество')->integer()->min(1)->default(1),
+    ]);
+```
+
+- Метод связи (`item()`) — в модели блока; имя поля — колонка внешнего ключа (`item_id`), как у обычного [BelongsTo](belongs-to.md). Сузить выбор — `->query(fn ($query) => ...)`, название — `titleColumn()`.
+- Варианты в блоке всегда ищутся по серверу (поиск по названию), список не повторяется в каждом блоке. Подписи выбранных записей всех блоков загружаются одним запросом.
+- Запись, которая уже стоит в блоке, но вышла из вариантов (в корзине, скрыта `query()`), остаётся выбранной и не мешает сохранить форму; выбрать такую запись заново в форме нельзя.
+- Выбранная запись проверяется так же, как в обычной форме: запись вне `query()` и несуществующая отклоняются; записи всех блоков проверяются одним запросом.
+- Один и тот же товар в двух блоках по умолчанию допустим (две строки заказа с одним товаром). Если нужен только один раз, добавьте полю правило `->rules(['distinct'])`; с уникальным индексом базы `unique(product_id, item_id)` форма тоже сохранится: убранные блоки удаляются до записи остальных.
+- Поле нельзя сделать зависимым (`dependsOn()`), а в `Repeater` и `Blocks` (JSON) выбор записи не работает: нужны блоки `HasMany`/`HasOne`.
 
 **Права:** блоки меняются в рамках права `update` родителя ([authorization.md](../authorization.md#связи-и-вложенные-записи)).
 

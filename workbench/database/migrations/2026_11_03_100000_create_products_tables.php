@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Поставщики, товары и отзывы о них: правка в ячейке, быстрый переключатель, цвет строки, вычисляемый столбец, связанные таблицы.
+     * Поставщики, товары, отзывы о них и состав комплекта (выбор товара в блоке): правка в ячейке, быстрый переключатель, цвет строки, вычисляемый столбец, связанные таблицы.
      */
     public function up(): void
     {
@@ -47,6 +47,15 @@ return new class extends Migration
             $table->boolean('is_approved')->default(false);
             $table->timestamps();
         });
+
+        Schema::create('product_bundle_items', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('item_id')->nullable()->constrained('products')->nullOnDelete();
+            $table->unsignedInteger('qty')->default(1);
+            $table->unsignedInteger('sort')->default(0);
+            $table->timestamps();
+        });
     }
 
     /**
@@ -54,6 +63,7 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::dropIfExists('product_bundle_items');
         Schema::dropIfExists('product_reviews');
         Schema::dropIfExists('products');
         Schema::dropIfExists('suppliers');

@@ -21,6 +21,25 @@
     }
 
     $sortable = ! $field->isSingle() && $writable && $field->getOrderColumn() !== null;
+
+    // Подписи выбранных записей (BelongsTo в блоках) — одним запросом на поле.
+    $prefetch = [];
+
+    foreach ($field->schema()->fields() as $inner) {
+        if (! $inner instanceof \Fastleo\Fields\BelongsTo) {
+            continue;
+        }
+
+        foreach ($blocks as $block) {
+            $selected = old(($block['key'] === null ? $path : $path.'.'.$block['key']).'.'.$inner->name, $block['child']?->getAttribute($inner->name));
+
+            if (is_scalar($selected) && $selected !== '') {
+                $prefetch[$inner->name][] = (string) $selected;
+            }
+        }
+    }
+
+    $field->prefetchOptions(array_map(fn (array $keys): array => array_values(array_unique($keys)), $prefetch));
 @endphp
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     @if ($field->isSingle())

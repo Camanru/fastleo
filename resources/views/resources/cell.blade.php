@@ -11,7 +11,7 @@
     @php($shown = $field->shownRecord($record))
     @php($badges = $field instanceof \Fastleo\Fields\Select && $field->hasBadges() ? $field->badgeItems($shown) : [])
     @php($display = ($inList ?? false) ? $field->listDisplay($shown) : $field->display($shown))
-    @php($link = ($inList ?? false) && ($linked ?? true) && ! ($trashed ?? false) && $field instanceof \Fastleo\Fields\BelongsTo && ! $field->isInlineEditable() && $record instanceof \Illuminate\Database\Eloquent\Model && is_string($display) && $display !== '' ? $field->linkUrl($record) : null)
+    @php($link = ($inList ?? false) && ($linked ?? true) && ! ($trashed ?? false) && ($field instanceof \Fastleo\Fields\BelongsTo || $field instanceof \Fastleo\Fields\MorphTo) && ! $field->isInlineEditable() && $record instanceof \Illuminate\Database\Eloquent\Model && is_string($display) && $display !== '' ? $field->linkUrl($record) : null)
     @if ($badges !== [])
         <span class="inline-flex flex-wrap gap-1">
             @foreach ($badges as $badge)

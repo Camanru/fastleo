@@ -24,7 +24,7 @@ it('orders groups as configured and puts links without a group first', function 
 
     $groups = Menu::groups();
 
-    expect(array_column($groups, 'label'))->toBe([null, 'Сайт', 'Контент', 'Медиа', 'Система'])
+    expect(array_column($groups, 'label'))->toBe([null, 'Сайт', 'Контент', 'Медиа'])
         ->and($groups[0]['items'][0])->toMatchArray(['label' => 'Помощь', 'icon' => 'link'])
         ->and($groups[1]['items'][0])->toMatchArray(['label' => 'Открыть сайт', 'url' => '/', 'icon' => 'globe'])
         ->and($groups[2]['items'][0])->toMatchArray(['label' => 'Новости', 'url' => route('fastleo.resources.index', 'news')]);
@@ -36,14 +36,15 @@ it('puts groups missing from the config after the listed ones in alphabetical or
         ['label' => 'А', 'url' => '/b', 'group' => 'Арбузы'],
     ]]);
 
-    expect(array_column(Menu::groups(), 'label'))->toBe(['Арбузы', 'Контент', 'Медиа', 'Система', 'Яблоки']);
+    expect(array_column(Menu::groups(), 'label'))->toBe(['Арбузы', 'Контент', 'Медиа', 'Яблоки']);
 });
 
-it('puts files into the media group and the change log into the system group', function (): void {
+it('puts files into the media group and the error log into the system group', function (): void {
+    config(['fastleo.logs.enabled' => true]);
     $groups = collect(Menu::groups())->keyBy('label');
 
     expect(array_column($groups['Медиа']['items'], 'label'))->toBe(['Файлы'])
-        ->and(array_column($groups['Система']['items'], 'label'))->toContain('Журнал изменений');
+        ->and(array_column($groups['Система']['items'], 'label'))->toContain('Журнал ошибок');
 });
 
 it('orders items inside a group by position, then by label', function (): void {

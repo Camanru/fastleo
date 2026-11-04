@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Number;
@@ -64,19 +63,6 @@ describe('writing', function (): void {
 
         expect($this->busy->refresh()->title)->toBe('Новое имя')
             ->and(Category::query()->toBase()->where('id', $this->busy->id)->exists())->toBeTrue();
-    });
-
-    it('keeps the computed column out of the activity log and the snapshot of a deleted record', function (): void {
-        $this->put(route('fastleo.resources.update', ['categories', $this->busy->id]), ['title' => 'Новое имя'])->assertSessionHasNoErrors();
-        $update = Activity::query()->where('event', 'updated')->latest('id')->first();
-
-        $this->delete(route('fastleo.resources.destroy', ['categories', $this->quiet->id]));
-        $delete = Activity::query()->where('event', 'deleted')->latest('id')->first();
-
-        expect(array_keys($update->changes))->toBe(['title'])
-            ->and($delete->snapshot)->toHaveKey('title')
-            ->and($delete->snapshot)->not->toHaveKey('articles_count')
-            ->and($delete->snapshot)->not->toHaveKey('views_total');
     });
 });
 

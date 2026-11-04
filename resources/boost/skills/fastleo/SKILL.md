@@ -135,12 +135,14 @@ class DoctorsAdminTest extends TestCase
 | Новые заявки или сообщения: выделить непросмотренные, в меню — их число | `protected static ?string $readColumn = 'read_at';` + колонка `timestamp` nullable | [resources.md](vendor/camanru/fastleo/docs/resources.md#отметка-просмотрено) |
 | Название записи в заголовке, крошках, поиске | первый столбец списка, не связь, или `title(Model $record)` | [resources.md](vendor/camanru/fastleo/docs/resources.md#title) |
 | Дочерние записи в карточке (машины и заявки клиента) | `relations()`: `Related::make('cars', CarResource::class)`; у дочернего раздела — `BelongsTo` на родителя | [related.md](vendor/camanru/fastleo/docs/related.md) |
-| Список или история справа от формы (двухколоночная карточка) | `Related::make(…)->aside()`; история — в ресурсе `$historyPanel = true` и `'activity' => ['enabled' => true]` в `config/fastleo.php` (журнал выключен по умолчанию) | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
+| Список справа от формы (двухколоночная карточка) | `Related::make(…)->aside()` | [related.md](vendor/camanru/fastleo/docs/related.md#боковая-колонка-карточки) |
 | Добавить дочернюю запись прямо под таблицей, без перехода на другую страницу (задача, комментарий) | `Related::make(…)->quickAdd(['title', 'due_at'])`, подпись кнопки — `->addLabel()` | [related.md](vendor/camanru/fastleo/docs/related.md#быстрое-добавление) |
 | Связанные записи таблицей в отдельной вкладке формы (отзывы товара); правка записи в окне или на странице раздела | `Tab::make('Отзывы', [Related::make(…)->editIn('modal')])` в `fields()` внутри `Tabs`; вкладка — либо поля, либо таблицы | [related.md](vendor/camanru/fastleo/docs/related.md#таблица-во-вкладке-формы) |
 | Список внутри блока или элемента (тарифы с пунктами, день недели с интервалами) | `Repeater`/`Blocks` среди `fields()` другого `Repeater`/`Block` — два уровня, не глубже | [fields/repeater.md](vendor/camanru/fastleo/docs/fields/repeater.md#список-внутри-элемента) |
 | Видео по ссылке (YouTube, Rutube, VK); описание картинки для `alt` | `Video::make('video')`, `<x-fastleo::video :url="…" />`; `Image::make('cover')->alt('cover_alt')` | [fields/video.md](vendor/camanru/fastleo/docs/fields/video.md), [fields/image.md](vendor/camanru/fastleo/docs/fields/image.md) |
 | Вложенные записи блоками в форме (ссылки статьи, цены услуги, до десятков штук) | поле `HasMany` во вкладке; для сотен записей — таблица `Related` | [fields/has-many.md](vendor/camanru/fastleo/docs/fields/has-many.md) |
+| Ссылка на запись одного из нескольких разделов (заметка на статью или товар) | `MorphTo::make('subject')->types([ArticleResource::class, ProductResource::class])`, колонки `nullableMorphs('subject')` | [fields/morph-to.md](vendor/camanru/fastleo/docs/fields/morph-to.md) |
+| Товар в комплекте, количество у связи «многие ко многим», выбор записи другого раздела в каждой строке | отдельная таблица с `id` и моделью; `HasMany` с `BelongsTo` внутри блока | [fields/has-many.md](vendor/camanru/fastleo/docs/fields/has-many.md#выбор-записи-в-блоке) |
 | Просмотр записи: окно (по умолчанию `'modal'`), отдельная страница (`'page'`) или без просмотра, только форма | `'record_view' => 'modal'\|'page'\|false` в `config/fastleo.php`; ссылку на запись в уведомлениях — `Fastleo::recordUrl($запись, false)` | [configuration.md](vendor/camanru/fastleo/docs/configuration.md#страница-просмотра-записи) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](vendor/camanru/fastleo/docs/related.md#раскрывающиеся-строки) |
 | Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](vendor/camanru/fastleo/docs/fields/select.md) |
@@ -196,9 +198,9 @@ php artisan fastleo:inspect --json     # то же для машины
 
 Что есть в JSON:
 
-- **Раздел:** `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()` или `$readColumn`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `read_column` (колонка отметки «просмотрено» или `null`), `poll` (период автообновления списка в секундах или `null`), `history_panel` (включена ли панель истории в карточке), `fields`, `filters`, `actions`, `relations`.
+- **Раздел:** `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()` или `$readColumn`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `read_column` (колонка отметки «просмотрено» или `null`), `poll` (период автообновления списка в секундах или `null`), `fields`, `filters`, `actions`, `relations`.
 - **Поле:** `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса).
-- **Поле, сведения по типу:** `relation` и `related_model` у связей; `folder` и `extensions` у файлов; `options` у `Select` (`null`, если вариантов больше 50); `max_length` у текстовых; `empty_value` у поля с `emptyValue()`; `quick_toggle: true` у галочки с `quickToggle()`; `badges: true` у списка с цветными метками; `from_query: true` у вычисляемого столбца (`fromQuery()`); `inline_editable: true` у поля с правкой в ячейке; `alt` у `Image` с `alt()` (имя парной колонки описания); вложенные `fields` у `Repeater` (и у вложенных в него списков), `types` у `Blocks` — `{тип: {label, fields}}`.
+- **Поле, сведения по типу:** `relation` и `related_model` у связей; `folder` и `extensions` у файлов; `options` у `Select` (`null`, если вариантов больше 50); `max_length` у текстовых; `empty_value` у поля с `emptyValue()`; `quick_toggle: true` у галочки с `quickToggle()`; `badges: true` у списка с цветными метками; `from_query: true` у вычисляемого столбца (`fromQuery()`); `inline_editable: true` у поля с правкой в ячейке; `alt` у `Image` с `alt()` (имя парной колонки описания); вложенные `fields` у `Repeater` (и у вложенных в него списков), `types` у `Blocks` — `{тип: {label, fields}}`, у `MorphTo` — `{адрес раздела: название}`.
 - **Фильтр:** `name`, `label`, `class`, `has_default` (есть значение по умолчанию).
 - **Связанная таблица** (`relations`): `name`, `label`, `resource`, `slug`, `foreign_key`, `expandable` (строки раскрываются), `aside` (в боковой колонке), `columns` (имена столбцов таблицы для текущего администратора), `quick_add` (имена полей быстрого добавления, `[]` — формы нет), `add_label` (подпись кнопки).
 
@@ -243,6 +245,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | колонка `$readColumn` — не дата со временем или NOT NULL | `$table->timestamp('read_at')->nullable()` |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |
 | `query()` ресурса не выполняется при проверке вычисляемых полей `fromQuery()` (`from_query_error`) | исправить `query()` по тексту ошибки базы |
+| `MorphTo`: нет колонки типа или ключа; колонка не в `$fillable`; у связи `morphTo()` свой `ownerKey`; модель типа не в `Relation::morphMap()`, а включён `enforceMorphMap()` | `nullableMorphs('subject')` в миграции; колонки в `$fillable`; убрать `ownerKey`; внести модель в карту ([MorphTo](vendor/camanru/fastleo/docs/fields/morph-to.md)) |
 
 **Предупреждения:**
 
@@ -254,6 +257,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | нет ссылки `public/storage` | `php artisan storage:link` |
 | ассеты устарели | опубликовать заново |
 | кеш `bootstrap/cache/fastleo.php` устарел | `php artisan fastleo:cache` |
+| в базе осталась таблица `fastleo_activity` или в `config/fastleo.php` ключ `activity` от журнала прежних версий | `php artisan fastleo:drop-activity`, ключ из конфига удалить |
 | колонка NOT NULL без значения по умолчанию, а поле не `required()` и без `emptyValue()` | `required()` у поля, `default()` в миграции или `emptyValue()` у поля |
 | больше `fastleo.relations.preload` связанных записей у `BelongsTo`/`BelongsToMany` — форма и фильтр вместо списка показывают поиск по серверу | так и задумано; чтобы вернуть обычный список, поднять `relations.preload` |
 | `maxLength()` больше длины колонки, у `Textarea` — длина не ограничена (только MySQL и PostgreSQL) | уменьшить или задать `maxLength()`, либо увеличить колонку |
@@ -265,6 +269,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | у записей с RichText при сохранении пропадут теги, атрибуты или плееры | разрешить их в `fastleo.rich_text` до первого сохранения старых записей; у поля со своим `sanitize()` — в этом методе |
 | у поля с `quickToggle()` стоит `readonly()`, `onlyInList()` или `hideOnEdit()` — переключатель не появится | убрать лишнее у поля или `quickToggle()` |
 | `SetToggle` указывает на поле `readonly()` — действие пропустит все записи | убрать `readonly()` или действие |
+| `MorphTo`: у разделов-типов ключи разных видов (число и строка) — в одну колонку ключа они не поместятся | оставить разделы с одинаковым видом ключа или сделать колонку строковой; для uuid/ulid — `nullableUuidMorphs()`/`nullableUlidMorphs()` |
 | у поля с `inlineEditable()` стоит `readonly()`, `disabled()`, `hideOnEdit()` или `onlyInList()` — ячейка в списке не станет редактируемой (`inline_readonly`) | убрать лишнее у поля или `inlineEditable()` |
 | включён `fastleo.robots`, а в `public` лежит свой `robots.txt` | удалить файл или выключить `fastleo.robots.enabled` |
 | на боевом сайте планировщик не запускался дольше 10 минут | cron: `* * * * * php artisan schedule:run`; метка запуска хранится в кеше приложения |
@@ -293,7 +298,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 
 ## MCP-сервер
 
-Через MCP Claude читает и правит записи самой админки — «покажи последние обращения», «исправь заголовок у статьи 12», «опубликуй все черновики». Сервер работает от имени одного администратора, с его правами: Policy моделей, `readonly`-разделы и проверка значений — те же, что в админке. Правки попадают в [журнал изменений](vendor/camanru/fastleo/docs/activity.md) под его именем (если журнал включён).
+Через MCP Claude читает и правит записи самой админки — «покажи последние обращения», «исправь заголовок у статьи 12», «опубликуй все черновики». Сервер работает от имени одного администратора, с его правами: Policy моделей, `readonly`-разделы и проверка значений — те же, что в админке.
 
 Подключение — в `.mcp.json` в корне сайта:
 
@@ -384,6 +389,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | [Gallery](vendor/camanru/fastleo/docs/fields/gallery.md) | несколько картинок с порядком | `json` + каст `array` |
 | [BelongsTo](vendor/camanru/fastleo/docs/fields/belongs-to.md) | связь с записью другой таблицы | `foreignId` |
 | [BelongsToMany](vendor/camanru/fastleo/docs/fields/belongs-to-many.md) | связь многие ко многим | промежуточная таблица |
+| [MorphTo](vendor/camanru/fastleo/docs/fields/morph-to.md) | запись одного из нескольких разделов (статья или товар) | `nullableMorphs` |
 | [HasMany](vendor/camanru/fastleo/docs/fields/has-many.md) | вложенные записи блоками | таблица блоков |
 | [HasOne](vendor/camanru/fastleo/docs/fields/has-one.md) | одна вложенная запись | таблица блока |
 | [Repeater](vendor/camanru/fastleo/docs/fields/repeater.md) | повторяющаяся группа полей | `json` + каст `array` |
@@ -400,7 +406,6 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 Подробности — в docs пакета (читайте нужный файл целиком):
 
 - [Действия над записями](vendor/camanru/fastleo/docs/actions.md) — Действие — кнопка, которая что-то делает с одной записью или с несколькими выбранными: «Опубликовать», «Отправить письмо», «Пересчитать цены».
-- [Журнал изменений](vendor/camanru/fastleo/docs/activity.md) — Журнал записывает, **кто, когда и что изменил в админке**: «было → стало» по каждому полю, копию удалённой записи. Из журнала можно вернуть прежние значения или…
 - [Вход, профиль и восстановление пароля](vendor/camanru/fastleo/docs/auth.md) — Вход в админку — отдельный guard `fastleo` поверх таблицы пользователей сайта. Доступ решает метод `canAccessFastleo()` модели (см.…
 - [Права доступа](vendor/camanru/fastleo/docs/authorization.md) — Кто входит в админку, решает `canAccessFastleo()` модели пользователя ([installation.md](vendor/camanru/fastleo/docs/installation.md)). Что администратор может делать в разделе, решают…
 - [Конструктор страниц (Blocks)](vendor/camanru/fastleo/docs/blocks.md) — Поле `Blocks` собирает страницу из блоков разных типов: текст, картинка, галерея, цитата, кнопка… Админ добавляет блоки из меню «Добавить блок», заполняет,…

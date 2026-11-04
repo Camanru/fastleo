@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Fastleo\Console;
 
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Auth\FastleoUser;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
@@ -18,7 +17,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
  * Запускает MCP-сервер админки для Claude: агент читает и правит записи разделов от имени администратора
- * `--user` с его правами (Policy). Правки попадают в журнал изменений. Сервер общается по stdio и ждёт сообщений
+ * `--user` с его правами (Policy). Сервер общается по stdio и ждёт сообщений
  * клиента — запускать вручную в терминале не нужно, команду прописывают в `.mcp.json` сайта.
  *
  * ```bash
@@ -48,7 +47,6 @@ final class McpCommand extends Command
         }
 
         Fastleo::guard()->setUser($user);
-        resolve(ActivityRecorder::class)->start();
 
         if ($this->option('allow-delete') === true) {
             config(['fastleo.mcp.allow_delete' => true]);

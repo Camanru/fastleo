@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Enum;
 use Fastleo\Fields\Number;
@@ -119,12 +118,13 @@ describe('saving', function (): void {
             ->and($this->article->title)->toBe('Статья');
     });
 
-    it('writes only the edited field to the activity log', function (): void {
+    it('saves through Eloquent and changes only the edited field', function (): void {
+        $updated = modelEvents(Article::class);
+
         $this->patchJson(inlineUrl($this->article, 'views'), ['value' => '25'])->assertOk();
 
-        $activity = Activity::query()->where('event', 'updated')->latest('id')->first();
-
-        expect(array_keys($activity->changes))->toBe(['views']);
+        expect($updated)->toHaveCount(1)
+            ->and(array_values(array_diff($updated[0], ['updated_at'])))->toBe(['views']);
     });
 
     it('clears an optional related record and refuses to clear a required field', function (): void {

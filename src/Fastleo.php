@@ -12,7 +12,6 @@ use Fastleo\Http\Middleware\Authenticate;
 use Fastleo\Http\Middleware\AuthenticateSession;
 use Fastleo\Http\Middleware\AuthorizePage;
 use Fastleo\Http\Middleware\EnsureCanAccessFastleo;
-use Fastleo\Http\Middleware\RecordActivity;
 use Fastleo\Http\Middleware\RequireTwoFactor;
 use Fastleo\Http\Middleware\SecurityHeaders;
 use Fastleo\Http\Middleware\SetLocale;
@@ -80,7 +79,7 @@ final class Fastleo
     }
 
     /**
-     * Middleware страниц админки после входа: проверка входа, сеанса, доступа, обязательной 2FA, запись журнала.
+     * Middleware страниц админки после входа: проверка входа, сеанса, доступа, обязательной 2FA.
      *
      * @return list<string>
      */
@@ -91,7 +90,6 @@ final class Fastleo
             AuthenticateSession::class,
             EnsureCanAccessFastleo::class,
             RequireTwoFactor::class,
-            RecordActivity::class,
         ];
     }
 

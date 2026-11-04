@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\Files\FileStore;
 use Fastleo\Logs\LogReader;
@@ -12,7 +11,7 @@ use Fastleo\Resource;
 
 /**
  * Меню админки: разделы-ресурсы (группа, позиция, иконка, счётчик), «Файлы» (группа «Медиа»),
- * «Журнал изменений» и «Журнал ошибок» (группа «Система») и свои ссылки из конфига.
+ * «Журнал ошибок» (группа «Система») и свои ссылки из конфига.
  *
  * Разделы без права `viewAny` не показываются. Группы идут в порядке `fastleo.menu.groups`,
  * остальные — по алфавиту; пункты без группы — сразу под «Дашбордом».
@@ -92,18 +91,6 @@ final class Menu
                 'icon' => 'folder-open',
                 'badge' => null,
                 'active' => request()->routeIs('fastleo.files.*'),
-            ];
-        }
-
-        if (ActivityRecorder::canView()) {
-            $entries[] = [
-                'group' => is_string($systemGroup) ? $systemGroup : null,
-                'position' => 50,
-                'label' => __('fastleo::activity.title', [], Fastleo::LOCALE),
-                'url' => route('fastleo.activity.index'),
-                'icon' => 'history',
-                'badge' => null,
-                'active' => request()->routeIs('fastleo.activity.*'),
             ];
         }
 

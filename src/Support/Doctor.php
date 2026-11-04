@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use BackedEnum;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\SetToggle;
+use Fastleo\Console\DropActivityCommand;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
@@ -17,6 +18,7 @@ use Fastleo\Fields\Field;
 use Fastleo\Fields\Gallery;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\KeyValue;
+use Fastleo\Fields\MorphTo;
 use Fastleo\Fields\Nested;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Password;
@@ -69,7 +71,6 @@ final class Doctor
         '2026_10_29_000000_create_fastleo_imports_table' => ['fastleo_imports'],
         '2026_10_30_000000_create_fastleo_logins_table' => ['fastleo_logins'],
         '2026_10_30_000100_create_fastleo_two_factor_table' => ['fastleo_two_factor'],
-        '2026_10_30_000200_create_fastleo_activity_table' => ['fastleo_activity'],
         '2026_10_30_000300_create_fastleo_settings_table' => ['fastleo_settings'],
         '2026_10_30_000400_create_fastleo_notifications_table' => ['fastleo_notifications'],
         '2026_10_31_000000_create_fastleo_notification_bots_table' => ['fastleo_notification_bots'],
@@ -235,6 +236,26 @@ final class Doctor
 
         if (self::storageLinkMissing()) {
             $this->add('warning', 'site', 'storage_link', hint: 'storage_link_hint');
+        }
+
+        if ($this->activityTableLeft()) {
+            $this->add('warning', 'site', 'activity_table', ['table' => DropActivityCommand::TABLE], 'activity_table_hint');
+        }
+
+        if (config()->has('fastleo.activity')) {
+            $this->add('warning', 'site', 'activity_config', hint: 'activity_config_hint');
+        }
+    }
+
+    /**
+     * В базе осталась таблица журнала изменений прежних версий; база недоступна — считаем, что её нет.
+     */
+    private function activityTableLeft(): bool
+    {
+        try {
+            return Schema::hasTable(DropActivityCommand::TABLE);
+        } catch (Throwable) {
+            return false;
         }
     }
 
@@ -772,6 +793,10 @@ final class Doctor
                 $this->nested($field, $scope, $editable);
             }
 
+            if ($field instanceof MorphTo) {
+                $this->morph($field, $model, $columns, $scope, $editable);
+            }
+
             if ($field instanceof Checkbox && $field->isQuickToggle() && (! $field->isWritable() || ! $field->showsInEditForm())) {
                 $this->add('warning', $scope, 'quick_toggle_readonly', ['field' => $field->name], 'quick_toggle_readonly_hint');
             }
@@ -894,10 +919,56 @@ final class Doctor
     }
 
     /**
+     * Поле MorphTo: связь `morphTo()` в модели, обе колонки в таблице и в `$fillable`, разделы-типы описаны верно.
+     *
+     * @param  array<string, array<string, mixed>>  $columns
+     */
+    private function morph(MorphTo $field, Model $model, array $columns, string $scope, bool $editable): void
+    {
+        try {
+            $relation = $field->relationInstance();
+            $types = $field->resolved();
+        } catch (Throwable $e) {
+            $this->add('error', $scope, 'morph', ['field' => $field->name, 'message' => $e->getMessage()]);
+
+            return;
+        }
+
+        foreach ([$relation->getMorphType(), $relation->getForeignKeyName()] as $column) {
+            if (! isset($columns[$column])) {
+                $this->add('error', $scope, 'morph_columns', ['field' => $field->name, 'column' => $column, 'table' => $model->getTable(), 'name' => $field->getRelationName()], 'morph_columns_hint');
+            } elseif ($editable && $field->isWritable() && $field->isInForm() && ! $model->isFillable($column)) {
+                $this->add('error', $scope, 'morph_not_fillable', ['field' => $field->name, 'column' => $column, 'model' => $model::class], 'morph_not_fillable_hint');
+            }
+        }
+
+        if (filled($relation->getOwnerKeyName())) {
+            $this->add('error', $scope, 'morph_owner_key', ['method' => $field->getRelationName(), 'model' => $model::class, 'key' => $relation->getOwnerKeyName()], 'morph_owner_key_hint');
+        }
+
+        foreach ($types as $type) {
+            try {
+                $type['model']->getMorphClass();
+            } catch (Throwable) {
+                $this->add('error', $scope, 'morph_map', ['field' => $field->name, 'model' => $type['model']::class], 'morph_map_hint');
+            }
+        }
+
+        if (count(array_unique(array_map(fn (array $type): string => $type['model']->getKeyType(), $types))) > 1) {
+            $this->add('warning', $scope, 'morph_key_types', ['field' => $field->name], 'morph_key_types_hint');
+        }
+    }
+
+    /**
      * Связанных записей больше `fastleo.relations.preload`: вместо списка вариантов форма и фильтр ищут по серверу.
      */
     private function remoteOptions(BelongsTo|BelongsToMany $field, string $scope): void
     {
+        // В блоке HasMany/HasOne поиск по серверу включён всегда, это не повод для предупреждения.
+        if ($field->nestedParent() !== null) {
+            return;
+        }
+
         try {
             $remote = $field->isRemote();
         } catch (Throwable) {

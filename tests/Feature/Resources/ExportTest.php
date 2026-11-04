@@ -13,6 +13,8 @@ use Illuminate\Testing\TestResponse;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\Product;
+use Workbench\App\Models\Remark;
 use Workbench\App\Models\Topic;
 
 beforeEach(function (): void {
@@ -193,4 +195,18 @@ it('leaves out a record that was deleted while the file was being written', func
 
     expect($deleted)->toBeTrue()
         ->and(array_column($rows, 0))->toBe(['id', (string) $kept->id]);
+});
+
+it('exports the object of a record as a section and a key and leaves unknown types empty', function (): void {
+    useFixtureResources('Morph');
+    $article = Article::factory()->create();
+    $product = Product::factory()->create();
+    Remark::query()->forceCreate(['body' => 'Статья', 'subject_type' => Article::class, 'subject_id' => $article->id]);
+    Remark::query()->forceCreate(['body' => 'Товар', 'subject_type' => Product::class, 'subject_id' => $product->id]);
+    Remark::query()->forceCreate(['body' => 'Чужая', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 4]);
+    Remark::query()->forceCreate(['body' => 'Пустая']);
+
+    $rows = exportedRows($this->get(route('fastleo.resources.export', ['resource' => 'remarks'])));
+
+    expect(array_column($rows, 2))->toBe(['О чём', '', '', 'products:'.$product->id, 'articles:'.$article->id]);
 });

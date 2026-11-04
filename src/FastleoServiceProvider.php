@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Fastleo;
 
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Auth\LoginHistory;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Console\CacheCommand;
 use Fastleo\Console\ClearCommand;
 use Fastleo\Console\DoctorCommand;
+use Fastleo\Console\DropActivityCommand;
 use Fastleo\Console\ImagesCommand;
 use Fastleo\Console\InspectCommand;
 use Fastleo\Console\InstallCommand;
@@ -72,7 +72,6 @@ final class FastleoServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom($this->packagePath('config/fastleo.php'), 'fastleo');
         $this->app->scoped(ResourceRegistry::class);
-        $this->app->singleton(ActivityRecorder::class);
         $this->app->singleton(SettingsStore::class);
         $this->app->singleton(HealthChecks::class);
         $this->app->scoped(SyncState::class);
@@ -172,6 +171,7 @@ final class FastleoServiceProvider extends ServiceProvider
             MakePageCommand::class,
             MakeResourceCommand::class,
             MakeWidgetCommand::class,
+            DropActivityCommand::class,
             McpCommand::class,
             ModuleCommand::class,
             PruneCommand::class,

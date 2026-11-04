@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\QueriesRelatedRecords;
 use Fastleo\Fields\Contracts\SearchesOptions;
@@ -113,14 +114,16 @@ class BelongsTo extends Field implements SearchesOptions
 
     /**
      * Правила; сохранённое значение записи проходит проверку, даже если связанная запись скрыта.
+     * В блоке `HasMany` сохранённым считается и ключ, уже стоящий в этом же блоке (`$keptFor`).
      *
+     * @param  (Closure(string, array<array-key, mixed>): list<string>)|null  $keptFor  по имени проверяемого поля и данным формы
      * @return array<string, list<mixed>>
      */
     #[Override]
-    public function getRules(?Model $record): array
+    public function getRules(?Model $record, ?Closure $keptFor = null): array
     {
         $rules = parent::getRules($record);
-        $rules[$this->name] = array_map(fn (mixed $rule): mixed => $rule instanceof OptionRule ? $this->optionRules($record)[1] : $rule, $rules[$this->name]);
+        $rules[$this->name] = array_map(fn (mixed $rule): mixed => $rule instanceof OptionRule ? $this->optionRules($record, $keptFor)[1] : $rule, $rules[$this->name]);
 
         return $rules;
     }
@@ -137,7 +140,7 @@ class BelongsTo extends Field implements SearchesOptions
     #[Override]
     public function display(Model $record): string|Htmlable|null
     {
-        if ($this->formatUsing instanceof \Closure) {
+        if ($this->formatUsing instanceof Closure) {
             return parent::display($record);
         }
 

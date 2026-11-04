@@ -21,7 +21,7 @@
         @if ($valueInvalid)<p class="text-sm text-danger">{{ $errors->first($rowPath.'.value') }}</p>@endif
     </div>
     @if ($writable)
-        <button type="button" @click="remove($el)" class="col-start-3 row-start-1 mt-2.5 text-ink-3 hover:text-danger sm:col-start-auto" aria-label="{{ __('fastleo::resources.nested_remove') }}" data-block-remove>
+        <button type="button" @click="remove($el)" class="col-start-3 row-start-1 mt-2.5 text-ink-3 hover:text-danger sm:col-start-auto sm:row-auto" aria-label="{{ __('fastleo::resources.nested_remove') }}" data-block-remove>
             <x-fastleo::icon name="trash-2" class="size-4" />
         </button>
     @endif

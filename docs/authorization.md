@@ -83,7 +83,7 @@ public function can(string $ability, ?Model $record): bool
 
 ## Связи и вложенные записи
 
-- Варианты связей ([BelongsTo](fields/belongs-to.md), [BelongsToMany](fields/belongs-to-many.md)) видит тот, у кого есть `viewAny` раздела. Policy связанной модели здесь не спрашивается — ограничьте варианты методом поля `query()`; сохранить запись вне вариантов нельзя.
+- Варианты связей ([BelongsTo](fields/belongs-to.md), [BelongsToMany](fields/belongs-to-many.md), [MorphTo](fields/morph-to.md)) видит тот, у кого есть `viewAny` раздела (у `MorphTo` — `viewAny` раздела каждого типа; подписи записей видны всем, у кого он есть). Policy связанной модели здесь не спрашивается — ограничьте варианты методом поля `query()`; сохранить запись вне вариантов нельзя.
 - [Связанная таблица](related.md) на странице записи видна при `view` родителя и `viewAny` дочернего раздела; «Добавить» — при `update` родителя и `create` дочернего. Изменяются и удаляются записи таблицы по Policy дочернего раздела.
 - Вложенные записи ([HasMany](fields/has-many.md), [HasOne](fields/has-one.md)) создаются, меняются и удаляются в рамках права `update` (или `create`) **родителя**; Policy модели блоков не спрашивается. Блок чужой записи изменить или удалить нельзя — его `id` из запроса игнорируется.
 
@@ -96,7 +96,6 @@ public function can(string $ability, ?Model $record): bool
 | Свои разделы | Policy модели (`php artisan fastleo:make-policy Lead`) или `can()` ресурса |
 | «Администраторы» (`/fastleo/users`) | Policy модели пользователя. Без неё любой администратор открывает раздел и может выдать себе роль или доступ другому; если разделом пользуется только владелец, закройте его Policy на `User` |
 | Готовые модули (заявки, страницы, новости) | Policy их моделей: код модулей лежит в вашем сайте. Страница настроек «Контакты» закрывается методом `canAccess()` своего класса ([настройки](settings.md)) |
-| Журнал изменений | Gate `viewFastleoActivity` ([activity.md](activity.md)) |
 | Журналы ошибок | Gate `viewFastleoLogs` ([журнал ошибок](pages.md#журнал-ошибок)) |
 | Файлы | Gate `manageFastleoFiles` ([files.md](files.md)) |
 | Очистка кеша | Gate `clearFastleoCache` |

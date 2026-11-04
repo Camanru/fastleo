@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\NoCreateArticlePolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
@@ -125,12 +124,12 @@ describe('the record', function (): void {
         $this->assertDatabaseHas('articles', ['title' => 'Решётка', 'category_id' => $this->category->id]);
     });
 
-    it('lands in the activity log through the writer', function (): void {
+    it('creates the record through Eloquent, so the observers of the model run', function (): void {
+        $created = modelEvents(Article::class, 'created');
+
         $this->postJson(quickAddUrl($this->category), ['data' => ['title' => 'Решётка']])->assertCreated();
 
-        $activity = Activity::query()->where('event', 'created')->latest('id')->first();
-
-        expect($activity?->subject_id)->toBe((string) Article::query()->value('id'));
+        expect($created)->toHaveCount(1);
     });
 
     it('does not take a parent or a field from the input that was not asked for', function (): void {

@@ -14,12 +14,15 @@ use Fastleo\Tests\Fixtures\QuickAdd\CategoryResource as QuickAddCategoryResource
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\ArticleResource as BrokenArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\Product;
 
 beforeEach(function (): void {
     // Публичная папка и кеш — во временной папке: общий каркас Testbench читают параллельные процессы тестов.
@@ -441,6 +444,13 @@ it('says when a relation list switches to the search on the server', function ()
     expect(implode("\n", messages('articles', 'warning')))->not->toContain('relations.preload');
 });
 
+it('does not warn about the search on the server for a product chosen inside a block', function (): void {
+    Product::factory()->count(3)->create();
+    config(['fastleo.relations.preload' => 2]);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('bundleItems');
+});
+
 it('does not check the queue timeout on a site without imports', function (): void {
     useFixtureResources('Doctor');
     config(['queue.connections.database.retry_after' => 90]);
@@ -584,6 +594,22 @@ it('warns that a robots.txt file hides the route of the package', function (): v
 
     File::delete($this->sandbox.'/public/robots.txt');
     expect(collect(diagnosed()['problems'])->pluck('message'))->not->toContain($message);
+});
+
+it('warns about what is left of the old change log', function (): void {
+    $table = 'В базе осталась таблица fastleo_activity: журнал изменений убран из пакета, она не используется.';
+    $key = 'В config/fastleo.php остался ключ activity: журнала изменений в пакете больше нет, настройка не действует.';
+
+    expect(collect(diagnosed()['problems'])->pluck('message')->all())->not->toContain($table)->not->toContain($key);
+
+    Schema::create('fastleo_activity', function ($table): void {
+        $table->id();
+    });
+    config(['fastleo.activity' => ['enabled' => true]]);
+    $problems = collect(diagnosed()['problems']);
+
+    expect($problems->firstWhere('message', $table))->toMatchArray(['level' => 'warning', 'scope' => 'site', 'hint' => 'Удалите её командой php artisan fastleo:drop-activity.'])
+        ->and($problems->firstWhere('message', $key))->toMatchArray(['level' => 'warning', 'scope' => 'site']);
 });
 
 describe('markup of the RichText field', function (): void {
@@ -881,4 +907,66 @@ describe('RichText with unusual values', function (): void {
     it('does not read the text of a field without a column', function (): void {
         expect(messages('mutated-notes', 'warning'))->toBe([]);
     })->skip(fn (): bool => DB::connection()->getDriverName() === 'pgsql', 'PostgreSQL после ошибки запроса считает транзакцию теста сломанной');
+});
+
+describe('the MorphTo field', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('DoctorMorph');
+        Schema::create('loose_remarks', function (Blueprint $table): void {
+            $table->id();
+            $table->text('body')->nullable();
+        });
+
+        foreach (['guarded_remarks', 'owner_key_remarks'] as $name) {
+            Schema::create($name, function (Blueprint $table): void {
+                $table->id();
+                $table->text('body')->nullable();
+                $table->nullableMorphs('subject');
+            });
+        }
+    });
+
+    afterEach(function (): void {
+        Relation::requireMorphMap(false);
+        Relation::morphMap([], false);
+    });
+
+    it('finds nothing wrong with a properly described field', function (): void {
+        expect(messages('fine', 'error'))->toBe([])->and(messages('fine', 'warning'))->toBe([]);
+    });
+
+    it('reports the columns that are not in the table', function (): void {
+        $errors = implode("\n", messages('no-columns', 'error'));
+
+        expect($errors)->toContain('«subject_type», которой нет в таблице loose_remarks')->toContain('«subject_id», которой нет');
+    });
+
+    it('reports the columns that are not in the fillable of the model', function (): void {
+        $errors = implode("\n", messages('not-fillable', 'error'));
+
+        expect($errors)->toContain('Колонка «subject_type» поля «subject» (MorphTo) не в $fillable')->toContain('Колонка «subject_id»');
+    });
+
+    it('reports a relation that looks for the record by its own key', function (): void {
+        expect(implode("\n", messages('owner-key', 'error')))->toContain('задаёт свой ownerKey (uuid)');
+    });
+
+    it('reports a model without the relation and a field without sections', function (): void {
+        expect(implode("\n", messages('no-relation', 'error')))->toContain('возвращающего MorphTo')
+            ->and(implode("\n", messages('no-types', 'error')))->toContain('не заданы разделы');
+    });
+
+    it('reports a model that is not in the morph map when the site demands the map', function (): void {
+        Relation::enforceMorphMap(['product' => Product::class]);
+
+        expect(implode("\n", messages('mapped', 'error')))->toContain('не внесена в Relation::morphMap()');
+    });
+
+    it('reports two sections of one model', function (): void {
+        expect(implode("\n", messages('duplicate', 'error')))->toContain('два раздела работают с моделью');
+    });
+
+    it('warns about sections whose keys are of different kinds', function (): void {
+        expect(implode("\n", messages('mixed', 'warning')))->toContain('ключи разных видов');
+    });
 });

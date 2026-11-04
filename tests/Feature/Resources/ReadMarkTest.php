@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Dom\Element;
 use Dom\HTMLDocument;
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +19,7 @@ beforeEach(function (): void {
 it('marks a record read when it is opened, quietly and without touching the record', function (): void {
     $feedback = Feedback::factory()->create(['updated_at' => now()->subDay()]);
     $updatedAt = $feedback->fresh()?->updated_at?->toDateTimeString();
+    $updated = modelEvents(Feedback::class);
 
     expect(FeedbackResource::badge())->toBe(1);
 
@@ -32,7 +32,7 @@ it('marks a record read when it is opened, quietly and without touching the reco
 
     expect($fresh?->read_at)->not->toBeNull()
         ->and($fresh?->updated_at?->toDateTimeString())->toBe($updatedAt)
-        ->and(Activity::query()->count())->toBe(0)
+        ->and($updated)->toHaveCount(0)
         ->and(FeedbackResource::badge())->toBeNull();
 });
 
@@ -143,6 +143,7 @@ it('stays in the list after marking records unread there', function (): void {
 it('marks selected records read and unread by actions, even in a read-only section', function (): void {
     $records = Feedback::factory()->count(2)->create();
     $ids = $records->map(fn (Feedback $feedback): string => (string) $feedback->id)->all();
+    $updated = modelEvents(Feedback::class);
 
     $this->post(route('fastleo.resources.action', ['feedback', 'mark-read']), ['ids' => $ids])
         ->assertRedirect()
@@ -154,7 +155,7 @@ it('marks selected records read and unread by actions, even in a read-only secti
         ->assertSessionHas('fastleo.success', 'Отмечено: 1.');
 
     expect(FeedbackResource::badge())->toBe(1)
-        ->and(Activity::query()->count())->toBe(0);
+        ->and($updated)->toHaveCount(0);
 });
 
 it('does nothing for a section without the read column', function (): void {

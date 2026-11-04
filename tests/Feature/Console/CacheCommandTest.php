@@ -15,6 +15,7 @@ use Workbench\App\Fastleo\FeedbackResource;
 use Workbench\App\Fastleo\PageResource;
 use Workbench\App\Fastleo\ProductResource;
 use Workbench\App\Fastleo\ProductReviewResource;
+use Workbench\App\Fastleo\RemarkResource;
 use Workbench\App\Fastleo\ReportPage;
 use Workbench\App\Fastleo\SupplierResource;
 use Workbench\App\Fastleo\TopicResource;
@@ -31,9 +32,9 @@ afterEach(function (): void {
 });
 
 it('caches the resource list and serves it from the cache', function (): void {
-    $this->artisan('fastleo:cache')->expectsOutputToContain('Список разделов, настроек и страниц закеширован: 11 шт.')->assertSuccessful();
+    $this->artisan('fastleo:cache')->expectsOutputToContain('Список разделов, настроек и страниц закеширован: 12 шт.')->assertSuccessful();
 
-    expect(require Fastleo::resources()->cachePath())->toBe([ArticleResource::class, CategoryResource::class, ContactsSettings::class, FeedbackResource::class, PageResource::class, ProductResource::class, ProductReviewResource::class, ReportPage::class, SupplierResource::class, TopicResource::class, UserResource::class]);
+    expect(require Fastleo::resources()->cachePath())->toBe([ArticleResource::class, CategoryResource::class, ContactsSettings::class, FeedbackResource::class, PageResource::class, ProductResource::class, ProductReviewResource::class, RemarkResource::class, ReportPage::class, SupplierResource::class, TopicResource::class, UserResource::class]);
 
     config(['fastleo.resources.path' => '/nonexistent']);
     Fastleo::resources()->flush();

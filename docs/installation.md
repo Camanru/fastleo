@@ -171,7 +171,6 @@ php artisan storage:link
 - `fastleo_imports` — отчёты об [импорте](import-export.md#импорт);
 - `fastleo_logins` — входы и устройства;
 - `fastleo_two_factor` — [2FA](auth.md);
-- `fastleo_activity` — [журнал изменений](activity.md);
 - `fastleo_settings` — [настройки сайта](settings.md);
 - `fastleo_notifications` — [уведомления](notifications.md);
 - `fastleo_dashboard_layouts` — [раскладка дашборда](dashboard.md#настройка-в-админке) каждого администратора;

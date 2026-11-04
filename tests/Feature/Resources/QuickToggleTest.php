@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Policies\NoUpdateArticlePolicy;
 use Illuminate\Database\QueryException;
@@ -69,21 +68,17 @@ describe('list', function (): void {
 });
 
 describe('switching', function (): void {
-    it('writes the value through Eloquent, answers JSON and leaves a trace in the activity log', function (): void {
+    it('writes the value through Eloquent and answers JSON', function (): void {
         $article = Article::factory()->create(['is_published' => false]);
-        Activity::query()->delete();
+        $updated = modelEvents(Article::class);
 
         $this->postJson(toggleUrl('articles', $article, 'is_published'), ['value' => 1])
             ->assertOk()
             ->assertExactJson(['value' => true]);
 
-        expect($article->refresh()->is_published)->toBeTrue();
-
-        $entry = Activity::query()->sole();
-        expect($entry->event)->toBe('updated')
-            ->and($entry->user_name)->toBe('Анна')
-            ->and(array_keys($entry->changes))->toBe(['is_published'])
-            ->and($entry->changes['is_published']['new'])->toBeTrue();
+        expect($article->refresh()->is_published)->toBeTrue()
+            ->and($updated)->toHaveCount(1)
+            ->and(array_values(array_diff($updated[0], ['updated_at'])))->toBe(['is_published']);
 
         $this->postJson(toggleUrl('articles', $article, 'is_published'), ['value' => 0])->assertOk()->assertExactJson(['value' => false]);
         expect($article->refresh()->is_published)->toBeFalse();
@@ -320,7 +315,7 @@ describe('SetToggle action', function (): void {
             Article::factory()->create(['is_published' => true]),
             Article::factory()->create(['is_published' => false]),
         ];
-        Activity::query()->delete();
+        $updated = modelEvents(Article::class);
 
         $this->from(route('fastleo.resources.index', 'articles'))
             ->post(route('fastleo.resources.action', ['articles', 'set-is-published-on']), ['ids' => [(string) $hidden->id, (string) $shown->id]])
@@ -329,7 +324,7 @@ describe('SetToggle action', function (): void {
         expect($hidden->refresh()->is_published)->toBeTrue()
             ->and($shown->refresh()->is_published)->toBeTrue()
             ->and($other->refresh()->is_published)->toBeFalse()
-            ->and(Activity::query()->count())->toBe(1);
+            ->and($updated)->toHaveCount(1);
 
         $this->post(route('fastleo.resources.action', ['articles', 'set-is-published-off']), ['ids' => [$hidden->id, $shown->id]])
             ->assertSessionHas('fastleo.success', 'Изменено: 2.');

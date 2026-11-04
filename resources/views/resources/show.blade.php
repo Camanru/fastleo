@@ -26,9 +26,6 @@
                 @include('fastleo::actions.forms', ['actions' => $recordActions])
             @endif
             @include('fastleo::actions.buttons')
-            @if ($resource::logsActivity() && \Fastleo\Activity\ActivityRecorder::isEnabled() && \Fastleo\Support\Authorization::allows('viewAny', $resource))
-                <x-fastleo::button variant="ghost" icon="history" :href="route('fastleo.resources.history', [$slug, $record->getKey()])">{{ __('fastleo::activity.history') }}</x-fastleo::button>
-            @endif
             @if ($siteUrl)
                 <x-fastleo::button variant="ghost" icon="external-link" :href="$siteUrl" target="_blank" rel="noopener">
                     {{ __('fastleo::resources.open_on_site') }}
@@ -87,9 +84,6 @@
         </div>
         @if ($hasSide)
             <aside class="flex min-w-0 flex-col gap-5" data-card-aside>
-                @if ($resource->showsHistoryPanel($record))
-                    @include('fastleo::resources.history-panel')
-                @endif
                 @include('fastleo::resources.related-sections', ['only' => 'aside'])
             </aside>
         @endif

@@ -6,6 +6,7 @@ namespace Workbench\App\Fastleo;
 
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\DateTime;
+use Fastleo\Fields\HasMany;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Select;
@@ -78,6 +79,12 @@ final class ProductResource extends Resource
                     Number::make('reviews_count', 'Отзывов')->fromQuery()->sortable(),
                     Text::make('note', 'Примечание')->hideWhenEmpty(),
                     DateTime::make('created_at', 'Добавлен')->readonly()->hideOnCreate()->hideInList(),
+                ]),
+                Tab::make('Комплект', [
+                    HasMany::make('bundleItems', 'Состав комплекта')->orderColumn('sort')->max(20)->fields([
+                        BelongsTo::make('item_id', 'Товар')->required(),
+                        Number::make('qty', 'Количество')->integer()->min(1)->max(1000)->default(1),
+                    ]),
                 ]),
                 Tab::make('Отзывы', [
                     Related::make('reviews', ProductReviewResource::class)->editIn('modal')->quickAdd(['author', 'rating'])->addLabel('Добавить отзыв'),

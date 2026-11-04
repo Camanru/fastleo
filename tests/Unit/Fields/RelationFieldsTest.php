@@ -144,7 +144,7 @@ describe('nested', function (): void {
     it('allows only simple fields inside blocks', function (Field $inner): void {
         HasMany::make('links')->fields([$inner])->forModel(Article::class)->schema();
     })->throws(LogicException::class, 'нельзя использовать внутри блоков')->with([
-        'relation' => fn (): BelongsTo => BelongsTo::make('article_id'),
+        'relation' => fn (): BelongsToMany => BelongsToMany::make('topics'),
         'slug' => fn (): Slug => Slug::make('slug'),
         'password' => fn (): Password => Password::make('password'),
         'nested' => fn (): HasMany => HasMany::make('rows'),
@@ -193,6 +193,19 @@ describe('conditions', function (): void {
         $schema = HasMany::make('links')->fields([Text::make('title'), Text::make('url')->visibleWhen('title', 'x')])->forModel(Article::class)->schema();
 
         expect($schema->fields())->toHaveCount(2);
+    });
+
+    it('rejects a dependent choice of a record inside blocks', function (): void {
+        HasMany::make('links')->fields([BelongsTo::make('category_id')->dependsOn('title', fn (): null => null)])->forModel(Article::class)->schema();
+    })->throws(LogicException::class, 'зависимых списков');
+
+    it('allows choosing a record inside blocks', function (): void {
+        $schema = HasMany::make('links')->fields([BelongsTo::make('category_id')])->forModel(Article::class)->schema();
+
+        expect($schema->fields())->toHaveCount(1)
+            ->and($schema->fields()[0]->nestedParent())->toBe('links')
+            ->and(BelongsTo::make('category_id')->nestedIn('links.*.')->optionsPath())->toBe('links.category_id')
+            ->and(BelongsTo::make('category_id')->optionsPath())->toBe('category_id');
     });
 
     it('does not allow dependent lists inside blocks', function (): void {

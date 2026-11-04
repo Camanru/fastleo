@@ -108,6 +108,10 @@ final class Table extends Widget
 
         $records = $query->with($eager)->orderByDesc($key)->limit($this->limit)->get();
 
+        foreach ($fields as $field) {
+            $field->prepareFor($records);
+        }
+
         return [
             'fields' => $fields,
             'rows' => $records->map(function (Model $record) use ($resource, $fields): array {

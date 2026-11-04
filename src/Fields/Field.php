@@ -504,6 +504,14 @@ abstract class Field
     }
 
     /**
+     * Имя поля `HasMany`/`HasOne`, в блоке которого стоит это поле; у поля верхнего уровня — null.
+     */
+    public function nestedParent(): ?string
+    {
+        return $this->rulePrefix === '' ? null : Str::before($this->rulePrefix, '.');
+    }
+
+    /**
      * Значение условия строкой — как его отправляет форма (`true` → `'1'`, enum → значение).
      */
     public static function conditionValue(mixed $value): string
@@ -675,7 +683,7 @@ abstract class Field
     /**
      * Значение поля приходит из `query()` ресурса, а не из колонки таблицы: число заявок клиента, сумма продаж, подзапрос.
      * Поле только для показа: в списке (по заголовку можно сортировать), на просмотре, в выгрузке и ответах MCP; в форме,
-     * импорте, записи MCP и журнале изменений его нет. Искать и фильтровать по нему нельзя. Имя поля — псевдоним значения
+     * импорте и записи MCP его нет. Искать и фильтровать по нему нельзя. Имя поля — псевдоним значения
      * в запросе (`withCount('offers')` даёт `offers_count`).
      *
      * ```php
@@ -707,7 +715,7 @@ abstract class Field
 
     /**
      * Править значение прямо в ячейке списка: щёлкнул, изменил, ушёл из поля — сохранилось (Enter тоже). Запись идёт так же,
-     * как из формы: право `update`, правила поля, Eloquent, observers, журнал изменений. Подходят текст, число, список и
+     * как из формы: право `update`, правила поля, Eloquent, observers. Подходят текст, число, список и
      * `BelongsTo` (если вариантов не больше `fastleo.relations.preload`). Поле не должно зависеть от других полей формы
      * (`dependsOn()`, `visibleWhen()`) и они от него — иначе значения разойдутся; такое описание — ошибка.
      * У первого столбца пропадает ссылка на запись.
@@ -906,15 +914,6 @@ abstract class Field
     public function hasRecordVisibility(): bool
     {
         return ! $this->showOnCreate || ! $this->showOnEdit || $this->hidden instanceof Closure;
-    }
-
-    /**
-     * Поле скрывается условием на запись: `hidden(fn ($record) => …)`. Журнал удалённой насовсем записи
-     * значения таких полей не показывает — проверить условие не на чем.
-     */
-    public function hasHiddenCondition(): bool
-    {
-        return $this->hidden instanceof Closure;
     }
 
     /**
@@ -1482,6 +1481,17 @@ abstract class Field
         }
 
         $record->fill([$this->name => $translations]);
+    }
+
+    /**
+     * Подготовиться к показу записей страницы списка, выгрузки или таблицы: загрузить нужное для всех строк
+     * одной выборкой (полиморфная связь). По умолчанию ничего не делает.
+     *
+     * @param  iterable<Model>  $records
+     */
+    public function prepareFor(iterable $records): void
+    {
+        //
     }
 
     /**

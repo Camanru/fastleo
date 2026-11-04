@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
 use Fastleo\Mcp\Tools\DescribeResource;
@@ -51,7 +50,6 @@ describe('section', function (): void {
 
         $this->get(route('fastleo.resources.edit', ['notification-bots', $bot->id]))->assertOk()->assertDontSee('AAAAAAAAAAAA');
         $this->get(route('fastleo.resources.show', ['notification-bots', $bot->id]))->assertOk()->assertDontSee('AAAAAAAAAAAA');
-        expect(Activity::query()->get()->toJson())->not->toContain('AAAAAAAAAAAA');
     });
 
     it('keeps the saved token when the field is left empty', function (): void {

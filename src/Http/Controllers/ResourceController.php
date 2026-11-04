@@ -424,7 +424,7 @@ final class ResourceController
     }
 
     /**
-     * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели и журнала).
+     * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели).
      */
     private function markRead(Resource $resource, Model $record): void
     {

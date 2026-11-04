@@ -144,14 +144,6 @@ describe('switched off', function (): void {
             ->assertDontSee('/fastleo/feedback/'.$feedback->id, false);
     });
 
-    it('has no link to the page of a record in the history of changes', function (): void {
-        $article = Article::factory()->create();
-
-        $this->get(route('fastleo.resources.history', ['articles', $article->id]))
-            ->assertOk()
-            ->assertDontSee('href="'.route('fastleo.resources.show', ['articles', $article->id]).'"', false);
-    });
-
     it('has no link to a record in the trash', function (): void {
         $article = Article::factory()->create();
         $article->delete();

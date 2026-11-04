@@ -123,7 +123,7 @@ final class RelatedController
      * в `data[поле]` создаёт дочернюю запись с внешним ключом этого родителя. Нужны права `update` родителя и `create`
      * дочернего раздела — те же, что у кнопки «Добавить». Из ввода берутся только поля быстрого добавления; остальные поля
      * формы создания дочернего раздела получают умолчания, как в обычной форме (`default()`, `Hidden`, `Slug`, `beforeSave()`),
-     * и все проходят проверку. Внешний ключ ставит связь родителя. Запись идёт через `RecordWriter`: Eloquent, observers, журнал.
+     * и все проходят проверку. Внешний ключ ставит связь родителя. Запись идёт через `RecordWriter`: Eloquent, observers.
      * Ответ — `{"ok": true}` (201) или `{"message": "…", "errors": {"поле": ["…"]}}` (422).
      */
     public function store(Request $request, string $resource, string $id, string $relation): JsonResponse

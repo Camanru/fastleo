@@ -12,6 +12,7 @@ use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\FileField;
 use Fastleo\Fields\Image;
+use Fastleo\Fields\MorphTo;
 use Fastleo\Fields\Nested;
 use Fastleo\Fields\Repeater;
 use Fastleo\Fields\Select;
@@ -79,7 +80,6 @@ final class ResourceInspector
                 'import_key' => $resource::importKey(),
                 'mcp' => $resource->isAvailableInMcp(),
                 'poll' => $resource::poll(),
-                'history_panel' => $resource::hasHistoryPanel(),
                 'fields' => $this->fields($resource->schema()->fields()),
                 'filters' => array_values(array_map($this->filter(...), $resource->listFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
@@ -171,6 +171,10 @@ final class ResourceInspector
         if ($field instanceof BelongsTo || $field instanceof BelongsToMany) {
             $details['relation'] = $field->getRelationName();
             $details['related_model'] = $this->attempt(fn (): string => $field->relatedModel()::class);
+        }
+
+        if ($field instanceof MorphTo) {
+            $details['types'] = $this->attempt(fn (): array => array_map(fn (array $type): string => $type['resource']::singular(), $field->resolved()));
         }
 
         if ($field instanceof Nested) {

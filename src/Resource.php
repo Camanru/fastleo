@@ -10,11 +10,11 @@ use Fastleo\Actions\DeleteRecords;
 use Fastleo\Actions\ForceDeleteRecords;
 use Fastleo\Actions\MarkRead;
 use Fastleo\Actions\RestoreRecords;
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Image;
+use Fastleo\Fields\MorphTo;
 use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\Authorization;
@@ -128,12 +128,6 @@ abstract class Resource
      * Запись по своему ключу (`'sku'`) не найдена — создаётся; по `id` — строка пропускается.
      */
     protected static ?string $importKey = null;
-
-    /** Вести журнал изменений раздела («кто, когда, было → стало», откат). */
-    protected static bool $activity = true;
-
-    /** Панель «История изменений» в боковой колонке карточки записи (последние изменения; полная история — по ссылке). */
-    protected static bool $historyPanel = false;
 
     /** Записи раздела находит глобальный поиск (Ctrl+K); `false` — раздел в нём не участвует. */
     protected static bool $globallySearchable = true;
@@ -287,7 +281,7 @@ abstract class Resource
     }
 
     /**
-     * Отметить записи просмотренными (`true`) или нет: прямым запросом, без событий модели, журнала изменений
+     * Отметить записи просмотренными (`true`) или нет: прямым запросом, без событий модели
      * и смены `updated_at` — отметка не меняет саму запись. Без `$readColumn` ничего не делает.
      *
      * ```php
@@ -328,12 +322,12 @@ abstract class Resource
      * }
      * ```
      *
-     * Варианты `BelongsTo` (`titleColumn()`) и журнал изменений берут название сами и от этого метода не зависят.
+     * Варианты `BelongsTo` (`titleColumn()`) берут название сами и от этого метода не зависят.
      */
     public function title(Model $record): string
     {
         $columns = $this->listFields();
-        $field = array_find($columns, fn (Field $column): bool => ! $column instanceof BelongsTo && ! $column instanceof BelongsToMany) ?? $columns[0] ?? null;
+        $field = array_find($columns, fn (Field $column): bool => ! $column instanceof BelongsTo && ! $column instanceof BelongsToMany && ! $column instanceof MorphTo) ?? $columns[0] ?? null;
 
         if (! $field instanceof Field) {
             return '';
@@ -428,41 +422,10 @@ abstract class Resource
     }
 
     /**
-     * Раздел ведёт журнал изменений.
-     */
-    public static function logsActivity(): bool
-    {
-        return static::$activity;
-    }
-
-    /**
-     * В боковой колонке карточки записи — панель «История изменений» (`protected static bool $historyPanel = true;`).
-     * Нужен включённый журнал (`fastleo.activity.enabled`) и журнал раздела (`$activity`); показывается тем, кто может
-     * смотреть журнал и запись.
-     */
-    public static function hasHistoryPanel(): bool
-    {
-        return static::$historyPanel && static::$activity && ActivityRecorder::isEnabled();
-    }
-
-    /**
-     * В боковой колонке карточки этой записи есть панель истории: она включена, журнал работает, администратор
-     * может смотреть журнал раздела и саму запись.
-     */
-    public function showsHistoryPanel(Model $record): bool
-    {
-        return static::hasHistoryPanel() && ActivityRecorder::canView() && Authorization::allows('viewAny', $this) && Authorization::allows('view', $this, $record);
-    }
-
-    /**
-     * В карточке записи есть боковая колонка: панель истории или таблицы `Related::aside()`, доступные администратору.
+     * В карточке записи есть боковая колонка: таблицы `Related::aside()`, доступные администратору.
      */
     public function hasSideColumn(Model $record): bool
     {
-        if ($this->showsHistoryPanel($record)) {
-            return true;
-        }
-
         return $this->showsRelations($record) && array_any($this->listRelations(), fn (Related $related): bool => $related->isAside() && Authorization::allows('view', $this, $record) && Authorization::allows('viewAny', $related->child()));
     }
 

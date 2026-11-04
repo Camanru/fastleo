@@ -159,10 +159,25 @@ class HasMany extends Nested
     {
         $relation = $this->relationInstance($record);
         $existing = $relation->get()->keyBy(fn (Model $child): string => $this->childKey($child));
+        $blocks = self::blocks($value);
         $kept = [];
         $position = 0;
 
-        foreach (self::blocks($value) as $block) {
+        // Убранные блоки удаляются раньше записи остальных: уникальный индекс (родитель, выбранная запись)
+        // не мешает убрать строку и добавить такую же заново.
+        foreach ($blocks as $block) {
+            if ($block['id'] !== null && $existing->has((string) $block['id'])) {
+                $kept[] = (string) $block['id'];
+            }
+        }
+
+        foreach ($existing as $key => $child) {
+            if (! in_array((string) $key, $kept, true) && $child->delete() === false) {
+                throw new OperationCancelled;
+            }
+        }
+
+        foreach ($blocks as $block) {
             $id = $block['id'] === null ? null : (string) $block['id'];
             $child = $id === null ? null : $existing->get($id);
 
@@ -183,15 +198,6 @@ class HasMany extends Nested
             }
 
             $this->saveChild($relation, $child, $block['values']);
-            $kept[] = $this->childKey($child);
-        }
-
-        foreach ($existing as $key => $child) {
-            if (! in_array((string) $key, $kept, true)) {
-                if ($child->delete() === false) {
-                    throw new OperationCancelled;
-                }
-            }
         }
 
         $record->unsetRelation($this->name);

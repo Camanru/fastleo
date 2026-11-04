@@ -11,8 +11,10 @@ use Fastleo\SoftNetica\SyncResult;
 use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\SettingsStore;
 use Fastleo\Tests\TestCase;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
@@ -199,6 +201,25 @@ function signInAndVisit(string $url): mixed
 function articleData(array $overrides = []): array
 {
     return ['type' => 'news', 'title' => 'Статья', 'status' => 'draft', 'views' => '0', ...$overrides];
+}
+
+/**
+ * Слушает события Eloquent модели (`updated`, `created`): по ним видно, что запись шла через `save()`.
+ * Возвращает список изменённых атрибутов для каждого события; для `created` — все заполненные.
+ *
+ * @param  class-string<Model>  $model
+ * @return ArrayObject<int, list<string>>
+ */
+function modelEvents(string $model, string $event = 'updated'): ArrayObject
+{
+    /** @var ArrayObject<int, list<string>> $events */
+    $events = new ArrayObject;
+
+    Event::listen('eloquent.'.$event.': '.$model, function (Model $record) use ($events, $event): void {
+        $events[] = array_keys($event === 'updated' ? $record->getChanges() : $record->getAttributes());
+    });
+
+    return $events;
 }
 
 /**

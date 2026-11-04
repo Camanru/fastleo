@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Fastleo\Imports;
 
-use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Auth\FastleoUser;
 use Fastleo\Fastleo;
 use Fastleo\Notifications\FastleoMessage;
@@ -73,18 +72,10 @@ final class ImportRecords implements ShouldQueue
             fclose($stream);
 
             $guard->setUser($user);
-            $recorder = resolve(ActivityRecorder::class);
-            // Без очереди задача идёт внутри запроса админа: записи строк в журнал не пишем, только итог.
             $importer = new Importer($resource, $import);
-            $recorder->withoutRecording(fn () => $importer->run($local, $extension));
+            $importer->run($local, $extension);
             $this->keepSkippedRows($import, $importer->skippedFile());
             $import->status = 'done';
-            $recorder->importFinished($resource, [
-                'created' => $import->created,
-                'updated' => $import->updated,
-                'skipped' => $import->skipped,
-                'file' => $import->file_name,
-            ]);
         } catch (ImportFailed $exception) {
             $import->status = 'failed';
             $import->message = $exception->getMessage();

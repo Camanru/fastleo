@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Fastleo\Fastleo;
 use Fastleo\Http\Controllers\ActionsController;
-use Fastleo\Http\Controllers\ActivityController;
 use Fastleo\Http\Controllers\AuthController;
 use Fastleo\Http\Controllers\DashboardController;
 use Fastleo\Http\Controllers\ExpandController;
@@ -74,9 +73,6 @@ Route::group([
         Route::get('logs', [LogsController::class, 'index'])->name('logs.index');
         Route::post('logs/clear', [LogsController::class, 'clear'])->name('logs.clear');
 
-        Route::get('activity', [ActivityController::class, 'index'])->name('activity.index');
-        Route::post('activity/{activity}/revert', [ActivityController::class, 'revert'])->where('activity', '[0-9]{1,18}')->name('activity.revert');
-
         Route::controller(ProfileController::class)->prefix('profile')->name('profile.')->group(function (): void {
             Route::get('/', 'show')->name('show');
             Route::put('/', 'update')->middleware('throttle:fastleo-profile')->name('update');
@@ -112,7 +108,7 @@ Route::group([
                 Route::get('create', 'create')->name('create');
                 Route::post('/', 'store')->name('store');
                 Route::post('reorder', 'reorder')->name('reorder');
-                Route::get('options/{field}', [OptionsController::class, '__invoke'])->where('field', '[A-Za-z_]\w*')->name('options');
+                Route::get('options/{field}', [OptionsController::class, '__invoke'])->where('field', '[A-Za-z_]\w*(\.[A-Za-z_]\w*)?')->name('options');
                 Route::get('export', [ExportController::class, '__invoke'])->name('export');
                 Route::post('import', [ImportsController::class, 'store'])->name('import');
                 Route::get('imports/{import}', [ImportsController::class, 'show'])->name('imports.show');
@@ -120,7 +116,6 @@ Route::group([
                 Route::post('actions/{action}', [ActionsController::class, '__invoke'])->where('action', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('action');
                 Route::get('filter-options/{filter}', [FilterOptionsController::class, '__invoke'])->where('filter', '[A-Za-z_]\w*')->name('filter-options');
                 Route::post('chats/{field}', [MessengerChatsController::class, '__invoke'])->where('field', '[A-Za-z_]\w*')->middleware('throttle:fastleo-integrations')->name('chats');
-                Route::get('{id}/history', [ActivityController::class, 'history'])->name('history');
                 Route::get('{id}/related/{relation}', RelatedController::class)->where('relation', '[A-Za-z_]\w*')->name('related');
                 Route::post('{id}/related/{relation}', [RelatedController::class, 'store'])->where('relation', '[A-Za-z_]\w*')->name('related.store');
                 Route::post('{id}/related/{relation}/reorder', [RelatedController::class, 'reorder'])->where('relation', '[A-Za-z_]\w*')->name('related.reorder');

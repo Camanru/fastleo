@@ -27,7 +27,7 @@ final class OptionRule implements DataAwareRule, Stringable, ValidationRule
     private array $data = [];
 
     /**
-     * @param  Closure(mixed, array<array-key, mixed>): bool  $passes  проверка значения
+     * @param  Closure(mixed, array<array-key, mixed>, string): bool  $passes  проверка значения (значение, данные формы, имя проверяемого поля)
      * @param  string  $message  правило, текст которого показать (`in`, `exists`)
      * @param  string|null  $description  как правило выглядит в `fastleo:inspect` (`in:"a","b"`); по умолчанию — имя класса
      */
@@ -58,7 +58,7 @@ final class OptionRule implements DataAwareRule, Stringable, ValidationRule
      */
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
-        if (! ($this->passes)($value, $this->data)) {
+        if (! ($this->passes)($value, $this->data, $attribute)) {
             $fail(ValidationMessages::line($this->message));
         }
     }

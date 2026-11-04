@@ -45,7 +45,7 @@ final class ResourceRegistry
      */
     public const array RESERVED_SLUGS = [
         'login', 'logout', 'files', 'search', 'settings', 'pages', 'logs', 'notifications',
-        'profile', 'activity', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica',
+        'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica',
     ];
 
     /**

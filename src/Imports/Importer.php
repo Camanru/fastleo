@@ -8,6 +8,7 @@ use DateTimeInterface;
 use Fastleo\Exports\SpreadsheetCell;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\MorphTo;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\DatabaseErrors;
@@ -419,11 +420,15 @@ final class Importer
 
         foreach ($this->fields($existing) as $field) {
             if (array_key_exists($field->name, $values)) {
+                if ($existing instanceof Model && $field instanceof MorphTo && $field->isLocked($existing) && blank($values[$field->name])) {
+                    continue; // пара, которую выгрузка не показывает, не стирается пустой ячейкой
+                }
+
                 $value = $field->isTranslatable()
                     ? $this->translations($field, $values[$field->name], $existing)
                     : $field->importValue($values[$field->name]);
 
-                if ($existing instanceof Model && $this->truncated($value, $existing->getAttribute($field->name))) {
+                if ($existing instanceof Model && is_string($value) && $this->truncated($value, $existing->getAttribute($field->name))) {
                     continue;
                 }
 

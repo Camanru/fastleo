@@ -253,7 +253,7 @@ use Illuminate\Support\Facades\Schedule;
 Schedule::command('stock:sync')->hourly()->withoutOverlapping()->onOneServer();
 ```
 
-Observers товара срабатывают (пересчёт цены со скидкой, сброс кеша), но в журнал изменений админки команда не пишет. Ручная загрузка файла по артикулу — [импорт](algorithms.md#как-обновлять-цены-из-файла-по-артикулу). Подробнее — [импорт](../import-export.md#импорт).
+Observers товара срабатывают (пересчёт цены со скидкой, сброс кеша). Ручная загрузка файла по артикулу — [импорт](algorithms.md#как-обновлять-цены-из-файла-по-артикулу). Подробнее — [импорт](../import-export.md#импорт).
 
 ## Уведомления
 
@@ -640,7 +640,6 @@ final class ProductFeedResource extends Resource
     protected static ?string $group = 'Выгрузки';
     protected static string $icon = 'file-down';
     protected static bool $readonly = true;
-    protected static bool $activity = false;
 
     public function query(Builder $query): Builder
     {

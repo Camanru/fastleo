@@ -8,11 +8,15 @@ use Fastleo\Widgets\Chart;
 use Fastleo\Widgets\Stat;
 use Fastleo\Widgets\Table;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Fastleo\ArticleResource;
+use Workbench\App\Fastleo\RemarkResource;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Feedback;
+use Workbench\App\Models\Product;
+use Workbench\App\Models\Remark;
 
 beforeEach(function (): void {
     $this->me = admin(['name' => 'Анна']);
@@ -210,6 +214,23 @@ describe('Table', function (): void {
         expect($rows)->toHaveCount(1)
             ->and((string) $rows[0]['cells'][0])->toContain('Черновик');
     });
+});
+
+it('loads the objects of the notes of a Table widget with one query for each section', function (): void {
+    $articles = Article::factory()->count(2)->create();
+    $products = Product::factory()->count(2)->create();
+
+    foreach ([...$articles, ...$products] as $subject) {
+        Remark::query()->forceCreate(['body' => 'Заметка', 'subject_type' => $subject::class, 'subject_id' => $subject->id]);
+    }
+
+    DB::enableQueryLog();
+    $rows = Table::make()->resource(RemarkResource::class)->resolve()['rows'];
+    $queries = collect(DB::getQueryLog())->pluck('query');
+
+    expect($rows)->toHaveCount(4)
+        ->and($queries->filter(fn (string $sql): bool => str_contains($sql, '"articles"') || str_contains($sql, '`articles`'))->count())->toBe(1)
+        ->and($queries->filter(fn (string $sql): bool => str_contains($sql, '"products"') || str_contains($sql, '`products`'))->count())->toBe(1);
 });
 
 describe('Stat', function (): void {

@@ -234,7 +234,7 @@
             x-cloak
             x-transition:enter="transition duration-200 ease-out-quint"
             x-transition:enter-start="translate-y-3 opacity-0"
-            class="fixed inset-x-0 bottom-4 z-30 mx-auto flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap items-center justify-center gap-0.5 rounded-card bg-inverse p-1 text-base text-on-inverse shadow-[0_10px_30px_rgb(0_0_0/.28)] lg:bottom-7"
+            class="fixed inset-x-0 bottom-4 z-30 mx-auto flex w-max max-w-[calc(100vw-1.5rem)] flex-wrap lg:left-[248px] lg:max-w-[calc(100vw-248px-1.5rem)] lg:collapsed:left-16 lg:collapsed:max-w-[calc(100vw-4rem-1.5rem)] items-center justify-center gap-0.5 rounded-card bg-inverse p-1 text-base text-on-inverse shadow-[0_10px_30px_rgb(0_0_0/.28)] lg:bottom-7"
             data-bulk-bar
         >
             <span class="pr-1.5 pl-2 font-semibold tabular-nums" x-text="@js(__('fastleo::actions.selected', ['count' => '__N__'])).replace('__N__', selected.length)"></span>

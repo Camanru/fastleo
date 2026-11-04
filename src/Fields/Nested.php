@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Fastleo\Layout\Layout;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasOneOrMany;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use LogicException;
 use Override;
 
@@ -98,12 +100,18 @@ abstract class Nested extends Field
             return $this->schema;
         }
 
-        $schema = new FormSchema($this->items, $this->relationInstance()->getRelated()::class);
+        $relation = $this->relationInstance();
+        $schema = new FormSchema($this->items, $relation->getRelated()::class);
 
         foreach ($schema->fields() as $field) {
             $field->nestedIn($this->isSingle() ? $this->name.'.' : $this->name.'.*.');
 
-            if ($field instanceof Nested || $field instanceof Repeater || $field instanceof Blocks || ($field instanceof SearchesOptions && ! $field instanceof Select) || $field->getDependsOn() !== null || $field instanceof Slug || $field instanceof Password || $field->isTranslatable()) {
+            // Внешний ключ связи ставит родитель при сохранении: поле с этим именем ничего бы не сохранило.
+            if ($field->name === $relation->getForeignKeyName()) {
+                throw new LogicException(__('fastleo::exceptions.nested_foreign_key', ['field' => $field->name, 'parent' => $this->name], Fastleo::LOCALE));
+            }
+
+            if ($field instanceof Nested || $field instanceof Repeater || $field instanceof Blocks || ($field instanceof SearchesOptions && ! $field instanceof Select && ! $field instanceof BelongsTo) || $field->getDependsOn() !== null || $field instanceof Slug || $field instanceof Password || $field->isTranslatable()) {
                 throw new LogicException(__('fastleo::exceptions.nested_field', ['field' => $field->name, 'parent' => $this->name, 'type' => class_basename($field)], Fastleo::LOCALE));
             }
 
@@ -196,8 +204,11 @@ abstract class Nested extends Field
         }
 
         foreach ($this->blockFields(null) as $field) {
-            foreach ($field->getRules(null) as $key => $fieldRules) {
-                $rules[$prefix.$key] = $fieldRules;
+            // Выбор записи принимает и ключ, уже стоящий в этом же блоке, даже если связанная запись сейчас вне вариантов.
+            $fieldRules = $field instanceof BelongsTo ? $field->getRules(null, $this->keptFor($record, $field)) : $field->getRules(null);
+
+            foreach ($fieldRules as $key => $keyRules) {
+                $rules[$prefix.$key] = $keyRules;
             }
         }
 
@@ -208,6 +219,66 @@ abstract class Nested extends Field
     protected function typeRules(): array
     {
         return ['array'];
+    }
+
+    /**
+     * Ключ выбранной записи каждого блока сохранённой записи: ключ вложенной записи → ключ выбора.
+     *
+     * @return array<string, string>
+     */
+    private function storedKeys(?Model $record, BelongsTo $field): array
+    {
+        if (! $record instanceof Model || ! $record->exists) {
+            return [];
+        }
+
+        $keys = [];
+
+        foreach ($this->children($record) as $child) {
+            $key = $child->getAttribute($field->name);
+            $id = $child->getKey();
+
+            if (is_scalar($key) && $key !== '' && is_scalar($id)) {
+                $keys[(string) $id] = (string) $key;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
+     * Какой сохранённый ключ принимает проверка этого блока: тот, что стоит в блоке с таким же `id`
+     * (блок записи не может подобрать скрытую запись, стоящую в другом блоке); у одиночного блока — его единственный.
+     *
+     * @return Closure(string, array<array-key, mixed>): list<string>
+     */
+    private function keptFor(?Model $record, BelongsTo $field): Closure
+    {
+        $stored = $this->storedKeys($record, $field);
+
+        return function (string $attribute, array $data) use ($stored): array {
+            if ($this->isSingle()) {
+                return array_values($stored);
+            }
+
+            $id = data_get($data, Str::beforeLast($attribute, '.').'.id');
+
+            return is_scalar($id) && isset($stored[(string) $id]) ? [$stored[(string) $id]] : [];
+        };
+    }
+
+    /**
+     * Загрузить подписи выбранных записей всех блоков одним запросом на поле (форма не делает запрос на каждый блок).
+     *
+     * @param  array<string, list<string>>  $keys  имя поля блока → ключи выбранных записей
+     */
+    public function prefetchOptions(array $keys): void
+    {
+        foreach ($this->schema()->fields() as $field) {
+            if ($field instanceof BelongsTo && isset($keys[$field->name])) {
+                $field->prefetch($keys[$field->name]);
+            }
+        }
     }
 
     /**
@@ -373,7 +444,7 @@ abstract class Nested extends Field
     #[Override]
     public function display(Model $record): string|Htmlable|null
     {
-        if ($this->formatUsing instanceof \Closure) {
+        if ($this->formatUsing instanceof Closure) {
             return parent::display($record);
         }
 
@@ -382,6 +453,9 @@ abstract class Nested extends Field
         if ($children->isEmpty()) {
             return null;
         }
+
+        // Названия выбранных записей (BelongsTo в блоке) — одним запросом на поле, а не на каждый блок.
+        $children->loadMissing(array_merge(...array_map(fn (Field $field): array => $field->eagerLoad(), $this->schema()->fields())));
 
         return new HtmlString(view('fastleo::fields.nested-show', [
             'field' => $this,

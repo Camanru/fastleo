@@ -44,6 +44,7 @@ Text::make('title', 'Заголовок')->required()->searchable()->sortable();
 | [Gallery](gallery.md) | несколько картинок с порядком | `json` + каст `array` |
 | [BelongsTo](belongs-to.md) | связь с записью другой таблицы | `foreignId` |
 | [BelongsToMany](belongs-to-many.md) | связь многие ко многим | промежуточная таблица |
+| [MorphTo](morph-to.md) | запись одного из нескольких разделов (статья или товар) | `nullableMorphs` |
 | [HasMany](has-many.md) | вложенные записи блоками | таблица блоков |
 | [HasOne](has-one.md) | одна вложенная запись | таблица блока |
 | [Repeater](repeater.md) | повторяющаяся группа полей | `json` + каст `array` |

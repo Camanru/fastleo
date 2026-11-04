@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Image;
+use Fastleo\Fields\MorphTo;
 use Fastleo\Layout\Layout;
 use Fastleo\Layout\Tab;
 use Fastleo\Layout\Tabs;
@@ -48,6 +49,10 @@ final readonly class FormSchema
         }
 
         foreach ($fields as $field) {
+            if (($fields[$field->getDependsOn() ?? ''] ?? null) instanceof MorphTo) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.depends_on_morph', ['field' => $field->name, 'controlling' => $field->getDependsOn()], Fastleo::LOCALE));
+            }
+
             $controlling = $fields[$field->getVisibleWhen()['field'] ?? ''] ?? null;
 
             if ($controlling instanceof Field && $controlling->isMultiple()) {

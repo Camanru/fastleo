@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use Fastleo\Activity\Activity;
 use Fastleo\Fastleo;
 use Fastleo\Imports\Import;
 use Fastleo\Imports\ImportRecords;
 use Fastleo\Notifications\AdminNotification;
+use Fastleo\Tests\Fixtures\Policies\NoListProductPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
@@ -23,6 +23,8 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\Product;
+use Workbench\App\Models\Remark;
 use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
 
@@ -444,23 +446,6 @@ it('fails an import that crashed and reports the error', function (): void {
     Exceptions::assertReported(RuntimeException::class);
 });
 
-it('writes one summary entry to the journal instead of an entry per row', function (): void {
-    importFile(xlsxFile([['Заголовок'], ['Раз'], ['Два'], ['Три']]));
-
-    $entries = Activity::query()->get();
-
-    expect($entries)->toHaveCount(1)
-        ->and($entries[0]->event)->toBe('import')
-        ->and($entries[0]->resource)->toBe('articles')
-        ->and($entries[0]->subject_id)->toBeNull()
-        ->and($entries[0]->changes)->toBeStoredJson([
-            'created' => ['new' => 3],
-            'updated' => ['new' => 0],
-            'skipped' => ['new' => 0],
-            'file' => ['new' => 'import.xlsx'],
-        ]);
-});
-
 it('tells the uploader in the bell how the import went, with a link to the report', function (): void {
     importFile(xlsxFile([['Заголовок'], ['Раз'], ['Два']]));
 
@@ -684,3 +669,57 @@ it('fails an archive with damaged data whether or not the server reports PHP war
     'warnings reported' => [E_ALL],
     'warnings hidden' => [E_ALL & ~E_WARNING],
 ]);
+
+it('keeps the object of a record that the export leaves empty when the cell stays empty', function (): void {
+    useFixtureResources('Morph');
+    $stored = Remark::query()->forceCreate(['body' => 'Старая', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 3]);
+
+    importFile(xlsxFile([['id', 'Заметка', 'О чём'], [$stored->id, 'Новая', '']]), 'remarks');
+
+    expect($stored->refresh()->only('body', 'subject_type', 'subject_id'))->toBe(['body' => 'Новая', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 3]);
+});
+
+it('does not import an object of a section the administrator may not list or one named by its class', function (): void {
+    useFixtureResources('Morph');
+    Gate::policy(Product::class, NoListProductPolicy::class);
+    $article = Article::factory()->create();
+    $product = Product::factory()->create(['is_visible' => true]);
+
+    importFile(xlsxFile([
+        ['id', 'Заметка', 'О чём'],
+        ['', 'Закрытый раздел', 'products:'.$product->id],
+        ['', 'Класс модели', Article::class.':'.$article->id],
+    ]), 'remarks');
+
+    expect(lastImport()->only('created', 'skipped'))->toBe(['created' => 0, 'skipped' => 2])
+        ->and(Remark::query()->count())->toBe(0);
+});
+
+it('imports the object of a record as a section and a key and checks it like the form', function (): void {
+    useFixtureResources('Morph');
+    $article = Article::factory()->create();
+    $shown = Product::factory()->create(['is_visible' => true]);
+    $hidden = Product::factory()->create(['is_visible' => false]);
+    $stored = Remark::query()->forceCreate(['body' => 'Старая', 'subject_type' => 'App\\Models\\Gone', 'subject_id' => 3]);
+
+    importFile(xlsxFile([
+        ['id', 'Заметка', 'О чём'],
+        ['', 'Статья', 'articles:'.$article->id],
+        ['', 'Товар', 'products:'.$shown->id],
+        ['', 'Скрытый', 'products:'.$hidden->id],
+        ['', 'Чужой раздел', 'remarks:1'],
+        ['', 'Без ключа', 'articles'],
+        ['', 'Пусто', ''],
+        [$stored->id, 'Обновлена', 'articles:'.$article->id],
+    ]), 'remarks');
+
+    $remarks = Remark::query()->orderBy('id')->get()->map(fn (Remark $remark): array => [$remark->body, $remark->subject_type, $remark->subject_id])->all();
+
+    expect(lastImport()->only('created', 'updated', 'skipped'))->toBe(['created' => 3, 'updated' => 1, 'skipped' => 3])
+        ->and($remarks)->toBe([
+            ['Обновлена', Article::class, $article->id],
+            ['Статья', Article::class, $article->id],
+            ['Товар', Product::class, $shown->id],
+            ['Пусто', null, null],
+        ]);
+});

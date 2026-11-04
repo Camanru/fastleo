@@ -55,6 +55,27 @@ trait QueriesRelatedRecords
     private array $optionsCount = [];
 
     /**
+     * Записи, загруженные заранее одним запросом (`prefetch()`), по ключам.
+     *
+     * @var array<string, Model>
+     */
+    private array $prefetched = [];
+
+    /**
+     * Ключи, которые искали в `prefetch()` (записи вне вариантов в `$prefetched` не попали).
+     *
+     * @var list<string>
+     */
+    private array $prefetchedKeys = [];
+
+    /**
+     * Найденные среди вариантов ключи всех блоков формы (`existingInBlocks()`) по набору проверяемых ключей.
+     *
+     * @var array<string, array<string, true>>
+     */
+    private array $existing = [];
+
+    /**
      * Метод связи в модели, если он называется не так, как поле.
      *
      * ```php
@@ -193,6 +214,41 @@ trait QueriesRelatedRecords
     }
 
     /**
+     * Имя поля в адресе поиска вариантов: `item_id` или, внутри блока `HasMany`/`HasOne`, `items.item_id`.
+     */
+    public function optionsPath(): string
+    {
+        $parent = $this->nestedParent();
+
+        return $parent === null ? $this->name : $parent.'.'.$this->name;
+    }
+
+    /**
+     * Ключи, подходящие по виду ключу связанной модели: значение из `old()` не доходит до запроса (на PostgreSQL
+     * нечисловой ключ числового столбца — ошибка базы).
+     *
+     * @param  list<string>  $keys
+     * @return list<string>
+     */
+    private function validKeys(array $keys): array
+    {
+        return array_values(array_filter($keys, fn (string $key): bool => RecordKey::strict($this->relatedModel(), $key) !== false));
+    }
+
+    /**
+     * Загрузить записи выбранных ключей одним запросом: подписи выбранных в блоках формы (`optionsFor()`)
+     * берутся из них без запроса на каждый блок. Работает для полей без `dependsOn()`.
+     *
+     * @param  list<string>  $keys
+     */
+    public function prefetch(array $keys): void
+    {
+        $keys = $this->validKeys($keys);
+        $this->prefetchedKeys = $keys;
+        $this->prefetched = $keys === [] ? [] : $this->optionsQuery()->whereKey($keys)->get()->keyBy(fn (Model $record): string => self::key($record))->all();
+    }
+
+    /**
      * Вариантов больше, чем выводится в странице (`fastleo.relations.preload`): список ищет по серверу.
      */
     public function isRemote(mixed $dependency = null): bool
@@ -279,11 +335,15 @@ trait QueriesRelatedRecords
      */
     public function optionsFor(array $keys, mixed $dependency = null, array $kept = []): array
     {
+        $keys = $this->validKeys($keys);
+
         if ($keys === []) {
             return [];
         }
 
-        $records = $this->optionsQuery($dependency)->whereKey($keys)->get()->keyBy(fn (Model $record): string => self::key($record));
+        $records = $dependency === null && array_diff($keys, $this->prefetchedKeys) === []
+            ? collect($this->prefetched)
+            : $this->optionsQuery($dependency)->whereKey($keys)->get()->keyBy(fn (Model $record): string => self::key($record));
         $missing = array_values(array_intersect(array_diff($keys, array_map(strval(...), $records->keys()->all())), $kept));
         $base = $missing === [] ? collect() : $this->baseOptionsQuery()->whereKey($missing)->get()->keyBy(fn (Model $record): string => self::key($record));
 
@@ -322,9 +382,11 @@ trait QueriesRelatedRecords
     /**
      * Правило: значение — ключ записи из запроса вариантов. Для числовых ключей перед ним — `integer`.
      *
+     * @param  (Closure(string, array<array-key, mixed>): list<string>)|null  $keptFor  ключи, которые принимаются кроме сохранённых
+     *                                                                                  в записи: по имени проверяемого поля и данным формы (сохранённое значение своего блока)
      * @return list<mixed>
      */
-    protected function optionRules(?Model $record = null): array
+    protected function optionRules(?Model $record = null, ?Closure $keptFor = null): array
     {
         // Уже сохранённое значение записи принимается, даже если оно сейчас вне вариантов
         // (связанная запись в корзине или скрыта query()): иначе правка формы стёрла бы связь.
@@ -333,15 +395,54 @@ trait QueriesRelatedRecords
         // Правило `integer` не останавливает следующие (без `bail`): не-число в запросе к числовому
         // ключу на PostgreSQL — ошибка базы (500), поэтому формат проверяется здесь же.
         $exists = new OptionRule(
-            fn (mixed $value, array $data): bool => is_scalar($value) && (
+            fn (mixed $value, array $data, string $attribute): bool => is_scalar($value) && (
                 (! $this->required && $this->isEmptyValue($value))
-                || (in_array((string) $value, $saved, true) && $this->dependencyUnchanged($record, $data))
+                || (in_array((string) $value, [...$saved, ...($keptFor instanceof Closure ? $keptFor($attribute, $data) : [])], true) && $this->dependencyUnchanged($record, $data))
                 || (RecordKey::strict($this->relatedModel(), (string) $value) !== false && $this->optionExists($value, $data))
             ),
             'exists',
         );
 
         return $numeric ? ['integer', $exists] : ['string', $exists];
+    }
+
+    /**
+     * Ключи вариантов поля, выбранные во всех блоках формы, одним запросом на форму (а не запрос на блок).
+     * Значения других блоков не подставляются: берутся только ключи нужного вида.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array<string, true>
+     */
+    private function existingInBlocks(array $data): array
+    {
+        $parent = data_get($data, (string) $this->nestedParent());
+        $blocks = is_array($parent) ? (str_ends_with($this->rulePrefix, '.*.') ? $parent : [$parent]) : [];
+        $keys = [];
+
+        foreach ($blocks as $block) {
+            $key = is_array($block) ? ($block[$this->name] ?? null) : null;
+
+            if ((is_string($key) || is_int($key)) && (string) $key !== '' && RecordKey::strict($this->relatedModel(), (string) $key) !== false) {
+                $keys[(string) $key] = (string) $key;
+            }
+        }
+
+        $hash = implode(',', $keys);
+
+        if (! isset($this->existing[$hash])) {
+            // Ключи уже прошли проверку вида (`RecordKey::strict`), поэтому база их примет.
+            $found = $keys === [] ? [] : $this->optionsQuery()->whereKey(array_values($keys))->pluck($this->relatedModel()->getQualifiedKeyName())->all();
+
+            $this->existing[$hash] = [];
+
+            foreach ($found as $key) {
+                if (is_int($key) || is_string($key)) {
+                    $this->existing[$hash][(string) $key] = true;
+                }
+            }
+        }
+
+        return $this->existing[$hash];
     }
 
     /**
@@ -352,6 +453,10 @@ trait QueriesRelatedRecords
      */
     private function optionExists(mixed $value, array $data): bool
     {
+        if ($this->nestedParent() !== null && $this->getDependsOn() === null) {
+            return is_scalar($value) && isset($this->existingInBlocks($data)[(string) $value]);
+        }
+
         try {
             return $this->optionsQuery($this->dependencyFrom($data))->whereKey($value)->exists();
         } catch (QueryException) {

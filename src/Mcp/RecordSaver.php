@@ -141,9 +141,13 @@ final class RecordSaver
         $names = array_map(fn (Field $field): string => $field->name, $fields);
 
         foreach ($writable as $field) {
+            if (in_array($field->name, $names, true) || ! array_key_exists((string) $field->getDependsOn(), $data)) {
+                continue;
+            }
+
             $stored = $existing->getAttribute($field->name);
 
-            if (in_array($field->name, $names, true) || ! array_key_exists((string) $field->getDependsOn(), $data) || ! is_scalar($stored)) {
+            if (! is_scalar($stored)) {
                 continue;
             }
 

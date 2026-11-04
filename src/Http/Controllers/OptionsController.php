@@ -6,6 +6,9 @@ namespace Fastleo\Http\Controllers;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Contracts\SearchesOptions;
+use Fastleo\Fields\Field;
+use Fastleo\Fields\MorphTo;
+use Fastleo\Fields\Nested;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\RecordKey;
@@ -13,6 +16,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 /**
  * Варианты поля-списка с поиском по серверу (связи с большим числом записей).
@@ -28,7 +32,7 @@ final class OptionsController
      * Если админ не может менять поле-зависимость, `depends` не учитывается: берётся значение записи
      * (нужно право её изменять), при создании — значение по умолчанию. Иначе подделкой `depends`
      * можно было бы увидеть чужие варианты.
-     * Нужны право просмотра раздела и поле, которое можно менять в форме.
+     * Нужны право просмотра раздела и поле, которое можно менять в форме. Поле блока `HasMany`/`HasOne` — `options/items.item_id`.
      */
     public function __invoke(Request $request, string $resource, string $field): JsonResponse
     {
@@ -36,7 +40,7 @@ final class OptionsController
         abort_unless($resource instanceof Resource, 404);
         Authorization::authorize('viewAny', $resource);
 
-        $field = $resource->schema()->field($field);
+        $field = $this->field($resource, $field);
         abort_unless($field instanceof SearchesOptions && $field->isFormField() && $field->isWritable(), 404);
 
         $search = $request->query('q');
@@ -59,6 +63,10 @@ final class OptionsController
             $dependency = $resource->controllingValue($depends, $record, [$depends => is_string($value) ? mb_substr($value, 0, 255) : null]);
         }
 
+        if ($field instanceof MorphTo) {
+            $dependency = $this->morphType($request, $field);
+        }
+
         try {
             $options = $field->searchOptions($search, self::LIMIT, $dependency);
         } catch (QueryException) {
@@ -67,5 +75,37 @@ final class OptionsController
         }
 
         return response()->json(['options' => $options]);
+    }
+
+    /**
+     * Раздел-тип поля MorphTo из `depends`: пустой — null (вариантов нет), неизвестный или закрытый администратору — 404.
+     */
+    private function morphType(Request $request, MorphTo $field): ?string
+    {
+        $type = $request->query('depends');
+        $type = is_string($type) ? mb_substr(trim($type), 0, 255) : '';
+
+        abort_unless($type === '' || $field->allowsType($type), 404);
+
+        return $type === '' ? null : $type;
+    }
+
+    /**
+     * Поле раздела по имени из адреса: `item_id` или поле блока `HasMany`/`HasOne` — `items.item_id`.
+     * Блок и его поле должны быть доступны для записи, иначе поля нет.
+     */
+    private function field(Resource $resource, string $path): ?Field
+    {
+        $field = $resource->schema()->field(Str::before($path, '.'));
+
+        if (! str_contains($path, '.')) {
+            return $field;
+        }
+
+        if (! $field instanceof Nested || ! $field->isFormField() || ! $field->isWritable()) {
+            return null;
+        }
+
+        return $field->schema()->field(Str::after($path, '.'));
     }
 }

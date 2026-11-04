@@ -10,7 +10,7 @@ use Fastleo\Resource;
 use Fastleo\Tests\Fixtures\Models\SecretNote;
 
 /**
- * Заметки с полем пароля под нестандартным именем `pin`: оно не должно попадать в сессию и журнал изменений.
+ * Заметки с полем пароля под нестандартным именем `pin`: оно не должно попадать в сессию.
  */
 final class SecretNoteResource extends Resource
 {
