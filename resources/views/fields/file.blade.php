@@ -13,7 +13,10 @@
         'crop' => $field instanceof \Fastleo\Fields\Image ? $field->getCrop() : null,
         'cropUrl' => route('fastleo.files.crop'),
     ];
+    $altField = $field instanceof \Fastleo\Fields\Image ? $field->altField() : null;
 @endphp
+{{-- С описанием картинки (alt) поле и описание — одна ячейка раскладки; ошибка и подсказка картинки остаются под картинкой. --}}
+@if ($altField !== null)<div class="flex flex-col gap-3">@endif
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     <div x-data="fastleoFile(@js($config))" class="flex flex-wrap items-center gap-3" data-file-field>
         @if ($writable)
@@ -53,6 +56,10 @@
         </span>
     </div>
 </x-fastleo::field>
+@if ($altField !== null)
+    @include('fastleo::form.items', ['items' => [$altField], 'record' => $record])
+</div>
+@endif
 
 @if ($writable && $config['crop'] !== null)
     @pushOnce('fastleo-scripts', 'fastleo-cropper')

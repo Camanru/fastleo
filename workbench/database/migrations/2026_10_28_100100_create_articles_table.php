@@ -41,6 +41,8 @@ return new class extends Migration
             $table->text('head_code')->nullable();
             $table->longText('content')->nullable();
             $table->string('cover')->nullable();
+            $table->string('cover_alt')->nullable();
+            $table->string('video')->nullable();
             $table->json('gallery')->nullable();
             $table->json('seo')->nullable();
             $table->string('attachment')->nullable();

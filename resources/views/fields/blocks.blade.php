@@ -21,7 +21,7 @@
 @endphp
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     <div
-        x-data="fastleoBlocks({ min: @js($field->getMin() ?? 0), max: @js($field->getMax()), sortable: @js($writable) })"
+        x-data="fastleoBlocks({ min: @js($field->getMin() ?? 0), max: @js($field->getMax()), sortable: @js($writable), placeholder: @js($field->keyPlaceholder()) })"
         data-blocks="{{ $path }}"
         class="flex flex-col gap-3"
     >
@@ -37,7 +37,7 @@
         @if ($writable)
             @foreach ($field->getTypes() as $type => $definition)
                 <template x-ref="template-{{ $type }}">
-                    @include('fastleo::fields.blocks-block', ['key' => '__KEY__', 'type' => $type, 'item' => null])
+                    @include('fastleo::fields.blocks-block', ['key' => $field->keyPlaceholder(), 'type' => $type, 'item' => null])
                 </template>
             @endforeach
             <div x-data="fastleoMenu" class="relative" @keydown.escape="if (menu) { $event.preventDefault(); $event.stopPropagation(); menu = false; }" @click.outside="menu = false" @scroll.window="place()" x-show="max === null || count < max">

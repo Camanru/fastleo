@@ -499,6 +499,7 @@ final class Doctor
 
         try {
             $fields = $resource->schema()->fields();
+            $this->assertLists($fields);
             $resource->listFilters();
             $resource->listActions();
             $resource->listRelations();
@@ -539,6 +540,29 @@ final class Doctor
         $this->queryColumns($resource, $fields, $scope);
         $this->fields($fields, $model, $columns, $scope, ! $resource::isReadonly());
         $this->inputVars($fields, $scope, ! $resource::isReadonly());
+    }
+
+    /**
+     * Описание списков внутри полей (Repeater, Blocks и вложенных в них) собирается сразу: подполе, которое там не работает,
+     * и третий уровень вложенности видны здесь, а не только при открытии формы.
+     *
+     * @param  list<Field>  $fields
+     *
+     * @throws LogicException подполе или вложенность, которые в списке не работают
+     */
+    private function assertLists(array $fields): void
+    {
+        foreach ($fields as $field) {
+            if ($field instanceof Repeater) {
+                $this->assertLists($field->schema()->fields());
+            }
+
+            if ($field instanceof Blocks) {
+                foreach (array_keys($field->getTypes()) as $type) {
+                    $this->assertLists($field->schema($type)->fields());
+                }
+            }
+        }
     }
 
     /**

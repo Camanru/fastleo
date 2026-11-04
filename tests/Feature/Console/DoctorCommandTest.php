@@ -821,6 +821,12 @@ it('does not fail when the SoftNetica checks cannot read the settings', function
     expect(implode("\n", messages('site', 'error')))->toContain('нет таблиц fastleo_settings');
 });
 
+it('reports a list inside a list inside a list as an error of the section, not only when the form is opened', function (): void {
+    useFixtureResources('DoctorBrokenList');
+
+    expect(implode("\n", messages('broken-list', 'error')))->toContain('на один уровень');
+});
+
 describe('relations and blocks that do not work', function (): void {
     beforeEach(function (): void {
         if (DB::connection()->getDriverName() === 'pgsql') {

@@ -7,10 +7,13 @@ namespace Fastleo\Support;
 use Fastleo\Actions\Action;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
+use Fastleo\Fields\Blocks;
 use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\FileField;
+use Fastleo\Fields\Image;
 use Fastleo\Fields\Nested;
+use Fastleo\Fields\Repeater;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
@@ -175,6 +178,18 @@ final class ResourceInspector
             $details['fields'] = $this->fields($field->schema()->fields());
         }
 
+        if ($field instanceof Repeater) {
+            $details['fields'] = $this->fields($field->schema()->fields());
+        }
+
+        if ($field instanceof Blocks) {
+            $details['types'] = [];
+
+            foreach ($field->getTypes() as $type => $block) {
+                $details['types'][$type] = ['label' => $block->getLabel(), 'fields' => $this->fields($field->schema($type)->fields())];
+            }
+        }
+
         if ($field instanceof Checkbox && $field->isQuickToggle()) {
             $details['quick_toggle'] = true;
         }
@@ -189,6 +204,10 @@ final class ResourceInspector
 
         if ($field->isInlineEditable()) {
             $details['inline_editable'] = true;
+        }
+
+        if ($field instanceof Image && $field->altField() instanceof Field) {
+            $details['alt'] = $field->altField()->name;
         }
 
         if ($field instanceof FileField) {

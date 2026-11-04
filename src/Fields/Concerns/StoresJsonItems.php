@@ -43,7 +43,12 @@ trait StoresJsonItems
         foreach ($schema->fields() as $field) {
             $field->nestedIn($prefix);
 
-            if ($field instanceof Nested || $field instanceof Repeater || $field instanceof Blocks || $field instanceof KeyValue || $field instanceof Seo
+            // Repeater и Blocks внутри элемента — один уровень вложенности: внутри них самих они уже не работают.
+            if (($field instanceof Repeater || $field instanceof Blocks) && $this->rulePrefix !== '') {
+                throw new LogicException(__('fastleo::exceptions.nested_depth', ['field' => $field->name, 'parent' => $this->name, 'type' => class_basename($field)], Fastleo::LOCALE));
+            }
+
+            if ($field instanceof Nested || $field instanceof KeyValue || $field instanceof Seo
                 || ($field instanceof SearchesOptions && ! $field instanceof Select) || $field->getDependsOn() !== null
                 || $field instanceof Slug || $field instanceof Password || $field->isTranslatable()) {
                 throw new LogicException(__('fastleo::exceptions.nested_field', ['field' => $field->name, 'parent' => $this->name, 'type' => class_basename($field)], Fastleo::LOCALE));
@@ -63,6 +68,17 @@ trait StoresJsonItems
         Nested::assertControllingFields($schema, $this->name);
 
         return $schema;
+    }
+
+    /**
+     * Метка ключа в шаблоне нового элемента: у списка внутри элемента своя (`__KEY_1__`), иначе замена ключа внешнего
+     * элемента задела бы и шаблон внутреннего.
+     */
+    public function keyPlaceholder(): string
+    {
+        $level = substr_count($this->rulePrefix, '*');
+
+        return $level === 0 ? '__KEY__' : '__KEY_'.$level.'__';
     }
 
     /**
@@ -93,6 +109,25 @@ trait StoresJsonItems
         }
 
         return $values;
+    }
+
+    /**
+     * Значения подполей элемента в том виде, в котором их принимает запись: вложенные Repeater и Blocks приводятся
+     * от сохранённого вида к виду формы.
+     *
+     * @param  list<Field>  $fields
+     * @param  array<array-key, mixed>  $item
+     * @return array<array-key, mixed>
+     */
+    protected static function inputItem(array $fields, array $item): array
+    {
+        foreach ($fields as $field) {
+            if (($field instanceof Repeater || $field instanceof Blocks) && array_key_exists($field->name, $item)) {
+                $item[$field->name] = $field->inputValue($item[$field->name]);
+            }
+        }
+
+        return $item;
     }
 
     /**
@@ -145,7 +180,7 @@ trait StoresJsonItems
     }
 
     /**
-     * Поставить в очередь варианты новых картинок подполей Image и Gallery.
+     * Поставить в очередь варианты новых картинок подполей Image и Gallery, в том числе во вложенных Repeater и Blocks.
      *
      * @param  list<Field>  $fields
      * @param  list<array<array-key, mixed>>  $items  значения элементов сейчас
@@ -154,6 +189,12 @@ trait StoresJsonItems
     protected static function queueItemVariants(array $fields, array $items, array $previous): void
     {
         foreach ($fields as $field) {
+            if ($field instanceof Repeater || $field instanceof Blocks) {
+                $field->queueVariantsOf(self::flatItems(array_column($items, $field->name)), self::flatItems(array_column($previous, $field->name)));
+
+                continue;
+            }
+
             if (! $field instanceof Image && ! $field instanceof Gallery) {
                 continue;
             }
@@ -162,6 +203,17 @@ trait StoresJsonItems
             $paths = array_diff(self::paths(array_column($items, $field->name)), $before);
             $field->queueVariants(array_values(array_unique($paths)));
         }
+    }
+
+    /**
+     * Элементы вложенного списка из значений подполя всех внешних элементов — одним списком.
+     *
+     * @param  array<array-key, mixed>  $values
+     * @return list<array<array-key, mixed>>
+     */
+    private static function flatItems(array $values): array
+    {
+        return array_merge(...array_map(self::storedItems(...), $values));
     }
 
     /**

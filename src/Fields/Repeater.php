@@ -123,7 +123,18 @@ class Repeater extends Field
      */
     public function schema(): FormSchema
     {
-        return $this->schema ??= $this->itemSchema($this->items, $this->name.'.*.');
+        return $this->schema ??= $this->itemSchema($this->items, $this->rulePrefix.$this->name.'.*.');
+    }
+
+    /**
+     * Список внутри элемента: правила подполей получают префикс внешнего списка, схему пора собрать заново.
+     */
+    #[Override]
+    public function nestedIn(string $prefix): static
+    {
+        $this->schema = null;
+
+        return parent::nestedIn($prefix);
     }
 
     /**
@@ -134,6 +145,19 @@ class Repeater extends Field
     public function itemFields(): array
     {
         return self::writableItemFields($this->schema());
+    }
+
+    /**
+     * Сохранённое значение колонки в виде, в котором его принимает запись (MCP, форма): список элементов,
+     * вложенные Repeater и Blocks — тоже в виде формы.
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    public function inputValue(mixed $stored): array
+    {
+        $fields = $this->itemFields();
+
+        return array_map(fn (array $item): array => self::inputItem($fields, $item), self::storedItems($stored));
     }
 
     #[Override]
@@ -262,7 +286,18 @@ class Repeater extends Field
 
         $previous = $record->wasRecentlyCreated ? [] : self::storedItems($record->getPrevious()[$this->name] ?? null);
 
-        self::queueItemVariants($this->itemFields(), self::storedItems($value), $previous);
+        $this->queueVariantsOf(self::storedItems($value), $previous);
+    }
+
+    /**
+     * Варианты новых картинок элементов (и вложенных списков).
+     *
+     * @param  list<array<array-key, mixed>>  $items  элементы сейчас
+     * @param  list<array<array-key, mixed>>  $previous  элементы до сохранения
+     */
+    public function queueVariantsOf(array $items, array $previous): void
+    {
+        self::queueItemVariants($this->itemFields(), $items, $previous);
     }
 
     /**

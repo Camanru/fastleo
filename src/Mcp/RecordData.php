@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Fastleo\Mcp;
 
+use Fastleo\Fields\Blocks;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Nested;
 use Fastleo\Fields\Password;
+use Fastleo\Fields\Repeater;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Model;
 
@@ -59,6 +61,10 @@ final class RecordData
     {
         if ($field instanceof Nested) {
             return self::nested($field, $record);
+        }
+
+        if ($field instanceof Repeater || $field instanceof Blocks) {
+            return $field->inputValue($record->getAttribute($field->name));
         }
 
         return $field->isTranslatable() ? $field->translations($record) : $field->hydrate($record);

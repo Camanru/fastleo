@@ -9,7 +9,7 @@
 @endphp
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     <div
-        x-data="fastleoBlocks({ min: @js($field->getMin() ?? 0), max: @js($field->getMax()), sortable: @js($sortable) })"
+        x-data="fastleoBlocks({ min: @js($field->getMin() ?? 0), max: @js($field->getMax()), sortable: @js($sortable), placeholder: @js($field->keyPlaceholder()) })"
         data-blocks="{{ $path }}"
         class="flex flex-col gap-3"
     >
@@ -24,7 +24,7 @@
         <p x-show="count === 0" @class(['text-sm text-ink-2 ', 'hidden' => $children->isNotEmpty()])>{{ __('fastleo::resources.nested_empty') }}</p>
         @if ($writable)
             <template x-ref="template">
-                @include('fastleo::fields.nested-block', ['key' => '__KEY__', 'child' => null, 'blockId' => null])
+                @include('fastleo::fields.nested-block', ['key' => $field->keyPlaceholder(), 'child' => null, 'blockId' => null])
             </template>
             <div>
                 <x-fastleo::button variant="dashed" icon="plus" x-show="max === null || count < max" x-on:click="add()" data-block-add>

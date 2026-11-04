@@ -36,3 +36,31 @@ it('adds blocks with an editor, moves and removes them and saves the order', fun
         ['type' => 'text', 'data' => ['body' => '<p>Текст блока</p>']],
     ]);
 });
+
+it('starts the editor again in a block that was moved while collapsed', function (): void {
+    $page = signInAndVisit(route('fastleo.resources.create', 'site-pages'));
+
+    $page->fill('input[name="title[ru]"]', 'Свёрнутые блоки')
+        ->click('[data-blocks=content] [data-block-add]')
+        ->click('[data-block-type=text]')
+        ->click('[data-blocks=content] [data-block-add]')
+        ->click('[data-block-type=text]')
+        ->assertPresent('[data-blocks=content] [data-block]:nth-child(2) [data-rich-text][data-ready]')
+        ->script("hugerte.get()[0].setContent('<p>Первый</p>'); hugerte.get()[1].setContent('<p>Второй</p>'); hugerte.triggerSave();");
+
+    $page->click('[data-blocks=content] [data-block]:nth-child(1) [data-block-toggle]')
+        ->click('[data-blocks=content] [data-block]:nth-child(2) [data-block-toggle]')
+        ->drag('[data-blocks=content] [data-block]:nth-child(2) [data-block-handle]', '[data-blocks=content] [data-block]:nth-child(1) [data-block-handle]')
+        ->click('[data-blocks=content] [data-block]:nth-child(1) [data-block-toggle]')
+        ->click('[data-blocks=content] [data-block]:nth-child(2) [data-block-toggle]')
+        ->assertPresent('[data-blocks=content] [data-block]:nth-child(1) [data-rich-text] iframe')
+        ->assertPresent('[data-blocks=content] [data-block]:nth-child(2) [data-rich-text] iframe')
+        ->press('Сохранить')
+        ->assertSee('Сохранено')
+        ->assertNoJavaScriptErrors();
+
+    expect(Page::query()->firstOrFail()->content)->toBe([
+        ['type' => 'text', 'data' => ['body' => '<p>Второй</p>']],
+        ['type' => 'text', 'data' => ['body' => '<p>Первый</p>']],
+    ]);
+});

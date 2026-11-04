@@ -1,6 +1,6 @@
 # Рецепты: клиенты, заявки, менеджеры
 
-Типовые задачи рабочих систем (CRM, заявки, заказы), которые решаются обычным кодом Laravel рядом с fastleo — новых возможностей в пакете для них не нужно. Примеры короткие: подставьте свои модели.
+Типовые задачи рабочих систем (CRM, заявки, заказы) и сайтов (координаты, расписание, галерея с подписями), которые решаются обычным кодом Laravel рядом с fastleo — новых возможностей в пакете для них не нужно. Примеры короткие: подставьте свои модели.
 
 ## Несколько телефонов у клиента
 
@@ -324,3 +324,74 @@ Hash::extend('legacy', fn () => new LegacyHasher(config('hashing.bcrypt')));
 **Старые хеши переносите в базу напрямую** — `DB::table('users')->insert([... 'password' => $oldHash])` или `update()`, а не через модель. Модель пользователя Laravel с кастом `'password' => 'hashed'` не узнаёт md5 как хеш и захеширует его ещё раз: после этого ни старый, ни новый пароль не подойдут.
 
 После того как все администраторы и пользователи вошли хотя бы раз, уберите `LegacyHasher`: старые хеши md5 слабы, и держать их дольше нужного незачем ([migrating.md](migrating.md#1-администраторы)). Тот, кто не вошёл, сбросит пароль письмом.
+
+## Координаты
+
+Широта и долгота — два поля `Number` рядом; отдельного типа поля нет.
+
+```php
+use Fastleo\Fields\Number;
+use Fastleo\Layout\Grid;
+
+Grid::make(2, [
+    Number::make('lat', 'Широта')->min(-90)->max(90),
+    Number::make('lng', 'Долгота')->min(-180)->max(180),
+]),
+```
+
+**Колонки:** `$table->decimal('lat', 9, 6)->nullable(); $table->decimal('lng', 9, 6)->nullable();`. Ссылка на карту в списке и на просмотре — через `formatUsing()` поля `lat`:
+
+```php
+use Illuminate\Support\HtmlString;
+
+Number::make('lat', 'Широта')->min(-90)->max(90)
+    ->formatUsing(fn ($value, $record) => $value === null ? null : new HtmlString(
+        '<a href="https://yandex.ru/maps/?pt='.e($record->lng).','.e($record->lat).'&z=16" target="_blank" rel="noopener">'.e($value).'</a>',
+    )),
+```
+
+## Недельное расписание
+
+День недели и интервалы приёма — `Repeater` из дней, в каждом день `Repeater` из интервалов (два уровня, [подробнее](fields/repeater.md#список-внутри-элемента)).
+
+```php
+use Fastleo\Fields\Repeater;
+use Fastleo\Fields\Select;
+use Fastleo\Fields\Time;
+
+Repeater::make('schedule', 'Расписание приёма')
+    ->fields([
+        Select::make('day', 'День')->required()->options([
+            'mon' => 'Понедельник', 'tue' => 'Вторник', 'wed' => 'Среда', 'thu' => 'Четверг',
+            'fri' => 'Пятница', 'sat' => 'Суббота', 'sun' => 'Воскресенье',
+        ]),
+        Repeater::make('slots', 'Интервалы')
+            ->fields([
+                Time::make('from', 'С')->required(),
+                Time::make('to', 'До')->required(),
+            ])
+            ->max(4),
+    ])
+    ->max(7);
+```
+
+**Колонка:** `$table->json('schedule')->nullable()`, в модели `'schedule' => 'array'`. На сайте: `@foreach ($doctor->schedule ?? [] as $day) {{ $day['day'] }}: @foreach ($day['slots'] ?? [] as $slot) {{ $slot['from'] }}–{{ $slot['to'] }} @endforeach @endforeach`.
+
+## Галерея с подписями
+
+[Gallery](fields/gallery.md) хранит только пути картинок. Галерея, у которой у каждой картинки есть подпись, — `Repeater` из `Image` и `Text`:
+
+```php
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Repeater;
+use Fastleo\Fields\Text;
+
+Repeater::make('photos', 'Фотографии')
+    ->fields([
+        Image::make('src', 'Фото')->directory('gallery')->variants('card')->required(),
+        Text::make('caption', 'Подпись'),
+    ])
+    ->max(30);
+```
+
+Колонка `json` с кастом `'array'`; элементы перетаскиваются, варианты картинок создаются. На сайте: `@foreach ($page->photos ?? [] as $photo) <x-fastleo::picture :src="$photo['src']" preset="card" :alt="$photo['caption'] ?? ''" /> @endforeach`. Подпись как `alt` у одной картинки — `Image::make('cover')->alt('cover_alt')` ([Image](fields/image.md)).

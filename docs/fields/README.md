@@ -25,6 +25,7 @@ Text::make('title', 'Заголовок')->required()->searchable()->sortable();
 | [Time](time.md) | время | `time` |
 | [Email](email.md) | email | `string` |
 | [Url](url.md) | адрес страницы | `string` |
+| [Video](video.md) | видео по ссылке YouTube, Rutube, VK | `string` |
 | [Tel](tel.md) | телефон | `string` |
 | [Color](color.md) | цвет HEX | `string` |
 | [Hidden](hidden.md) | скрытое значение | любая |

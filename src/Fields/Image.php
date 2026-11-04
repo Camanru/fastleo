@@ -32,6 +32,15 @@ class Image extends File
     /** Миниатюра в ячейке заголовка списка вместо отдельного столбца. */
     protected bool $inTitle = false;
 
+    /** Колонка с описанием картинки (alt) или null. */
+    protected ?string $altColumn = null;
+
+    /** Подпись поля описания. */
+    protected ?string $altLabel = null;
+
+    /** Поле описания, собранное из настроек картинки. */
+    private ?Text $altField = null;
+
     #[Override]
     public function onlyImages(): bool
     {
@@ -58,6 +67,49 @@ class Image extends File
         $this->crop = $ratio;
 
         return $this;
+    }
+
+    /**
+     * Описание картинки (alt) в парной колонке: поле ввода под картинкой, пишется вместе с ней. Колонка `string`,
+     * в `$fillable` модели; доступ (`readonly()`, `hidden()`, `visibleWhen()`…) у описания такой же, как у картинки.
+     * Внутри Repeater и Blocks описание — соседний ключ элемента.
+     *
+     * ```php
+     * Image::make('cover', 'Обложка')->alt('cover_alt');
+     * ```
+     */
+    public function alt(string $column, ?string $label = null): static
+    {
+        $this->altColumn = $column;
+        $this->altLabel = $label;
+        $this->altField = null;
+
+        return $this;
+    }
+
+    /**
+     * Поле описания картинки или null, если `alt()` не вызывали. Схема раздела добавляет его после картинки.
+     */
+    public function altField(): ?Text
+    {
+        if ($this->altColumn === null) {
+            return null;
+        }
+
+        if (! $this->altField instanceof Text) {
+            $alt = Text::make($this->altColumn, $this->altLabel ?? __('fastleo::resources.image_alt', locale: Fastleo::LOCALE))->maxLength(255)->hideInList();
+            $alt->readonly = $this->readonly;
+            $alt->disabled = $this->disabled;
+            $alt->hidden = $this->hidden;
+            $alt->accessModified = $this->accessModified;
+            $alt->showInForm = $this->showInForm;
+            $alt->showOnCreate = $this->showOnCreate;
+            $alt->showOnEdit = $this->showOnEdit;
+            $alt->visibleWhen = $this->visibleWhen;
+            $this->altField = $alt;
+        }
+
+        return $this->altField;
     }
 
     /**

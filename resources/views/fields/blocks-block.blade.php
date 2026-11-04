@@ -13,7 +13,7 @@
         @endif
         <span class="flex size-7 shrink-0 items-center justify-center rounded-[7px] bg-primary-soft text-primary-text"><x-fastleo::icon :name="$definition->getIcon()" class="size-4" /></span>
         <span @class(['flex-1 text-xs font-semibold', 'text-danger' => $invalid, 'text-ink-2' => ! $invalid])>{{ $definition->getLabel() }}</span>
-        <button type="button" class="flex size-[30px] items-center justify-center rounded-[7px] text-ink-3 hover:bg-hover hover:text-ink" x-on:click="open = ! open" :aria-expanded="open" aria-label="{{ __('fastleo::resources.blocks_toggle') }}">
+        <button type="button" class="flex size-[30px] items-center justify-center rounded-[7px] text-ink-3 hover:bg-hover hover:text-ink" x-on:click="open = ! open" :aria-expanded="open" aria-label="{{ __('fastleo::resources.blocks_toggle') }}" data-block-toggle>
             <x-fastleo::icon name="chevron-down" class="size-4 transition-transform" x-bind:class="open || 'rotate-90'" />
         </button>
         @if ($writable)

@@ -70,6 +70,22 @@ it('describes fields: rules, relation, files and enum options', function (): voi
         ->and($fields['tags']['multiple'])->toBeTrue();
 });
 
+it('describes the sub fields of repeaters and the types of blocks, nested lists included', function (): void {
+    useFixtureResources('Nested');
+
+    $fields = collect(inspected('site-pages')['fields'])->keyBy('name');
+    $faq = collect($fields['faq']['fields'])->keyBy('name');
+    $plans = collect($fields['content']['types']['plans']['fields'])->keyBy('name');
+
+    expect($faq['question']['type'])->toBe('text')
+        ->and($faq['steps']['fields'])->toHaveCount(4)
+        ->and($faq['steps']['rules'])->toHaveKey('steps.*.title')
+        ->and($faq['extras']['types']['note'])->toMatchArray(['label' => 'Заметка'])
+        ->and($faq['extras']['types']['note']['fields'][0]['name'])->toBe('text')
+        ->and(array_keys($fields['content']['types']))->toBe(['text', 'plans'])
+        ->and($plans['items']['fields'][0]['name'])->toBe('name');
+});
+
 it('shows what a field writes instead of an empty value', function (): void {
     useFixtureResources('EmptyValues');
 

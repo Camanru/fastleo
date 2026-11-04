@@ -36,6 +36,8 @@ use Workbench\Database\Factories\ArticleFactory;
  * @property string|null $source_url
  * @property string|null $content
  * @property string|null $cover
+ * @property string|null $cover_alt
+ * @property string|null $video
  * @property list<string>|null $gallery
  * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
  * @property string|null $attachment
@@ -45,7 +47,7 @@ use Workbench\Database\Factories\ArticleFactory;
 #[Fillable([
     'type', 'category_id', 'subcategory_id', 'title', 'excerpt', 'status', 'tags', 'views', 'price', 'is_featured', 'is_published',
     'published_on', 'starts_at', 'opens_at', 'author_email', 'source_url', 'phone', 'color',
-    'slug', 'layout', 'rating', 'keywords', 'body', 'head_code', 'content', 'cover', 'gallery', 'attachment', 'seo',
+    'slug', 'layout', 'rating', 'keywords', 'body', 'head_code', 'content', 'cover', 'cover_alt', 'video', 'gallery', 'attachment', 'seo',
 ])]
 final class Article extends Model
 {

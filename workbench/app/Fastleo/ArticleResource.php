@@ -34,6 +34,7 @@ use Fastleo\Fields\Textarea;
 use Fastleo\Fields\Time;
 use Fastleo\Fields\Toggle;
 use Fastleo\Fields\Url;
+use Fastleo\Fields\Video;
 use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Filters\BelongsToManyFilter;
 use Fastleo\Filters\BooleanFilter;
@@ -112,8 +113,9 @@ final class ArticleResource extends Resource
                     Code::make('head_code', 'Код в <head>')->rows(6)->help('Вставляется на страницу статьи без изменений')->hideInList(),
                 ]),
                 Tab::make('Медиа', [
-                    Image::make('cover', 'Обложка')->directory('articles')->crop('16:9')->variants('card')->inTitle(),
+                    Image::make('cover', 'Обложка')->directory('articles')->crop('16:9')->variants('card')->inTitle()->alt('cover_alt'),
                     Gallery::make('gallery', 'Фотогалерея')->directory('articles')->max(20)->variants('photo')->hideInList(),
+                    Video::make('video', 'Видео')->help('Ссылка на YouTube, Rutube или VK Видео')->hideInList(),
                     File::make('attachment', 'Файл для скачивания')->extensions(['pdf', 'docx', 'xlsx'])->directory('documents')->hideInList(),
                 ]),
                 Tab::make('Ссылки', [

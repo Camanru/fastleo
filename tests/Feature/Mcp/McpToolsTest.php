@@ -6,6 +6,7 @@ use Fastleo\Activity\Activity;
 use Fastleo\Activity\ActivityRecorder;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
+use Fastleo\Mcp\RecordData;
 use Fastleo\Mcp\RecordSaver;
 use Fastleo\Mcp\ToolFailed;
 use Fastleo\Mcp\Tools\CreateRecord;
@@ -588,4 +589,34 @@ it('explains a real database refusal of an action to the agent', function (): vo
 
     mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'broken', 'ids' => [(string) $article->id]])
         ->assertHasErrors(['такое значение уже есть']);
+});
+
+it('gives out repeater and blocks values in the shape that update accepts, nested lists included', function (): void {
+    useFixtureResources('Nested');
+    $faq = [['question' => 'Как записаться?', 'kind' => 'text', 'steps' => [['title' => 'Позвонить', 'mode' => 'plain'], ['title' => 'Прийти', 'mode' => 'extra', 'extra' => 'с паспортом']], 'extras' => [['type' => 'note', 'data' => ['text' => 'Заранее']]]]];
+    $content = [['type' => 'plans', 'data' => ['title' => 'Базовый', 'items' => [['name' => 'Осмотр', 'price' => '500', 'about' => null]]]], ['type' => 'text', 'data' => ['body' => '<p>Привет</p>']]];
+    $page = Page::factory()->create(['faq' => $faq, 'content' => $content]);
+
+    mcp()->tool(GetRecord::class, ['resource' => 'site-pages', 'id' => (string) $page->id])
+        ->assertHasNoErrors()
+        ->assertSee(['"type":"note","note":{"text":"Заранее"}', '"type":"plans","plans":{"title":"Базовый","items":[{"name":"Осмотр"']);
+
+    $values = json_decode(json_encode(RecordData::detail(Fastleo::resources()->find('site-pages') ?? throw new LogicException, $page)['values'], JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'site-pages', 'id' => (string) $page->id, 'values' => ['faq' => $values['faq'], 'content' => $values['content']]])
+        ->assertHasNoErrors();
+
+    expect($page->refresh()->faq)->toBeStoredJson($faq)
+        ->and($page->content)->toBeStoredJson($content);
+});
+
+it('keeps the order of the inner items an agent sends without empty sub fields', function (): void {
+    useFixtureResources('Nested');
+    $page = Page::factory()->create(['faq' => []]);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'site-pages', 'id' => (string) $page->id, 'values' => ['faq' => [
+        ['question' => 'Вопрос', 'steps' => [['title' => 'Первый'], ['mode' => 'plain', 'title' => 'Второй']]],
+    ]]])->assertHasNoErrors();
+
+    expect(array_column($page->refresh()->faq[0]['steps'] ?? [], 'title'))->toBe(['Первый', 'Второй']);
 });

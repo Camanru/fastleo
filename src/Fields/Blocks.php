@@ -151,7 +151,18 @@ class Blocks extends Field
     {
         $block = $this->types[$type] ?? throw new LogicException(__('fastleo::exceptions.block_type', ['type' => $type], Fastleo::LOCALE));
 
-        return $this->schemas[$type] ??= $this->itemSchema($block->getItems(), $this->name.'.*.'.$type.'.');
+        return $this->schemas[$type] ??= $this->itemSchema($block->getItems(), $this->rulePrefix.$this->name.'.*.'.$type.'.');
+    }
+
+    /**
+     * Список внутри элемента: правила подполей получают префикс внешнего списка, схемы пора собрать заново.
+     */
+    #[Override]
+    public function nestedIn(string $prefix): static
+    {
+        $this->schemas = [];
+
+        return parent::nestedIn($prefix);
     }
 
     /**
@@ -162,6 +173,27 @@ class Blocks extends Field
     public function typeFields(string $type): array
     {
         return self::writableItemFields($this->schema($type));
+    }
+
+    /**
+     * Сохранённое значение колонки в виде, в котором его принимает запись (MCP, форма):
+     * `[{"type": "text", "text": {"body": "…"}}]` — поля блока под ключом его типа. Блоки неизвестного типа пропускаются.
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    public function inputValue(mixed $stored): array
+    {
+        $blocks = [];
+
+        foreach (self::storedItems($stored) as $block) {
+            $type = $block['type'] ?? null;
+
+            if (is_string($type) && isset($this->types[$type])) {
+                $blocks[] = ['type' => $type, $type => self::inputItem($this->typeFields($type), is_array($block['data'] ?? null) ? $block['data'] : [])];
+            }
+        }
+
+        return $blocks;
     }
 
     #[Override]
@@ -293,11 +325,21 @@ class Blocks extends Field
             return;
         }
 
-        $current = self::storedItems($value);
         $previous = $record->wasRecentlyCreated ? [] : self::storedItems($record->getPrevious()[$this->name] ?? null);
 
+        $this->queueVariantsOf(self::storedItems($value), $previous);
+    }
+
+    /**
+     * Варианты новых картинок блоков всех типов (и вложенных списков).
+     *
+     * @param  list<array<array-key, mixed>>  $blocks  блоки сейчас
+     * @param  list<array<array-key, mixed>>  $previous  блоки до сохранения
+     */
+    public function queueVariantsOf(array $blocks, array $previous): void
+    {
         foreach (array_keys($this->types) as $type) {
-            self::queueItemVariants($this->typeFields($type), $this->dataOf($current, $type), $this->dataOf($previous, $type));
+            self::queueItemVariants($this->typeFields($type), $this->dataOf($blocks, $type), $this->dataOf($previous, $type));
         }
     }
 

@@ -55,15 +55,44 @@ Repeater::make('faq', 'Вопросы и ответы')
 
 ## Что можно положить в элемент
 
-**Работают** простые поля: `Text`, `Textarea`, `Number`, `Select`, `Radio`, `Enum`, `Checkbox`, `Toggle`, `Date`, `DateTime`, `Time`, `Email`, `Url`, `Tel`, `Color`, `Range`, `Hidden`, `Tags`, `Code`, `Markdown`, файлы `Image`, `File`, `Gallery` и `RichText`, а также `visibleWhen()` по соседнему подполю.
+**Работают** простые поля (и один вложенный список — см. ниже): `Text`, `Textarea`, `Number`, `Select`, `Radio`, `Enum`, `Checkbox`, `Toggle`, `Date`, `DateTime`, `Time`, `Email`, `Url`, `Video`, `Tel`, `Color`, `Range`, `Hidden`, `Tags`, `Code`, `Markdown`, файлы `Image`, `File`, `Gallery` и `RichText`, а также `visibleWhen()` по соседнему подполю.
 
 **Не работают** (понятная ошибка при открытии раздела):
 
 - связи, `HasMany`/`HasOne`;
-- другие JSON-поля: `Repeater`, `Blocks`, `KeyValue`;
+- `KeyValue` и `Seo`; `Repeater` и `Blocks` — только на один уровень (см. ниже);
 - `Slug`, `Password`;
 - `dependsOn()`, `translatable()`;
 - `hideOnCreate()`/`hideOnEdit()`/`hidden()`, `readonly()`/`disabled()` — элемент сохраняется заново из формы, и скрытое значение стёрлось бы.
+
+## Список внутри элемента
+
+В элемент можно положить ещё один `Repeater` или `Blocks` — два уровня, не глубже: тарифы с пунктами, этапы работ с шагами, день недели с интервалами приёма.
+
+```php
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Repeater;
+use Fastleo\Fields\Text;
+
+Repeater::make('plans', 'Тарифы')
+    ->fields([
+        Text::make('title', 'Название')->required(),
+        Repeater::make('items', 'Что входит')
+            ->fields([
+                Text::make('name', 'Пункт')->required(),
+                Number::make('price', 'Цена, ₽'),
+            ])
+            ->max(10),
+    ])
+    ->max(6);
+```
+
+Хранится вложенным списком: `[{"title": "Базовый", "items": [{"name": "Осмотр", "price": "500"}]}]`; на сайте — `@foreach ($plan['items'] ?? [] as $item)`. Внутри `Blocks` вложенный список лежит в данных блока: `{"type": "plans", "data": {"title": "Базовый", "items": [...]}}`.
+
+- Проверка, ошибки, `required()`, `min()`/`max()`, чистка `RichText` и варианты картинок работают на обоих уровнях; ошибка стоит у поля того элемента, где она допущена.
+- `visibleWhen()` внутри элемента ссылается на поле **того же элемента** (внутреннего или внешнего), а не на поле другого уровня с тем же именем.
+- Третий уровень (список в списке в списке) не поддерживается — понятная ошибка при открытии раздела.
+- Поле формы — это каждое подполе каждого элемента: два уровня по умолчанию (100 × 100 элементов) упираются в `max_input_vars` PHP, `fastleo:doctor` об этом предупреждает. Ставьте `max()` и внутреннему списку, и внешнему.
 
 Если элементы нужно искать, фильтровать или связывать с другими записями — используйте отдельную таблицу и [HasMany](has-many.md).
 

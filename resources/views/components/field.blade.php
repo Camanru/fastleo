@@ -3,7 +3,8 @@
 @php
     $path ??= $field->name;
     $id ??= 'field-'.$field->name;
-    $error = $errors->first($path) ?: $errors->first($path.'.*');
+    // У списка элементов (Repeater, Blocks) ошибки подполей показывает само подполе, а не список над ним.
+    $error = $errors->first($path) ?: ($field instanceof \Fastleo\Fields\Repeater || $field instanceof \Fastleo\Fields\Blocks ? null : $errors->first($path.'.*'));
     // «Такое значение уже есть» + ссылка на ту запись (duplicateOf()), если её можно открыть.
     $duplicate = $error ? $field->duplicateRecord(old($path)) : null;
     $duplicateResource = $duplicate ? \Fastleo\Fastleo::resources()->find((string) request()->route('resource')) : null;

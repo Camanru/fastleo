@@ -20,6 +20,11 @@ function fieldValue(scope, field, nested = false) {
             continue;
         }
 
+        // Поле с таким же именем во вложенном списке (Repeater внутри элемента) — не управляющее.
+        if (nested && scope.matches('[data-block]') && input.closest('[data-block]') !== scope) {
+            continue;
+        }
+
         if (input.type === 'checkbox') {
             // Снятая галочка без скрытого «0» (readonly) — тоже «0», а не пустое значение.
             value = input.checked ? input.value : value === '' ? '0' : value;
@@ -1632,6 +1637,14 @@ Alpine.data('fastleoRichText', ({ height, picker, contentCss = [], contentStyle 
         }
 
         const textarea = this.$refs.text;
+        const stale = window.hugerte.get(textarea.id);
+
+        // Блок перенесли свёрнутым: iframe прежнего редактора выгрузился, HugeRTE пометил его удалённым, но оставил
+        // в списке под тем же id — новый запуск на нём падает. Убираем остаток.
+        if (stale && stale.removed) {
+            window.hugerte.remove(stale);
+        }
+
         const form = textarea.closest('form');
         const dark = document.documentElement.classList.contains('dark');
 
@@ -2254,10 +2267,11 @@ Alpine.data('fastleoCombobox', (config) => ({
 }));
 
 /**
- * Вложенные блоки HasMany: добавить (из <template x-ref="template"> с ключом __KEY__), удалить, перетащить за ручку.
+ * Вложенные блоки HasMany, Repeater, Blocks: добавить (из <template x-ref="template"> с меткой ключа `placeholder`:
+ * у списка внутри элемента своя, `__KEY_1__`), удалить, перетащить за ручку.
  * Порядок блоков в форме = порядок отправки = порядок сохранения.
  */
-Alpine.data('fastleoBlocks', ({ min, max, sortable }) => ({
+Alpine.data('fastleoBlocks', ({ min, max, sortable, placeholder = '__KEY__' }) => ({
     min,
     max,
     count: 0,
@@ -2286,7 +2300,7 @@ Alpine.data('fastleoBlocks', ({ min, max, sortable }) => ({
     add(type = null) {
         const key = `new-${Date.now()}-${++this.created}`;
         const template = type === null ? this.$refs.template : this.$refs[`template-${type}`];
-        this.$refs.list.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll('__KEY__', key));
+        this.$refs.list.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll(placeholder, key));
         this.count++;
         this.changed();
         this.$nextTick(() => this.$refs.list.lastElementChild?.querySelector('input:not([type=hidden]), textarea, select')?.focus());

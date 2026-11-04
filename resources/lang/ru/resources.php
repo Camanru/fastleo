@@ -104,6 +104,8 @@ return [
     'nested_remove' => 'Удалить блок',
     'nested_move' => 'Перетащить',
     'nested_empty' => 'Пока пусто',
+    'image_alt' => 'Описание картинки (alt)',
+    'video_link' => 'Укажите ссылку на видео YouTube, Rutube или VK Видео.',
     'tree_has_children' => 'Сначала удалите или перенесите вложенные записи.',
     'tree_cycle' => 'Нельзя перенести запись внутрь неё самой.',
     'tree_collapse_all' => 'Свернуть всё',

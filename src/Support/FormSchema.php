@@ -6,6 +6,7 @@ namespace Fastleo\Support;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\Image;
 use Fastleo\Layout\Layout;
 use Fastleo\Layout\Tab;
 use Fastleo\Layout\Tabs;
@@ -170,6 +171,11 @@ final readonly class FormSchema
         foreach ($items as $item) {
             if ($item instanceof Field) {
                 $fields[] = $item;
+
+                // Описание картинки (`Image::alt()`) — отдельное поле схемы, форма рисует его в шаблоне картинки.
+                if ($item instanceof Image && $item->altField() instanceof Field) {
+                    $fields[] = $item->altField();
+                }
             } elseif ($item instanceof Related && ! $inResource) {
                 throw new InvalidArgumentException(__('fastleo::exceptions.related_not_in_resource', ['relation' => $item->name], Fastleo::LOCALE));
             } elseif ($item instanceof Related && ! $inTab) {

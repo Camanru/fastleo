@@ -187,8 +187,9 @@ final class RecordWriter
     }
 
     /**
-     * `validated()` собирает массивы в порядке правил (`links.*.id` раньше `links.*.title`), а не формы.
-     * Порядок ключей верхних массивов (вложенные блоки, метки) возвращается как во вводе.
+     * `validated()` собирает массивы в порядке правил (`links.*.id` раньше `links.*.title`), а не формы: элемент без
+     * первого подполя уезжал бы в конец. Порядок ключей всех массивов (вложенные блоки, метки, списки внутри элементов
+     * Repeater и Blocks) возвращается как во вводе.
      *
      * @param  array<array-key, mixed>  $validated
      * @param  array<array-key, mixed>  $input
@@ -200,7 +201,7 @@ final class RecordWriter
             $raw = $input[$key] ?? null;
 
             if (is_array($value) && is_array($raw)) {
-                $validated[$key] = array_replace(array_intersect_key($raw, $value), $value);
+                $validated[$key] = self::inInputOrder(array_replace(array_intersect_key($raw, $value), $value), $raw);
             }
         }
 
