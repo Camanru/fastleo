@@ -118,6 +118,7 @@ Reading order with short descriptions (in Russian): [docs/README.md](docs/README
 - [Page builder](docs/blocks.md)
 - [Translatable fields](docs/translations.md)
 - [Authorization](docs/authorization.md)
+- [Administrator roles](docs/roles.md)
 - [Login, profile, password reset](docs/auth.md)
 - [Site settings](docs/settings.md)
 - [Closing the site for visitors](docs/site-closing.md)

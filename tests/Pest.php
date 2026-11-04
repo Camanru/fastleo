@@ -10,6 +10,7 @@ use Fastleo\SoftNetica\Synchronizer;
 use Fastleo\SoftNetica\SyncResult;
 use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\SettingsStore;
+use Fastleo\Tests\Fixtures\Roles\RoleUser;
 use Fastleo\Tests\TestCase;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
@@ -23,6 +24,9 @@ use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use PragmaRX\Google2FA\Google2FA;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Workbench\App\Models\User;
 
 // Плагин браузерных тестов перед запуском делает @rmdir(tests/Browser/Traces); без каталога PHPUnit
@@ -33,6 +37,7 @@ if (! is_dir(__DIR__.'/Browser/Traces')) {
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit', 'Browser');
 pest()->extend(TestCase::class)->group('performance')->in('Performance');
+pest()->group('roles')->in('Feature/Roles');
 
 /**
  * Строгое сравнение JSON-значения из базы без учёта порядка ключей в объектах.
@@ -55,6 +60,51 @@ expect()->extend('toBeStoredJson', function (array $expected): object {
 function admin(array $attributes = []): User
 {
     return User::factory()->admin()->create($attributes);
+}
+
+/**
+ * Включить роли для теста: пользователь сайта с трейтом `HasRoles` (`RoleUser`), `fastleo.roles.enabled`, чистый кеш прав spatie.
+ * Вызывается в `beforeEach` файлов `tests/Feature/Roles`.
+ */
+function useRoles(): void
+{
+    config([
+        'auth.providers.users.model' => RoleUser::class,
+        'fastleo.roles.enabled' => true,
+    ]);
+    resolve(PermissionRegistrar::class)->forgetCachedPermissions();
+}
+
+/**
+ * Администратор с ролью spatie (тесты ролей): строка в `users`, но модель с трейтом `HasRoles`.
+ *
+ * @param  array<string, mixed>  $attributes
+ */
+function roleAdmin(?Role $role = null, array $attributes = []): RoleUser
+{
+    $user = RoleUser::query()->findOrFail(admin($attributes)->getKey());
+
+    if ($role instanceof Role) {
+        $user->assignRole($role);
+    }
+
+    return $user;
+}
+
+/**
+ * Роль guard `fastleo` с правами вида `articles.view`, `articles.update` (имя права — `fastleo.{раздел}.{группа}`).
+ *
+ * @param  list<string>  $permissions
+ */
+function role(string $name, array $permissions = []): Role
+{
+    $role = Role::findOrCreate($name, Fastleo::GUARD);
+
+    foreach ($permissions as $permission) {
+        $role->givePermissionTo(Permission::findOrCreate('fastleo.'.$permission, Fastleo::GUARD));
+    }
+
+    return $role;
 }
 
 /**

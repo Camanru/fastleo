@@ -25,11 +25,13 @@ use Fastleo\Console\MakeWidgetCommand;
 use Fastleo\Console\McpCommand;
 use Fastleo\Console\ModuleCommand;
 use Fastleo\Console\PruneCommand;
+use Fastleo\Console\RolesCommand;
 use Fastleo\Console\SkillCommand;
 use Fastleo\Console\SoftNeticaSyncCommand;
 use Fastleo\Console\UnlockCommand;
 use Fastleo\Console\UserCommand;
 use Fastleo\Health\HealthChecks;
+use Fastleo\Http\ErrorPage;
 use Fastleo\Http\Middleware\SecurityHeaders;
 use Fastleo\Notifications\FastleoChannel;
 use Fastleo\SoftNetica\Connection;
@@ -45,16 +47,19 @@ use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 /**
  * Подключает fastleo к сайту: конфиг, guard, маршруты, шаблоны, переводы, миграции и команды.
@@ -131,6 +136,9 @@ final class FastleoServiceProvider extends ServiceProvider
                 Sitemap::touched($payload[0]);
             }
         });
+        // Страницы ошибок 403, 404, 419 и 429 внутри админки: в оформлении админки, а не голая страница Laravel.
+        $this->app->make(ExceptionHandler::class)->renderable(fn (HttpExceptionInterface $exception, Request $request): ?Response => ErrorPage::render($exception, $request));
+
         Notification::extend('fastleo', fn (): FastleoChannel => new FastleoChannel);
         View::composer('fastleo::settings.softnetica', fn (\Illuminate\View\View $view) => $view->with('status', Status::current()));
         $this->limitRequests();
@@ -177,6 +185,7 @@ final class FastleoServiceProvider extends ServiceProvider
             PruneCommand::class,
             SkillCommand::class,
             SoftNeticaSyncCommand::class,
+            RolesCommand::class,
             UnlockCommand::class,
             UserCommand::class,
         ]);

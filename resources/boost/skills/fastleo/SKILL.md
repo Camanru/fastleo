@@ -198,6 +198,7 @@ php artisan fastleo:inspect --json     # то же для машины
 
 Что есть в JSON:
 
+- **Роли** (если включены `fastleo.roles.enabled`): ключ `roles` — `owner` (имя роли-владельца) и `roles[]` с `name`, `owner` и `sections` (адрес раздела → группы `view`, `create`, `update`, `delete`).
 - **Раздел:** `slug`, `class`, `label`, `singular`, `group`, `icon`, `position`, `in_menu` (пункт меню есть), `has_badge` (у пункта меню есть число — `badge()` или `$readColumn`), `model`, `table`, `policy` (класс Policy или `null` — тогда доступ полный), `readonly`, `exportable`, `importable`, `import_key`, `soft_deletes`, `sort_column`, `tree_column`, `read_column` (колонка отметки «просмотрено» или `null`), `poll` (период автообновления списка в секундах или `null`), `fields`, `filters`, `actions`, `relations`.
 - **Поле:** `name`, `type`, `label`, `required`, `readonly`, `multiple`, `translatable`, `in_form`, `in_list`, `searchable`, `sortable`, `writes_attribute`, `rules` (правила проверки по ключам запроса).
 - **Поле, сведения по типу:** `relation` и `related_model` у связей; `folder` и `extensions` у файлов; `options` у `Select` (`null`, если вариантов больше 50); `max_length` у текстовых; `empty_value` у поля с `emptyValue()`; `quick_toggle: true` у галочки с `quickToggle()`; `badges: true` у списка с цветными метками; `from_query: true` у вычисляемого столбца (`fromQuery()`); `inline_editable: true` у поля с правкой в ячейке; `alt` у `Image` с `alt()` (имя парной колонки описания); вложенные `fields` у `Repeater` (и у вложенных в него списков), `types` у `Blocks` — `{тип: {label, fields}}`, у `MorphTo` — `{адрес раздела: название}`.
@@ -245,6 +246,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | колонка `$readColumn` — не дата со временем или NOT NULL | `$table->timestamp('read_at')->nullable()` |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |
 | `query()` ресурса не выполняется при проверке вычисляемых полей `fromQuery()` (`from_query_error`) | исправить `query()` по тексту ошибки базы |
+| роли включены (`fastleo.roles.enabled`), а в модели пользователя нет трейта `HasRoles` или не выполнены миграции spatie; включён режим `teams`; нет ни одного владельца | [roles.md](vendor/camanru/fastleo/docs/roles.md#как-включить): трейт, миграции, `php artisan fastleo:roles --owner=email` |
 | `MorphTo`: нет колонки типа или ключа; колонка не в `$fillable`; у связи `morphTo()` свой `ownerKey`; модель типа не в `Relation::morphMap()`, а включён `enforceMorphMap()` | `nullableMorphs('subject')` в миграции; колонки в `$fillable`; убрать `ownerKey`; внести модель в карту ([MorphTo](vendor/camanru/fastleo/docs/fields/morph-to.md)) |
 
 **Предупреждения:**
@@ -257,6 +259,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | нет ссылки `public/storage` | `php artisan storage:link` |
 | ассеты устарели | опубликовать заново |
 | кеш `bootstrap/cache/fastleo.php` устарел | `php artisan fastleo:cache` |
+| роли: администраторы без ролей guard `fastleo` или с правами напрямую, у разделов нет прав, роли в базе есть, а `fastleo.roles.enabled` выключен | [roles.md](vendor/camanru/fastleo/docs/roles.md): роль в разделе «Администраторы», права через роли, включить флаг |
 | в базе осталась таблица `fastleo_activity` или в `config/fastleo.php` ключ `activity` от журнала прежних версий | `php artisan fastleo:drop-activity`, ключ из конфига удалить |
 | колонка NOT NULL без значения по умолчанию, а поле не `required()` и без `emptyValue()` | `required()` у поля, `default()` в миграции или `emptyValue()` у поля |
 | больше `fastleo.relations.preload` связанных записей у `BelongsTo`/`BelongsToMany` — форма и фильтр вместо списка показывают поиск по серверу | так и задумано; чтобы вернуть обычный список, поднять `relations.preload` |
@@ -278,6 +281,17 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 Проверка NOT NULL пропускает поля, которые заполняются сами: галочки, пароль, поля с `emptyValue()`, адрес `Slug` с `from()` (без `from()` адрес сам не заполнится), Gallery, KeyValue, Seo, поля со значением `default()`, колонки со значением по умолчанию в базе или в `$attributes` модели, а также разделы только для чтения.
 
 **`--sanitize-diff`** — вместо обычных проверок обходит **все** записи полей RichText верхнего уровня и сравнивает текст в базе с тем, что сохранит чистка HTML (с учётом `fastleo.rich_text`, `sanitizeUsing()` и своего `sanitize()`). По каждому полю печатает «изменится N из M записей» и первые 50 записей: ключ, кусок текста вокруг первого расхождения «было» и «станет». Сравнение буквальное, поэтому видны не только потерянные теги, но и изменённые атрибуты и сущности (`&l` → `&amp;l`). Ничего не меняет в базе, код выхода `0` (`1` — если настройка `fastleo.rich_text` недопустима). С `--json` отдаёт `{"fields": [{"resource", "field", "checked", "changed", "records": [{"key", "locale", "before", "after"}]}]}`; поля, где ничего не изменится, в список не попадают.
+
+### `fastleo:roles`
+
+Создаёт роль-владельца для [ролей администраторов](vendor/camanru/fastleo/docs/roles.md) и по `--owner` выдаёт её администратору. Без `--owner` никого не повышает, поэтому безопасна при каждом деплое; если владельцев не осталось, доступ возвращает запуск с `--owner=email`.
+
+```bash
+php artisan fastleo:roles --owner=admin@site.ru
+php artisan fastleo:roles --presets   # ещё и готовые роли «Администратор», «Редактор», «Наблюдатель»
+```
+
+`--presets` создаёт недостающие готовые роли с правами по текущим разделам; существующие роли не меняет. Права ролей и разделы «Роли» и «Администраторы» человек правит в админке, ИИ-агенту они недоступны.
 
 ### `fastleo:make-*`
 
@@ -318,7 +332,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 | Инструмент | Что делает |
 |---|---|
 | `list-resources` | разделы, к которым есть доступ |
-| `describe-resource` | поля, правила проверки, связи, фильтры, действия (то же, что `fastleo:inspect`) |
+| `describe-resource` | поля, правила проверки, связи, фильтры, действия (то же, что `fastleo:inspect`); при включённых [ролях](vendor/camanru/fastleo/docs/roles.md) ещё `role_rights` — что роль агента разрешает в разделе (`view`, `create`, `update`, `delete`) |
 | `list-records` | записи раздела: `q` (поиск), `filters` (значения фильтров по умолчанию не применяются), `sort`, `direction`, `page`, `per_page` (до 100) |
 | `get-record` | запись со всеми значениями формы |
 | `create-record` | новая запись: `values` — значения полей |
@@ -426,6 +440,7 @@ php artisan fastleo:doctor --sanitize-diff   # какие записи изме�
 - [Связанные таблицы на странице записи](vendor/camanru/fastleo/docs/related.md) — Карточка клиента с его машинами и заявками, статья с комментариями, рубрика со статьями: таблица записей другого раздела показывается прямо под формой записи…
 - [Страница-отчёт: фильтры и виджеты](vendor/camanru/fastleo/docs/reports.md) — Статистика по менеджерам, продажи за период, заявки по источникам: страница админки без модели, на которой сверху — фильтры (период, менеджер, статус), а под…
 - [Разделы (ресурсы)](vendor/camanru/fastleo/docs/resources.md) — Раздел админки — это класс-ресурс. Он описывает модель, подписи, место в меню и поля. По нему fastleo строит пункт меню, список записей, форму создания и…
+- [Роли администраторов](vendor/camanru/fastleo/docs/roles.md) — Когда в админку входит больше одного человека, а видеть всё должен не каждый (регистратор не открывает настройки, редактор не удаляет, наблюдатель только…
 - [Безопасность](vendor/camanru/fastleo/docs/security.md) — Админка открыта в интернет, поэтому пакет защищает вход, права, запись данных и файлы сам, без настройки. На этой странице — что именно защищено и что стоит…
 - [SEO и карта сайта](vendor/camanru/fastleo/docs/seo.md) — Три части: поле [`Seo`](vendor/camanru/fastleo/docs/fields/seo.md) в админке, компонент `<x-fastleo::seo>` в шаблоне сайта и `/sitemap.xml`.
 - [Настройки сайта](vendor/camanru/fastleo/docs/settings.md) — Страница настроек — класс с полями, как ресурс, но без модели: телефон, почта для заявок, часы работы, счётчики, соцсети. Администратор правит их в админке, а…

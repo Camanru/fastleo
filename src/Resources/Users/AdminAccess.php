@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Fastleo\Resources\Users;
 
 use Closure;
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Toggle;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
+use Illuminate\Validation\ValidationException;
 use Override;
 
 /**
@@ -44,6 +47,25 @@ final class AdminAccess extends Toggle
     public function fill(Model $record, mixed $value): void
     {
         $record->forceFill([$this->name => $value]);
+    }
+
+    /**
+     * Доступ снят у владельца — роль остаётся, а войти он не может: если других владельцев с доступом нет, запись
+     * откатывается. Проверка идёт внутри транзакции записи, с блокировкой (как при снятии роли).
+     */
+    #[Override]
+    public function afterSave(Model $record, mixed $value): void
+    {
+        if (filter_var($value, FILTER_VALIDATE_BOOLEAN) || ! RoleMatrix::enabled()) {
+            return;
+        }
+
+        $owner = UserGuard::lockOwnerRole($record);
+        $relation = UserGuard::rolesRelation($record);
+
+        if ($owner instanceof Model && $relation instanceof MorphToMany && UserGuard::holds($record, $owner) && ! UserGuard::ownerRemains($record, $relation, $owner)) {
+            throw ValidationException::withMessages([$this->name => __('fastleo::users.last_owner', [], Fastleo::LOCALE)]);
+        }
     }
 
     /**

@@ -24,7 +24,7 @@ use Workbench\Database\Factories\UserFactory;
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
-final class User extends Authenticatable implements FastleoUser
+class User extends Authenticatable implements FastleoUser
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;

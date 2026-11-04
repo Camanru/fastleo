@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Fastleo\Logs;
 
 use Carbon\CarbonImmutable;
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
-use Illuminate\Support\Facades\Gate;
 
 /**
  * Чтение журналов Laravel (`storage/logs/*.log`) с конца, порциями: файл не загружается целиком, за один вызов
@@ -69,7 +69,7 @@ final readonly class LogReader
             return false;
         }
 
-        return ! Gate::has('viewFastleoLogs') || Gate::forUser(Fastleo::guard()->user())->allows('viewFastleoLogs');
+        return RoleMatrix::gate('viewFastleoLogs');
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Widgets;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Health\HealthChecks;
 use Fastleo\Support\CacheCleaner;
@@ -16,6 +17,15 @@ use Override;
  */
 final class ServerStatus extends Widget
 {
+    /**
+     * Версии, диск, очередь и сбои проверок видны только владельцу, когда включены роли администраторов.
+     */
+    #[Override]
+    public function isVisible(): bool
+    {
+        return RoleMatrix::allowsOwnerOnly() && parent::isVisible();
+    }
+
     #[Override]
     public function view(): string
     {

@@ -3,6 +3,7 @@ laravel: '@testbench'
 providers:
   - Fastleo\FastleoServiceProvider
   - Laravel\Mcp\Server\McpServiceProvider
+  - Spatie\Permission\PermissionServiceProvider
   - Workbench\App\Providers\WorkbenchServiceProvider
 
 migrations:

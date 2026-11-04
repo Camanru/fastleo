@@ -37,7 +37,11 @@
         "pestphp/pest-plugin-browser": "^5.1",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-type-coverage": "^5.0",
-        "rector/rector": "^2.8"
+        "rector/rector": "^2.8",
+        "spatie/laravel-permission": "^8.3"
+    },
+    "suggest": {
+        "spatie/laravel-permission": "Roles for administrators: the fastleo.roles.enabled option checks permissions of the fastleo guard roles on top of Policies (docs/roles.md)."
     },
     "autoload": {
         "psr-4": {

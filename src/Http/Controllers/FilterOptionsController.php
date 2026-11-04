@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Http\Controllers;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Resource;
@@ -31,6 +32,7 @@ final class FilterOptionsController
 
         $filter = $resource->listFilters()[$filter] ?? null;
         abort_unless($filter instanceof BelongsToFilter, 404);
+        abort_unless(RoleMatrix::allowsRelated($filter->relation()->relatedModel()), 403);
 
         $search = $request->query('q');
         $search = is_string($search) ? mb_substr(trim($search), 0, 255) : '';

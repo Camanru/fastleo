@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +16,8 @@ use Illuminate\Support\Facades\Gate;
  * Нет Policy у модели — разрешено всё. Есть Policy — решает её метод (`viewAny`, `view`, `create`,
  * `update`, `delete`, `restore`, `forceDelete`); метода нет — запрещено, как везде в Laravel.
  * В разделе «только чтение» изменения запрещены всегда. Метод ресурса `can()` может запретить действие ещё и сверх Policy.
+ * При включённых ролях (`fastleo.roles.enabled`) сначала спрашивается матрица ролей ({@see RoleMatrix}): запрет любого
+ * из трёх слоёв — запрет.
  *
  * ```php
  * Authorization::allows('update', $resource, $record);
@@ -31,6 +34,10 @@ final class Authorization
     public static function allows(string $ability, Resource $resource, ?Model $record = null): bool
     {
         if ($resource::isReadonly() && in_array($ability, self::WRITE_ABILITIES, true)) {
+            return false;
+        }
+
+        if (! RoleMatrix::allows($ability, $resource::slug())) {
             return false;
         }
 
@@ -77,7 +84,7 @@ final class Authorization
      */
     public static function allowsOwnOr(string $ability, string $fallback, Resource $resource, ?Model $record = null): bool
     {
-        if (! $resource->can($ability, $record)) {
+        if (! RoleMatrix::allows($ability, $resource::slug()) || ! $resource->can($ability, $record)) {
             return false;
         }
 

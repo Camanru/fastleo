@@ -39,6 +39,11 @@ abstract class ResourceTool extends Tool
 
             Fastleo::guard()->setUser($user);
 
+            // Права и роли spatie кешируются в памяти процесса: изменённые в админке действуют со следующего вызова.
+            if (method_exists($user, 'forgetCachedPermissions')) {
+                $user->forgetCachedPermissions();
+            }
+
             return $this->run($request);
         } catch (ToolFailed $e) {
             return Response::error($e->getMessage());

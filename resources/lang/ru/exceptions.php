@@ -57,6 +57,7 @@ return [
     'morph_type_unknown' => 'Поле «:field» (MorphTo): :class не найден среди разделов сайта. Нужен класс ресурса, который находится в app/Fastleo (или в fastleo.resources.path).',
     'morph_type_duplicate' => 'Поле «:field» (MorphTo): два раздела работают с моделью :model — по сохранённому типу их не различить. Оставьте один.',
     'morph_unsupported' => 'Поле «:field» (MorphTo) не работает с :methods: уберите это из описания поля.',
+    'roles_trait_missing' => 'Поле «Роли»: в модели :model нет связи roles(). Добавьте в модель пользователя трейт Spatie\\Permission\\Traits\\HasRoles (docs/roles.md).',
     'relation_missing' => 'Поле «:field»: в модели :model нет метода связи :method(), возвращающего :type. Добавьте связь или укажите метод: ->relation(\'имя\').',
     'relation_foreign_key' => 'Поле «:field»: связь :method() использует колонку «:key». Назовите поле по колонке: BelongsTo::make(\':key\').',
     'nested_depth' => 'Поле «:field» (:type) нельзя использовать внутри «:parent»: Repeater и Blocks вкладываются только на один уровень — внутри элемента списка, который сам лежит в форме раздела.',

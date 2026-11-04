@@ -149,11 +149,17 @@ final class ResourceController
         }
 
         try {
-            DB::connection($record->getConnectionName())->transaction(fn (): null => $record->delete() === false ? throw new OperationCancelled : null);
+            DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
+                $resource->beforeDelete($record);
+
+                if ($record->delete() === false) {
+                    throw new OperationCancelled;
+                }
+            });
         } catch (QueryException $exception) {
             return back(fallback: route('fastleo.resources.index', $resource::slug()))->with('fastleo.error', DatabaseErrors::explain($exception));
-        } catch (OperationCancelled) {
-            return back(fallback: route('fastleo.resources.index', $resource::slug()))->with('fastleo.error', __('fastleo::resources.delete_cancelled'));
+        } catch (OperationCancelled $cancelled) {
+            return back(fallback: route('fastleo.resources.index', $resource::slug()))->with('fastleo.error', $cancelled->getMessage() ?: __('fastleo::resources.delete_cancelled'));
         }
 
         // Удаление из связанной таблицы возвращает на страницу родителя.
@@ -195,11 +201,17 @@ final class ResourceController
         }
 
         try {
-            DB::connection($record->getConnectionName())->transaction(fn (): null => $record->forceDelete() === false ? throw new OperationCancelled : null);
+            DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
+                $resource->beforeDelete($record);
+
+                if ($record->forceDelete() === false) {
+                    throw new OperationCancelled;
+                }
+            });
         } catch (QueryException $exception) {
             return back(fallback: route('fastleo.resources.index', $resource::slug()))->with('fastleo.error', DatabaseErrors::explain($exception));
-        } catch (OperationCancelled) {
-            return back(fallback: route('fastleo.resources.index', ['resource' => $resource::slug(), 'trashed' => 1]))->with('fastleo.error', __('fastleo::resources.delete_cancelled'));
+        } catch (OperationCancelled $cancelled) {
+            return back(fallback: route('fastleo.resources.index', ['resource' => $resource::slug(), 'trashed' => 1]))->with('fastleo.error', $cancelled->getMessage() ?: __('fastleo::resources.delete_cancelled'));
         }
 
         return to_route('fastleo.resources.index', ['resource' => $resource::slug(), 'trashed' => 1])

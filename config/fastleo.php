@@ -1,6 +1,8 @@
 <?php
 
 declare(strict_types=1);
+
+use Fastleo\Resources\RoleResource;
 use Fastleo\Resources\UserResource;
 
 return [
@@ -58,6 +60,26 @@ return [
 
     'users' => [
         'resource' => UserResource::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Роли администраторов
+    |--------------------------------------------------------------------------
+    |
+    | roles.enabled — права по разделам через spatie/laravel-permission (docs/roles.md): действие разрешено,
+    | только если разрешают роли администратора, метод ресурса can() и Policy модели. Выключено — как раньше.
+    | roles.owner — роль-владелец (guard fastleo): проходит все проверки, одна управляет «Администраторами»,
+    | настройками, файлами и журналом ошибок. Выдать её: php artisan fastleo:roles --owner=email.
+    | roles.resource — раздел «Роли» с матрицей прав (Fastleo\Resources\RoleResource): оставьте как есть,
+    | укажите свой класс-наследник или null, чтобы раздела не было (роли тогда заводятся сидером).
+    |
+    */
+
+    'roles' => [
+        'resource' => RoleResource::class,
+        'enabled' => false,
+        'owner' => 'fastleo-owner',
     ],
 
     /*

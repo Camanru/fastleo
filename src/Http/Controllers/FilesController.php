@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Http\Controllers;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Files\FileName;
 use Fastleo\Files\FileRejected;
 use Fastleo\Files\FileStore;
@@ -23,7 +24,8 @@ use Illuminate\Validation\ValidationException;
  * Файловый менеджер: папки и файлы внутри корня загрузок на диске Storage.
  *
  * Открыт всем, кто может войти в админку; раздел «Файлы» целиком и удаление можно закрыть Gate
- * `manageFastleoFiles` (`FileStore::canManage()`), окно выбора, загрузка и обрезка остаются у всех. Изменяющие действия — POST/DELETE с CSRF,
+ * `manageFastleoFiles` (`FileStore::canManage()`), окно выбора, загрузка и обрезка остаются у всех (при включённых ролях —
+ * у тех, у кого есть создание или изменение хоть в одном разделе: `RoleMatrix::canWrite()`). Изменяющие действия — POST/DELETE с CSRF,
  * ответы — JSON (страница обновляет сетку сама). Каждый путь из запроса проходит
  * `PathGuard`; загрузка — белый список расширений, проверка и пересохранение картинок.
  */
@@ -55,7 +57,7 @@ final class FilesController
         }
 
         $picker = $request->query('picker') === 'field' ? 'field' : null;
-        abort_if($picker === null && ! FileStore::canManage(), 403);
+        abort_if($picker === null ? ! FileStore::canManage() : ! RoleMatrix::canWrite(), 403);
 
         $imagesOnly = $picker !== null && $request->query('accept') === 'images';
         $listing = FileStore::listing($folder);
@@ -90,6 +92,8 @@ final class FilesController
      */
     public function upload(Request $request): JsonResponse
     {
+        abort_unless(RoleMatrix::canWrite(), 403);
+
         /** @var mixed $files вложенные массивы `files[0][]` тоже возможны — их отвергает проверка */
         $files = $request->file('files');
         $attributes = [];
@@ -136,6 +140,8 @@ final class FilesController
      */
     public function folder(Request $request): JsonResponse
     {
+        abort_unless(RoleMatrix::canWrite(), 403);
+
         Validator::make($request->all(), [
             'folder' => ['required', 'string'],
             'name' => ['required', 'string', 'max:100'],
@@ -185,6 +191,8 @@ final class FilesController
      */
     public function crop(Request $request): JsonResponse
     {
+        abort_unless(RoleMatrix::canWrite(), 403);
+
         Validator::make($request->all(), [
             'path' => ['required', 'string'],
             'x' => ['required', 'integer', 'min:0'],

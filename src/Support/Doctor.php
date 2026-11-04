@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use BackedEnum;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\SetToggle;
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Console\DropActivityCommand;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
@@ -34,11 +35,14 @@ use Fastleo\Imports\ImportRecords;
 use Fastleo\Messengers\ChatIds;
 use Fastleo\Page;
 use Fastleo\Resource;
+use Fastleo\Resources\UserResource;
+use Fastleo\Resources\Users\UserGuard;
 use Fastleo\Settings;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\Html\HtmlLoss;
 use Fastleo\Support\Html\RichTextSettings;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\MigrationRepositoryInterface;
 use Illuminate\Database\Migrations\Migrator;
@@ -121,6 +125,7 @@ final class Doctor
         $this->missingPackageTables = [];
 
         $this->site();
+        $this->roles();
         $this->cache();
 
         try {
@@ -178,6 +183,94 @@ final class Doctor
         }
 
         return $this->problems;
+    }
+
+    /**
+     * Роли администраторов: включены без трейта `HasRoles` и таблиц; нет владельца; администраторы без ролей и с прямыми правами;
+     * у разделов нет прав; роли заведены, а флаг выключен (ограничения молча не действуют).
+     */
+    private function roles(): void
+    {
+        $rolesTable = $this->permissionTable('roles');
+        $enabled = RoleMatrix::enabled();
+
+        if (! $enabled) {
+            if ($rolesTable !== null && DB::table($rolesTable)->where('guard_name', Fastleo::GUARD)->exists()) {
+                $this->add('warning', 'roles', 'roles_disabled_with_roles', [], 'roles_disabled_with_roles_hint');
+            }
+
+            return;
+        }
+
+        $roleModel = RoleMatrix::roleModel();
+
+        if (! $roleModel instanceof Model || $rolesTable === null) {
+            $this->add('error', 'roles', 'roles_not_ready', [], 'roles_not_ready_hint');
+
+            return;
+        }
+
+        if (config('permission.teams') === true) {
+            $this->add('error', 'roles', 'roles_teams', [], 'roles_teams_hint');
+        }
+
+        $class = UserModel::fastleoClassName();
+        $user = $class === null ? null : new $class;
+
+        if ($user instanceof Model) {
+            $this->rolesOfAdmins($user);
+        }
+
+        $permissions = $this->permissionTable('permissions');
+        $known = $permissions === null ? [] : DB::table($permissions)->where('guard_name', Fastleo::GUARD)->pluck('name')->all();
+        $missing = [];
+
+        foreach (Fastleo::resources()->all() as $slug => $resource) {
+            // «Администраторы» при ролях открыты только владельцу: прав на этот раздел не нужно.
+            if (! is_a($resource, UserResource::class, true) && ! in_array(RoleMatrix::permission($slug, 'view'), $known, true)) {
+                $missing[] = $slug;
+            }
+        }
+
+        if ($missing !== []) {
+            $this->add('warning', 'roles', 'roles_permissions_missing', ['sections' => implode(', ', $missing)], 'roles_permissions_missing_hint');
+        }
+    }
+
+    /**
+     * Владельцы и администраторы без ролей guard `fastleo`; администраторы с прямыми правами мимо ролей.
+     */
+    private function rolesOfAdmins(Model $user): void
+    {
+        if (! UserGuard::owners($user)->exists()) {
+            $this->add('error', 'roles', 'roles_no_owner', ['role' => RoleMatrix::ownerRole()], 'roles_no_owner_hint');
+        }
+
+        $guard = static fn (Builder $roles): Builder => $roles->where('guard_name', Fastleo::GUARD);
+        $withoutRole = $user->newQuery()->where('fastleo_admin', true)->whereDoesntHave('roles', $guard)->count();
+        $direct = $user->newQuery()->where('fastleo_admin', true)->whereHas('permissions', $guard)->count();
+
+        if ($withoutRole > 0) {
+            $this->add('warning', 'roles', 'roles_admin_without_role', ['count' => $withoutRole], 'roles_admin_without_role_hint');
+        }
+
+        if ($direct > 0) {
+            $this->add('warning', 'roles', 'roles_direct_permissions', ['count' => $direct], 'roles_direct_permissions_hint');
+        }
+    }
+
+    /**
+     * Имя таблицы spatie (`roles`, `permissions`), если она есть в базе.
+     */
+    private function permissionTable(string $key): ?string
+    {
+        $table = config('permission.table_names.'.$key);
+
+        try {
+            return is_string($table) && Schema::hasTable($table) ? $table : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

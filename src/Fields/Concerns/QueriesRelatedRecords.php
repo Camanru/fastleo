@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Fastleo\Fields\Concerns;
 
 use Closure;
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
+use Fastleo\Resource;
 use Fastleo\Support\ContainsExpression;
 use Fastleo\Support\OptionRule;
 use Fastleo\Support\RecordKey;
@@ -15,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
+use Override;
 
 /**
  * Общее у полей-связей с выбором записей (BelongsTo, BelongsToMany): запрос вариантов,
@@ -179,6 +182,44 @@ trait QueriesRelatedRecords
         }
 
         return $this->titleColumn = $related->getKeyName();
+    }
+
+    /**
+     * Поле только для чтения; при ролях — и когда связанный раздел администратору не открыт: выбрать запись из закрытой
+     * таблицы нельзя, а привязанные раньше остаются как есть.
+     */
+    #[Override]
+    public function isReadonly(): bool
+    {
+        return parent::isReadonly() || (RoleMatrix::enabled() && RoleMatrix::closesRelated($this->relatedModel()));
+    }
+
+    /**
+     * Подсказка поля; у связи на закрытый ролями раздел к ней добавляется объяснение, почему выбрать запись нельзя.
+     */
+    #[Override]
+    public function getHelp(): ?string
+    {
+        $help = parent::getHelp();
+        $related = RoleMatrix::enabled() ? $this->relatedModel() : null;
+
+        if (! $related instanceof Model || ! RoleMatrix::closesRelated($related)) {
+            return $help;
+        }
+
+        $resource = Fastleo::resources()->forModel($related::class);
+        $notice = __('fastleo::roles.related_closed', ['section' => $resource instanceof Resource ? $resource::label() : $related::class], Fastleo::LOCALE);
+
+        return $help === null || $help === '' ? $notice : $help.' '.$notice;
+    }
+
+    /**
+     * Поле можно менять; закрытая ролями связь — нет (см. `isReadonly()`).
+     */
+    #[Override]
+    public function isWritable(): bool
+    {
+        return parent::isWritable() && (! RoleMatrix::enabled() || ! RoleMatrix::closesRelated($this->relatedModel()));
     }
 
     /**

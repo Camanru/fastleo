@@ -44,12 +44,18 @@ abstract class DeletesRecords extends Action
             }
 
             try {
-                DB::connection($record->getConnectionName())->transaction(fn (): null => $operation($record) === false ? throw new OperationCancelled : null);
+                DB::connection($record->getConnectionName())->transaction(function () use ($operation, $record): void {
+                    $this->resource()->beforeDelete($record);
+
+                    if ($operation($record) === false) {
+                        throw new OperationCancelled;
+                    }
+                });
                 $count++;
             } catch (QueryException $exception) {
                 $problems[] = DatabaseErrors::explain($exception);
-            } catch (OperationCancelled) {
-                $problems[] = __('fastleo::resources.delete_cancelled');
+            } catch (OperationCancelled $cancelled) {
+                $problems[] = $cancelled->getMessage() ?: __('fastleo::resources.delete_cancelled');
             }
         }
 

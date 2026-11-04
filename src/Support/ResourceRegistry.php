@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Closing\ClosingSettings;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Fastleo;
@@ -195,10 +196,10 @@ final class ResourceRegistry
             /** @var list<class-string<Resource>> $classes */
             $classes = require $this->cachePath();
 
-            return $this->withBuiltIn($this->withSoftNetica($classes));
+            return $this->withBuiltIn($this->withRoles($this->withSoftNetica($classes)));
         }
 
-        return $this->withBuiltIn($this->withSoftNetica($this->discover()));
+        return $this->withBuiltIn($this->withRoles($this->withSoftNetica($this->discover())));
     }
 
     /**
@@ -252,6 +253,25 @@ final class ResourceRegistry
 
         if (SiteClosing::enabled()) {
             $classes[] = ClosingSettings::class;
+        }
+
+        return $classes;
+    }
+
+    /**
+     * Добавить раздел «Роли» из `fastleo.roles.resource`, если роли включены (`fastleo.roles.enabled`) и у модели
+     * пользователей есть трейт `HasRoles`. Проверяется при каждом запросе, а не при сборке кеша: выключатель действует
+     * и на сайте с `fastleo:cache`.
+     *
+     * @param  list<class-string<Resource|Settings|Page>>  $classes
+     * @return list<class-string<Resource|Settings|Page>>
+     */
+    private function withRoles(array $classes): array
+    {
+        $class = config('fastleo.roles.resource');
+
+        if (RoleMatrix::enabled() && is_string($class) && class_exists($class) && is_subclass_of($class, Resource::class) && $class::hasModel() && ! in_array($class, $classes, true)) {
+            $classes[] = $class;
         }
 
         return $classes;

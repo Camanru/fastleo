@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Reports\Filters;
 use Fastleo\Reports\ReportFilter;
 use Fastleo\Widgets\Chart;
@@ -163,11 +164,11 @@ abstract class Page
     }
 
     /**
-     * Администратору можно открывать страницу. По умолчанию — всем администраторам.
+     * Администратору можно открывать страницу. По умолчанию — всем администраторам, а при включённых ролях — только владельцу.
      */
     public function canAccess(?Authenticatable $user): bool
     {
-        return true;
+        return RoleMatrix::allowsOwnerOnly();
     }
 
     /**

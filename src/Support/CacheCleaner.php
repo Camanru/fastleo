@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Gate;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -20,7 +20,7 @@ use Symfony\Component\Finder\Finder;
 final class CacheCleaner
 {
     /**
-     * Админу можно очищать кеш: Gate `clearFastleoCache`, если сайт его описал, иначе можно любому админу.
+     * Админу можно очищать кеш: Gate `clearFastleoCache`, если сайт его описал, иначе любому админу (при включённых ролях — только владельцу).
      *
      * ```php
      * Gate::define('clearFastleoCache', fn (User $user) => $user->is_owner);
@@ -28,7 +28,7 @@ final class CacheCleaner
      */
     public static function canClear(): bool
     {
-        return ! Gate::has('clearFastleoCache') || Gate::forUser(Fastleo::guard()->user())->allows('clearFastleoCache');
+        return RoleMatrix::gate('clearFastleoCache');
     }
 
     /**

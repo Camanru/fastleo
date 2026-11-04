@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Filters;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
@@ -70,6 +71,11 @@ class BelongsToFilter extends Filter
     public function searchOptions(string $search = '', ?int $limit = null): array
     {
         $field = $this->relation();
+
+        if (RoleMatrix::closesRelated($field->relatedModel())) {
+            return [];
+        }
+
         $query = $field->baseOptionsQuery();
         $title = $query->qualifyColumn($field->getTitleColumn());
 
@@ -91,6 +97,10 @@ class BelongsToFilter extends Filter
     {
         if ($value === null) {
             return [];
+        }
+
+        if (RoleMatrix::closesRelated($this->relation()->relatedModel())) {
+            return [['value' => $value, 'label' => $value]];
         }
 
         $record = $this->relation()->baseOptionsQuery()->whereKey($value)->first();

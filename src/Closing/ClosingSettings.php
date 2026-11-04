@@ -41,11 +41,11 @@ final class ClosingSettings extends Settings
     }
 
     /**
-     * Страница доступна, пока функция включена в конфиге.
+     * Страница доступна, пока функция включена в конфиге; при включённых ролях — только владельцу.
      */
     #[Override]
     public function canAccess(?Authenticatable $user): bool
     {
-        return SiteClosing::enabled();
+        return SiteClosing::enabled() && parent::canAccess($user);
     }
 }

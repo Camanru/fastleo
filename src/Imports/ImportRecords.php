@@ -72,6 +72,7 @@ final class ImportRecords implements ShouldQueue
             fclose($stream);
 
             $guard->setUser($user);
+            $this->forgetCachedPermissions($user);
             $importer = new Importer($resource, $import);
             $importer->run($local, $extension);
             $this->keepSkippedRows($import, $importer->skippedFile());
@@ -123,6 +124,16 @@ final class ImportRecords implements ShouldQueue
         Import::disk()->delete([$import->path, $import->errorsPath()]);
 
         $this->notifyUploader($import);
+    }
+
+    /**
+     * Воркер очереди живёт долго и держит кеш прав spatie в памяти: перед импортом читаем роли заново.
+     */
+    private function forgetCachedPermissions(FastleoUser $user): void
+    {
+        if (method_exists($user, 'forgetCachedPermissions')) {
+            $user->forgetCachedPermissions();
+        }
     }
 
     /**

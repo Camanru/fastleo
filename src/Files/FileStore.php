@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Fastleo\Files;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Exceptions\ImageException;
@@ -37,8 +37,9 @@ final class FileStore
 
     /**
      * Админу доступен раздел «Файлы» (пункт меню, страница менеджера и удаление): Gate `manageFastleoFiles`, если сайт
-     * его описал, иначе любому админу. Сами файлы Gate не прячет: окно выбора файла в полях показывает все папки,
-     * а загрузка, создание папок и обрезка от Gate не зависят.
+     * его описал, иначе любому админу (при включённых ролях — только владельцу). Сами файлы Gate не прячет: окно выбора файла
+     * в полях показывает все папки, а загрузка, создание папок и обрезка от Gate не зависят (при включённых ролях им нужно
+     * право создания или изменения хоть в одном разделе).
      *
      * ```php
      * Gate::define('manageFastleoFiles', fn (User $user) => $user->is_owner);
@@ -46,7 +47,7 @@ final class FileStore
      */
     public static function canManage(): bool
     {
-        return ! Gate::has('manageFastleoFiles') || Gate::forUser(Fastleo::guard()->user())->allows('manageFastleoFiles');
+        return RoleMatrix::gate('manageFastleoFiles');
     }
 
     /**

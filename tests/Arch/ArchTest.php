@@ -33,3 +33,7 @@ arch('the request is read through Laravel, not superglobals')
 arch('commands extend the Laravel console command')
     ->expect('Fastleo\Console')
     ->toExtend(Command::class);
+
+arch('spatie/laravel-permission is optional: only tests use its classes')
+    ->expect('Spatie\Permission')
+    ->toOnlyBeUsedIn('Fastleo\Tests');

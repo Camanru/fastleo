@@ -10,4 +10,6 @@ parameters:
         - database
         - workbench/app
         - workbench/database
+    excludePaths:
+        - workbench/database/migrations/2026_11_04_200000_create_permission_tables.php
     tmpDir: .phpstan.cache

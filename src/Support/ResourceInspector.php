@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Fastleo\Support;
 
 use Fastleo\Actions\Action;
+use Fastleo\Auth\RoleMatrix;
+use Fastleo\Auth\RolePermissions;
+use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Blocks;
@@ -23,6 +26,7 @@ use Fastleo\Page;
 use Fastleo\Related;
 use Fastleo\Resource;
 use Fastleo\Settings;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Stringable;
 use Throwable;
@@ -88,6 +92,43 @@ final class ResourceInspector
         } catch (Throwable $e) {
             return [...$info, 'error' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Роли администраторов и их права по разделам (`sections`: адрес раздела → группы `view`, `create`, `update`, `delete`).
+     * `null` — роли выключены или не готовы (нет трейта `HasRoles`, таблиц). Роль-владелец проходит всё, разделов у неё нет.
+     *
+     * @return array{owner: string, roles: list<array{name: string, owner: bool, sections: array<string, list<string>>}>}|null
+     */
+    public function roles(): ?array
+    {
+        $model = RoleMatrix::enabled() ? RoleMatrix::roleModel() : null;
+
+        if (! $model instanceof Model) {
+            return null;
+        }
+
+        try {
+            $records = $model->newQuery()->where('guard_name', Fastleo::GUARD)->orderBy('name')->get();
+        } catch (Throwable) {
+            return null;
+        }
+
+        $roles = [];
+
+        foreach ($records as $role) {
+            $sections = [];
+
+            foreach (RolePermissions::current($role) as $name) {
+                [, $slug, $group] = explode('.', $name);
+                $sections[$slug][] = $group;
+            }
+
+            $title = $role->getAttribute('name');
+            $roles[] = ['name' => is_string($title) ? $title : '', 'owner' => $title === RoleMatrix::ownerRole(), 'sections' => $sections];
+        }
+
+        return ['owner' => RoleMatrix::ownerRole(), 'roles' => $roles];
     }
 
     /**

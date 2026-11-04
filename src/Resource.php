@@ -19,6 +19,7 @@ use Fastleo\Filters\Filter;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\FormSchema;
+use Fastleo\Support\OperationCancelled;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -409,6 +410,26 @@ abstract class Resource
     public function can(string $ability, ?Model $record): bool
     {
         return true;
+    }
+
+    /**
+     * Проверка перед удалением записи (из раздела, из корзины и массовым действием): выполняется внутри транзакции
+     * удаления. Бросьте `OperationCancelled` с причиной — запись останется, админ увидит причину.
+     *
+     * ```php
+     * public function beforeDelete(Model $record): void
+     * {
+     *     if ($record->orders()->exists()) {
+     *         throw new OperationCancelled('У записи есть заказы.');
+     *     }
+     * }
+     * ```
+     *
+     * @throws OperationCancelled
+     */
+    public function beforeDelete(Model $record): void
+    {
+        //
     }
 
     /**

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fastleo\Mcp\Tools;
 
+use Fastleo\Auth\RoleMatrix;
+use Fastleo\Auth\RolePermissions;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\ResourceInspector;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -37,6 +39,7 @@ final class DescribeResource extends ResourceTool
         return Response::json([
             ...new ResourceInspector()->resource($resource),
             'can' => ['create' => Authorization::allows('create', $resource)],
+            ...(RoleMatrix::enabled() ? ['role_rights' => array_combine(RolePermissions::GROUPS, array_map(fn (string $group): bool => RoleMatrix::allows($group === 'view' ? 'viewAny' : $group, $resource::slug()), RolePermissions::GROUPS))] : []),
         ]);
     }
 }

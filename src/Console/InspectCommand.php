@@ -49,7 +49,7 @@ final class InspectCommand extends Command
 
             $info = $inspector->resource($resource);
 
-            return $this->output($info, [$info], [], []);
+            return $this->output($info, [$info], [], [], null);
         }
 
         $resources = [];
@@ -82,7 +82,14 @@ final class InspectCommand extends Command
             }
         }
 
-        return $this->output(['resources' => $resources, 'settings' => $settings, 'pages' => $pages], $resources, $settings, $pages);
+        $roles = $inspector->roles();
+
+        return $this->output([
+            'resources' => $resources,
+            'settings' => $settings,
+            'pages' => $pages,
+            ...($roles === null ? [] : ['roles' => $roles]),
+        ], $resources, $settings, $pages, $roles);
     }
 
     /**
@@ -90,8 +97,9 @@ final class InspectCommand extends Command
      * @param  list<array<string, mixed>>  $resources
      * @param  list<array<string, mixed>>  $settings
      * @param  list<array<string, mixed>>  $pages
+     * @param  array{owner: string, roles: list<array{name: string, owner: bool, sections: array<string, list<string>>}>}|null  $roles
      */
-    private function output(array $json, array $resources, array $settings, array $pages): int
+    private function output(array $json, array $resources, array $settings, array $pages, ?array $roles): int
     {
         if ($this->option('json') === true) {
             $this->line(json_encode($json, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
@@ -107,6 +115,13 @@ final class InspectCommand extends Command
             $this->components->twoColumnDetail(
                 __('fastleo::console.inspect_page', ['label' => $this->text($page['label'] ?? ''), 'slug' => $this->text($page['slug'] ?? '')]),
                 $this->text($page['view'] ?? ''),
+            );
+        }
+
+        foreach ($roles['roles'] ?? [] as $role) {
+            $this->components->twoColumnDetail(
+                __('fastleo::console.inspect_role', ['name' => $role['name']]),
+                $role['owner'] ? __('fastleo::console.inspect_role_owner') : implode('; ', array_map(fn (string $slug, array $groups): string => $slug.' ('.implode(', ', $groups).')', array_keys($role['sections']), $role['sections'])),
             );
         }
 

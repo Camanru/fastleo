@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo;
 
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Nested;
@@ -103,11 +104,11 @@ abstract class Settings
     }
 
     /**
-     * Администратору можно открывать и менять страницу. По умолчанию — всем администраторам.
+     * Администратору можно открывать и менять страницу. По умолчанию — всем администраторам, а при включённых ролях — только владельцу.
      */
     public function canAccess(?Authenticatable $user): bool
     {
-        return true;
+        return RoleMatrix::allowsOwnerOnly();
     }
 
     /**
