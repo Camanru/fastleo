@@ -244,3 +244,74 @@ it('escapes the alt text passed with {{ }} or as a value only once and still esc
             ->not->toContain('&amp;amp;');
     }
 });
+
+it('reads a preset as sorted unique widths up to 10000 and a ratio as a number', function (): void {
+    config(['fastleo.images.presets.mixed' => ['widths' => [800, 400, 400, 0, -5, 10_000, 10_001, '300', 1.5], 'ratio' => '16:9', 'watermark' => true]]);
+
+    expect(Variants::preset('mixed'))->toBe(['widths' => [400, 800, 10_000], 'ratio' => 16 / 9, 'watermark' => true])
+        ->and(Variants::preset('photo'))->toBe(['widths' => [480], 'ratio' => null, 'watermark' => false]);
+
+    config(['fastleo.images.presets.truthy' => ['widths' => [100], 'watermark' => 1]]);
+
+    expect(Variants::preset('truthy')['watermark'])->toBeFalse();
+});
+
+it('refuses a preset without usable widths or with a ratio that is not two numbers', function (mixed $preset): void {
+    config(['fastleo.images.presets.bad' => $preset]);
+
+    expect(fn (): array => Variants::preset('bad'))->toThrow(LogicException::class, 'bad');
+})->with([
+    'no widths' => [[]],
+    'only unusable widths' => [['widths' => [0, 'x', 10_001]]],
+    'ratio with a zero' => [['widths' => [100], 'ratio' => '0:3']],
+    'ratio with a word' => [['widths' => [100], 'ratio' => 'wide']],
+    'ratio of one number' => [['widths' => [100], 'ratio' => '16']],
+    'ratio of five digits' => [['widths' => [100], 'ratio' => '10000:3']],
+    'ratio not a string' => [['widths' => [100], 'ratio' => 1.5]],
+]);
+
+it('makes the widths that fit and one the size of the picture when some of them are wider', function (int $imageWidth, array $widths): void {
+    putImage('uploads/a.jpg', $imageWidth, 300);
+
+    expect(array_keys(Variants::generate('uploads/a.jpg', 'small')))->toBe($widths);
+})->with([
+    'wider than all' => [500, [200, 300]],
+    'as wide as the largest' => [300, [200, 300]],
+    'between' => [250, [200, 250]],
+    'narrower than all' => [100, [100]],
+]);
+
+it('reads only the sound sizes from the manifest in the order of the widths', function (): void {
+    putImage('uploads/a.jpg', 500, 300);
+    Variants::generate('uploads/a.jpg', 'small');
+    Cache::flush();
+    $this->disk->put(Variants::folder('small', 'uploads/a.jpg').'/manifest.json', '{"300":225,"200":150,"x":5,"0":5,"100":0,"400":"big"}');
+
+    expect(Variants::sizes('uploads/a.jpg', 'small'))->toBe([200 => 150, 300 => 225]);
+});
+
+it('forgets the sizes of a picture that was replaced by something broken', function (): void {
+    putImage('uploads/a.jpg', 500, 300);
+    Variants::generate('uploads/a.jpg', 'small');
+
+    expect(Variants::sizes('uploads/a.jpg', 'small'))->not->toBe([]);
+
+    $this->disk->put('uploads/a.jpg', 'broken');
+
+    expect(Variants::generate('uploads/a.jpg', 'small'))->toBe([])
+        ->and(Variants::sizes('uploads/a.jpg', 'small'))->toBe([])
+        ->and($this->disk->exists(Variants::folder('small', 'uploads/a.jpg').'/200.webp'))->toBeFalse();
+});
+
+it('cuts the picture to the largest frame of the ratio, rounding the sides', function (int $width, int $height, string $ratio, int $frameWidth, int $frameHeight): void {
+    config(['fastleo.images.presets.framed' => ['widths' => [2000], 'ratio' => $ratio]]);
+    putImage('uploads/a.jpg', $width, $height);
+
+    expect(Variants::generate('uploads/a.jpg', 'framed'))->toBe([$frameWidth => $frameHeight]);
+})->with([
+    'wide picture, tall frame' => [1000, 500, '1:1', 500, 500],
+    'tall picture, wide frame' => [500, 1000, '2:1', 500, 250],
+    'rounded up' => [1000, 1000, '2:3', 667, 1000],
+    'rounded down' => [1000, 1000, '3:2', 1000, 667],
+    'same ratio' => [800, 600, '4:3', 800, 600],
+]);

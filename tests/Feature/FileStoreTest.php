@@ -111,3 +111,72 @@ it('makes no thumbnail for a picture whose data does not decode', function (): v
     expect(FileStore::thumbnail('uploads/photo.png'))->toBeNull()
         ->and($this->disk->exists('fastleo/thumbs/uploads/photo.png.webp'))->toBeFalse();
 });
+
+it('crops exactly inside the picture and refuses a frame that sticks out by one pixel or has no size', function (): void {
+    $this->disk->put('uploads/photo.png', UploadedFile::fake()->image('a.png', 100, 80)->getContent());
+
+    expect(FileStore::crop('uploads/photo.png', 0, 0, 100, 80))->toBe('uploads/photo-crop.png')
+        ->and(FileStore::crop('uploads/photo.png', 99, 79, 1, 1))->toBe('uploads/photo-crop-1.png');
+
+    foreach ([[1, 0, 100, 80], [0, 1, 100, 80], [0, 0, 101, 80], [0, 0, 100, 81], [-1, 0, 10, 10], [0, -1, 10, 10], [0, 0, 0, 10], [0, 0, 10, 0]] as $frame) {
+        expect(fn (): string => FileStore::crop('uploads/photo.png', ...$frame))->toThrow(FileRejected::class, 'Рамка выходит за картинку.');
+    }
+});
+
+it('says the size limit of a picture in whole megapixels', function (int $limit, int $width, int $height, string $megapixels): void {
+    config(['fastleo.files.max_pixels' => $limit]);
+
+    expect(fn (): string => FileStore::store(UploadedFile::fake()->image('big.png', $width, $height), 'uploads'))
+        ->toThrow(FileRejected::class, '«big.png» больше '.$megapixels.' мегапикселей');
+})->with([
+    'rounds down' => [1_400_000, 1500, 1000, '1'],
+    'rounds up' => [2_500_000, 2000, 1500, '3'],
+]);
+
+it('sorts the folder like a person: by the natural order, ignoring the case, and hides what the site hid', function (): void {
+    config(['fastleo.files.hidden' => ['thumbs', '*.bak']]);
+
+    foreach (['uploads/img10.jpg', 'uploads/img2.jpg', 'uploads/Img1.jpg', 'uploads/old.bak', 'uploads/.hidden', 'uploads/b/x.jpg', 'uploads/a10/x.jpg', 'uploads/a2/x.jpg', 'uploads/thumbs/x.jpg'] as $path) {
+        $this->disk->put($path, 'x');
+    }
+
+    $listing = FileStore::listing('uploads');
+
+    expect(array_column($listing['files'], 'name'))->toBe(['Img1.jpg', 'img2.jpg', 'img10.jpg'])
+        ->and(array_column($listing['folders'], 'name'))->toBe(['a2', 'a10', 'b']);
+});
+
+it('checks every part of the path against the hidden names', function (): void {
+    config(['fastleo.files.hidden' => ['thumbs', '*.bak']]);
+
+    expect(FileStore::isHidden('uploads/thumbs/a.jpg'))->toBeTrue()
+        ->and(FileStore::isHidden('uploads/a.bak'))->toBeTrue()
+        ->and(FileStore::isHidden('uploads/a.jpg'))->toBeFalse()
+        ->and(FileStore::isHidden('uploads//a.jpg'))->toBeFalse();
+
+    config(['fastleo.files.hidden' => 'thumbs']);
+    expect(FileStore::isHidden('uploads/thumbs'))->toBeTrue();
+
+    config(['fastleo.files.hidden' => [5, null, 'thumbs']]);
+    expect(FileStore::isHidden('uploads/5/a.jpg'))->toBeFalse()->and(FileStore::isHidden('thumbs'))->toBeTrue();
+
+    config(['fastleo.files.hidden' => []]);
+    expect(FileStore::isHidden('uploads/thumbs'))->toBeFalse();
+});
+
+it('deletes the thumbnails of what it deletes and leaves the thumbnails of the others', function (): void {
+    foreach (['uploads/d/a.jpg', 'fastleo/thumbs/uploads/d/a.jpg.webp', 'uploads/e/b.jpg', 'fastleo/thumbs/uploads/e/b.jpg.webp', 'uploads/c.jpg', 'fastleo/thumbs/uploads/c.jpg.webp'] as $path) {
+        $this->disk->put($path, 'x');
+    }
+
+    expect(FileStore::delete('uploads/d'))->toBeTrue()
+        ->and(FileStore::delete('uploads/c.jpg'))->toBeTrue()
+        ->and(FileStore::delete('uploads/missing.jpg'))->toBeFalse()
+        ->and($this->disk->allFiles())->toEqualCanonicalizing(['uploads/e/b.jpg', 'fastleo/thumbs/uploads/e/b.jpg.webp']);
+});
+
+it('makes the folder of the upload when it does not exist yet', function (): void {
+    FileStore::store(UploadedFile::fake()->createWithContent('price.txt', 'x'), 'uploads/new');
+
+    expect($this->disk->directoryExists('uploads/new'))->toBeTrue();
+});

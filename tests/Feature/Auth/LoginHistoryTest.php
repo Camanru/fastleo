@@ -117,3 +117,37 @@ it('does not try to email an admin who has no address about a new device', funct
     expect(LoginRecord::query()->count())->toBe(2);
     Notification::assertNothingSent();
 });
+
+it('keeps a device by the first 255 characters of its user agent', function (): void {
+    $agent = str_repeat('a', 300);
+
+    signInFrom($agent);
+    signInFrom($agent);
+
+    expect(LoginRecord::query()->sole()->user_agent)->toBe(str_repeat('a', 255));
+});
+
+it('forgets the devices not seen for 90 days and keeps the others', function (): void {
+    $record = fn (string $fingerprint, int $days): LoginRecord => LoginRecord::query()->create([
+        'user_id' => '1', 'fingerprint' => $fingerprint, 'ip' => '10.0.0.1', 'user_agent' => null,
+        'created_at' => now()->subDays($days), 'last_seen_at' => now()->subDays($days),
+    ]);
+    $record('fresh', 89);
+    $record('stale', 91);
+
+    expect(resolve(LoginHistory::class)->prune())->toBe(1)
+        ->and(LoginRecord::query()->pluck('fingerprint')->all())->toBe(['fresh']);
+});
+
+it('keeps at least a day of history whatever the setting', function (): void {
+    config(['fastleo.auth.logins_keep_days' => 0]);
+    $record = fn (string $fingerprint, int $hours): LoginRecord => LoginRecord::query()->create([
+        'user_id' => '1', 'fingerprint' => $fingerprint, 'ip' => '10.0.0.1', 'user_agent' => null,
+        'created_at' => now()->subHours($hours), 'last_seen_at' => now()->subHours($hours),
+    ]);
+    $record('today', 12);
+    $record('older', 36);
+
+    expect(resolve(LoginHistory::class)->prune())->toBe(1)
+        ->and(LoginRecord::query()->pluck('fingerprint')->all())->toBe(['today']);
+});

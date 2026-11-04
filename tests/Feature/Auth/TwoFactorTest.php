@@ -244,7 +244,7 @@ describe('login challenge', function (): void {
     it('accepts one of two parallel requests with the same code', function (): void {
         $twoFactor = resolve(TwoFactor::class);
         $secret = $twoFactor->begin($this->admin);
-        $twoFactor->confirm($this->admin, totp($secret, -1));
+        confirmTwoFactor($twoFactor, $this->admin, $secret);
 
         // Параллельный запрос успевает записать тот же шаг между чтением записи и её обновлением.
         $raced = false;
@@ -355,7 +355,7 @@ describe('service', function (): void {
             ->and($twoFactor->confirm($this->admin, 'abcdef'))->toBeNull()
             ->and($twoFactor->confirm($this->admin, '12345'))->toBeNull();
 
-        $twoFactor->confirm($this->admin, totp($secret, -1));
+        confirmTwoFactor($twoFactor, $this->admin, $secret);
         expect($twoFactor->isPending($this->admin))->toBeFalse()
             ->and($twoFactor->confirm($this->admin, totp($secret)))->toBeNull()
             ->and($twoFactor->verify($this->admin, 'abcdef'))->toBeFalse();
@@ -430,4 +430,52 @@ it('refuses a code instead of failing when the stored secret is empty', function
     } finally {
         TwoFactorCredential::getEventDispatcher()->forget('eloquent.retrieved: '.TwoFactorCredential::class);
     }
+});
+
+it('keeps the secret and the recovery codes out of the serialized credential', function (): void {
+    withTwoFactor($this->admin);
+    $credential = TwoFactorCredential::query()->sole();
+
+    expect($credential->toArray())->not->toHaveKeys(['secret', 'recovery_codes'])
+        ->and($credential->toJson())->not->toContain('recovery_codes')
+        ->and($credential->last_step)->toBeInt()
+        ->and($credential->confirmed_at)->toBeInstanceOf(DateTimeInterface::class)
+        ->and($credential->recovery_codes)->toBeArray();
+});
+
+it('gives nothing to a user without a credential', function (): void {
+    $twoFactor = resolve(TwoFactor::class);
+
+    expect($twoFactor->isPending($this->admin))->toBeFalse()
+        ->and($twoFactor->confirm($this->admin, '123456'))->toBeNull()
+        ->and($twoFactor->verify($this->admin, '123456'))->toBeFalse()
+        ->and($twoFactor->remainingRecoveryCodes($this->admin))->toBe(0);
+});
+
+it('issues eight recovery codes of two groups of five characters', function (): void {
+    ['codes' => $codes] = withTwoFactor($this->admin);
+
+    expect($codes)->toHaveCount(TwoFactor::RECOVERY_CODES)->each->toMatch('/^[a-z0-9]{5}-[a-z0-9]{5}$/')
+        ->and(array_unique($codes))->toHaveCount(8);
+});
+
+it('keeps the recovery codes a plain list after one is used', function (): void {
+    ['codes' => $codes] = withTwoFactor($this->admin);
+    $twoFactor = resolve(TwoFactor::class);
+
+    expect($twoFactor->verifyRecoveryCode($this->admin, $codes[0]))->toBeTrue()
+        ->and(array_is_list(TwoFactorCredential::query()->sole()->recovery_codes))->toBeTrue()
+        ->and($twoFactor->remainingRecoveryCodes($this->admin))->toBe(7)
+        ->and($twoFactor->verifyRecoveryCode($this->admin, $codes[0]))->toBeFalse()
+        ->and($twoFactor->verifyRecoveryCode($this->admin, $codes[1]))->toBeTrue();
+});
+
+it('does not accept a code of an earlier step than the last accepted one', function (): void {
+    $twoFactor = resolve(TwoFactor::class);
+    $secret = $twoFactor->begin($this->admin);
+    confirmTwoFactor($twoFactor, $this->admin, $secret);
+
+    expect($twoFactor->verify($this->admin, totp($secret, 1)))->toBeTrue()
+        ->and($twoFactor->verify($this->admin, totp($secret, 0)))->toBeFalse()
+        ->and($twoFactor->verify($this->admin, totp($secret, -1)))->toBeFalse();
 });

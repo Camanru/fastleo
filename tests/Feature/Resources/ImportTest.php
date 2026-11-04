@@ -10,6 +10,7 @@ use Fastleo\Tests\Fixtures\Policies\NoListProductPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
@@ -291,6 +292,75 @@ it('reads back its own csv export with the formula guard', function (): void {
     expect(Article::query()->orderBy('id')->pluck('title')->all())->toBe(['=1+2', 'Обычный, с запятой']);
 });
 
+it('finds the delimiter of a csv in its first line, with or without the BOM', function (string $delimiter, string $bom): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', $bom."Заголовок{$delimiter}Просмотры\nОтчёт{$delimiter}7\n"));
+
+    expect(Article::query()->where('title', 'Отчёт')->value('views'))->toBe(7);
+})->with([
+    'semicolon' => [';', ''],
+    'comma' => [',', ''],
+    'tab' => ["\t", ''],
+    'semicolon with BOM' => [';', "\u{FEFF}"],
+    'comma with BOM' => [',', "\u{FEFF}"],
+]);
+
+it('reads a csv of one column', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок\nОдин\nДва\n"));
+
+    expect(Article::query()->orderBy('id')->pluck('title')->all())->toBe(['Один', 'Два']);
+});
+
+it('recognizes the columns whatever the case and the spaces around the header', function (): void {
+    importFile(xlsxFile([[' ЗАГОЛОВОК ', ' просмотры'], ['Отчёт', 7]]));
+
+    expect(Article::query()->where('title', 'Отчёт')->value('views'))->toBe(7);
+});
+
+it('takes the first of two columns with the same header', function (): void {
+    importFile(xlsxFile([['Заголовок', 'Заголовок', 'Просмотры'], ['Первый', 'Второй', 3]]));
+
+    expect(Article::query()->pluck('title')->all())->toBe(['Первый']);
+});
+
+it('does not split a one-column csv at a semicolon in the text', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок\nОдин; два\n"));
+
+    expect(Article::query()->pluck('title')->all())->toBe(['Один; два']);
+});
+
+it('reads only the first sheet of a workbook', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-xlsx').'.xlsx';
+    $writer = new XlsxWriter();
+    $writer->openToFile($path);
+    $writer->addRow(Row::fromValues(['Заголовок']));
+    $writer->addRow(Row::fromValues(['С первого листа']));
+    $writer->addNewSheetAndMakeItCurrent();
+    $writer->addRow(Row::fromValues(['Заголовок']));
+    $writer->addRow(Row::fromValues(['Со второго листа']));
+    $writer->close();
+
+    importFile(new UploadedFile($path, 'two-sheets.xlsx', null, null, true));
+
+    expect(Article::query()->pluck('title')->all())->toBe(['С первого листа']);
+});
+
+it('saves the progress while a long file is read, not only at the end', function (): void {
+    $progressWrites = function (int $rows): int {
+        $writes = 0;
+        DB::listen(function ($query) use (&$writes): void {
+            $writes += str_starts_with($query->sql, 'update') && str_contains($query->sql, 'imports') && str_contains($query->sql, 'processed') ? 1 : 0;
+        });
+        importFile(xlsxFile([['Заголовок'], ...array_map(fn (int $number): array => ['Статья '.$number], range(1, $rows))]));
+
+        return $writes;
+    };
+
+    $short = $progressWrites(5);
+    $long = $progressWrites(250);
+
+    expect($long)->toBeGreaterThanOrEqual($short + 2);
+});
+
 it('stops after the row limit and says so', function (): void {
     config(['fastleo.import.max_rows' => 2]);
 
@@ -448,6 +518,54 @@ it('counts the real unpacked size, not the size written in the archive', functio
 
     expect(lastImport()->status)->toBe('failed')
         ->and(lastImport()->message)->toContain('слишком большой после распаковки');
+});
+
+/**
+ * Таблица xlsx с лишним файлом внутри: после распаковки в ней ровно столько байт, сколько указано.
+ */
+function xlsxUnpackingTo(int $bytes): UploadedFile
+{
+    $path = xlsxFile([['Заголовок'], ['Из архива']])->getPathname();
+    $zip = new ZipArchive();
+    $zip->open($path);
+    $unpacked = 0;
+
+    for ($index = 0; $index < $zip->numFiles; $index++) {
+        $unpacked += (int) $zip->statIndex($index)['size'];
+    }
+
+    $zip->addFromString('padding.bin', str_repeat('0', $bytes - $unpacked));
+    $zip->close();
+
+    return new UploadedFile($path, 'padded.xlsx', null, null, true);
+}
+
+it('takes a spreadsheet that unpacks into exactly the limit and refuses one that is a byte more', function (): void {
+    config(['fastleo.import.max_unpacked' => 1]);
+
+    importFile(xlsxUnpackingTo(1024 * 1024));
+
+    expect(lastImport()->status)->toBe('done')
+        ->and(Article::query()->pluck('title')->all())->toBe(['Из архива']);
+
+    importFile(xlsxUnpackingTo(1024 * 1024 + 1));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл слишком большой после распаковки (больше 1 МБ). Разделите его на части.'])
+        ->and(Article::query()->count())->toBe(1);
+});
+
+it('adds up the unpacked size of all files of the archive and allows a megabyte at least', function (): void {
+    config(['fastleo.import.max_unpacked' => 0]);
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/one.xml', str_repeat('0', 600 * 1024));
+    $zip->addFromString('xl/two.xml', str_repeat('0', 600 * 1024));
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'two-files.xlsx', null, null, true));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл слишком большой после распаковки (больше 1 МБ). Разделите его на части.']);
 });
 
 it('fails an import that crashed and reports the error', function (): void {

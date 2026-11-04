@@ -6,6 +6,7 @@ use Fastleo\Files\FileName;
 use Fastleo\Files\FileTypes;
 use Fastleo\Files\PathGuard;
 use Fastleo\Files\UploadLimits;
+use Illuminate\Support\Facades\Storage;
 
 it('makes a safe latin file name', function (string $original, string $expected): void {
     expect(FileName::sanitize($original))->toBe($expected);
@@ -66,4 +67,53 @@ it('accepts a nested uploads root', function (): void {
         ->and(PathGuard::inside('media/uploads/a.jpg'))->toBe('media/uploads/a.jpg')
         ->and(PathGuard::inside('media/a.jpg'))->toBeNull()
         ->and(PathGuard::entry('media/uploads'))->toBeNull();
+});
+
+it('names the wrong root in the error', function (): void {
+    config(['fastleo.files.root' => 'fastleo/files']);
+
+    expect(PathGuard::root(...))->toThrow(LogicException::class, 'Недопустимый корень файлов «fastleo/files»');
+});
+
+it('lets through the root and what is inside it, but not a sibling folder that starts the same', function (): void {
+    expect(PathGuard::inside('uploads'))->toBe('uploads')
+        ->and(PathGuard::inside('uploads/doctors/a.jpg'))->toBe('uploads/doctors/a.jpg')
+        ->and(PathGuard::inside('uploads-evil/a.jpg'))->toBeNull()
+        ->and(PathGuard::inside('uploadsx'))->toBeNull();
+});
+
+it('accepts a path of 1024 characters and refuses 1025', function (): void {
+    $path = 'uploads'.str_repeat('/'.str_repeat('a', 99), 10).'/'.str_repeat('a', 16);
+
+    expect(strlen($path))->toBe(1024)
+        ->and(PathGuard::inside($path))->toBe($path)
+        ->and(PathGuard::inside($path.'a'))->toBeNull();
+});
+
+it('cuts a name and a folder at 100 characters', function (): void {
+    expect(FileName::sanitize(str_repeat('a', 150).'.jpg'))->toBe(str_repeat('a', 100).'.jpg')
+        ->and(FileName::folder(str_repeat('b', 150)))->toBe(str_repeat('b', 100));
+});
+
+it('numbers the taken names up to ten and then adds a random suffix', function (): void {
+    $disk = Storage::fake('public');
+    $disk->put('f/a.jpg', 'x');
+
+    foreach (range(1, 9) as $number) {
+        $disk->put('f/a-'.$number.'.jpg', 'x');
+    }
+
+    expect(FileName::unique($disk, 'f', 'a.jpg'))->toBe('f/a-10.jpg');
+
+    $disk->put('f/a-10.jpg', 'x');
+
+    expect(FileName::unique($disk, 'f', 'a.jpg'))->toMatch('~^f/a-[a-z0-9]{8}\.jpg$~');
+});
+
+it('numbers a name without an extension', function (): void {
+    $disk = Storage::fake('public');
+    $disk->put('f/readme', 'x');
+
+    expect(FileName::unique($disk, 'f', 'readme'))->toBe('f/readme-1')
+        ->and(FileName::unique($disk, 'f', 'free.txt'))->toBe('f/free.txt');
 });

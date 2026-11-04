@@ -26,7 +26,7 @@
         "laravel/mcp": "^1.0",
         "openspout/openspout": "^5.13",
         "pragmarx/google2fa": "^9.1",
-        "symfony/html-sanitizer": "^8.1"
+        "symfony/html-sanitizer": "^8.1.11"
     },
     "require-dev": {
         "driftingly/rector-laravel": "^2.7",
@@ -89,6 +89,7 @@
         "test:coverage": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser --coverage --min=100",
         "test:types": "@php vendor/bin/pest --type-coverage --min=100",
         "test:browser": "@php vendor/bin/pest --testsuite=Browser",
+        "test:databases": "scripts/test-databases.sh",
         "check": [
             "@lint",
             "@test:types",

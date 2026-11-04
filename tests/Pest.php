@@ -118,6 +118,18 @@ function totp(string $secret, int $step = 0): string
 }
 
 /**
+ * Подтвердить настройку двухфакторной защиты кодом прошлого шага (текущий и следующий остаются свободны для проверок).
+ * Окно проверки — один шаг назад: если граница 30-секундного шага пришлась между расчётом кода и проверкой, код уже вне окна,
+ * поэтому при отказе расчёт и проверка повторяются один раз.
+ *
+ * @return list<string>|null
+ */
+function confirmTwoFactor(TwoFactor $twoFactor, User $admin, string $secret): ?array
+{
+    return $twoFactor->confirm($admin, totp($secret, -1)) ?? $twoFactor->confirm($admin, totp($secret, -1));
+}
+
+/**
  * Включённая двухфакторная защита у администратора (последний принятый код — шаг назад).
  *
  * @return array{secret: string, codes: list<string>}
@@ -126,7 +138,7 @@ function withTwoFactor(User $admin): array
 {
     $twoFactor = resolve(TwoFactor::class);
     $secret = $twoFactor->begin($admin);
-    $codes = $twoFactor->confirm($admin, totp($secret, -1));
+    $codes = confirmTwoFactor($twoFactor, $admin, $secret);
 
     return ['secret' => $secret, 'codes' => $codes ?? []];
 }
