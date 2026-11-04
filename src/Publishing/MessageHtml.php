@@ -31,7 +31,7 @@ final class MessageHtml
     public static function fromMarkdown(string $markdown): string
     {
         $html = Str::markdown($markdown, ['html_input' => 'escape', 'allow_unsafe_links' => false, 'max_nesting_level' => 50]);
-        $document = new DOMDocument;
+        $document = new DOMDocument();
         @$document->loadHTML('<?xml encoding="utf-8"?><body>'.$html.'</body>', LIBXML_NONET);
         $body = $document->getElementsByTagName('body')->item(0);
 

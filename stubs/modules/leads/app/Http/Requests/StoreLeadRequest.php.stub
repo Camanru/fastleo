@@ -31,6 +31,9 @@ class StoreLeadRequest extends FormRequest
     /** Форма старше суток считается устаревшей. */
     private const int MAX_SECONDS = 86400;
 
+    /** Текст без байта NUL и в верном UTF-8: иначе PostgreSQL отвечает ошибкой 500. */
+    private const string TEXT = 'regex:/\A[^\x00]*\z/u';
+
     /**
      * Метка времени показа формы для скрытого поля `form_token`: зашифрована и привязана к сессии посетителя.
      */
@@ -55,10 +58,10 @@ class StoreLeadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:100'],
-            'phone' => ['required', 'string', 'max:50', 'regex:/^[0-9+()\-\s.]{5,}$/'],
+            'name' => ['required', 'string', 'max:100', self::TEXT],
+            'phone' => ['required', 'string', 'max:50', 'regex:/^[0-9+()\- .]{5,}$/D'],
             'email' => ['nullable', 'email', 'max:255'],
-            'message' => ['nullable', 'string', 'max:2000'],
+            'message' => ['nullable', 'string', 'max:2000', self::TEXT],
             'leave_empty' => ['nullable', 'string', 'max:255'],
             'form_token' => ['nullable', 'string', 'max:1000'],
         ];
@@ -81,7 +84,8 @@ class StoreLeadRequest extends FormRequest
     {
         $seconds = $this->secondsSinceShown();
 
-        return $seconds !== null && ($seconds < self::MIN_SECONDS || $seconds > self::MAX_SECONDS);
+        // Метка выдана другой сессии: у живого посетителя сессия сменилась (вход или выход на сайте) — форму надо показать заново.
+        return $seconds !== null && ($seconds < self::MIN_SECONDS || $seconds > self::MAX_SECONDS || ! $this->isFromThisSession());
     }
 
     /**
@@ -89,13 +93,34 @@ class StoreLeadRequest extends FormRequest
      */
     private function secondsSinceShown(): ?int
     {
+        $token = $this->shownToken();
+
+        return $token === null ? null : now()->timestamp - (int) $token[0];
+    }
+
+    /**
+     * Метка выдана этой сессии: чужую (украденную или собранную заранее) форма не принимает.
+     */
+    private function isFromThisSession(): bool
+    {
+        $token = $this->shownToken();
+
+        return $token !== null && hash_equals($this->session()->getId(), $token[1]);
+    }
+
+    /**
+     * Расшифрованная метка: время показа и номер сессии; null — метки нет или она подделана.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    private function shownToken(): ?array
+    {
         try {
             [$shownAt, $session] = explode('|', Crypt::decryptString((string) $this->input('form_token')).'|', 3);
         } catch (DecryptException) {
             return null;
         }
 
-        // Метка выдана этой сессии: чужую (украденную или собранную заранее) форма не принимает.
-        return hash_equals($this->session()->getId(), $session) ? now()->timestamp - (int) $shownAt : null;
+        return [$shownAt, $session];
     }
 }

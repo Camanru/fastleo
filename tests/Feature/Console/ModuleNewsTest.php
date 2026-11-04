@@ -150,6 +150,17 @@ it('tells what to add by hand when the dashboard of the site is built differentl
     expect(File::get($this->sandbox.'/app/Fastleo/Dashboard.php'))->not->toContain('Последние новости');
 });
 
+it('keeps the written modules and asks to add widgets by hand when the dashboard cannot be written', function (): void {
+    File::ensureDirectoryExists($this->sandbox.'/app/Fastleo/Dashboard.php');
+
+    $this->artisan('fastleo:module', ['modules' => ['news']])
+        ->expectsOutputToContain('Dashboard.php устроен необычно')
+        ->expectsOutputToContain("Table::make('Последние новости')")
+        ->assertSuccessful();
+
+    expect(File::exists($this->sandbox.'/app/Fastleo/NewsResource.php'))->toBeTrue();
+});
+
 it('shows only published news whose date has come in the published scope', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
     bootCopiedNews($this);

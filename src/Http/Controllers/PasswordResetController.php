@@ -48,11 +48,15 @@ final class PasswordResetController
         $user = UserLookup::adminByEmail($email);
 
         if ($user instanceof CanResetPassword) {
+            // Письмо уходит после ответа: его отправка (SMTP при очереди sync) не должна выдавать существующий адрес временем ответа.
             $this->broker()->sendResetLink(['email' => $email], function (CanResetPassword $user, string $token): void {
-                rescue(fn () => Notification::route('mail', $user->getEmailForPasswordReset())->notify(
+                defer(fn () => rescue(fn () => Notification::route('mail', $user->getEmailForPasswordReset())->notify(
                     new ResetPasswordNotification($token, $user->getEmailForPasswordReset(), $this->expireMinutes()),
-                ));
+                )));
             });
+        } else {
+            // Для существующего адреса создаётся токен (хеш пароля): столько же работы и для несуществующего.
+            Hash::make(Str::random(40));
         }
 
         return back()->with('status', __('fastleo::auth.forgot_sent'));

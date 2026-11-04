@@ -87,6 +87,22 @@ it('puts the Claude skill next to the site and refreshes it on a repeat run', fu
     expect(File::get($this->sandbox.'/skill/SKILL.md'))->toContain('name: fastleo');
 });
 
+it('counts a relative path of the skill from the root of the site', function (): void {
+    $this->app->setBasePath($this->sandbox);
+
+    $this->artisan('fastleo:skill', ['--path' => 'tools/skill'])->assertSuccessful();
+
+    expect($this->sandbox.'/tools/skill/SKILL.md')->toBeFile();
+});
+
+it('does not ask to create a user when an administrator already exists', function (): void {
+    admin();
+
+    $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
+        ->doesntExpectOutputToContain('php artisan fastleo:user')
+        ->assertSuccessful();
+});
+
 it('does not overwrite a config the site already has', function (): void {
     File::put(config_path('fastleo.php'), "<?php\n\nreturn ['path' => 'admin'];\n");
 

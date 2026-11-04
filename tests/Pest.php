@@ -112,7 +112,7 @@ function role(string $name, array $permissions = []): Role
  */
 function totp(string $secret, int $step = 0): string
 {
-    $google2fa = new Google2FA;
+    $google2fa = new Google2FA();
 
     return $google2fa->oathTotp($secret, $google2fa->getTimestamp() + $step);
 }
@@ -263,7 +263,7 @@ function articleData(array $overrides = []): array
 function modelEvents(string $model, string $event = 'updated'): ArrayObject
 {
     /** @var ArrayObject<int, list<string>> $events */
-    $events = new ArrayObject;
+    $events = new ArrayObject();
 
     Event::listen('eloquent.'.$event.': '.$model, function (Model $record) use ($events, $event): void {
         $events[] = array_keys($event === 'updated' ? $record->getChanges() : $record->getAttributes());
@@ -282,7 +282,7 @@ function exportedRows(TestResponse $response, string $format = 'xlsx'): array
     $path = tempnam(sys_get_temp_dir(), 'fastleo-export');
     file_put_contents($path, $response->streamedContent());
 
-    $reader = $format === 'csv' ? new CsvReader(new CsvOptions(FIELD_DELIMITER: ';')) : new XlsxReader;
+    $reader = $format === 'csv' ? new CsvReader(new CsvOptions(FIELD_DELIMITER: ';')) : new XlsxReader();
     $reader->open($path);
     $rows = [];
 

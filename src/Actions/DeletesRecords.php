@@ -48,7 +48,7 @@ abstract class DeletesRecords extends Action
                     $this->resource()->beforeDelete($record);
 
                     if ($operation($record) === false) {
-                        throw new OperationCancelled;
+                        throw new OperationCancelled();
                     }
                 });
                 $count++;

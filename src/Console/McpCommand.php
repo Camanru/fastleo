@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace Fastleo\Console;
 
 use Fastleo\Auth\FastleoUser;
+use Fastleo\Auth\UserLookup;
 use Fastleo\Fastleo;
 use Fastleo\Mcp\FastleoServer;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Str;
 use Laravel\Mcp\Server\McpServiceProvider;
 use Laravel\Mcp\Server\Transport\StdioTransport;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -38,7 +40,7 @@ final class McpCommand extends Command
         app()->setLocale(Fastleo::LOCALE);
 
         $email = $this->option('user');
-        $user = is_string($email) && $email !== '' ? Fastleo::guard()->getProvider()->retrieveByCredentials(['email' => $email]) : null;
+        $user = is_string($email) && $email !== '' ? UserLookup::byEmail(Str::lower(trim($email))) : null;
 
         if (! $user instanceof Authenticatable || ! $user instanceof FastleoUser || ! $user->canAccessFastleo()) {
             $this->components->error(__('fastleo::mcp.user_unknown', ['email' => is_string($email) ? $email : '']));

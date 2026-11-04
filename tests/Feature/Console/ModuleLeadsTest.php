@@ -188,7 +188,16 @@ it('validates the form and keeps the typed values', function (): void {
     expect(Lead::query()->count())->toBe(0);
 });
 
-it('silently drops bots: filled trap, missing, forged or foreign-session token', function (): void {
+it('rejects a byte that PostgreSQL cannot store', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
+    bootCopiedLeads($this);
+
+    $this->post('/leads', leadInput(['name' => "Ив\0ан", 'message' => "\xB1\x31"]))->assertSessionHasErrors(['name', 'message']);
+
+    expect(Lead::query()->count())->toBe(0);
+});
+
+it('silently drops bots: filled trap, missing or forged token', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
     bootCopiedLeads($this);
     Notification::fake();
@@ -197,7 +206,6 @@ it('silently drops bots: filled trap, missing, forged or foreign-session token',
     foreach ([
         leadInput(['leave_empty' => 'http://spam.example']),
         leadInput(['form_token' => 'подделка']),
-        leadInput(['form_token' => leadFormToken(60, 'чужая-сессия')]),
         ['name' => 'Бот', 'phone' => '+7 900 000-00-00'],
     ] as $input) {
         $this->post('/leads', $input)->assertSessionHas('lead_sent');
@@ -213,8 +221,9 @@ it('asks a living visitor to repeat when the form was sent too fast or is stale,
     Notification::fake();
     admin();
 
-    foreach ([0, 86401] as $secondsAgo) {
-        $this->post('/leads', leadInput(['name' => 'Мария', 'form_token' => leadFormToken($secondsAgo)]))
+    // Третья метка выдана другой сессии: у живого посетителя она сменилась между показом формы и отправкой.
+    foreach ([leadFormToken(0), leadFormToken(86401), leadFormToken(60, 'прежняя-сессия')] as $token) {
+        $this->post('/leads', leadInput(['name' => 'Мария', 'form_token' => $token]))
             ->assertSessionHasErrors('form_token')
             ->assertSessionMissing('lead_sent')
             ->assertSessionHasInput('name', 'Мария');
@@ -235,6 +244,20 @@ it('limits the number of forms from one address without sharing the counter with
 
     $this->post('/leads', leadInput())->assertTooManyRequests();
     $this->get('/other')->assertOk();
+});
+
+it('notifies the administrators of at most twenty leads a minute, but keeps every lead', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
+    bootCopiedLeads($this);
+    Notification::fake();
+    $admin = admin();
+
+    foreach (range(1, 22) as $number) {
+        $this->withServerVariables(['REMOTE_ADDR' => '203.0.113.'.$number])->post('/leads', leadInput())->assertSessionHas('lead_sent');
+    }
+
+    expect(Lead::query()->count())->toBe(22);
+    Notification::assertSentToTimes($admin, MessageNotification::class, 20);
 });
 
 it('gives the form a token that is bound to the session of the visitor', function (): void {

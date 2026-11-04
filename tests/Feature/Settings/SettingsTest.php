@@ -10,6 +10,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Settings;
 use Fastleo\Support\FormSchema;
 use Fastleo\Support\SettingsStore;
+use Fastleo\Tests\Fixtures\Settings\SiteSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
@@ -55,6 +56,31 @@ describe('page', function (): void {
             ->and($stored['maintenance'])->toBeFalse();
 
         $this->get(route('fastleo.settings.edit', 'site'))->assertSee('value="Стоматология"', false)->assertSee('value="12"', false);
+    });
+
+    it('forgets the cached settings only after the transaction commits', function (): void {
+        $this->put(route('fastleo.settings.update', 'site'), siteForm());
+        expect(fastleo_setting('site.title'))->toBe('Стоматология');
+
+        DB::beginTransaction();
+        resolve(SettingsStore::class)->save(new SiteSettings(), ['title' => 'Новое']);
+
+        // Читатель сайта до коммита перестроил бы кеш из старых строк и закрепил их.
+        expect(Cache::has('fastleo.settings'))->toBeTrue()
+            ->and(fastleo_setting('site.title'))->toBe('Стоматология');
+
+        DB::commit();
+
+        expect(Cache::has('fastleo.settings'))->toBeFalse()
+            ->and(fastleo_setting('site.title'))->toBe('Новое');
+    });
+
+    it('saves a value with a broken byte sequence instead of failing with a server error', function (): void {
+        $this->put(route('fastleo.settings.update', 'site'), siteForm(['title' => "Клиника \xB1"]))
+            ->assertRedirect(route('fastleo.settings.edit', 'site'))
+            ->assertSessionHas('fastleo.success');
+
+        expect(mb_check_encoding((string) fastleo_setting('site.title'), 'UTF-8'))->toBeTrue();
     });
 
     it('validates the fields and keeps the old values on an error', function (): void {

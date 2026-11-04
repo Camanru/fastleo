@@ -244,9 +244,16 @@ final class Fastleo
 
         $text = $message->toText();
 
+        // Очередь sync на веб-запросе: страницы сайта (форма заявки) не ждут ответа мессенджера — отправка идёт после ответа.
+        $afterResponse = ! app()->runningInConsole() && config('queue.default') === 'sync';
+
         foreach (NotificationBot::query()->where('enabled', true)->get() as $bot) {
             foreach ($bot->recipients as $chatId) {
-                dispatch(new SendAdminMessage($bot, $chatId, $text));
+                $pending = dispatch(new SendAdminMessage($bot, $chatId, $text))->afterCommit();
+
+                if ($afterResponse) {
+                    $pending->afterResponse();
+                }
             }
         }
     }
@@ -375,7 +382,7 @@ final class Fastleo
 
         $dashboard = class_exists($class) && is_subclass_of($class, Dashboard::class) ? resolve($class) : null;
 
-        return $dashboard instanceof Dashboard ? $dashboard : new Dashboard;
+        return $dashboard instanceof Dashboard ? $dashboard : new Dashboard();
     }
 
     /**

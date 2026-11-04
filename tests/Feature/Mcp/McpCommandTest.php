@@ -42,6 +42,13 @@ it('starts the server as the chosen admin with deletion off', function (): void 
         ->and(config('fastleo.mcp.allow_delete'))->toBeFalse();
 });
 
+it('finds the admin by an email in any case and by the exact address only', function (): void {
+    $admin = admin(['email' => 'boss@example.com']);
+
+    $this->artisan('fastleo:mcp', ['--user' => ' BOSS@Example.com '])->assertSuccessful();
+    expect(Fastleo::guard()->user()?->getAuthIdentifier())->toBe($admin->getAuthIdentifier());
+});
+
 it('allows deletion only when asked with --allow-delete', function (): void {
     $this->artisan('fastleo:mcp', ['--user' => admin()->email, '--allow-delete' => true])->assertSuccessful();
 

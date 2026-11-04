@@ -159,7 +159,7 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 | `$globallySearchable` | `true` | Записи раздела находит [глобальный поиск](list.md#глобальный-поиск) (Ctrl+K) |
 | `$poll` | `null` | Раз в сколько секунд (5–3600) список и [связанные таблицы](related.md) раздела обновляются сами — [list.md](list.md#автообновление-списка) |
 | `$readColumn` | `null` | Колонка отметки «просмотрено» (`'read_at'`): открытая запись становится просмотренной, число в меню — непросмотренные — [ниже](#отметка-просмотрено) |
-| `$mcp` | `true` | Раздел доступен ИИ-агентам через [MCP-сервер](claude.md#mcp-сервер); `false` — сервер его не видит (закрывайте разделы с чужими данными и адресами получателей заявок) |
+| `$mcp` | `true` | Раздел доступен ИИ-агентам через [MCP-сервер](claude.md#mcp-сервер); `false` — сервер его не видит (закрывайте разделы с чужими данными и адресами получателей заявок); отдельную согласованную запись закрывает метод `isLockedForMcp(Model $record): bool` ([подробнее](claude.md#mcp-сервер)) |
 
 Все свойства — статические и типизированные:
 
@@ -169,7 +169,7 @@ protected static int $position = 10;
 protected static ?array $defaultOrder = ['name', 'asc'];
 ```
 
-Адрес раздела (`$slug`) — латиница в нижнем регистре, цифры и дефис. Нельзя брать адреса, которые занимает сама админка: `login`, `logout`, `files`, `search`, `settings`, `pages`, `logs`, `notifications`, `profile`, `two-factor`, `forgot-password`, `reset-password`, `sitemap`, `markdown`, `clear-cache`, `softnetica`. Два ресурса с одним адресом — ошибка.
+Адрес раздела (`$slug`) — латиница в нижнем регистре, цифры и дефис. Нельзя брать адреса, которые занимает сама админка: `login`, `logout`, `dashboard`, `files`, `search`, `settings`, `pages`, `logs`, `notifications`, `profile`, `two-factor`, `forgot-password`, `reset-password`, `sitemap`, `markdown`, `clear-cache`, `softnetica`. Два ресурса с одним адресом — ошибка.
 
 ## Методы
 
@@ -412,7 +412,7 @@ public function parent(): BelongsTo
 
 ## События модели
 
-Всё, что админка делает с записью, идёт через модель: по одной записи, через `save()`/`delete()`/`restore()`/`forceDelete()`. Массовых запросов `query()->update()/delete()` нет, поэтому observers и события Eloquent видят каждую запись.
+Всё, что админка делает с записью, идёт через модель: по одной записи, через `save()`/`delete()`/`restore()`/`forceDelete()`. Массовых запросов `query()->update()/delete()` нет, поэтому observers и события Eloquent видят каждую запись; единственное исключение — [отметка «просмотрено»](#отметка-просмотрено): она ставится прямым запросом без событий.
 
 | Операция | События модели |
 |---|---|

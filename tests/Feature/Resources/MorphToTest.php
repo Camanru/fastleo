@@ -427,7 +427,7 @@ describe('the field description', function (): void {
         $field = MorphTo::make('subject')->types([ArticleResource::class])->forModel(GuardedRemark::class);
         useFixtureResources('Morph');
 
-        $field->fill(new GuardedRemark, ['type' => 'articles', 'id' => '1']);
+        $field->fill(new GuardedRemark(), ['type' => 'articles', 'id' => '1']);
     })->throws(LogicException::class, 'не разрешено моделью');
 
     it('does not instantiate the class named in the database', function (): void {

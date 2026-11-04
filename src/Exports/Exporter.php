@@ -108,7 +108,7 @@ final readonly class Exporter
                 set_time_limit(0);
             }
 
-            $writer = $format === 'csv' ? new CsvWriter(new CsvOptions(FIELD_DELIMITER: ';')) : new XlsxWriter;
+            $writer = $format === 'csv' ? new CsvWriter(new CsvOptions(FIELD_DELIMITER: ';')) : new XlsxWriter();
             $writer->openToFile('php://output');
             $this->write($writer, $query->with($relations), $fields, $format === 'csv');
             $writer->close();

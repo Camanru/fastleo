@@ -38,7 +38,7 @@ function generatedFields(string $path, string $class): array
 {
     require_once $path;
     /** @var Resource $resource */
-    $resource = new $class;
+    $resource = new $class();
 
     return collect($resource->schema()->fields())
         ->mapWithKeys(fn (Field $field): array => [$field->name => class_basename($field).': '.implode('|', array_map(

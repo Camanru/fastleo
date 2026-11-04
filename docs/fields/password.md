@@ -10,7 +10,7 @@ Password::make('password', 'Пароль')->required()->confirmed();
 
 **Колонка:** `$table->string('password')`. Каст `'password' => 'hashed'` в модели не мешает: уже готовый хеш он не хеширует повторно.
 
-**Проверка:** строка и требования сайта `Password::defaults()` (по умолчанию — не короче 8 символов); с `confirmed()` — значения двух полей совпадают. Свои требования задаются в `AppServiceProvider`:
+**Проверка:** строка не длиннее 255 символов и требования сайта `Password::defaults()` (по умолчанию — не короче 8 символов); с `confirmed()` — значения двух полей совпадают. Свои требования задаются в `AppServiceProvider`:
 
 ```php
 use Illuminate\Validation\Rules\Password;

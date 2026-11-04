@@ -44,14 +44,14 @@ final class HtmlSanitizer
     public static function config(): HtmlSanitizerConfig
     {
         $aligned = ['style'];
-        $config = (new HtmlSanitizerConfig)
+        $config = new HtmlSanitizerConfig()
             ->defaultAction(HtmlSanitizerAction::Block)
             ->allowLinkSchemes(['http', 'https', 'mailto', 'tel'])
             ->allowRelativeLinks()
             ->allowMediaSchemes(['http', 'https'])
             ->allowRelativeMedias()
-            ->withAttributeSanitizer(RichTextSettings::styles() ? new SafeStyleSanitizer : new TextAlignSanitizer)
-            ->withAttributeSanitizer(new VideoFrameSanitizer)
+            ->withAttributeSanitizer(RichTextSettings::styles() ? new SafeStyleSanitizer() : new TextAlignSanitizer())
+            ->withAttributeSanitizer(new VideoFrameSanitizer())
             ->forceAttribute('a', 'rel', 'noopener')
             ->withMaxInputLength(self::MAX_LENGTH * 4);
 

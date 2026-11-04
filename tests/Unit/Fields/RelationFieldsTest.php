@@ -18,6 +18,7 @@ use Fastleo\Fields\Toggle;
 use Fastleo\Support\FormSchema;
 use Fastleo\Tests\Fixtures\Models\Assignment;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Validator;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -59,7 +60,7 @@ describe('belongs to', function (): void {
         expect($field->dehydrate('7'))->toBe(7)
             ->and($field->dehydrate(''))->toBeNull()
             ->and($field->hydrate($article))->toBe('7')
-            ->and($field->hydrate(new Article))->toBeNull()
+            ->and($field->hydrate(new Article()))->toBeNull()
             ->and($field->display($article))->toBe('Новости')
             ->and($field->display(new Article(['category_id' => 9])->setRelation('category', null)))->toBe('9')
             ->and($field->formatUsing(fn (mixed $value): string => '№'.$value)->display($article))->toBe('№7')
@@ -70,15 +71,15 @@ describe('belongs to', function (): void {
 describe('belongs to many', function (): void {
     it('cleans keys and reads the related records', function (): void {
         $field = BelongsToMany::make('topics')->forModel(Article::class);
-        $article = (new Article)->setRelation('topics', new Collection([new Topic(['title' => 'А']), new Topic(['title' => 'Б'])]));
+        $article = new Article()->setRelation('topics', new Collection([new Topic(['title' => 'А']), new Topic(['title' => 'Б'])]));
 
         expect($field->dehydrate(['3', '', '3', 5, ['x']]))->toBe([3, 5])
             ->and($field->dehydrate('3'))->toBe([])
             ->and($field->formValue(null))->toBe([])
             ->and($field->default([1, 'x', null])->formValue(null))->toBe(['1', 'x'])
             ->and($field->display($article))->toBe('А, Б')
-            ->and($field->display((new Article)->setRelation('topics', new Collection)))->toBeNull()
-            ->and($field->hydrate((new Article)->setRelation('topics', new Collection)))->toBe([])
+            ->and($field->display(new Article()->setRelation('topics', new Collection())))->toBeNull()
+            ->and($field->hydrate(new Article()->setRelation('topics', new Collection())))->toBe([])
             ->and($field->writesAttribute())->toBeFalse()
             ->and($field->isMultiple())->toBeTrue()
             ->and($field->isVisibleInList())->toBeFalse()
@@ -219,4 +220,11 @@ describe('conditions', function (): void {
     it('rejects a relation dependency that is not a column name', function (): void {
         BelongsTo::make('category_id')->dependsOn('x y', fn (): null => null);
     })->throws(InvalidArgumentException::class);
+});
+
+it('refuses more links in one save than a check by query can bear', function (): void {
+    $rules = BelongsToMany::make('topics')->forModel(Article::class)->getRules(null);
+
+    expect($rules['topics'])->toContain('max:1000')
+        ->and(Validator::make(['topics' => range(1, 1001)], ['topics' => $rules['topics']])->errors()->keys())->toBe(['topics']);
 });

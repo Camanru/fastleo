@@ -28,6 +28,6 @@ final class ArticleResource extends Resource
      */
     public function actions(): array
     {
-        return [new HideFromAgent, new RefusedByDatabase];
+        return [new HideFromAgent(), new RefusedByDatabase()];
     }
 }

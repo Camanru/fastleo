@@ -26,6 +26,6 @@ it('shows the first thumbnails of a gallery in the list and the total when there
 });
 
 it('shows nothing for an empty gallery and the custom format when one is set', function (): void {
-    expect(Gallery::make('gallery')->listDisplay(new Article))->toBeNull()
+    expect(Gallery::make('gallery')->listDisplay(new Article()))->toBeNull()
         ->and(Gallery::make('gallery')->formatUsing(fn (mixed $value): string => 'Свой вывод')->listDisplay(new Article(['gallery' => ['uploads/a.jpg']])))->toBe('Свой вывод');
 });

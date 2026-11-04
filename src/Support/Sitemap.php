@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Closure;
 use DateTimeInterface;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Seo;
 use Fastleo\Resource;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -40,6 +43,11 @@ final class Sitemap
 
     private const string REFUSED_KEY = 'fastleo.sitemap.refused';
 
+    private const string LOCK_KEY = 'fastleo.sitemap.build';
+
+    /** Сколько секунд запрос ждёт строителя карты (для тестов). */
+    private static int $lockWait = 15;
+
     /**
      * XML карты по адресу `/sitemap.xml` (из кеша, если он включён): сама карта или, если адресов много, индекс файлов.
      */
@@ -47,7 +55,7 @@ final class Sitemap
     {
         $meta = self::meta();
 
-        return $meta === null ? self::rebuild()['main'] : $meta['main'];
+        return $meta === null ? self::exclusive(fn (): string => self::meta()['main'] ?? self::rebuild()['main']) : $meta['main'];
     }
 
     /**
@@ -56,21 +64,65 @@ final class Sitemap
      */
     public static function page(int $page): ?string
     {
-        $meta = self::meta();
-
-        if ($meta !== null) {
-            if ($page < 1 || $page > $meta['files']) {
-                return null;
-            }
-
-            $cached = Cache::get(self::PAGE_KEY.$page);
-
-            if (is_string($cached)) {
-                return $cached;
-            }
+        // Номер вне предела не стоит сборки карты: иначе любой /sitemap-999.xml строил бы её целиком (при выключенном кеше — каждый раз).
+        if ($page < 1 || $page > self::MAX_FILES) {
+            return null;
         }
 
-        return self::rebuild()['pages'][$page - 1] ?? null;
+        $found = self::cachedPage($page);
+
+        if ($found !== false) {
+            return $found;
+        }
+
+        return self::exclusive(function () use ($page): ?string {
+            $found = self::cachedPage($page);
+
+            return $found !== false ? $found : (self::rebuild()['pages'][$page - 1] ?? null);
+        });
+    }
+
+    /**
+     * Файл карты из кеша: строка — он там; null — такого файла нет (кеш знает число файлов); false — кеша нет.
+     */
+    private static function cachedPage(int $page): string|false|null
+    {
+        $meta = self::meta();
+
+        if ($meta === null) {
+            return false;
+        }
+
+        if ($page > $meta['files']) {
+            return null;
+        }
+
+        $cached = Cache::get(self::PAGE_KEY.$page);
+
+        return is_string($cached) ? $cached : false;
+    }
+
+    /**
+     * Сборка карты под блокировкой: при холодном кеше (после сохранения записи, после деплоя) параллельные запросы
+     * ждут одного строителя и берут готовое, а не собирают карту каждый сам. Кеш выключен, без блокировок или строитель
+     * не уложился в срок — собираем без блокировки.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $build  читает кеш ещё раз и при необходимости собирает карту
+     * @return T
+     */
+    private static function exclusive(Closure $build): mixed
+    {
+        if (config()->integer('fastleo.sitemap.cache_minutes', 60) <= 0 || ! Cache::getStore() instanceof LockProvider) {
+            return $build();
+        }
+
+        try {
+            return Cache::lock(self::LOCK_KEY, 120)->block(self::$lockWait, $build);
+        } catch (LockTimeoutException) {
+            return $build();
+        }
     }
 
     /**
@@ -207,7 +259,7 @@ final class Sitemap
      */
     private static function index(int $files): string
     {
-        $writer = new XMLWriter;
+        $writer = new XMLWriter();
         $writer->openMemory();
         $writer->startDocument('1.0', 'UTF-8');
         $writer->startElement('sitemapindex');

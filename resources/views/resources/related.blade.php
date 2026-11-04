@@ -159,7 +159,7 @@
                 @include('fastleo::form.items', ['items' => $related->quickAddFields(), 'record' => null, 'namePrefix' => 'data', 'pathPrefix' => 'data', 'idPrefix' => 'quick-'.$related->name.'-'.$parentRecord->getKey().'-'])
             </div>
             <ul x-cloak x-show="errors.length > 0" class="flex flex-col gap-0.5 text-xs text-danger" role="alert">
-                <template x-for="message in errors" :key="message"><li x-text="message"></li></template>
+                <template x-for="(message, position) in errors" :key="position + message"><li x-text="message"></li></template>
             </ul>
             <div class="flex justify-end">
                 <x-fastleo::button type="submit" variant="primary" size="sm" icon="plus" x-bind:disabled="busy">{{ $related->getAddLabel() }}</x-fastleo::button>

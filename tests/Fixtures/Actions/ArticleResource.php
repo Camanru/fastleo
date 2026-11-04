@@ -37,6 +37,6 @@ final class ArticleResource extends Resource
      */
     public function actions(): array
     {
-        return [new MarkFeatured, new RenameArticles, new ExportTitles, new ArchiveArticle, new BrokenAction];
+        return [new MarkFeatured(), new RenameArticles(), new ExportTitles(), new ArchiveArticle(), new BrokenAction()];
     }
 }

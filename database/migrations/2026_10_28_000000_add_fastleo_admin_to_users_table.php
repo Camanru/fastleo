@@ -43,6 +43,6 @@ return new class extends Migration
     {
         $model = UserModel::className();
 
-        return $model !== null && is_a($model, Model::class, true) ? (new $model)->getTable() : 'users';
+        return $model !== null && is_a($model, Model::class, true) ? new $model()->getTable() : 'users';
     }
 };

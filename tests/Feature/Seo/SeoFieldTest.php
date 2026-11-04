@@ -86,7 +86,7 @@ describe('saving', function (): void {
 
 describe('description errors', function (): void {
     it('stops with a clear message when the model column has no array cast', function (): void {
-        expect(fn () => Seo::make('meta')->fill(new Category, []))->toThrow(LogicException::class, 'meta');
+        expect(fn () => Seo::make('meta')->fill(new Category(), []))->toThrow(LogicException::class, 'meta');
     });
 
     it('cannot be used inside a repeater', function (): void {

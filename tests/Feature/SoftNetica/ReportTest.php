@@ -153,6 +153,14 @@ describe('site checks', function (): void {
             ->and($check['summary'])->toContain('[скрыто]')->toContain('[ссылка]')->toContain('[путь]');
     });
 
+    it('hides relative and network paths too', function (): void {
+        Fastleo::healthCheck('paths', 'Пути', fn (): HealthResult => HealthResult::failed('Не открыть storage/logs/laravel.log и \\\\fileserver\share\site\.env, а 3/4 и and/or остаются'));
+
+        $summary = collectedChecks()['paths']['summary'];
+
+        expect($summary)->not->toContain('laravel.log')->not->toContain('fileserver')->toContain('3/4')->toContain('and/or');
+    });
+
     it('limits the length of the label, summary and message', function (): void {
         Fastleo::healthCheck('long', str_repeat('Я', 300), fn (): HealthResult => HealthResult::warning(str_repeat('слово ', 200)));
 

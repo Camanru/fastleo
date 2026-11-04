@@ -135,7 +135,7 @@ it('does not send a publication whose channels were all switched off', function 
 it('does nothing when the action got no publication', function (): void {
     Queue::fake();
 
-    $result = new SendPublication()->handle(new EloquentCollection, []);
+    $result = new SendPublication()->handle(new EloquentCollection(), []);
 
     expect($result->type)->toBe('error');
     Queue::assertNothingPushed();

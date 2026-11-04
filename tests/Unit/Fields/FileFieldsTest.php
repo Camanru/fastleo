@@ -54,7 +54,7 @@ it('keeps gallery paths without empty values and repeats', function (): void {
 });
 
 it('needs an array cast for a gallery', function (): void {
-    Gallery::make('title')->fill(new Category, ['uploads/a.jpg']);
+    Gallery::make('title')->fill(new Category(), ['uploads/a.jpg']);
 })->throws(LogicException::class, 'добавьте колонке каст');
 
 it('takes a crop ratio as width:height', function (): void {

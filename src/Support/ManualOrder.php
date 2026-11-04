@@ -24,7 +24,7 @@ final class ManualOrder
      * если номера у соседей повторяются, они перенумеровываются 1..n.
      *
      * @param  Collection<int, Model>  $siblings  соседи вместе с самой записью в текущем порядке
-     * @return bool false — соседа, рядом с которым надо встать, среди записей нет (ответ 422)
+     * @return bool false — соседа, рядом с которым надо встать, среди записей нет или сохранение соседа отменил observer (ответ 422, порядок не меняется)
      *
      * @throws QueryException ошибка базы при записи номеров
      */
@@ -58,19 +58,24 @@ final class ManualOrder
             $values = range(1, count($values));
         }
 
-        DB::connection($record->getConnectionName())->transaction(function () use ($keys, $siblings, $column, $values): void {
-            foreach ($keys as $index => $siblingKey) {
-                $sibling = $siblings->get($siblingKey);
+        try {
+            DB::connection($record->getConnectionName())->transaction(function () use ($keys, $siblings, $column, $values): void {
+                foreach ($keys as $index => $siblingKey) {
+                    $sibling = $siblings->get($siblingKey);
 
-                if ($sibling instanceof Model) {
-                    $sibling->setAttribute($column, $values[$index]);
+                    if ($sibling instanceof Model) {
+                        $sibling->setAttribute($column, $values[$index]);
 
-                    if ($sibling->isDirty($column)) {
-                        $sibling->save();
+                        // Observer соседа отменил сохранение: порядок не должен измениться наполовину.
+                        if ($sibling->isDirty($column) && ! $sibling->save()) {
+                            throw new OperationCancelled();
+                        }
                     }
                 }
-            }
-        });
+            });
+        } catch (OperationCancelled) {
+            return false;
+        }
 
         return true;
     }

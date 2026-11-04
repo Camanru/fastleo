@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Fastleo\Files;
 
+use Closure;
 use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
+use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Intervention\Image\Exceptions\ImageException;
@@ -138,13 +141,8 @@ final class FileStore
         }
 
         if (! FileTypes::isImage($name)) {
-            $path = FileName::unique($disk, $folder, $name);
-
-            if ($disk->putFileAs($folder, $file, basename($path)) === false) {
-                throw FileRejected::because('rejected_write', ['name' => $original]);
-            }
-
-            return $path;
+            return self::putUnique($disk, $folder, $name, fn (string $path): bool => $disk->putFileAs($folder, $file, basename($path)) !== false)
+                ?? throw FileRejected::because('rejected_write', ['name' => $original]);
         }
 
         $binary = (string) $file->get();
@@ -163,13 +161,32 @@ final class FileStore
             throw FileRejected::because('rejected_not_image', ['name' => $original]);
         }
 
-        $path = FileName::unique($disk, $folder, $name);
+        return self::putUnique($disk, $folder, $name, fn (string $path): bool => $disk->put($path, $binary) !== false)
+            ?? throw FileRejected::because('rejected_write', ['name' => $original]);
+    }
 
-        if (! $disk->put($path, $binary)) {
-            throw FileRejected::because('rejected_write', ['name' => $original]);
+    /**
+     * Свободное имя и запись под блокировкой: два одновременных файла с одним именем не займут одно место
+     * (запись перезаписывает). Кеш без блокировок или занятая блокировка — запись без неё. Null — диск не принял файл.
+     *
+     * @param  Closure(string): bool  $write  записать по свободному пути
+     */
+    private static function putUnique(FilesystemAdapter $disk, string $folder, string $name, Closure $write): ?string
+    {
+        $claim = function () use ($disk, $folder, $name, $write): ?string {
+            $path = FileName::unique($disk, $folder, $name);
+
+            return $write($path) ? $path : null;
+        };
+
+        // Кеш без блокировок (своё хранилище сайта) даёт то же, что занятая блокировка: запись без неё.
+        $claimed = Cache::getStore() instanceof LockProvider ? Cache::lock('fastleo.upload.'.md5($folder.'/'.$name), 30)->get($claim) : false;
+
+        if ($claimed === false) {
+            return $claim();
         }
 
-        return $path;
+        return is_string($claimed) ? $claimed : null;
     }
 
     /**
@@ -198,11 +215,9 @@ final class FileStore
 
             $image->crop($width, $height, $x, $y);
             $extension = FileTypes::extension($path);
-            $target = FileName::unique($disk, dirname($path), pathinfo($path, PATHINFO_FILENAME).'-crop.'.$extension);
-
-            if (! $disk->put($target, Images::encode($image, $extension))) {
-                throw FileRejected::because('rejected_write', ['name' => $name]);
-            }
+            $encoded = Images::encode($image, $extension);
+            $target = self::putUnique($disk, dirname($path), pathinfo($path, PATHINFO_FILENAME).'-crop.'.$extension, fn (string $target): bool => $disk->put($target, $encoded) !== false)
+                ?? throw FileRejected::because('rejected_write', ['name' => $name]);
         } catch (ImageException) {
             throw FileRejected::because('crop_not_image', ['name' => $name]);
         }
@@ -271,7 +286,8 @@ final class FileStore
         $disk = self::disk();
         $thumbnail = self::SERVICE_ROOT.'/thumbs/'.$path.'.webp';
 
-        if ($disk->fileExists($thumbnail)) {
+        // Готовая миниатюра годится, пока файл не заменили под тем же именем (загрузка по FTP, обновление на диске).
+        if ($disk->fileExists($thumbnail) && (! $disk->fileExists($path) || $disk->lastModified($thumbnail) >= $disk->lastModified($path))) {
             return $thumbnail;
         }
 

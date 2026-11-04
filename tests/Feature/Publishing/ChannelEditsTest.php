@@ -92,6 +92,21 @@ describe('remove', function (): void {
         expect(Publication::query()->count())->toBe(0);
     });
 
+    it('forgets the messages of a Max post that are already deleted, so that a retry goes on from the failed one', function (): void {
+        Http::fake(['platform-api2.max.ru/messages*' => Http::sequence()->push(['success' => true])->push(['success' => true])->push(['success' => false, 'message' => 'нет прав'])->push(['success' => true])]);
+        $channel = publishingChannel(['messenger' => 'max', 'token' => MAX_TOKEN, 'chat_id' => '-71234567']);
+        $publication = sentPublication($channel, ['layout' => 'text', 'message_ids' => ['album' => ['mid.1', 'mid.2', 'mid.3']], 'media_tokens' => ['tok']]);
+
+        channelAction($publication, 'remove-channels')->assertSessionHas('fastleo.error');
+
+        expect(Delivery::query()->sole())->status->toBe('sent')->message_ids->toBe(['album' => ['mid.3']]);
+
+        channelAction($publication, 'remove-channels')->assertSessionHas('fastleo.success');
+
+        Http::assertSentCount(4);
+        expect(Delivery::query()->sole())->status->toBe('removed');
+    });
+
     it('explains why a post could not be removed and keeps it as sent', function (): void {
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => "Bad Request: message can't be deleted"], 400)]);
         $publication = sentPublication(publishingChannel(), ['layout' => 'text', 'message_ids' => ['text' => '3']]);

@@ -253,6 +253,7 @@ describe('Stat', function (): void {
         $count = 1;
         expect($stat->resolve()['url'])->toBe('/fastleo/leads')
             ->and(Stat::make('a')->url(fn (): string => 'javascript:alert(1)')->resolve()['url'])->toBeNull()
+            ->and(Stat::make('a')->url(fn (): string => "/\t/evil.example")->resolve()['url'])->toBeNull()
             ->and(Stat::make('a')->url(fn (): ?string => null)->resolve()['url'])->toBeNull();
     });
 

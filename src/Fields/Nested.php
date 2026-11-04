@@ -172,7 +172,7 @@ abstract class Nested extends Field
             return new Collection([$related]);
         }
 
-        return $related instanceof Collection ? $related : new Collection;
+        return $related instanceof Collection ? $related : new Collection();
     }
 
     #[Override]
@@ -184,7 +184,7 @@ abstract class Nested extends Field
     #[Override]
     protected function formatDefault(mixed $value): mixed
     {
-        return new Collection;
+        return new Collection();
     }
 
     /**
@@ -391,7 +391,7 @@ abstract class Nested extends Field
                 continue;
             }
 
-            if ($value != $field->untouchedValue()) {
+            if (! $field->isUntouched($value)) {
                 return false;
             }
         }
@@ -428,7 +428,7 @@ abstract class Nested extends Field
         }
 
         if ($relation->save($child) === false) {
-            throw new OperationCancelled;
+            throw new OperationCancelled();
         }
 
         foreach ($fields as $field) {

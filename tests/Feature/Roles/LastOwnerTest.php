@@ -100,6 +100,7 @@ it('leaves a user model without the roles trait alone', function (): void {
 
 it('does not look at the owners while roles are off', function (): void {
     config(['fastleo.roles.enabled' => false]);
+    admin();
 
     new AdminAccess('fastleo_admin')->afterSave(roleAdmin($this->owner, ['fastleo_admin' => false]), '0');
 

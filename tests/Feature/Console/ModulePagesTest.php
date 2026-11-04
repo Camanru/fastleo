@@ -108,6 +108,29 @@ it('refuses to install over an existing pages table', function (): void {
     expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile();
 });
 
+it('reminds to refresh the cache of the sections when the site keeps one', function (): void {
+    File::ensureDirectoryExists($this->sandbox.'/bootstrap/cache');
+    File::put($this->sandbox.'/bootstrap/cache/fastleo.php', '<?php return [];');
+
+    $this->artisan('fastleo:module', ['modules' => ['pages']])
+        ->expectsOutputToContain('php artisan fastleo:cache')
+        ->assertSuccessful();
+});
+
+it('finds a migration of the site also when the path of the site has glob characters', function (): void {
+    $special = $this->sandbox.'/site [1]';
+    File::ensureDirectoryExists($special.'/database/migrations');
+    File::ensureDirectoryExists($special.'/routes');
+    File::put($special.'/routes/web.php', "<?php\n");
+    File::put($special.'/composer.json', File::get($this->sandbox.'/composer.json'));
+    File::put($special.'/database/migrations/2024_01_01_000000_create_pages_table.php', '<?php');
+    $this->app->setBasePath($special);
+
+    $this->artisan('fastleo:module', ['modules' => ['pages']])
+        ->expectsOutputToContain('create_pages_table.php уже есть')
+        ->assertFailed();
+});
+
 it('refuses to install over a migration of the site that was not run yet and creates the same table', function (): void {
     File::ensureDirectoryExists($this->sandbox.'/database/migrations');
     File::put($this->sandbox.'/database/migrations/2024_01_01_000000_create_pages_table.php', '<?php');

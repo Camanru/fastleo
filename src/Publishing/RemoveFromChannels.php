@@ -45,7 +45,7 @@ final class RemoveFromChannels extends Action
                         throw new MessengerFailed(__('fastleo::messengers.post_unknown'));
                     }
 
-                    $delivery->channel->bot()->deletePost($delivery->channel->chat_id, $delivery->message_ids ?? []);
+                    $delivery->channel->bot()->deletePost($delivery->channel->chat_id, $delivery->message_ids ?? [], $delivery->forget(...));
                     $delivery->update(['status' => 'removed', 'error' => null]);
                 } catch (MessengerFailed $exception) {
                     $delivery->update(['error' => $exception->getMessage()]);

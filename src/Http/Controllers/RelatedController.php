@@ -190,7 +190,7 @@ final class RelatedController
         }
 
         $request->session()->flashInput(is_array($pending['input'] ?? null) ? $pending['input'] : []);
-        $errors = new MessageBag;
+        $errors = new MessageBag();
 
         foreach (is_array($pending['errors'] ?? null) ? $pending['errors'] : [] as $key => $messages) {
             foreach ((array) $messages as $message) {

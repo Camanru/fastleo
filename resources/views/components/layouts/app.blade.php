@@ -131,11 +131,11 @@
                     <p x-show="query.trim().length < 2" class="px-4 py-6 text-center text-sm text-ink-2">{{ __('fastleo::search.hint') }}</p>
                     <p x-cloak x-show="failed" class="px-4 py-6 text-center text-sm text-danger">{{ __('fastleo::search.error') }}</p>
                     <p x-cloak x-show="searched && !loading && !failed && groups.length === 0 && query.trim().length >= 2" class="px-4 py-6 text-center text-sm text-ink-2">{{ __('fastleo::search.empty') }}</p>
-                    <template x-for="group in groups" :key="group.label">
+                    <template x-for="(group, groupIndex) in groups" :key="groupIndex + group.label">
                         <div class="pb-1.5">
                             <div class="px-2.5 py-1.5 text-[11px] font-semibold tracking-[.04em] text-ink-3 uppercase" x-text="group.label"></div>
                             <ul>
-                                <template x-for="(item, position) in group.items" :key="item.url">
+                                <template x-for="(item, position) in group.items" :key="position + item.url">
                                     <li>
                                         <a
                                             :href="item.url"

@@ -134,7 +134,7 @@ class User extends Authenticatable implements FastleoUser // fastleo: implements
 - `Cannot use Illuminate\Foundation\Auth\User as Authenticatable because the name is already in use` — строку `use … as Authenticatable` добавили второй раз; оставьте одну.
 - `Interface "App\Models\FastleoUser" not found` — нет строк `use Fastleo\Auth\…` вверху файла.
 
-**Не добавляйте `fastleo_admin` в `$fillable`** и не используйте `$guarded = []` у модели пользователя: иначе форма регистрации или профиля сайта сможет выдать права администратора. Флаг ставит команда `fastleo:user`.
+**Не добавляйте `fastleo_admin` в `$fillable`** и не используйте `$guarded = []` у модели пользователя: иначе форма регистрации или профиля сайта сможет выдать права администратора. Флаг ставит команда `fastleo:user`; `fastleo:doctor` сообщает об ошибке, если `fastleo_admin` доступен для массового присваивания.
 
 Своё правило доступа — переопределите метод:
 

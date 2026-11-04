@@ -188,6 +188,23 @@ describe('telegram', function (): void {
             ->and($publication->refresh()->status)->toBe('sent');
     });
 
+    it('keeps the layout of a post whose photo was sent when the text is shortened before the retry', function (): void {
+        Http::fake(['api.telegram.org/*' => Http::sequence()
+            ->push(telegramMessage(1))
+            ->push(['ok' => false, 'description' => 'Bad Request: can\'t parse entities'], 400)
+            ->push(telegramMessage(2))]);
+        $publication = publication(['images' => publicationImages(1), 'text' => str_repeat('слово ', 200)]);
+
+        publicationAction($publication)->assertSessionHas('fastleo.error', 'Не отправлено');
+
+        $publication->refresh()->update(['text' => 'Коротко']);
+        publicationAction($publication->refresh(), 'retry')->assertSessionHas('fastleo.success');
+
+        // Фото второй раз не уходит, а текст отправляется отдельным сообщением, а не пропадает вместе с раскладкой «фото с подписью».
+        Http::assertSentCount(3);
+        expect(Delivery::query()->sole())->status->toBe('sent')->layout->toBe('photo+text')->message_ids->toBeStoredJson(['photo' => '1', 'text' => '2']);
+    });
+
     it('does not retry by itself when the connection broke after sending and tells the author', function (): void {
         Http::fake(['api.telegram.org/*' => fn (): never => throw new ConnectionException('cURL error 28: Operation timed out')]);
         $publication = publication();

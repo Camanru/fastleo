@@ -8,10 +8,12 @@ use Fastleo\Fields\Markdown;
 use Fastleo\Fields\Password;
 use Fastleo\Fields\Radio;
 use Fastleo\Fields\Range;
+use Fastleo\Fields\Select;
 use Fastleo\Fields\Slug;
 use Fastleo\Fields\Tags;
 use Fastleo\Support\OptionRule;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\Validator;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
@@ -60,6 +62,13 @@ describe('password', function (): void {
             ->and($field->getRules(User::factory()->create())['password'][0])->toBe('nullable');
     });
 
+    it('refuses a password longer than 255 characters', function (): void {
+        $rules = Password::make('password')->getRules(null);
+
+        expect(Validator::make(['password' => str_repeat('a1', 128)], $rules)->errors()->keys())->toBe(['password'])
+            ->and(Validator::make(['password' => str_repeat('a1', 20)], $rules)->fails())->toBeFalse();
+    });
+
     it('never shows the hash', function (): void {
         $user = User::factory()->create();
 
@@ -71,7 +80,7 @@ describe('password', function (): void {
     });
 
     it('keeps spaces and leaves the model untouched for an empty value', function (): void {
-        $user = new User;
+        $user = new User();
 
         Password::make('password')->fill($user, Password::make('password')->dehydrate(''));
         expect($user->getAttributes())->toBe([]);
@@ -81,7 +90,22 @@ describe('password', function (): void {
     });
 });
 
+describe('select search', function (): void {
+    it('searches options whose labels come from a closure as numbers', function (): void {
+        $field = Select::make('rating')->options(fn (): array => [1 => 100, 2 => 250]);
+
+        expect($field->searchOptions('25'))->toBe([['value' => '2', 'label' => '250']]);
+    });
+});
+
 describe('slug', function (): void {
+    it('does not accept a trailing line break that the unique check would not see', function (): void {
+        $rules = Slug::make('slug')->unique(false)->getRules(null);
+
+        expect(Validator::make(['slug' => "abc\n"], $rules)->fails())->toBeTrue()
+            ->and(Validator::make(['slug' => 'abc'], $rules)->fails())->toBeFalse();
+    });
+
     it('transliterates russian text like Laravel', function (string $text, string $slug): void {
         expect(Slug::slugify($text))->toBe($slug);
     })->with([
@@ -121,10 +145,10 @@ describe('slug', function (): void {
 describe('tags', function (): void {
     it('reads tags from an array or a json string', function (): void {
         expect(Tags::make('keywords')->hydrate(new Article(['keywords' => ['a', 1]])))->toBe(['a', '1'])
-            ->and(Tags::make('keywords')->hydrate((new Category)->setRawAttributes(['keywords' => '["x"]'])))->toBe(['x'])
+            ->and(Tags::make('keywords')->hydrate(new Category()->setRawAttributes(['keywords' => '["x"]'])))->toBe(['x'])
             ->and(Tags::make('keywords')->formValue(null))->toBe([])
             ->and(Tags::make('keywords')->display(new Article(['keywords' => ['a', 'b']])))->toBe('a, b')
-            ->and(Tags::make('keywords')->display(new Article))->toBeNull();
+            ->and(Tags::make('keywords')->display(new Article()))->toBeNull();
     });
 
     it('builds rules for the list and each tag', function (): void {
@@ -142,7 +166,7 @@ describe('tags', function (): void {
     });
 
     it('needs an array cast in the model', function (): void {
-        Tags::make('title')->fill(new Category, ['a']);
+        Tags::make('title')->fill(new Category(), ['a']);
     })->throws(LogicException::class, 'добавьте колонке каст');
 });
 
@@ -152,11 +176,11 @@ it('shows code as escaped text and markdown as html', function (): void {
 
     expect($html(Code::make('head_code')->display($article)))->toContain('&lt;b&gt;x&lt;/b&gt;')
         ->and(Code::make('head_code')->listDisplay($article))->toBe('<b>x</b>')
-        ->and(Code::make('head_code')->display(new Article))->toBeNull()
-        ->and(Code::make('head_code')->listDisplay(new Article))->toBeNull()
+        ->and(Code::make('head_code')->display(new Article()))->toBeNull()
+        ->and(Code::make('head_code')->listDisplay(new Article()))->toBeNull()
         ->and($html(Markdown::make('body')->display($article)))->toStartWith('<div class="fastleo-prose"><p><strong>x</strong>')
         ->and(mb_strlen((string) Markdown::make('body')->listDisplay($article)))->toBe(103)
-        ->and(Markdown::make('body')->listDisplay(new Article))->toBeNull()
+        ->and(Markdown::make('body')->listDisplay(new Article()))->toBeNull()
         ->and(Markdown::make('body')->formatUsing(fn (): string => 'своё')->display($article))->toBe('своё')
         ->and(Markdown::render(null)->toHtml())->toBe('')
         ->and(Markdown::render('')->toHtml())->toBe('');

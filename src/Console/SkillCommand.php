@@ -36,7 +36,12 @@ final class SkillCommand extends Command
         app()->setLocale(Fastleo::LOCALE);
 
         $path = $this->option('path');
-        $target = is_string($path) && $path !== '' ? $path : base_path('.claude/skills/fastleo');
+        // Относительный путь считается от корня сайта, а не от папки, из которой запущена команда.
+        $target = match (true) {
+            ! is_string($path) || $path === '' => base_path('.claude/skills/fastleo'),
+            str_starts_with($path, '/') || preg_match('~^[A-Za-z]:[\\\\/]~', $path) === 1 => $path,
+            default => base_path($path),
+        };
 
         File::copyDirectory(dirname(__DIR__, 2).'/'.self::SOURCE, $target);
         $this->components->info(__('fastleo::console.skill_done', ['path' => $target]));

@@ -83,7 +83,7 @@ describe('report', function (): void {
     });
 
     it('counts failed jobs only when the failed job log can count', function (): void {
-        $this->app->instance('queue.failer', new NullFailedJobProvider);
+        $this->app->instance('queue.failer', new NullFailedJobProvider());
         expect(reportRow('Упавшие задачи очереди'))->toMatchArray(['value' => '0', 'status' => 'ok']);
 
         $this->app->instance('queue.failer', Mockery::mock(FailedJobProviderInterface::class));

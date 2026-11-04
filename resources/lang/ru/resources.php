@@ -139,4 +139,5 @@ return [
     'related_error' => 'Не удалось загрузить таблицу. Обновите страницу.',
     'duplicate_open' => 'Открыть: :title',
     'related_loading' => 'Загрузка…',
+    'rich_text_formats' => 'Абзац=p; Заголовок 2=h2; Заголовок 3=h3; Заголовок 4=h4',
 ];

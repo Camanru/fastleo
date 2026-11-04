@@ -69,7 +69,7 @@ final class RolesCommand extends Command
 
         $class = UserModel::fastleoClassName();
 
-        if ($class !== null && ! UserGuard::owners(new $class)->exists()) {
+        if ($class !== null && ! UserGuard::owners(new $class())->exists()) {
             $this->components->warn(__('fastleo::console.roles_no_owner'));
         }
 

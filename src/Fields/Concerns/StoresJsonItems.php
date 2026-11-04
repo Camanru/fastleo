@@ -145,7 +145,7 @@ trait StoresJsonItems
                 continue;
             }
 
-            if ($value != $field->untouchedValue()) {
+            if (! $field->isUntouched($value)) {
                 return false;
             }
         }

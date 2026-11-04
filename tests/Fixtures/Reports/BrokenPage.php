@@ -28,7 +28,7 @@ final class BrokenPage extends Page
             Stat::make('Падает')->value(fn (): int => throw new RuntimeException('нет данных')),
             Stat::make('Скрыт')->value(1)->visible(false),
             Stat::make('Работает')->value(7),
-            Rows::make('Строки')->columns(['Название', 'Число'])->rows(fn (): array => [['<b>x</b>', 1234567], ['Лишнее', 1.5, 'не будет показано'], ['Целое', 2500.0], ['Объект', new RuntimeException]]),
+            Rows::make('Строки')->columns(['Название', 'Число'])->rows(fn (): array => [['<b>x</b>', 1234567], ['Лишнее', 1.5, 'не будет показано'], ['Целое', 2500.0], ['Объект', new RuntimeException()]]),
         ];
     }
 

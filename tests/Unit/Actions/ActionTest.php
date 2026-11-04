@@ -43,7 +43,7 @@ function resourceWithActions(array $actions): Resource
 }
 
 it('names an action after its class and puts the built-in ones first', function (): void {
-    $actions = resourceWithActions([new MarkFeatured, new RenameArticles])->listActions();
+    $actions = resourceWithActions([new MarkFeatured(), new RenameArticles()])->listActions();
 
     expect(array_keys($actions))->toBe(['delete', 'restore', 'force-delete', 'mark-featured', 'rename-articles'])
         ->and($actions['rename-articles']->getLabel())->toBe('Дописать к заголовку')

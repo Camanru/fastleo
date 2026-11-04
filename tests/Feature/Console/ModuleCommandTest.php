@@ -37,7 +37,7 @@ it('copies the contacts module into the site as a settings page only', function 
 
     require_once $this->sandbox.'/app/Fastleo/ContactsSettings.php';
 
-    expect(new ContactsSettings)->toBeInstanceOf(Settings::class);
+    expect(new ContactsSettings())->toBeInstanceOf(Settings::class);
 });
 
 it('writes nothing and lists every conflict when a file is already taken', function (): void {

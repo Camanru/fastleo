@@ -190,8 +190,8 @@ final class ArticleResource extends Resource
     public function actions(): array
     {
         return [
-            new PublishArticles,
-            new SchedulePublication,
+            new PublishArticles(),
+            new SchedulePublication(),
             Publish::make(fn (Article $article): Post => Post::make('**'.$article->title.'**'.($article->excerpt === null ? '' : "\n\n".$article->excerpt))
                 ->images([$article->cover])
                 ->button('Читать на сайте', route('articles.show', $article->id))),

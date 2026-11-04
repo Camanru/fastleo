@@ -60,8 +60,17 @@ final class CloseSiteForVisitors
             return false;
         }
 
-        $user = Fastleo::guard()->user();
+        $guard = Fastleo::guard();
+        $user = $guard->user();
 
-        return $user instanceof FastleoUser && $user->canAccessFastleo();
+        if (! $user instanceof FastleoUser || ! $user->canAccessFastleo()) {
+            return false;
+        }
+
+        // Сеанс, закрытый сменой пароля («выйти на других устройствах»), сайт открытым не видит: хеш, который админка записала при входе.
+        $stored = $request->session()->get('password_hash_'.Fastleo::GUARD);
+        $password = $user->getAuthPassword();
+
+        return ! is_string($stored) || hash_equals($stored, $guard->hashPasswordForCookie($password)) || hash_equals($stored, $password);
     }
 }

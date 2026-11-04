@@ -45,9 +45,16 @@ final class ResourceRegistry
      * Адреса, которые админка занимает сама или займёт на следующих этапах, — их нельзя брать ресурсу.
      */
     public const array RESERVED_SLUGS = [
-        'login', 'logout', 'files', 'search', 'settings', 'pages', 'logs', 'notifications',
+        'login', 'logout', 'dashboard', 'files', 'search', 'settings', 'pages', 'logs', 'notifications',
         'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica',
     ];
+
+    /**
+     * Найденные классы разделов, страниц настроек и своих страниц (обход папки и чтение кеша — раз за запрос).
+     *
+     * @var list<class-string<Resource|Settings|Page>>|null
+     */
+    private ?array $classes = null;
 
     /**
      * Ресурсы по адресу раздела.
@@ -192,14 +199,18 @@ final class ResourceRegistry
      */
     public function classes(): array
     {
+        if ($this->classes !== null) {
+            return $this->classes;
+        }
+
         if (is_file($this->cachePath())) {
             /** @var list<class-string<Resource>> $classes */
             $classes = require $this->cachePath();
 
-            return $this->withBuiltIn($this->withRoles($this->withSoftNetica($classes)));
+            return $this->classes = $this->withBuiltIn($this->withRoles($this->withSoftNetica($classes)));
         }
 
-        return $this->withBuiltIn($this->withRoles($this->withSoftNetica($this->discover())));
+        return $this->classes = $this->withBuiltIn($this->withRoles($this->withSoftNetica($this->discover())));
     }
 
     /**
@@ -335,6 +346,7 @@ final class ResourceRegistry
      */
     public function flush(): void
     {
+        $this->classes = null;
         $this->resources = null;
         $this->instances = [];
         $this->settings = null;

@@ -25,7 +25,7 @@ final class DatabaseErrors
     {
         $state = $exception->errorInfo[0] ?? $exception->getCode();
         $state = is_scalar($state) ? (string) $state : '';
-        $message = $exception->getMessage();
+        $message = self::driverMessage($exception);
 
         $reason = match (true) {
             $exception instanceof UniqueConstraintViolationException => 'unique',
@@ -45,12 +45,23 @@ final class DatabaseErrors
     }
 
     /**
+     * Текст ошибки драйвера без SQL и значений запроса: в `getMessage()` лежат введённые администратором значения,
+     * слово «foreign key» в поле формы не должно менять причину ошибки.
+     */
+    private static function driverMessage(QueryException $exception): string
+    {
+        $message = $exception->errorInfo[2] ?? null;
+
+        return is_string($message) ? $message : $exception->getMessage();
+    }
+
+    /**
      * Колонки, по которым база отказала в уникальности, из текста драйвера: SQLite (`articles.slug`), PostgreSQL
      * (`Key (slug)=(…)`) и MySQL (имя индекса `articles_slug_unique` по умолчанию Laravel). Не нашлись — null.
      */
     private static function uniqueColumns(QueryException $exception): ?string
     {
-        $message = $exception->getMessage();
+        $message = self::driverMessage($exception);
 
         if (preg_match('/UNIQUE constraint failed: (.+?)(?: \(Connection|$)/', $message, $match) === 1) {
             return implode(', ', array_map(fn (string $column): string => Str::afterLast(trim($column), '.'), explode(',', $match[1])));

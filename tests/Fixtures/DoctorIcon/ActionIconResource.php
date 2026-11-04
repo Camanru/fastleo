@@ -30,6 +30,6 @@ final class ActionIconResource extends Resource
      */
     public function actions(): array
     {
-        return [new BadIconAction];
+        return [new BadIconAction()];
     }
 }

@@ -105,7 +105,7 @@ final readonly class TwoFactor
      */
     public function qrSvg(Authenticatable $user, string $secret): string
     {
-        $writer = new Writer(new ImageRenderer(new RendererStyle(192, 1), new SvgImageBackEnd));
+        $writer = new Writer(new ImageRenderer(new RendererStyle(192, 1), new SvgImageBackEnd()));
 
         return trim(Str::after($writer->writeString($this->otpauthUrl($user, $secret)), '?>'));
     }

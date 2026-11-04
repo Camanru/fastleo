@@ -18,6 +18,7 @@ use Fastleo\Support\RecordWriter;
 use Fastleo\Support\ValidationMessages;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\DB;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Cell\StringCell;
 use OpenSpout\Common\Entity\Row;
@@ -158,7 +159,7 @@ final class Importer
                 ));
             } else {
                 $this->assertUnpackedSizeIsSafe($path);
-                $reader = new XlsxReader;
+                $reader = new XlsxReader();
             }
 
             $reader->open($path);
@@ -180,7 +181,7 @@ final class Importer
      */
     private function assertUnpackedSizeIsSafe(string $path): void
     {
-        $zip = new ZipArchive;
+        $zip = new ZipArchive();
 
         if ($zip->open($path, ZipArchive::RDONLY) !== true) {
             throw new ImportFailed(__('fastleo::imports.unreadable', locale: Fastleo::LOCALE));
@@ -279,8 +280,9 @@ final class Importer
             };
 
             if ($target === null || isset($used[$id])) {
-                if ($name !== '' && $index !== $this->importKeyColumn) {
-                    $unknown[] = $name;
+                // В отчёте — не больше 50 имён по 100 символов: файл с тысячами столбцов не раздувает отчёт и страницу прогресса.
+                if ($name !== '' && $index !== $this->importKeyColumn && count($unknown) < 50) {
+                    $unknown[] = mb_substr($name, 0, 100);
                 }
 
                 continue;
@@ -343,7 +345,7 @@ final class Importer
     {
         if (! $this->skippedWriter instanceof XlsxWriter) {
             $this->skippedPath = (string) tempnam(sys_get_temp_dir(), 'fastleo-skipped');
-            $this->skippedWriter = new XlsxWriter;
+            $this->skippedWriter = new XlsxWriter();
             $this->skippedWriter->openToFile($this->skippedPath);
             $bold = new Style(fontBold: true);
             $header = [...$this->header, new StringCell(__('fastleo::imports.error', locale: Fastleo::LOCALE), $bold)];
@@ -396,7 +398,14 @@ final class Importer
                 return __('fastleo::imports.record_missing', ['key' => $key], Fastleo::LOCALE);
             }
         } elseif ($importKey !== null && $key !== null) {
-            $existing = $this->resource->newQuery()->where($model->qualifyColumn($importKey), $key)->first();
+            try {
+                // В транзакции: на PostgreSQL упавший запрос иначе отравляет внешнюю транзакцию (сохранение строки там же).
+                $existing = DB::transaction(fn (): ?Model => $this->resource->newQuery()->where($model->qualifyColumn($importKey), $key)->first());
+            } catch (QueryException) {
+                // База не сравнивает ключ со значением ячейки (PostgreSQL: число и слово) — это ошибка строки, а не сбой импорта.
+                return __('fastleo::imports.record_missing', ['key' => $key], Fastleo::LOCALE);
+            }
+
             $writesKey = in_array($importKey, array_map(fn (Field $field): string => $field->name, $this->fields()), true);
 
             // Ключ не загружается (readonly, нет в форме) — новая запись осталась бы без него и дублировалась бы.

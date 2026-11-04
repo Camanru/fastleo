@@ -88,6 +88,6 @@ final class NotificationsController
      */
     private function safeUrl(mixed $url): ?string
     {
-        return is_string($url) && preg_match('~^(https?://|/(?![/\\\\]))~i', $url) === 1 ? $url : null;
+        return is_string($url) && preg_match('~^(https?://|/(?![/\\\\\x00-\x20]))~i', $url) === 1 ? $url : null;
     }
 }

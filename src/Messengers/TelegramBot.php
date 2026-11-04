@@ -128,6 +128,12 @@ final class TelegramBot extends Bot
             $count === 1 => 'photo+text',
             default => 'album+text',
         };
+
+        // Повтор после сбоя: картинка уже ушла по прежней раскладке — текст правили, но раскладка поста остаётся той же.
+        if ((isset($done['photo']) || isset($done['album'])) && is_string($done['layout'] ?? null)) {
+            $layout = $done['layout'];
+        }
+
         $markup = $button === null ? null : json_encode(['inline_keyboard' => [[['text' => $button['label'], 'url' => $button['url']]]]], JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
         if ($count === 1 && ! isset($done['photo'])) {
@@ -195,10 +201,10 @@ final class TelegramBot extends Bot
     }
 
     /**
-     * `deleteMessages`: все сообщения поста разом. Telegram удаляет только сообщения моложе 48 часов.
+     * `deleteMessages`: все сообщения поста разом (поэтому `$deleted` не нужен). Telegram удаляет только сообщения моложе 48 часов.
      */
     #[Override]
-    public function deletePost(string $chatId, array $messageIds): void
+    public function deletePost(string $chatId, array $messageIds, ?Closure $deleted = null): void
     {
         $ids = array_map(intval(...), self::allIds($messageIds));
 

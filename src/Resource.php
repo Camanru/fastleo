@@ -612,6 +612,22 @@ abstract class Resource
     }
 
     /**
+     * Запись закрыта для правки ИИ-агентом через MCP, пока человек её не откроет (по умолчанию нет). Агент не должен
+     * менять то, что человек уже согласовал: например, публикацию, поставленную на отправку. Человек в админке правит как обычно.
+     *
+     * ```php
+     * public function isLockedForMcp(Model $record): bool
+     * {
+     *     return $record->status === 'scheduled';
+     * }
+     * ```
+     */
+    public function isLockedForMcp(Model $record): bool
+    {
+        return false;
+    }
+
+    /**
      * Модель задана.
      */
     public static function hasModel(): bool
@@ -834,7 +850,7 @@ abstract class Resource
     {
         $model = static::model();
 
-        return new $model;
+        return new $model();
     }
 
     /**
@@ -959,7 +975,7 @@ abstract class Resource
         }
 
         $actions = [];
-        $builtIn = static::usesSoftDeletes() ? [new DeleteRecords, new RestoreRecords, new ForceDeleteRecords] : [new DeleteRecords];
+        $builtIn = static::usesSoftDeletes() ? [new DeleteRecords(), new RestoreRecords(), new ForceDeleteRecords()] : [new DeleteRecords()];
 
         if (static::readColumn() !== null) {
             $builtIn = [MarkRead::make(true), MarkRead::make(false), ...$builtIn];

@@ -59,17 +59,19 @@ final class SettingsStore
     {
         foreach ($page->encrypted() as $key) {
             if (isset($values[$key]) && $values[$key] !== '') {
-                $values[$key] = Crypt::encryptString(json_encode($values[$key], JSON_THROW_ON_ERROR));
+                $values[$key] = Crypt::encryptString(json_encode($values[$key], JSON_THROW_ON_ERROR | JSON_INVALID_UTF8_SUBSTITUTE));
             }
         }
 
         DB::table('fastleo_settings')->upsert(
-            [['slug' => $page::slug(), 'value' => json_encode($values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE), 'created_at' => now(), 'updated_at' => now()]],
+            [['slug' => $page::slug(), 'value' => json_encode($values, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE), 'created_at' => now(), 'updated_at' => now()]],
             ['slug'],
             ['value', 'updated_at'],
         );
 
-        $this->flush();
+        // Сохранение идёт в транзакции вместе с afterSave полей: сбросив кеш раньше коммита, читатель сайта
+        // перестроил бы его из старых строк, и rememberForever закрепил бы их.
+        DB::afterCommit(fn () => $this->flush());
     }
 
     /**

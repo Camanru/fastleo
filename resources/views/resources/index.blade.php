@@ -121,7 +121,7 @@
 
         @if ($tree && $records->isNotEmpty())
             {{-- «Свернуть всё», пока ни одна ветка не свёрнута, иначе «Развернуть всё». --}}
-            <div x-data="{ expanded: JSON.parse(localStorage.getItem(@js('fastleo.tree.'.$slug)) || '[]').length === 0 }" @fastleo-tree-changed.window="expanded = $event.detail">
+            <div x-data="{ expanded: (() => { try { return JSON.parse(localStorage.getItem(@js('fastleo.tree.'.$slug)) || '[]').length === 0; } catch { return true; } })() }" @fastleo-tree-changed.window="expanded = $event.detail">
                 <x-fastleo::button variant="ghost" x-on:click="expanded = ! expanded; $dispatch('fastleo-tree', expanded ? 'expand' : 'collapse')" title="{{ __('fastleo::resources.tree_toggle_all') }}">
                     <x-fastleo::icon name="chevrons-down-up" class="size-4 shrink-0" x-show="expanded" />
                     <x-fastleo::icon name="chevrons-up-down" class="size-4 shrink-0" x-cloak x-show="! expanded" />

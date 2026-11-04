@@ -43,12 +43,12 @@ it('creates an action that runs on records', function (): void {
     $path = $this->sandbox.'/Fastleo/Actions/PublishDoctors.php';
     require $path;
     $class = $this->namespace.'\\Actions\\PublishDoctors';
-    $action = new $class;
+    $action = new $class();
 
     expect($action)->toBeInstanceOf(Action::class)
         ->and($action->key())->toBe('publish-doctors')
         ->and($action->getLabel())->toBe('Publish Doctors')
-        ->and($action->handle(new Collection([new Article, new Article]), []))->toEqual(ActionResult::success('Готово: 2'));
+        ->and($action->handle(new Collection([new Article(), new Article()]), []))->toEqual(ActionResult::success('Готово: 2'));
 });
 
 it('creates a filter with a view that narrows the list', function (): void {
@@ -94,7 +94,7 @@ it('creates a page that the registry finds and the admin opens', function (): vo
     $class = $this->namespace.'\\ReportPage';
 
     expect(Fastleo::resources()->pages())->toMatchArray(['report' => $class])
-        ->and(new $class)->toBeInstanceOf(Page::class);
+        ->and(new $class())->toBeInstanceOf(Page::class);
 
     $this->actingAs(admin(), 'fastleo')
         ->get(route('fastleo.pages.show', 'report'))
@@ -125,7 +125,7 @@ it('creates a field that extends Text and has its own view', function (): void {
     expect($field)->toBeInstanceOf(Text::class)
         ->and($field->view())->toBe('fastleo.fields.phone');
 
-    View::share('errors', new ViewErrorBag);
+    View::share('errors', new ViewErrorBag());
     $html = view($field->view(), ['field' => $field, 'value' => '+7', 'name' => 'phone', 'path' => 'phone', 'id' => 'f-phone'])->render();
 
     expect($html)->toContain('name="phone"', 'id="f-phone"');
@@ -172,7 +172,7 @@ it('creates a settings page that the registry finds', function (): void {
     require_once $path;
     $class = $this->namespace.'\\ContactsSettings';
 
-    expect(new $class)->toBeInstanceOf(Settings::class)
+    expect(new $class())->toBeInstanceOf(Settings::class)
         ->and(array_keys(new $class()->schema()->fields()))->not->toBeEmpty();
 
     $this->artisan('fastleo:make-settings', ['name' => 'ContactsSettings'])->expectsOutputToContain('уже есть')->assertFailed();
@@ -219,7 +219,7 @@ describe('policy', function (): void {
             expect(method_exists($class, $ability))->toBeTrue($ability);
         }
 
-        $policy = new $class;
+        $policy = new $class();
         $user = admin();
         expect($policy->viewAny($user))->toBeTrue()
             ->and($policy->update($user, Article::factory()->create()))->toBeTrue();
@@ -233,4 +233,16 @@ describe('policy', function (): void {
         $this->artisan('fastleo:make-policy', ['name' => 'ArticlePolicy', '--model' => Article::class])->expectsOutputToContain('уже есть')->assertFailed();
         $this->artisan('fastleo:make-policy', ['name' => 'Article', '--model' => Article::class, '--force' => true])->assertSuccessful();
     });
+});
+
+it('explains a missing name instead of a stack trace when there is nobody to ask', function (string $command): void {
+    $this->artisan($command, ['--no-interaction' => true])
+        ->expectsOutputToContain('Не указано имя')
+        ->assertFailed();
+})->with(['fastleo:make-action', 'fastleo:make-resource', 'fastleo:make-policy']);
+
+it('cuts the suffix only from the end of the name', function (): void {
+    $this->artisan('fastleo:make-page', ['name' => 'ContactsPageX'])->assertSuccessful();
+
+    expect(File::exists($this->sandbox.'/Fastleo/ContactsPageXPage.php'))->toBeTrue();
 });

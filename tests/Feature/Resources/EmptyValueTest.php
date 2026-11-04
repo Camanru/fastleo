@@ -97,8 +97,8 @@ describe('fields that do not take it', function (): void {
         $multiple = Select::make('days')->options(['a' => 'A'])->emptyValue(0)->multiple();
         $translatable = Text::make('title')->emptyValue('')->translatable();
 
-        expect(fn () => $multiple->fill(new Article, null))->toThrow(LogicException::class)
-            ->and(fn () => $translatable->fill(new Article, []))->toThrow(LogicException::class);
+        expect(fn () => $multiple->fill(new Article(), null))->toThrow(LogicException::class)
+            ->and(fn () => $translatable->fill(new Article(), []))->toThrow(LogicException::class);
     });
 
     it('refuses it in a subfield of a JSON field', function (): void {

@@ -158,7 +158,7 @@ final class ResourceQuery
         $offset = $page > intdiv(PHP_INT_MAX, $perPage) ? count($roots) : ($page - 1) * $perPage;
         ['keys' => $keys, 'truncated' => $this->treeTruncated] = $this->tree()->page(array_slice($roots, $offset, $perPage), max(1, config()->integer('fastleo.list.max_all', 1000)));
         $position = array_flip($keys);
-        $records = $keys === [] ? new Collection : $this->query()->whereKey($keys)->get()
+        $records = $keys === [] ? new Collection() : $this->query()->whereKey($keys)->get()
             ->sortBy(fn (Model $record): int => $position[$this->key($record)] ?? 0)
             ->values();
 

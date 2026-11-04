@@ -86,7 +86,7 @@ it('lets a role with the related section attach its records', function (): void 
 });
 
 it('does not close a relation while nobody is signed in', function (): void {
-    expect(RoleMatrix::closesRelated(new Category))->toBeFalse();
+    expect(RoleMatrix::closesRelated(new Category()))->toBeFalse();
 });
 
 it('takes the fastleo guard of the right even when the default guard is web', function (): void {

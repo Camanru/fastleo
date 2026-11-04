@@ -84,7 +84,7 @@ it('shows the beginning of the text without tags in the list', function (): void
     $article = new Article(['content' => '<h2>Цены &amp; акции</h2><p>'.str_repeat('слово ', 40).'</p>']);
 
     expect($field->listDisplay($article))->toStartWith('Цены & акции слово слово')->toEndWith('...')
-        ->and($field->listDisplay(new Article))->toBeNull()
+        ->and($field->listDisplay(new Article()))->toBeNull()
         ->and($field->height(100)->getHeight())->toBe(150);
 });
 

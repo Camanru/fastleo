@@ -106,7 +106,7 @@ it('shows a rich text through formatUsing in the list', function (): void {
 it('formats a block with a custom closure instead of its own table', function (Field $field): void {
     $field->formatUsing(fn (mixed $value): string => 'Свой вывод');
 
-    expect($field->display(new Article))->toBe('Свой вывод');
+    expect($field->display(new Article()))->toBe('Свой вывод');
 })->with([
     'belongs to many' => fn (): BelongsToMany => BelongsToMany::make('topics'),
     'blocks' => fn (): Blocks => Blocks::make('content')->blocks([Block::make('text')]),

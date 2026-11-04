@@ -61,7 +61,7 @@ class Password extends Field
     #[Override]
     protected function typeRules(): array
     {
-        return ['string', PasswordRule::default(), ...($this->confirmed ? ['confirmed'] : [])];
+        return ['string', 'max:255', PasswordRule::default(), ...($this->confirmed ? ['confirmed'] : [])];
     }
 
     /**

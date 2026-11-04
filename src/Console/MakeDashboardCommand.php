@@ -27,6 +27,6 @@ final class MakeDashboardCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: '', stub: 'dashboard', suffix: '', view: null, nextKey: 'make_next_dashboard', name: 'Dashboard');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: '', stub: 'dashboard', suffix: '', view: null, nextKey: 'make_next_dashboard', name: 'Dashboard');
     }
 }

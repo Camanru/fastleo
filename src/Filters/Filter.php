@@ -54,9 +54,11 @@ abstract class Filter
      *
      * @throws InvalidArgumentException имя не похоже на имя колонки
      */
-    final public function __construct(public readonly string $name, /** Подпись над фильтром или null — подпись одноимённого поля ресурса. */
-        protected ?string $label = null)
-    {
+    final public function __construct(
+        public readonly string $name,
+        /** Подпись над фильтром или null — подпись одноимённого поля ресурса. */
+        protected ?string $label = null,
+    ) {
         if (preg_match('/^[A-Za-z_]\w*$/', $name) !== 1) {
             throw new InvalidArgumentException(__('fastleo::exceptions.field_name', ['name' => $name], Fastleo::LOCALE));
         }

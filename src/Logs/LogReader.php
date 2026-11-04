@@ -33,7 +33,7 @@ final readonly class LogReader
     private const int DETAILS_LIMIT = 20480;
 
     /** Начало записи: «[2026-10-09 15:13:02] production.ERROR: …». */
-    private const string HEADER = '/^\[(\d{4}-\d\d\-\d\d[ T]\d\d:\d\d:\d\d)[^\]]*\] ([\w-]+)\.([A-Z]+): /m';
+    private const string HEADER = '/^\[(\d{4}-\d\d\-\d\d[ T]\d\d:\d\d:\d\d)[^\]\n]*\] ([\w-]+)\.([A-Z]+): /m';
 
     /**
      * Фильтры уровней: «Ошибки», «Предупреждения и ошибки», «Все» (null).

@@ -63,7 +63,10 @@ final class ErrorPage
      */
     private static function isAdminRequest(Request $request): bool
     {
-        if (str_starts_with((string) $request->route()?->getName(), 'fastleo.')) {
+        $name = (string) $request->route()?->getName();
+
+        // Карта сайта и robots.txt публичные: посетитель получает обычную страницу ошибки сайта.
+        if (str_starts_with($name, 'fastleo.') && ! in_array($name, ['fastleo.sitemap', 'fastleo.sitemap.page', 'fastleo.robots'], true)) {
             return true;
         }
 

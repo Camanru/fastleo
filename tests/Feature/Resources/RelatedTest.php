@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Http\Controllers\RelatedController;
 use Fastleo\Related;
+use Fastleo\Resource;
 use Fastleo\Support\ReturnUrl;
 use Fastleo\Tests\Fixtures\Policies\HiddenArticlePolicy;
 use Fastleo\Tests\Fixtures\Policies\NoUpdateArticlePolicy;
@@ -79,6 +80,18 @@ describe('description', function (): void {
         'the relation shown also as a form field' => ['conflict', 'перезапишет'],
     ])->throws(LogicException::class);
 
+    it('explains a table whose section has no model instead of failing with an Error', function (): void {
+        $withoutModel = new class extends Resource
+        {
+            public function fields(): array
+            {
+                return [];
+            }
+        };
+
+        Related::make('articles', $withoutModel::class)->bind(Fastleo::resources()->find('categories'));
+    })->throws(LogicException::class, 'не найден');
+
     it('lets the same relation stay in the creation form only', function (): void {
         useFixtureResources('RelatedBroken');
         BrokenCategoryResource::$mode = 'create-only';
@@ -91,7 +104,7 @@ it('shows nothing when the parent has no key to look the records up by, instead 
     Article::factory()->create(['title' => 'Без рубрики', 'category_id' => null]);
     $related = Fastleo::resources()->find('categories')->listRelations()['articles'];
 
-    $scoped = Article::query()->tap($related->scopeFor(new Category));
+    $scoped = Article::query()->tap($related->scopeFor(new Category()));
 
     expect($scoped->count())->toBe(0);
 });

@@ -16,7 +16,7 @@ final class SchedulerPulse
     /** Метке старше стольких секунд не верим: cron запускает `schedule:run` каждую минуту. */
     public const int STALE_SECONDS = 600;
 
-    private const string KEY = 'fastleo:schedule-ran';
+    private const string KEY = 'fastleo.schedule-ran';
 
     /**
      * Записать запуск (вызывается из события консоли при старте `schedule:run`).

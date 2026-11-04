@@ -27,6 +27,6 @@ final class MakeActionCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: 'Actions', stub: 'action', suffix: '', view: null, nextKey: 'make_next_action');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: 'Actions', stub: 'action', suffix: '', view: null, nextKey: 'make_next_action');
     }
 }

@@ -58,6 +58,9 @@ final readonly class TwoFactorController
             return to_route('fastleo.profile.show')->withErrors(['code' => __('fastleo::auth.two_factor_failed')], 'two_factor');
         }
 
+        // Сеанс или cookie «запомнить меня», украденные до включения защиты, второго шага не проходили бы: закрываем их.
+        Fastleo::guard()->logoutOtherDevices($request->string('current_password')->toString());
+
         return to_route('fastleo.profile.show')
             ->with('fastleo.success', __('fastleo::profile.two_factor_enabled'))
             ->with('fastleo.recovery_codes', $codes);

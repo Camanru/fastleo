@@ -146,11 +146,30 @@ class Number extends Field
     {
         $value = $record->getAttribute($this->name);
 
-        return match (true) {
-            is_int($value), is_float($value) => $value,
-            is_numeric($value) => str_contains($value, '.') || stripos($value, 'e') !== false ? (float) $value : (int) $value,
-            default => self::exportScalar($value),
-        };
+        if (is_int($value) || is_float($value)) {
+            return $value;
+        }
+
+        if (! is_string($value) || ! is_numeric($value)) {
+            return self::exportScalar($value);
+        }
+
+        // Больше 15 значащих цифр float теряет точность (DECIMAL(20,4), большой bigint): такое число уходит текстом как есть.
+        if ($this->significantDigits($value) > 15) {
+            return $value;
+        }
+
+        return str_contains($value, '.') || stripos($value, 'e') !== false ? (float) $value : (int) $value;
+    }
+
+    /**
+     * Сколько значащих цифр в записи числа (без знака, точки, ведущих нулей и порядка `e`).
+     */
+    private function significantDigits(string $number): int
+    {
+        $mantissa = explode('e', strtolower($number))[0];
+
+        return strlen(ltrim(str_replace(['-', '+', '.'], '', $mantissa), '0'));
     }
 
     /**

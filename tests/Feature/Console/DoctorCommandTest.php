@@ -14,6 +14,7 @@ use Fastleo\Tests\Fixtures\QuickAdd\CategoryResource as QuickAddCategoryResource
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\ArticleResource as BrokenArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Artisan;
@@ -95,6 +96,45 @@ it('reports a read column that cannot hold the time of reading', function (): vo
 
     expect(implode("\n", messages('read-flag', 'error')))->toContain('Колонка отметки «просмотрено» «is_published» ($readColumn) должна быть датой со временем')
         ->and(collect(diagnosed()['problems'])->firstWhere('scope', 'read-flag')['hint'] ?? null)->toBe("\$table->timestamp('is_published')->nullable()->index();");
+});
+
+it('warns about a uuid key of a model without HasUuids', function (): void {
+    DB::statement('create table plain_uuid_things (id uuid primary key, title varchar(255))');
+    useFixtureResources('DoctorUuidKey');
+
+    expect(implode("\n", messages('plain-uuid-things', 'warning')))->toContain('Ключ «id» — колонка uuid');
+})->skip(fn (): bool => ! in_array(DB::getDriverName(), ['sqlite', 'pgsql'], true), 'тип uuid есть только в SQLite (по имени типа) и PostgreSQL');
+
+it('warns when the cached routes keep an address of the admin that the config no longer has', function (): void {
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('Маршруты закешированы');
+
+    // Приложение запоминает, что маршруты закешированы, в контейнере (`routes.cached`).
+    $this->app->instance('routes.cached', true);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('Маршруты закешированы');
+
+    config(['fastleo.path' => 'panel']);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain('Маршруты закешированы');
+
+    config(['fastleo.path' => 'fastleo', 'fastleo.domain' => 'admin.example.com']);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain('Маршруты закешированы');
+});
+
+it('reports a user model that lets fastleo_admin be mass assigned', function (): void {
+    expect(implode("\n", messages('site', 'error')))->not->toContain('fastleo_admin');
+
+    Model::unguard();
+
+    try {
+        $problem = collect(diagnosed()['problems'])->firstWhere('level', 'error');
+    } finally {
+        Model::reguard();
+    }
+
+    expect($problem['message'] ?? null)->toBe('Колонка fastleo_admin модели пользователя доступна для массового присваивания.')
+        ->and($problem['hint'] ?? '')->toContain('$guarded = []');
 });
 
 it('reports a record_view value that is none of modal, page and false', function (): void {

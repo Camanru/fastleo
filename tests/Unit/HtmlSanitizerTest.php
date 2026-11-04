@@ -33,6 +33,8 @@ it('removes scripts, handlers and dangerous links from the editor html', functio
     'data image' => '<img src="data:image/png;base64,AAAA">',
     'iframe to a site' => '<iframe src="https://evil.example/phish"></iframe>',
     'iframe javascript' => '<iframe src="javascript:alert(1)"></iframe>',
+    'iframe path climbs out of the player' => '<iframe src="https://www.youtube.com/embed/../redirect?q=x"></iframe>',
+    'iframe encoded dots' => '<iframe src="https://www.youtube.com/embed/%2e%2e/redirect"></iframe>',
 ]);
 
 it('keeps the structure of the text', function (): void {
@@ -134,6 +136,7 @@ it('still removes dangerous markup when the site allows more', function (string 
     'iframe srcdoc' => '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
     'style with url' => '<div style="background: url(https://evil.example/x.png)">x</div>',
     'style with javascript' => '<div style="background: url(javascript:alert(1))">x</div>',
+    'style with image-set' => '<div style="background: image-set(\'https://evil.example/p.png\' 1x)">x</div>',
 ]);
 
 it('keeps style but drops its dangerous parts when styles is enabled', function (): void {
@@ -141,6 +144,13 @@ it('keeps style but drops its dangerous parts when styles is enabled', function 
 
     expect(HtmlSanitizer::clean('<div style="display: none; COLOR: red; position: fixed; background: url(x.png); width: expression(alert(1))">x</div><p style="text-align: center; z-index: 9">y</p>'))
         ->toBe('<div style="display: none; color: red">x</div><p style="text-align: center; z-index: 9">y</p>');
+});
+
+it('drops absolute positioning that covers the page when styles is enabled', function (): void {
+    config()->set('fastleo.rich_text', ['tags' => ['p'], 'styles' => true]);
+
+    expect(HtmlSanitizer::clean('<p style="position: ABSOLUTE; top: 0; width: 100vw; color: red">x</p>'))
+        ->toBe('<p style="top: 0; width: 100vw; color: red">x</p>');
 });
 
 it('rejects an unsafe rich_text setting', function (string $key, array $values): void {

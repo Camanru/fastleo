@@ -76,7 +76,16 @@ final class MakeResourceCommand extends Command
     {
         app()->setLocale(Fastleo::LOCALE);
 
-        $name = Str::studly(Str::beforeLast(trim($this->stringArgument('name') ?? text(label: __('fastleo::console.make_name'), required: true)), 'Resource'));
+        $input = $this->stringArgument('name') ?? ($this->input->isInteractive() ? text(label: __('fastleo::console.make_name'), required: true) : null);
+
+        // Спросить некого (--no-interaction, запуск без терминала): понятная ошибка вместо трассировки.
+        if ($input === null) {
+            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-resource Doctor']));
+
+            return self::FAILURE;
+        }
+
+        $name = Str::studly(Str::chopEnd(trim($input), 'Resource'));
 
         if (preg_match('/^[A-Z][A-Za-z0-9]*$/', $name) !== 1) {
             $this->components->error(__('fastleo::console.make_name_invalid', ['name' => $name]));
@@ -105,7 +114,7 @@ final class MakeResourceCommand extends Command
         $this->properties = [];
 
         if ($this->option('generate')) {
-            $fields = $this->generateFields(new $model);
+            $fields = $this->generateFields(new $model());
 
             if ($fields === null) {
                 return self::FAILURE;

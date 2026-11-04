@@ -73,6 +73,25 @@ final class Delivery extends Model
     }
 
     /**
+     * Забыть номер удалённого из канала сообщения: повторное удаление не должно искать его снова.
+     */
+    public function forget(string $messageId): void
+    {
+        $remaining = [];
+
+        foreach ($this->message_ids ?? [] as $role => $value) {
+            $ids = array_values(array_filter(is_array($value) ? $value : [$value], fn (string $id): bool => $id !== $messageId));
+
+            if ($ids !== []) {
+                $remaining[$role] = is_array($value) ? $ids : $ids[0];
+            }
+        }
+
+        $this->message_ids = $remaining;
+        $this->save();
+    }
+
+    /**
      * Запомнить номера отправленных сообщений сразу после шага отправки.
      *
      * @param  array<string, string|list<string>>  $ids

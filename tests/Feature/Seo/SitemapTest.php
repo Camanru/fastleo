@@ -145,6 +145,32 @@ describe('records', function (): void {
         $this->get('/sitemap-0.xml')->assertNotFound();
     });
 
+    it('does not build the map for a file number beyond the limit, even with the cache off', function (): void {
+        enableSitemap(['cache_minutes' => 0, 'urls' => ['/a']]);
+        DB::enableQueryLog();
+
+        // Публичный 404 карты — обычная страница сайта, а не экран ошибки админки.
+        $this->get('/sitemap-'.(Sitemap::MAX_FILES + 1).'.xml')->assertNotFound()->assertDontSee('В админку');
+        $this->get('/sitemap-999.xml')->assertNotFound();
+
+        expect(DB::getQueryLog())->toBe([]);
+    });
+
+    it('builds the map itself when the one who holds the lock takes too long', function (): void {
+        enableSitemap(['urls' => ['/a']]);
+        $lock = Cache::lock('fastleo.sitemap.build', 30);
+        $lock->get();
+        $wait = new ReflectionProperty(Sitemap::class, 'lockWait');
+        $wait->setValue(null, 0);
+
+        try {
+            expect(sitemapLocs($this))->toBe(['https://site.test/a']);
+        } finally {
+            $wait->setValue(null, 15);
+            $lock->release();
+        }
+    });
+
     it('builds no more than ten files and never more than fifty thousand addresses in one', function (): void {
         enableSitemap(['per_file' => 1, 'urls' => array_map(fn (int $number): string => '/page-'.$number, range(1, 15))]);
 

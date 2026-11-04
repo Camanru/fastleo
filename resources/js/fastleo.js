@@ -58,10 +58,32 @@ const STORAGE_KEY = 'fastleo-theme';
 const MODES = ['light', 'dark', 'system'];
 
 /**
+ * Хранилище браузера без исключений: в закрытом режиме и при запрете cookie localStorage бросает ошибку,
+ * из-за чего без этой обёртки не запускалась бы вся страница. Выбор тогда живёт до перезагрузки.
+ */
+const storage = {
+    get(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch {
+            return null;
+        }
+    },
+
+    set(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch {
+            // Хранилище закрыто.
+        }
+    },
+};
+
+/**
  * Выбранная тема: из localStorage или по умолчанию из конфига (data-theme на <html>).
  */
 function storedMode() {
-    const mode = localStorage.getItem(STORAGE_KEY);
+    const mode = storage.get(STORAGE_KEY);
 
     return MODES.includes(mode) ? mode : document.documentElement.dataset.theme || 'system';
 }
@@ -85,7 +107,7 @@ Alpine.data('fastleoTheme', () => ({
 
     set(mode) {
         this.mode = mode;
-        localStorage.setItem(STORAGE_KEY, mode);
+        storage.set(STORAGE_KEY, mode);
 
         // На 200 мс включаем плавную смену цветов, чтобы тема не «щёлкала».
         const root = document.documentElement;
@@ -124,7 +146,7 @@ Alpine.data('fastleoDensity', () => ({
 
     toggle() {
         this.compact = !this.compact;
-        localStorage.setItem('fastleo-density', this.compact ? 'compact' : 'comfortable');
+        storage.set('fastleo-density', this.compact ? 'compact' : 'comfortable');
         document.documentElement.classList.toggle('fl-compact', this.compact);
     },
 }));
@@ -142,7 +164,7 @@ Alpine.data('fastleoShell', () => ({
 
     toggleCollapsed() {
         this.collapsed = !this.collapsed;
-        localStorage.setItem(SIDEBAR_KEY, this.collapsed ? '1' : '0');
+        storage.set(SIDEBAR_KEY, this.collapsed ? '1' : '0');
         document.documentElement.classList.toggle('fl-collapsed', this.collapsed);
     },
 }));
@@ -164,7 +186,26 @@ Alpine.data('fastleoForm', () => ({
         Alpine.store('fastleoForm').dirty = this.dirty;
         this.$el.addEventListener('input', () => (this.dirty = true));
         this.$el.addEventListener('change', () => (this.dirty = true));
-        this.$el.addEventListener('submit', () => (this.submitting = true));
+        this.$el.addEventListener('submit', (event) => {
+            // Второй «Сохранить» (двойной щелчок, Ctrl+S) создал бы вторую запись; файл, который ещё грузится, потерялся бы.
+            if (this.submitting || this.isUploading()) {
+                event.preventDefault();
+
+                return;
+            }
+
+            this.submitting = true;
+
+            // Другой обработчик отменил отправку (подтверждение) — форму снова можно отправить.
+            setTimeout(() => (this.submitting = !event.defaultPrevented && this.submitting));
+        });
+
+        // Возврат кнопкой «Назад» показывает страницу из кеша браузера с прежним состоянием.
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) {
+                this.submitting = false;
+            }
+        });
 
         window.addEventListener('beforeunload', (event) => {
             if (this.dirty && !this.submitting) {
@@ -187,6 +228,13 @@ Alpine.data('fastleoForm', () => ({
                 this.$el.requestSubmit(save || undefined);
             }
         });
+    },
+
+    /**
+     * В форме идёт загрузка файла (поле файла или галереи) — отправка потеряла бы его.
+     */
+    isUploading() {
+        return [...this.$el.querySelectorAll('[x-data]')].some((element) => Alpine.$data(element)?.uploading === true);
     },
 }));
 
@@ -330,6 +378,13 @@ Alpine.data('fastleoPoll', ({ interval }) => ({
             const response = await fetch(location.href, { headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
 
             if (!response.ok) {
+                return;
+            }
+
+            // Сеанс закончился: адрес перевёл на страницу входа — опрашивать её незачем.
+            if (response.redirected) {
+                clearInterval(this.timer);
+
                 return;
             }
 
@@ -590,6 +645,7 @@ Alpine.data('fastleoQuickAdd', ({ url, failed }) => ({
 Alpine.data('fastleoImport', ({ url, state }) => ({
     state,
     timer: null,
+    failures: 0,
 
     init() {
         if (!this.state.finished) {
@@ -606,10 +662,19 @@ Alpine.data('fastleoImport', ({ url, state }) => ({
             const response = await fetch(url, { headers: { Accept: 'application/json' } });
 
             if (response.ok) {
+                this.failures = 0;
                 this.state = await response.json();
+            } else if ([401, 419].includes(response.status)) {
+                // Сеанс закончился: страница входа вернёт на импорт.
+                location.reload();
+            } else {
+                this.failures++;
             }
+        } catch {
+            this.failures++;
         } finally {
-            if (this.state.finished) {
+            // Страницы импорта нет или сервер не отвечает — опрашивать дальше бесполезно.
+            if (this.state.finished || this.failures >= 10) {
                 clearInterval(this.timer);
             }
         }
@@ -656,9 +721,22 @@ Alpine.data('fastleoMenu', dropdownMenu);
  */
 function storedColumns(key) {
     try {
-        const stored = JSON.parse(localStorage.getItem(key) ?? '[]');
+        const stored = JSON.parse(storage.get(key) ?? '[]');
 
         return Array.isArray(stored) ? stored.filter((name) => typeof name === 'string') : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Список из хранилища (свёрнутые ветки дерева); повреждённое значение — пустой список.
+ */
+function storedList(key) {
+    try {
+        const stored = JSON.parse(storage.get(key) ?? '[]');
+
+        return Array.isArray(stored) ? stored : [];
     } catch {
         return [];
     }
@@ -689,12 +767,7 @@ Alpine.data('fastleoColumns', ({ key, first }) => ({
     },
 
     save() {
-        try {
-            localStorage.setItem(key, JSON.stringify(this.hidden));
-        } catch {
-            // Хранилище закрыто: столбцы скрыты до перезагрузки страницы.
-        }
-
+        storage.set(key, JSON.stringify(this.hidden));
         this.apply();
     },
 
@@ -1609,7 +1682,7 @@ function relativeUrl(url) {
  * HugeRTE грузится отдельным файлом, поэтому редактор запускается, когда он готов.
  * Изменения отмечают форму, Ctrl/Cmd+S сохраняет, картинку и файл выбирают в менеджере.
  */
-Alpine.data('fastleoRichText', ({ height, picker, contentCss = [], contentStyle = null }) => ({
+Alpine.data('fastleoRichText', ({ height, picker, blockFormats, contentCss = [], contentStyle = null }) => ({
     editor: null,
 
     init() {
@@ -1670,7 +1743,7 @@ Alpine.data('fastleoRichText', ({ height, picker, contentCss = [], contentStyle 
             plugins: 'autolink code fullscreen image link lists media searchreplace table wordcount',
             toolbar: 'undo redo | blocks | bold italic | alignleft aligncenter alignright | bullist numlist | link image media table blockquote | removeformat code fullscreen',
             toolbar_mode: 'wrap',
-            block_formats: 'Абзац=p; Заголовок 2=h2; Заголовок 3=h3; Заголовок 4=h4',
+            block_formats: blockFormats,
             relative_urls: false,
             convert_urls: false,
             entity_encoding: 'raw',
@@ -2312,8 +2385,12 @@ Alpine.data('fastleoBlocks', ({ min, max, sortable, placeholder = '__KEY__' }) =
     },
 
     remove(button) {
-        button.closest('[data-block]')?.remove();
-        this.count--;
+        const block = button.closest('[data-block]');
+
+        if (block !== null) {
+            block.remove();
+            this.count--;
+        }
         this.changed();
     },
 
@@ -2460,7 +2537,7 @@ async function postMove(url, row) {
  * Строку можно бросить только среди соседей (тот же родитель); сервер получает before/after.
  */
 Alpine.data('fastleoList', ({ key, url, tree }) => ({
-    collapsed: JSON.parse(localStorage.getItem(key) || '[]'),
+    collapsed: storedList(key),
 
     init() {
         // Строка с адресом открывается кликом в любом месте, кроме кнопок, ссылок и полей.
@@ -2543,7 +2620,7 @@ Alpine.data('fastleoList', ({ key, url, tree }) => ({
     },
 
     save() {
-        localStorage.setItem(key, JSON.stringify(this.collapsed));
+        storage.set(key, JSON.stringify(this.collapsed));
         this.$dispatch('fastleo-tree-changed', this.collapsed.length === 0);
     },
 
@@ -2606,16 +2683,24 @@ Alpine.data('fastleoVisible', ({ field, values }) => ({
  * При смене поля-зависимости варианты запрашиваются с сервера, выбор сбрасывается.
  */
 Alpine.data('fastleoDependentSelect', ({ url, depends }) => ({
+    request: 0,
+
     init() {
         const select = this.$el;
         const form = select.closest('form');
 
         watchField(form, depends, false, async (value) => {
             const placeholder = select.multiple ? null : select.options[0]?.cloneNode(true);
+            // Ответ на прежний запрос (быстрая смена поля) не должен подменить варианты нового.
+            const mine = ++this.request;
 
             try {
                 const response = await fetch(`${url}?${new URLSearchParams({ depends: value })}`, { headers: { Accept: 'application/json' } });
                 const options = response.ok ? (await response.json()).options : [];
+
+                if (mine !== this.request) {
+                    return;
+                }
 
                 select.replaceChildren(...(placeholder ? [placeholder] : []), ...options.map((option) => new Option(option.label, option.value)));
             } catch {

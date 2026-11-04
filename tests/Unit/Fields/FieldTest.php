@@ -39,7 +39,7 @@ it('decides where the field is visible', function (): void {
     expect(Text::make('a')->hideOnCreate()->isVisibleInForm(null))->toBeFalse()
         ->and(Text::make('a')->hideOnCreate()->isVisibleInForm($record))->toBeTrue()
         ->and(Text::make('a')->hideOnEdit()->isVisibleInForm($record))->toBeFalse()
-        ->and(Text::make('a')->hideOnEdit()->isVisibleInForm(new Category))->toBeTrue()
+        ->and(Text::make('a')->hideOnEdit()->isVisibleInForm(new Category()))->toBeTrue()
         ->and(Text::make('a')->onlyInList()->isVisibleInForm(null))->toBeFalse()
         ->and(Text::make('a')->onlyInList()->isVisibleInList())->toBeTrue()
         ->and(Text::make('a')->onlyInList()->isVisibleOnShow($record))->toBeFalse()
@@ -63,7 +63,7 @@ it('formats the list value with a closure', function (): void {
 });
 
 it('shows arrays as JSON and empty values as nothing', function (): void {
-    $record = new Category;
+    $record = new Category();
     $record->setRawAttributes(['title' => '', 'code' => null]);
 
     expect(Text::make('title')->display($record))->toBeNull()

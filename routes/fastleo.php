@@ -58,7 +58,7 @@ Route::group([
         Route::post('clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
         Route::put('dashboard/layout', [DashboardController::class, 'saveLayout'])->name('dashboard.layout.save');
         Route::delete('dashboard/layout', [DashboardController::class, 'resetLayout'])->name('dashboard.layout.reset');
-        Route::post('markdown', MarkdownPreviewController::class)->name('markdown');
+        Route::post('markdown', MarkdownPreviewController::class)->middleware('throttle:60,1')->name('markdown');
 
         $slugPattern = '[a-z0-9]+(?:-[a-z0-9]+)*';
         Route::get('settings/{page}', [SettingsController::class, 'edit'])->where('page', $slugPattern)->name('settings.edit');

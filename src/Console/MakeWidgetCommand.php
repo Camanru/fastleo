@@ -27,6 +27,6 @@ final class MakeWidgetCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: 'Widgets', stub: 'widget', suffix: '', view: 'fastleo.widgets.{kebab}', nextKey: 'make_next_widget');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: 'Widgets', stub: 'widget', suffix: '', view: 'fastleo.widgets.{kebab}', nextKey: 'make_next_widget');
     }
 }

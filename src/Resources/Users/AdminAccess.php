@@ -56,7 +56,17 @@ final class AdminAccess extends Toggle
     #[Override]
     public function afterSave(Model $record, mixed $value): void
     {
-        if (filter_var($value, FILTER_VALIDATE_BOOLEAN) || ! RoleMatrix::enabled()) {
+        if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+            return;
+        }
+
+        // Без ролей: два администратора, снимающие доступ друг у друга одновременно, оба прошли бы проверку правила.
+        // Здесь, внутри транзакции записи, с блокировкой одна из записей откатится.
+        if (! RoleMatrix::enabled()) {
+            if (! $record->newQuery()->where('fastleo_admin', true)->lockForUpdate()->exists()) {
+                throw ValidationException::withMessages([$this->name => __('fastleo::users.last_admin', [], Fastleo::LOCALE)]);
+            }
+
             return;
         }
 

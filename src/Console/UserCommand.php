@@ -86,7 +86,7 @@ final class UserCommand extends Command
             return self::FAILURE;
         }
 
-        $user ??= new $model;
+        $user ??= new $model();
 
         $name = $this->stringOption('name');
         $password = $this->stringOption('password');

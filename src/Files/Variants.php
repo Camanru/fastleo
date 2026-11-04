@@ -136,6 +136,12 @@ final class Variants
     public static function sizes(string $path, string $preset): array
     {
         self::preset($preset);
+
+        // Испорченное значение в базе (`..`, путь вне корня): страница сайта выводит оригинал, а не падает на чтении манифеста.
+        if (PathGuard::inside($path) === null) {
+            return [];
+        }
+
         $key = self::cacheKey($path, $preset);
         $cached = Cache::get($key);
 

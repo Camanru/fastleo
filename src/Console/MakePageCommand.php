@@ -28,7 +28,7 @@ final class MakePageCommand extends Command
      */
     public function handle(): int
     {
-        $generator = new SiteClassGenerator($this, $this->components);
+        $generator = new SiteClassGenerator($this, $this->components, $this->input->isInteractive());
 
         if ($this->option('report') === true) {
             return $generator->generate(directory: '', stub: 'report-page', suffix: 'Page', view: null, nextKey: 'make_next_page');

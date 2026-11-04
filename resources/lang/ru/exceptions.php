@@ -60,6 +60,8 @@ return [
     'roles_trait_missing' => 'Поле «Роли»: в модели :model нет связи roles(). Добавьте в модель пользователя трейт Spatie\\Permission\\Traits\\HasRoles (docs/roles.md).',
     'relation_missing' => 'Поле «:field»: в модели :model нет метода связи :method(), возвращающего :type. Добавьте связь или укажите метод: ->relation(\'имя\').',
     'relation_foreign_key' => 'Поле «:field»: связь :method() использует колонку «:key». Назовите поле по колонке: BelongsTo::make(\':key\').',
+    'visible_when_empty' => 'visibleWhen(\':field\', []): список значений пуст — поле не показывалось бы никогда. Укажите хотя бы одно значение.',
+    'visible_when_asterisk' => 'Поле «:field» внутри списка: значение «:value» в visibleWhen() не может содержать «*» (Laravel подставляет в него номер элемента). Используйте другое значение.',
     'nested_depth' => 'Поле «:field» (:type) нельзя использовать внутри «:parent»: Repeater и Blocks вкладываются только на один уровень — внутри элемента списка, который сам лежит в форме раздела.',
     'nested_field' => 'Поле «:field» (:type) нельзя использовать внутри блоков «:parent»: там работают простые поля, файлы и RichText (из связей — только BelongsTo; без BelongsToMany, KeyValue и Seo, зависимых списков, Slug, Password и многоязычных полей; Repeater и Blocks — только в элементе верхнего уровня).',
     'block_type' => 'Недопустимое имя типа блока «:type»: латиница в нижнем регистре, цифры и подчёркивание, первой — буква, не «type».',

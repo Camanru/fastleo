@@ -91,7 +91,7 @@ it('exports and imports a column for every language', function (): void {
     Storage::fake('local');
     $page = Page::factory()->create(['title' => ['ru' => 'Главная', 'en' => 'Home']]);
 
-    $headers = new Exporter(Fastleo::resources()->find('site-pages') ?? throw new RuntimeException)->headers();
+    $headers = new Exporter(Fastleo::resources()->find('site-pages') ?? throw new RuntimeException())->headers();
     expect($headers)->toBe(['id', 'Заголовок (RU)', 'Заголовок (EN)', 'Адрес']);
 
     $export = $this->get(route('fastleo.resources.export', ['resource' => 'site-pages', 'format' => 'csv']));
@@ -122,7 +122,7 @@ it('is available only for text fields', function (): void {
 });
 
 it('needs the array cast of the column without spatie', function (): void {
-    Text::make('excerpt')->translatable()->fill(new Article, ['ru' => 'Текст']);
+    Text::make('excerpt')->translatable()->fill(new Article(), ['ru' => 'Текст']);
 })->throws(LogicException::class, 'хранит массив');
 
 it('takes the languages from the config and falls back to the language of the site', function (): void {

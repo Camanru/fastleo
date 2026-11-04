@@ -37,8 +37,15 @@ final class MakePolicyCommand extends Command
         app()->setLocale(Fastleo::LOCALE);
 
         $argument = $this->argument('name');
-        $input = is_string($argument) && trim($argument) !== '' ? trim($argument) : text(label: __('fastleo::console.make_model_name'), required: true);
-        $name = Str::studly(Str::beforeLast($input, 'Policy'));
+        $input = is_string($argument) && trim($argument) !== '' ? trim($argument) : ($this->input->isInteractive() ? text(label: __('fastleo::console.make_model_name'), required: true) : null);
+
+        if ($input === null) {
+            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-policy Doctor']));
+
+            return self::FAILURE;
+        }
+
+        $name = Str::studly(Str::chopEnd($input, 'Policy'));
 
         if (preg_match('/^[A-Z][A-Za-z0-9]*$/', $name) !== 1) {
             $this->components->error(__('fastleo::console.make_name_invalid', ['name' => $name]));

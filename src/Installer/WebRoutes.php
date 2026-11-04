@@ -29,9 +29,12 @@ final class WebRoutes
             return false;
         }
 
-        $routes = $routes === '' ? "<?php\n" : rtrim($routes)."\n";
+        // Закрывающий тег PHP снят, иначе дописанный код вышел бы текстом страницы; переводы строк Windows (CRLF) сохраняются.
+        $crlf = str_contains($routes, "\r\n");
+        $routes = $routes === '' ? "<?php\n" : rtrim((string) preg_replace('/\?>\s*$/', '', $routes))."\n";
+        $block = "\n".self::MARKER." (routes/site/*.php)\nforeach (glob(__DIR__.'/site/*.php') ?: [] as \$siteRoutes) {\n    require \$siteRoutes;\n}\n";
 
-        File::put($this->path(), $routes."\n".self::MARKER." (routes/site/*.php)\nforeach (glob(__DIR__.'/site/*.php') ?: [] as \$siteRoutes) {\n    require \$siteRoutes;\n}\n");
+        File::put($this->path(), $crlf ? str_replace("\n", "\r\n", str_replace("\r\n", "\n", $routes.$block)) : $routes.$block);
 
         return true;
     }

@@ -94,7 +94,7 @@ final class Stat extends Widget
         $value = $this->value instanceof Closure ? ($this->value)() : $this->value;
         $description = $this->description instanceof Closure ? ($this->description)() : $this->description;
         $url = $this->url instanceof Closure ? ($this->url)() : $this->url;
-        $safe = is_string($url) && preg_match('~^(https?://|/(?![/\\\\]))~i', $url) === 1;
+        $safe = is_string($url) && preg_match('~^(https?://|/(?![/\\\\\x00-\x20]))~i', $url) === 1;
 
         return [
             'value' => is_int($value) || is_float($value) ? number_format($value, is_float($value) ? 2 : 0, ',', ' ') : $value,

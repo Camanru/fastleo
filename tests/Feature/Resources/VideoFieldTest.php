@@ -67,7 +67,7 @@ it('renders the player on the site and skips what is not a video', function (): 
 it('says why the link is refused in Russian even when the site works in another locale', function (): void {
     app()->setLocale('en');
 
-    $errors = validator(['video' => 'https://example.com/clip'], ['video' => [new VideoLinkRule]])->errors();
+    $errors = validator(['video' => 'https://example.com/clip'], ['video' => [new VideoLinkRule()]])->errors();
 
     expect($errors->first('video'))->toBe('Укажите ссылку на видео YouTube, Rutube или VK Видео.');
 });

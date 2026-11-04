@@ -74,7 +74,7 @@ it('adds a version to asset urls', function (): void {
 
 it('mounts the admin under the configured path and domain', function (): void {
     config(['fastleo.path' => 'admin', 'fastleo.domain' => 'admin.example.com']);
-    Route::setRoutes(new RouteCollection);
+    Route::setRoutes(new RouteCollection());
     require dirname(__DIR__, 2).'/routes/fastleo.php';
     resolve('url')->setRoutes(Route::getRoutes());
 

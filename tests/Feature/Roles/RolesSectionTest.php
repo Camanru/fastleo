@@ -245,10 +245,10 @@ it('says nothing about the rights of a role that has none', function (): void {
 });
 
 it('has no rights for a role that is not saved yet and writes nothing to a model without rights', function (): void {
-    RolePermissions::sync(new Article, ['fastleo.articles.view']);
+    RolePermissions::sync(new Article(), ['fastleo.articles.view']);
 
-    expect(RolePermissions::current(new Role))->toBe([])
-        ->and(RolePermissions::current(new Article))->toBe([]);
+    expect(RolePermissions::current(new Role()))->toBe([])
+        ->and(RolePermissions::current(new Article()))->toBe([]);
 });
 
 it('creates no ready roles while the user model has no roles trait', function (): void {

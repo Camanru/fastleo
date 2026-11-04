@@ -37,8 +37,8 @@ final class Channel extends Model
     /** @var array<string, mixed> */
     protected $attributes = ['enabled' => true];
 
-    /** Ключ в контейнере: есть ли включённый канал (запоминается на время запроса). */
-    private const string ANY_ENABLED = 'fastleo.channels.any-enabled';
+    /** Ключ в контейнере: есть ли включённый канал (запоминается на время запроса или задачи очереди — `scoped` в провайдере). */
+    public const string ANY_ENABLED = 'fastleo.channels.any-enabled';
 
     /**
      * Есть хотя бы один включённый канал: тогда видны «Публикации» и кнопка публикации в разделах сайта.
@@ -46,15 +46,19 @@ final class Channel extends Model
      */
     public static function anyEnabled(): bool
     {
-        if (! app()->bound(self::ANY_ENABLED)) {
-            try {
-                app()->instance(self::ANY_ENABLED, self::query()->where('enabled', true)->exists());
-            } catch (QueryException) {
-                return false;
-            }
-        }
-
         return resolve(self::ANY_ENABLED) === true;
+    }
+
+    /**
+     * Запрос к базе для `anyEnabled()` (его вызывает контейнер один раз на запрос); таблицы ещё нет — каналов нет.
+     */
+    public static function lookUpAnyEnabled(): bool
+    {
+        try {
+            return self::query()->where('enabled', true)->exists();
+        } catch (QueryException) {
+            return false;
+        }
     }
 
     /**

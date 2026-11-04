@@ -177,7 +177,7 @@ class Blocks extends Field
 
     /**
      * Сохранённое значение колонки в виде, в котором его принимает запись (MCP, форма):
-     * `[{"type": "text", "text": {"body": "…"}}]` — поля блока под ключом его типа. Блоки неизвестного типа пропускаются.
+     * `[{"type": "text", "text": {"body": "…"}}]` — поля блока под ключом его типа. Блоки неизвестного типа пропускаются (при записи они сохраняются нетронутыми).
      *
      * @return list<array<array-key, mixed>>
      */
@@ -307,12 +307,26 @@ class Blocks extends Field
         return $blocks;
     }
 
+    /**
+     * Записать блоки из формы. Блоки типа, которого нет в `blocks()` (тип убрали из ресурса), форма не показывает,
+     * поэтому они остаются в записи нетронутыми, после известных: сохранение не должно молча стирать данные.
+     */
     #[Override]
     public function fill(Model $record, mixed $value): void
     {
         $this->assertArrayCast($record);
 
+        $unknown = array_values(array_filter(
+            self::storedItems($record->getAttribute($this->name)),
+            fn (array $block): bool => ! is_string($block['type'] ?? null) || ! isset($this->types[$block['type']]),
+        ));
+
         parent::fill($record, $value);
+
+        if ($unknown !== []) {
+            $known = $record->getAttribute($this->name);
+            $record->setAttribute($this->name, [...(is_array($known) ? $known : []), ...$unknown]);
+        }
     }
 
     /**

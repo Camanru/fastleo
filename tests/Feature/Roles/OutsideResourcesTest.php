@@ -111,7 +111,7 @@ it('does not hand out labels of the administrators section even to a role with t
     $this->actingAs(roleAdmin(role('curious', ['users.view'])), Fastleo::GUARD);
 
     expect(RoleMatrix::allows('viewAny', 'users'))->toBeTrue()
-        ->and(RoleMatrix::allowsRelated(new RoleUser))->toBeFalse();
+        ->and(RoleMatrix::allowsRelated(new RoleUser()))->toBeFalse();
 });
 
 it('hides the server status from everyone but the owner', function (): void {

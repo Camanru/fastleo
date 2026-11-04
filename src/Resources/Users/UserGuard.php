@@ -71,13 +71,15 @@ final class UserGuard
     }
 
     /**
-     * Удаление записи не оставит сайт без владельца: роли выключены, запись не владелец или другой владелец остаётся.
+     * Удаление записи не оставит сайт без доступа: запись не администратор (роли выключены) либо другой администратор или владелец остаётся.
      * Вызывается из события `deleting` модели пользователей, внутри транзакции удаления.
      */
     public static function mayDelete(Model $record): bool
     {
         if (! RoleMatrix::enabled()) {
-            return true;
+            // Без ролей: другой администратор должен остаться; блокировка не даёт двум последним удалить друг друга одновременно.
+            return ! $record->getAttribute('fastleo_admin')
+                || $record->newQuery()->whereKeyNot($record->getKey())->where('fastleo_admin', true)->lockForUpdate()->exists();
         }
 
         $owner = self::lockOwnerRole($record);

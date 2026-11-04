@@ -18,7 +18,10 @@ use function Laravel\Prompts\text;
  */
 final readonly class SiteClassGenerator
 {
-    public function __construct(private Command $command, private Factory $components) {}
+    /**
+     * @param  bool  $interactive  есть кому задавать вопросы (нет `--no-interaction`, запуск из терминала)
+     */
+    public function __construct(private Command $command, private Factory $components, private bool $interactive) {}
 
     /**
      * Создать класс (и шаблон) и подсказать, куда его подключить.
@@ -35,7 +38,14 @@ final readonly class SiteClassGenerator
         app()->setLocale(Fastleo::LOCALE);
 
         $input = $name !== '' ? $name : $this->askName();
-        $name = Str::studly($suffix === '' ? $input : Str::beforeLast($input, $suffix));
+
+        if ($input === null) {
+            $this->components->error(__('fastleo::console.make_name_required', ['example' => $this->command->getName().' Doctor']));
+
+            return Command::FAILURE;
+        }
+
+        $name = Str::studly($suffix === '' ? $input : Str::chopEnd($input, $suffix));
 
         if (preg_match('/^[A-Z][A-Za-z0-9]*$/', $name) !== 1) {
             $this->components->error(__('fastleo::console.make_name_invalid', ['name' => $name]));
@@ -78,13 +88,17 @@ final readonly class SiteClassGenerator
     }
 
     /**
-     * Имя класса из аргумента команды или из вопроса.
+     * Имя класса из аргумента команды или из вопроса; null — имени нет и спросить некому (`--no-interaction`).
      */
-    private function askName(): string
+    private function askName(): ?string
     {
         $argument = $this->command->argument('name');
 
-        return is_string($argument) && trim($argument) !== '' ? trim($argument) : text(label: __('fastleo::console.make_class_name'), required: true);
+        if (is_string($argument) && trim($argument) !== '') {
+            return trim($argument);
+        }
+
+        return $this->interactive ? text(label: __('fastleo::console.make_class_name'), required: true) : null;
     }
 
     /**

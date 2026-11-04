@@ -27,7 +27,7 @@ final class JsonItem extends Model
      */
     public static function from(array $values): self
     {
-        $item = new self;
+        $item = new self();
         $item->setRawAttributes(array_filter($values, is_string(...), ARRAY_FILTER_USE_KEY), true);
         $item->exists = true;
 

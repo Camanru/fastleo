@@ -67,6 +67,14 @@ it('stores an upload under a safe latin name, shrinks a wide picture and never o
     expect(getimagesizefromstring((string) $this->disk->get('uploads/foto-vracha.jpg')))->toMatchArray([0 => 1024, 1 => 512]);
 });
 
+it('refuses every file with a validation error when the site allows no extension at all', function (): void {
+    config(['fastleo.files.extensions' => []]);
+
+    $this->postJson(route('fastleo.files.upload'), ['folder' => 'uploads', 'files' => [UploadedFile::fake()->image('a.jpg')]])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('files.0');
+});
+
 it('stores other files as they are and creates the folder of a field', function (): void {
     $this->post(route('fastleo.files.upload'), [
         'folder' => 'uploads/prices',

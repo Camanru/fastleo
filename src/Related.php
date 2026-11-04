@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo;
 
 use Closure;
+use Error;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\Nested;
@@ -364,7 +365,12 @@ final class Related
             ], Fastleo::LOCALE));
         }
 
-        $child = is_subclass_of($this->resource, Resource::class) ? Fastleo::resources()->find($this->resource::slug()) : null;
+        try {
+            $child = is_subclass_of($this->resource, Resource::class) ? Fastleo::resources()->find($this->resource::slug()) : null;
+        } catch (Error) {
+            // Раздел без `$model`: адрес выводится из имени модели, а её нет — понятная ошибка вместо Error.
+            $child = null;
+        }
 
         if (! $child instanceof $this->resource) {
             throw new LogicException(__('fastleo::exceptions.related_resource', ['relation' => $this->name, 'class' => $this->resource], Fastleo::LOCALE));

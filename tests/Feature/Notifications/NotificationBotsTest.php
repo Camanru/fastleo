@@ -130,7 +130,7 @@ describe('test message without a bot', function (): void {
     it('answers with an error when the action got no bot', function (): void {
         app()->setLocale(Fastleo::LOCALE);
 
-        $result = new SendTestMessage()->handle(new EloquentCollection, []);
+        $result = new SendTestMessage()->handle(new EloquentCollection(), []);
 
         expect($result->type)->toBe('error')->and($result->message)->toBe('Сообщение не отправлено: —');
     });

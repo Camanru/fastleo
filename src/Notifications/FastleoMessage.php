@@ -58,7 +58,7 @@ final class FastleoMessage
      */
     public function url(?string $url): self
     {
-        $this->url = $url !== null && preg_match('~^(https?://|/(?![/\\\\]))~i', $url) === 1 ? $url : null;
+        $this->url = $url !== null && preg_match('~^(https?://|/(?![/\\\\\x00-\x20]))~i', $url) === 1 ? $url : null;
 
         return $this;
     }

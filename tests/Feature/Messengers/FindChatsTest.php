@@ -55,6 +55,14 @@ it('uses the saved token of the bot when the field is empty', function (): void 
     Http::assertSent(fn (HttpRequest $request): bool => str_contains($request->url(), TELEGRAM_TOKEN));
 });
 
+it('does not check a token typed by an admin who may only look at the bots', function (): void {
+    Http::fake();
+    Gate::policy(NotificationBot::class, ReadOnlyBotPolicy::class);
+
+    findChats(['messenger' => 'telegram', 'token' => TELEGRAM_TOKEN])->assertForbidden();
+    Http::assertNothingSent();
+});
+
 it('does not use the saved token without the right to change the bot', function (): void {
     Http::fake();
     Gate::policy(NotificationBot::class, ReadOnlyBotPolicy::class);

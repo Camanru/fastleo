@@ -99,6 +99,10 @@ abstract class ResourceTool extends Tool
             throw new ToolFailed(__('fastleo::mcp.forbidden', ['ability' => $ability]));
         }
 
+        if ($ability === 'update' && $resource->isLockedForMcp($record)) {
+            throw new ToolFailed(__('fastleo::mcp.locked'));
+        }
+
         return $record;
     }
 }

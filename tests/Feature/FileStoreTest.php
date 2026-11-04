@@ -6,6 +6,7 @@ use Fastleo\Files\FileRejected;
 use Fastleo\Files\FileStore;
 use Fastleo\Tests\Fixtures\Files\UnwritableDisk;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -73,6 +74,35 @@ it('returns the existing thumbnail without making it again', function (): void {
     expect($path)->toBe('fastleo/thumbs/uploads/a.jpg.webp')
         ->and(FileStore::thumbnail('uploads/a.jpg'))->toBe($path)
         ->and($this->disk->get($path))->toBe('cached');
+});
+
+it('still stores a file when the cache has no locks or the lock of the name is busy', function (): void {
+    $store = fn (): string => FileStore::store(UploadedFile::fake()->createWithContent('price.txt', 'x'), 'uploads');
+
+    config(['cache.default' => 'null']);
+    resolve('cache')->forgetDriver();
+    expect($store())->toBe('uploads/price.txt');
+
+    config(['cache.default' => 'array']);
+    resolve('cache')->forgetDriver();
+    $lock = Cache::lock('fastleo.upload.'.md5('uploads/price.txt'), 30);
+    $lock->get();
+
+    expect($store())->toBe('uploads/price-1.txt');
+    $lock->release();
+});
+
+it('makes the thumbnail again when the picture was replaced under the same name', function (): void {
+    $this->disk->put('uploads/a.jpg', UploadedFile::fake()->image('a.jpg', 800, 600)->getContent());
+    $path = FileStore::thumbnail('uploads/a.jpg');
+    $this->disk->put($path, 'stale');
+    touch($this->disk->path($path), time() - 100);
+
+    $this->disk->put('uploads/a.jpg', UploadedFile::fake()->image('a.jpg', 400, 400)->getContent());
+    touch($this->disk->path('uploads/a.jpg'), time());
+
+    expect(FileStore::thumbnail('uploads/a.jpg'))->toBe($path)
+        ->and($this->disk->get($path))->not->toBe('stale');
 });
 
 it('makes no thumbnail for a picture whose data does not decode', function (): void {

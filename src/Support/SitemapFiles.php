@@ -86,7 +86,7 @@ final class SitemapFiles
 
     private function open(): XMLWriter
     {
-        $writer = new XMLWriter;
+        $writer = new XMLWriter();
         $writer->openMemory();
         $writer->startDocument('1.0', 'UTF-8');
         $writer->startElement('urlset');

@@ -91,6 +91,6 @@ class NotificationBotResource extends Resource
     #[Override]
     public function actions(): array
     {
-        return [new SendTestMessage];
+        return [new SendTestMessage()];
     }
 }

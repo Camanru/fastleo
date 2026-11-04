@@ -69,7 +69,7 @@ describe('text-like fields', function (): void {
 
     it('hides a hidden field in the list and on the record page', function (): void {
         expect(Hidden::make('type')->isVisibleInList())->toBeFalse()
-            ->and(Hidden::make('type')->isVisibleOnShow(new Article))->toBeFalse();
+            ->and(Hidden::make('type')->isVisibleOnShow(new Article()))->toBeFalse();
     });
 });
 
@@ -83,6 +83,17 @@ describe('Number', function (): void {
         expect(Number::make('qty')->integer()->dehydrate('42'))->toBe(42)
             ->and(Number::make('price')->dehydrate('10.50'))->toBe('10.50')
             ->and(Number::make('price')->dehydrate(''))->toBeNull();
+    });
+
+    it('exports a long decimal as typed instead of rounding it through float', function (): void {
+        $field = Number::make('total');
+        $export = fn (string $value): int|float|string|null => $field->exportValue(new Article()->setRawAttributes(['total' => $value]));
+
+        expect($export('12345678901234567.89'))->toBe('12345678901234567.89')
+            ->and($export('-9223372036854775807'))->toBe('-9223372036854775807')
+            ->and($export('12.50'))->toBe(12.5)
+            ->and($export('007'))->toBe(7)
+            ->and($export('1.5e3'))->toBe(1500.0);
     });
 
     it('sets the arrow step', function (): void {
@@ -131,8 +142,8 @@ describe('Select', function (): void {
             ->and($status->display($record))->toBe('На проверке')
             ->and($tags->hydrate($record))->toBe(['a', 'zzz'])
             ->and($tags->display($record))->toBe('А, zzz')
-            ->and($tags->display(new Article))->toBeNull()
-            ->and($tags->hydrate(new Article))->toBe([]);
+            ->and($tags->display(new Article()))->toBeNull()
+            ->and($tags->hydrate(new Article()))->toBe([]);
     });
 
     it('asks the options closure once', function (): void {
@@ -173,7 +184,7 @@ describe('dates and times', function (): void {
 
     it('shows and saves date and time in the admin time zone', function (): void {
         config(['app.timezone' => 'UTC', 'fastleo.timezone' => 'Europe/Moscow']);
-        $record = new Article;
+        $record = new Article();
         $record->setRawAttributes(['starts_at' => '2026-03-08 09:30:00']);
         $field = DateTime::make('starts_at');
 
@@ -204,7 +215,7 @@ describe('dates and times', function (): void {
 
         expect(Time::make('opens_at')->hydrate($record))->toBe('09:05')
             ->and(Time::make('opens_at')->display($record))->toBe('09:05')
-            ->and(Time::make('opens_at')->hydrate(new Article))->toBeNull();
+            ->and(Time::make('opens_at')->hydrate(new Article()))->toBeNull();
     });
 });
 

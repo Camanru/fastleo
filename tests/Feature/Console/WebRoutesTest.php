@@ -30,3 +30,22 @@ it('creates routes/web.php when the site has none', function (): void {
     expect(new WebRoutes()->ensureSiteRoutes())->toBeTrue()
         ->and(File::get($this->sandbox.'/routes/web.php'))->toStartWith('<?php');
 });
+
+it('connects the routes inside the code of a file that ends with a closing tag', function (): void {
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\nRoute::get('/', fn () => 'главная');\n?>\n");
+
+    new WebRoutes()->ensureSiteRoutes();
+
+    $routes = File::get($this->sandbox.'/routes/web.php');
+
+    expect($routes)->not->toContain('?>')
+        ->and($routes)->toContain('require $siteRoutes');
+});
+
+it('keeps the Windows line breaks of the file', function (): void {
+    File::put($this->sandbox.'/routes/web.php', "<?php\r\n\r\nRoute::get('/', fn () => 'главная');\r\n");
+
+    new WebRoutes()->ensureSiteRoutes();
+
+    expect(str_replace("\r\n", '', File::get($this->sandbox.'/routes/web.php')))->not->toContain("\n");
+});

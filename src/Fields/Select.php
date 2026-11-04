@@ -195,6 +195,9 @@ class Select extends Field implements SearchesOptions
         $options = [];
 
         foreach ($this->getOptions($dependency) as $value => $label) {
+            // Подпись из замыкания может быть числом: под strict_types mb_stripos принимает только строку.
+            $label = (string) $label;
+
             if ($search === '' || mb_stripos($label, $search) !== false) {
                 $options[] = ['value' => (string) $value, 'label' => $label];
             }

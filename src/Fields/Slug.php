@@ -24,7 +24,7 @@ use Override;
 class Slug extends Text
 {
     /** Формат адреса. */
-    public const string PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/';
+    public const string PATTERN = '/^[a-z0-9]+(?:-[a-z0-9]+)*$/D';
 
     /** Поле, из которого строится адрес. */
     protected ?string $from = null;

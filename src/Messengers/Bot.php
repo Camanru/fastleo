@@ -99,13 +99,15 @@ abstract class Bot
     abstract public function editPost(string $chatId, string $layout, array $messageIds, array $mediaTokens, string $html, ?array $button): void;
 
     /**
-     * Удалить пост из канала (все его сообщения).
+     * Удалить пост из канала (все его сообщения). Если мессенджер удаляет сообщения по одному, `$deleted` получает
+     * номер каждого удалённого: при сбое на середине повтор не наткнётся на уже удалённые.
      *
      * @param  array<string, mixed>  $messageIds
+     * @param  (Closure(string): void)|null  $deleted
      *
      * @throws MessengerFailed
      */
-    abstract public function deletePost(string $chatId, array $messageIds): void;
+    abstract public function deletePost(string $chatId, array $messageIds, ?Closure $deleted = null): void;
 
     /**
      * Все номера сообщений поста списком.

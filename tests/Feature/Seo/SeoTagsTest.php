@@ -115,7 +115,7 @@ describe('values', function (): void {
     });
 
     it('reads the field from a JSON string and ignores a foreign value', function (): void {
-        $article = new Article;
+        $article = new Article();
         $article->setRawAttributes(['seo' => '{"title":"Из строки"}']);
 
         expect(SeoTags::resolve($article)['title'])->toBe('Из строки');

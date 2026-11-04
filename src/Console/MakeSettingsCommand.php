@@ -27,6 +27,6 @@ final class MakeSettingsCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: '', stub: 'settings', suffix: 'Settings', view: null, nextKey: 'make_next_settings');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: '', stub: 'settings', suffix: 'Settings', view: null, nextKey: 'make_next_settings');
     }
 }

@@ -124,6 +124,17 @@ it('keeps the site open for a signed-in administrator and tells the templates', 
     expect(View::shared('fastleoSiteClosed'))->toBeTrue();
 });
 
+it('closes the site for a session that the admin panel ended by a change of password', function (): void {
+    enableClosing();
+    $admin = admin();
+
+    $this->actingAs($admin, Fastleo::GUARD)->withSession(['password_hash_fastleo' => Fastleo::guard()->hashPasswordForCookie($admin->getAuthPassword())])
+        ->get('/closing-page')->assertOk();
+
+    $this->actingAs($admin, Fastleo::GUARD)->withSession(['password_hash_fastleo' => Fastleo::guard()->hashPasswordForCookie('hash-before-the-change')])
+        ->get('/closing-page')->assertStatus(503);
+});
+
 it('closes the site for a user who cannot enter the admin panel', function (): void {
     enableClosing();
     $this->actingAs(User::factory()->create(['fastleo_admin' => false]), Fastleo::GUARD);

@@ -7,6 +7,7 @@ use Fastleo\Auth\TwoFactorCredential;
 use Fastleo\Fastleo;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FA\Google2FA;
 
@@ -60,6 +61,19 @@ describe('setup in the profile', function (): void {
 
         // Повторный показ страницы кодов уже не содержит.
         $this->get(route('fastleo.profile.show'))->assertDontSee('data-recovery-codes', false);
+    });
+
+    it('ends the other sessions when the protection is turned on: their password hash no longer matches', function (): void {
+        $this->post(route('fastleo.profile.two-factor.enable'), ['current_password' => 'password']);
+        $secret = resolve(TwoFactor::class)->pendingSecret($this->admin);
+        $before = $this->admin->fresh()?->password;
+
+        $this->post(route('fastleo.profile.two-factor.confirm'), ['code' => totp($secret), 'current_password' => 'password']);
+
+        $after = $this->admin->fresh();
+
+        expect($after?->password)->not->toBe($before)
+            ->and(Hash::check('password', (string) $after?->password))->toBeTrue();
     });
 
     it('shows an unreadable pending secret in the confirmation form of the profile', function (): void {

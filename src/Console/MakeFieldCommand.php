@@ -27,6 +27,6 @@ final class MakeFieldCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: 'Fields', stub: 'field', suffix: '', view: 'fastleo.fields.{kebab}', nextKey: 'make_next_field');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: 'Fields', stub: 'field', suffix: '', view: 'fastleo.fields.{kebab}', nextKey: 'make_next_field');
     }
 }

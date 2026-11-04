@@ -37,7 +37,7 @@ it('keeps a fastleo guard described by the site', function (): void {
 
 it('serves the admin from the site root when the path is empty', function (): void {
     config(['fastleo.path' => '']);
-    Route::setRoutes(new RouteCollection);
+    Route::setRoutes(new RouteCollection());
     require dirname(__DIR__, 2).'/routes/fastleo.php';
     resolve('url')->setRoutes(Route::getRoutes());
     $this->actingAs(admin(), Fastleo::GUARD);
@@ -56,7 +56,7 @@ it('explains a fastleo guard that does not use the session driver', function ():
 });
 
 it('adds the sitemap and robots.txt routes at boot only when they are switched on', function (): void {
-    Route::setRoutes(new RouteCollection);
+    Route::setRoutes(new RouteCollection());
     new FastleoServiceProvider($this->app)->boot();
     Route::getRoutes()->refreshNameLookups();
 

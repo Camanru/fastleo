@@ -46,7 +46,7 @@ describe('size and keys', function (): void {
     });
 
     it('gives widgets with the same title different keys', function (): void {
-        expect(array_keys(DashboardGrid::keyed(new Dashboard)))->toBe(['stat-zaiavki', 'stat-zaiavki-2', 'counter', 'stat-tolko-anne']);
+        expect(array_keys(DashboardGrid::keyed(new Dashboard())))->toBe(['stat-zaiavki', 'stat-zaiavki-2', 'counter', 'stat-tolko-anne']);
     });
 
     it('accepts only a safe key', function (): void {
@@ -60,7 +60,7 @@ describe('saved layout', function (): void {
     it('applies the order, the size and the hiding of the administrator', function (): void {
         putLayout([['counter', 2, 3, false], ['stat-zaiavki', 1, 1, true]])->assertNoContent();
 
-        $items = DashboardGrid::build(new Dashboard, $this->me);
+        $items = DashboardGrid::build(new Dashboard(), $this->me);
 
         expect(array_column($items, 'key'))->toBe(['counter', 'stat-zaiavki', 'stat-zaiavki-2', 'stat-tolko-anne'])
             ->and($items[0])->toMatchArray(['cols' => 2, 'rows' => 3, 'hidden' => false])
@@ -84,7 +84,7 @@ describe('saved layout', function (): void {
             ['key' => 'stat-zaiavki-2', 'cols' => 4, 'rows' => 1, 'hidden' => false],
         ]]);
 
-        expect(array_column(DashboardGrid::build(new Dashboard, $this->me), 'key'))->toBe(['stat-zaiavki-2', 'stat-zaiavki', 'counter', 'stat-tolko-anne']);
+        expect(array_column(DashboardGrid::build(new Dashboard(), $this->me), 'key'))->toBe(['stat-zaiavki-2', 'stat-zaiavki', 'counter', 'stat-tolko-anne']);
     });
 
     it('keeps the layout of one administrator away from another', function (): void {
@@ -92,7 +92,7 @@ describe('saved layout', function (): void {
 
         $other = admin(['name' => 'Борис']);
 
-        expect(array_column(array_filter(DashboardGrid::build(new Dashboard, $other), fn (array $item): bool => $item['hidden']), 'key'))->toBe([])
+        expect(array_column(array_filter(DashboardGrid::build(new Dashboard(), $other), fn (array $item): bool => $item['hidden']), 'key'))->toBe([])
             ->and(DashboardLayout::query()->count())->toBe(1);
     });
 
@@ -102,7 +102,7 @@ describe('saved layout', function (): void {
         $this->delete(route('fastleo.dashboard.layout.reset'))->assertRedirect(route('fastleo.dashboard'));
 
         expect(DashboardLayout::query()->count())->toBe(0)
-            ->and(DashboardGrid::build(new Dashboard, $this->me)[0]['key'])->toBe('stat-zaiavki');
+            ->and(DashboardGrid::build(new Dashboard(), $this->me)[0]['key'])->toBe('stat-zaiavki');
     });
 
     it('replaces the layout on the second save instead of adding a record', function (): void {

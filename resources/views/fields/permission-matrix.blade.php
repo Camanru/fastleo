@@ -52,7 +52,7 @@
                         @foreach ($groups as $group)
                             <th scope="col" class="w-24 px-2 py-2.5 text-center">
                                 @if ($writable)
-                                    <button type="button" class="rounded-[6px] px-1.5 py-0.5 hover:bg-sunken hover:text-ink" @click="columnAll('{{ $group }}')" title="{{ __('fastleo::roles.select_column', ['group' => __('fastleo::roles.group_'.$group)]) }}">{{ __('fastleo::roles.group_'.$group) }}</button>
+                                    <button type="button" class="rounded-[6px] px-1.5 py-0.5 hover:bg-sunken hover:text-ink" @click="columnAll(@js($group))" title="{{ __('fastleo::roles.select_column', ['group' => __('fastleo::roles.group_'.$group)]) }}">{{ __('fastleo::roles.group_'.$group) }}</button>
                                 @else
                                     {{ __('fastleo::roles.group_'.$group) }}
                                 @endif
@@ -65,7 +65,7 @@
                         <tr @class(['border-line', 'border-t' => ! $loop->first])>
                             <th scope="row" class="px-4 py-2.5 text-left font-medium">
                                 @if ($writable)
-                                    <button type="button" class="text-left hover:text-primary" @click="rowAll('{{ $section['slug'] }}', @js($section['groups']))" title="{{ __('fastleo::roles.select_row', ['section' => $section['label']]) }}">{{ $section['label'] }}</button>
+                                    <button type="button" class="text-left hover:text-primary" @click="rowAll(@js($section['slug']), @js($section['groups']))" title="{{ __('fastleo::roles.select_row', ['section' => $section['label']]) }}">{{ $section['label'] }}</button>
                                 @else
                                     {{ $section['label'] }}
                                 @endif
@@ -80,8 +80,8 @@
                                             data-permission="{{ \Fastleo\Auth\RoleMatrix::permission($section['slug'], $group) }}"
                                             aria-label="{{ $section['label'] }}: {{ mb_strtolower(__('fastleo::roles.group_'.$group)) }}"
                                             class="size-[18px] accent-primary"
-                                            :checked="has('{{ $section['slug'] }}', '{{ $group }}')"
-                                            @if ($writable) @change="set('{{ $section['slug'] }}', '{{ $group }}', $event.target.checked)" @else disabled @endif
+                                            :checked="has(@js($section['slug']), @js($group))"
+                                            @if ($writable) @change="set(@js($section['slug']), @js($group), $event.target.checked)" @else disabled @endif
                                         >
                                     @endif
                                 </td>

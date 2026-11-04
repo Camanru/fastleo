@@ -7,7 +7,7 @@
 @endphp
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     @if ($writable)
-        <div x-data="fastleoRichText(@js(['height' => $field->getHeight(), 'picker' => $field->pickerUrl(), 'contentCss' => \Fastleo\Support\Html\RichTextSettings::contentCss(), 'contentStyle' => \Fastleo\Support\Html\RichTextSettings::contentStyle()]))" data-rich-text>
+        <div x-data="fastleoRichText(@js(['height' => $field->getHeight(), 'picker' => $field->pickerUrl(), 'blockFormats' => __('fastleo::resources.rich_text_formats'), 'contentCss' => \Fastleo\Support\Html\RichTextSettings::contentCss(), 'contentStyle' => \Fastleo\Support\Html\RichTextSettings::contentStyle()]))" data-rich-text>
             <textarea
                 id="{{ $id }}"
                 name="{{ $name }}"

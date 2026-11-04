@@ -39,8 +39,8 @@ it('keeps the text of a rule object on a field named like a rule', function (str
     expect($validator->errors()->first($field))->not->toBe(ValidationMessages::line($field))
         ->and($validator->errors()->first($field))->toBe(__('fastleo::resources.video_link', [], Fastleo::LOCALE));
 })->with([
-    'url' => ['url', new VideoLinkRule],
-    'email' => ['email', new VideoLinkRule],
+    'url' => ['url', new VideoLinkRule()],
+    'email' => ['email', new VideoLinkRule()],
 ]);
 
 it('still gives the text of the rule itself to a field named like that rule', function (): void {

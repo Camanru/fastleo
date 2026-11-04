@@ -191,10 +191,14 @@ final class MaxBot extends Bot
      * `DELETE /messages` по каждому сообщению поста; ответ проверяется по `success`.
      */
     #[Override]
-    public function deletePost(string $chatId, array $messageIds): void
+    public function deletePost(string $chatId, array $messageIds, ?Closure $deleted = null): void
     {
         foreach (self::allIds($messageIds) as $id) {
             $this->confirm($this->request('delete', '/messages', query: ['message_id' => $id]));
+
+            if ($deleted instanceof Closure) {
+                $deleted($id);
+            }
         }
     }
 

@@ -39,7 +39,7 @@ final class Icons
     public static function render(string $name, ?ComponentAttributeBag $attributes = null): HtmlString
     {
         $svg = str_replace('stroke-width="2"', 'stroke-width="1.75"', self::svg($name));
-        $attributes = ($attributes ?? new ComponentAttributeBag)->merge(['aria-hidden' => 'true'])->toHtml();
+        $attributes = ($attributes ?? new ComponentAttributeBag())->merge(['aria-hidden' => 'true'])->toHtml();
 
         return new HtmlString((string) preg_replace('/^<svg\b/', '<svg '.$attributes, $svg, 1));
     }

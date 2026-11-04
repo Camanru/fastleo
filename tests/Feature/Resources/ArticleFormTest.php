@@ -149,7 +149,7 @@ it('shows the form again when a forged request sent arrays instead of the values
 });
 
 it('opens the tab that has an error', function (): void {
-    $response = $this->withSession(['errors' => (new ViewErrorBag)->put('default', new MessageBag(['author_email' => 'Ошибка']))])
+    $response = $this->withSession(['errors' => new ViewErrorBag()->put('default', new MessageBag(['author_email' => 'Ошибка']))])
         ->get(route('fastleo.resources.create', 'articles'));
 
     $response->assertOk()->assertSee('active: 4, failed: true', false);

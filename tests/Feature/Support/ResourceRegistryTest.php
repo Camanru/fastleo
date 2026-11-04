@@ -85,7 +85,7 @@ it('explains a custom page with a bad address', function (): void {
 
 it('refuses a class from the container that is not a resource', function (): void {
     $class = Fastleo::resources()->all()['articles'];
-    $this->app->bind($class, fn (): stdClass => new stdClass);
+    $this->app->bind($class, fn (): stdClass => new stdClass());
 
     expect(fn (): ?\Fastleo\Resource => Fastleo::resources()->find('articles'))->toThrow(LogicException::class, 'не найден или не наследует');
 });

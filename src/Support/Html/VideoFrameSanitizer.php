@@ -46,7 +46,7 @@ final class VideoFrameSanitizer implements AttributeSanitizerInterface
         $value = trim($value);
 
         foreach ([...self::PLAYERS, ...RichTextSettings::iframeHosts()] as $player) {
-            if (str_starts_with($value, $player) && preg_match('/[\s"\'<>\\\\]/', $value) !== 1) {
+            if (str_starts_with($value, $player) && preg_match('/[\s"\'<>\\\\]|\.\.|%2e|%5c/i', $value) !== 1) {
                 return $value;
             }
         }

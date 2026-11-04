@@ -31,6 +31,6 @@ final class ArticleResource extends Resource
      */
     public function actions(): array
     {
-        return [new StampArticles];
+        return [new StampArticles()];
     }
 }

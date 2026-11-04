@@ -32,6 +32,8 @@ final class MessengerChatsController
         $resource = Fastleo::resources()->find($resource);
         abort_unless($resource instanceof Resource, 404);
         Authorization::authorize('viewAny', $resource);
+        // Токен из запроса — чужой ввод для обращения к мессенджеру: проверять чужие токены может тот, кто вправе завести или изменить бота.
+        abort_unless(Authorization::allows('create', $resource) || Authorization::allows('update', $resource), 403);
 
         $field = $resource->schema()->field($field);
         abort_unless($field instanceof ChatIds && $field->isFormField() && $field->isWritable(), 404);

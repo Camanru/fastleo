@@ -97,7 +97,7 @@ describe('the values taken', function (): void {
         $open = Category::factory()->create(['code' => 'open']);
         $hidden = Category::factory()->create(['code' => null]);
 
-        $values = ModelDefaults::prefill(new ArticleResource, [
+        $values = ModelDefaults::prefill(new ArticleResource(), [
             'title' => 'Заголовок',
             'status' => 'draft',
             'views' => '7',
@@ -110,8 +110,8 @@ describe('the values taken', function (): void {
         ]);
 
         expect($values)->toBe(['title' => 'Заголовок', 'status' => 'draft', 'views' => '7', 'category_id' => (string) $open->id])
-            ->and(ModelDefaults::prefill(new ArticleResource, ['category_id' => (string) $hidden->id, 'status' => 'zzz', 'title' => ['a']]))->toBe([])
-            ->and(ModelDefaults::prefill(new ArticleResource, 'title'))->toBe([]);
+            ->and(ModelDefaults::prefill(new ArticleResource(), ['category_id' => (string) $hidden->id, 'status' => 'zzz', 'title' => ['a']]))->toBe([])
+            ->and(ModelDefaults::prefill(new ArticleResource(), 'title'))->toBe([]);
     });
 });
 

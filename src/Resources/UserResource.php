@@ -127,7 +127,7 @@ class UserResource extends Resource
     #[Override]
     public function actions(): array
     {
-        return [new ResetTwoFactor];
+        return [new ResetTwoFactor()];
     }
 
     /**

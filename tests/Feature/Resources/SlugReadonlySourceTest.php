@@ -44,7 +44,7 @@ it('still accepts the address built from the saved title when the title cannot b
 });
 
 it('reads the source of the address as all translations when the model keeps them, and as a plain value otherwise', function (): void {
-    $spatie = new SpatiePage;
+    $spatie = new SpatiePage();
     $spatie->replaceTranslations('title', ['ru' => 'Услуги', 'en' => 'Services']);
 
     expect(Slug::make('slug')->from('title')->sourceOf($spatie))->toBe(['ru' => 'Услуги', 'en' => 'Services'])

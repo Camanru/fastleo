@@ -15,6 +15,7 @@ use Fastleo\Mcp\Tools\ListRecords;
 use Fastleo\Mcp\Tools\ListResources;
 use Fastleo\Mcp\Tools\RunAction;
 use Fastleo\Mcp\Tools\UpdateRecord;
+use Fastleo\Publishing\Publication;
 use Fastleo\Resources\UserResource;
 use Fastleo\Tests\Fixtures\McpPersonal\ClosedResource;
 use Fastleo\Tests\Fixtures\McpPersonal\PhoneFieldResource;
@@ -229,6 +230,24 @@ it('changes only the fields that were sent', function (): void {
     expect($article->title)->toBe('New title')
         ->and($article->views)->toBe(7)
         ->and($article->status->value)->toBe('draft');
+});
+
+it('lets an agent edit a draft publication but not one that is waiting to be sent', function (): void {
+    $publication = Publication::query()->create(['text' => 'Черновик', 'channel_ids' => [(string) publishingChannel()->id]]);
+    $update = ['resource' => 'publications', 'id' => (string) $publication->id, 'values' => ['text' => 'Правка агента']];
+
+    mcp()->tool(UpdateRecord::class, $update)->assertHasNoErrors();
+    expect($publication->refresh()->text)->toBe('Правка агента');
+
+    foreach (['scheduled', 'sending'] as $status) {
+        $publication->forceFill(['status' => $status])->save();
+
+        mcp()->tool(UpdateRecord::class, [...$update, 'values' => ['text' => 'Подмена']])->assertHasErrors(['закрыта для правки агентом']);
+        expect($publication->refresh()->text)->toBe('Правка агента');
+    }
+
+    $publication->forceFill(['status' => 'draft'])->save();
+    mcp()->tool(UpdateRecord::class, [...$update, 'values' => ['text' => 'Снова можно']])->assertHasNoErrors();
 });
 
 it('keeps the record intact when the check fails', function (): void {
@@ -650,7 +669,7 @@ it('gives out repeater and blocks values in the shape that update accepts, neste
         ->assertHasNoErrors()
         ->assertSee(['Заранее', 'Осмотр']);
 
-    $values = json_decode(json_encode(RecordData::detail(Fastleo::resources()->find('site-pages') ?? throw new LogicException, $page)['values'], JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+    $values = json_decode(json_encode(RecordData::detail(Fastleo::resources()->find('site-pages') ?? throw new LogicException(), $page)['values'], JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
 
     // Порядок ключей объекта JSON зависит от базы (MySQL сортирует их), поэтому форма сверяется по значению.
     expect($values['faq'][0]['extras'])->toEqual([['type' => 'note', 'note' => ['text' => 'Заранее']]])

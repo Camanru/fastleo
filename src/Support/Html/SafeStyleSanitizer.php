@@ -9,7 +9,7 @@ use Symfony\Component\HtmlSanitizer\Visitor\AttributeSanitizer\AttributeSanitize
 
 /**
  * Атрибут `style` остаётся, но без опасного: адресов (`url()`), `expression`, `javascript:`, `@import`, `behavior`,
- * экранирования `\`, комментариев и позиционирования `fixed`/`sticky` (накладка на страницу). Включается
+ * экранирования `\`, комментариев и позиционирования `fixed`/`sticky`/`absolute` (накладка на страницу). Включается
  * настройкой `fastleo.rich_text.styles`; без неё остаётся только `text-align` (TextAlignSanitizer).
  */
 final class SafeStyleSanitizer implements AttributeSanitizerInterface
@@ -41,11 +41,11 @@ final class SafeStyleSanitizer implements AttributeSanitizerInterface
 
             [, $property, $content] = $match;
 
-            if (preg_match('/url\s*\(|expression|javascript|vbscript|behavior|binding|@|\\\\|\/\*|[<>]/i', $content) === 1) {
+            if (preg_match('/url\s*\(|image-set|src\s*\(|expression|javascript|vbscript|behavior|binding|@|\\\\|\/\*|[<>]/i', $content) === 1) {
                 continue;
             }
 
-            if (strtolower($property) === 'position' && preg_match('/fixed|sticky/i', $content) === 1) {
+            if (strtolower($property) === 'position' && preg_match('/fixed|sticky|absolute/i', $content) === 1) {
                 continue;
             }
 

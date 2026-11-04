@@ -43,6 +43,11 @@ final class ImportRecords implements ShouldQueue
             return;
         }
 
+        // Большой файл идёт дольше max_execution_time (при очереди sync; воркер лимита не имеет).
+        if (function_exists('set_time_limit')) {
+            set_time_limit(0);
+        }
+
         $import->update(['status' => 'running']);
         $disk = Import::disk();
         $extension = strtolower(pathinfo($import->path, PATHINFO_EXTENSION));

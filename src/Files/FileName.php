@@ -54,8 +54,9 @@ final class FileName
         $suffix = $extension === '' ? '' : '.'.$extension;
         $path = $folder.'/'.$name;
 
+        // После десяти занятых номеров — случайный суффикс: на облачном диске каждая проверка — запрос.
         for ($number = 1; $disk->exists($path); $number++) {
-            $path = $folder.'/'.($number <= 1000 ? $base.'-'.$number : $base.'-'.Str::lower(Str::random(8))).$suffix;
+            $path = $folder.'/'.($number <= 10 ? $base.'-'.$number : $base.'-'.Str::lower(Str::random(8))).$suffix;
         }
 
         return $path;

@@ -63,7 +63,7 @@ it('does not email when new_login_mail is off', function (): void {
 it('renders the new login mail with time, address and a link to the profile', function (): void {
     $notification = new NewLoginNotification('10.0.0.9', 'Firefox', now());
     app()->setLocale($notification->locale ?? 'en');
-    $mail = $notification->toMail(new stdClass);
+    $mail = $notification->toMail(new stdClass());
 
     expect($notification->locale)->toBe('ru')
         ->and($mail->subject)->toContain('нового устройства')
@@ -75,7 +75,7 @@ it('builds the link of the new login mail from APP_URL, not from the Host header
     config(['app.url' => 'https://site.test']);
     $this->get('http://evil.test/fastleo/login');
 
-    $mail = new NewLoginNotification('10.0.0.9', 'Firefox', now())->toMail(new stdClass);
+    $mail = new NewLoginNotification('10.0.0.9', 'Firefox', now())->toMail(new stdClass());
 
     expect($mail->actionUrl)->toBe('https://site.test/fastleo/profile');
 });

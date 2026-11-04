@@ -11,6 +11,7 @@ use Fastleo\Fastleo;
 use Fastleo\Notifications\FastleoMessage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -19,6 +20,9 @@ use Throwable;
  */
 class LeadController extends Controller
 {
+    /** Сколько уведомлений о заявках в минуту уходит администраторам со всего сайта. */
+    private const int NOTIFICATIONS_PER_MINUTE = 20;
+
     /**
      * Сохранить заявку и сообщить администраторам. Бот получает тот же ответ, но заявка не сохраняется;
      * живой посетитель, отправивший форму слишком быстро или с устаревшей страницы, видит ошибку и может повторить.
@@ -37,14 +41,15 @@ class LeadController extends Controller
             ]);
 
             // Заявка уже сохранена: сбой уведомления (почта, бот) не должен показывать посетителю ошибку.
+            // Общий потолок на сайт: пул адресов не завалит администраторов; сверх него заявки лежат в разделе без уведомления.
             try {
-                Fastleo::notifyAdmins(
+                RateLimiter::attempt('leads-notify', self::NOTIFICATIONS_PER_MINUTE, fn () => Fastleo::notifyAdmins(
                     FastleoMessage::make('Новая заявка')
                         ->body($lead->name.', '.$lead->phone)
                         ->url(Fastleo::recordUrl($lead, false))
                         ->icon('inbox')
                         ->level('success'),
-                );
+                ));
             } catch (Throwable $e) {
                 report($e);
             }

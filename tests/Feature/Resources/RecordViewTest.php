@@ -52,7 +52,7 @@ describe('in a window', function (): void {
         $article = Article::factory()->create();
 
         expect(Fastleo::recordViewInModal())->toBeFalse()
-            ->and(ArticleResource::viewModalUrl((new ArticleResource)->viewUrl($article)))->toBeNull();
+            ->and(ArticleResource::viewModalUrl(new ArticleResource()->viewUrl($article)))->toBeNull();
         $this->get(route('fastleo.resources.index', 'articles'))->assertOk()->assertDontSee('data-record-view', false);
     });
 
@@ -62,7 +62,7 @@ describe('in a window', function (): void {
         $window = route('fastleo.resources.show', ['articles', $article->id, 'frame' => 1]);
 
         expect(Fastleo::recordViewInModal())->toBeTrue()
-            ->and(ArticleResource::viewModalUrl((new ArticleResource)->viewUrl($article)))->toBe($window)
+            ->and(ArticleResource::viewModalUrl(new ArticleResource()->viewUrl($article)))->toBe($window)
             ->and(ArticleResource::viewModalUrl(null))->toBeNull();
         $this->get(route('fastleo.resources.index', 'articles'))->assertOk()->assertSee('data-record-view="'.$window.'"', false);
         $this->get($window)->assertOk()->assertSee('Приточная')->assertDontSee('fastleo-menu', false)->assertDontSee('<!DOCTYPE html>', false)
@@ -100,7 +100,7 @@ describe('in a window', function (): void {
         $article = Article::factory()->create();
 
         expect(Fastleo::recordViewInModal())->toBeFalse()
-            ->and(ArticleResource::viewModalUrl((new ArticleResource)->viewUrl($article)))->toBeNull();
+            ->and(ArticleResource::viewModalUrl(new ArticleResource()->viewUrl($article)))->toBeNull();
     });
 });
 

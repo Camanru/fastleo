@@ -68,7 +68,8 @@ final class DashboardController
             }
         }
 
-        DashboardLayout::query()->updateOrCreate(['user_id' => $this->userKey()], ['layout' => array_values($layout)]);
+        // Два первых сохранения подряд (двойной щелчок, два окна) упираются в unique(user_id): второе находит строку первого.
+        retry(2, fn (): DashboardLayout => DashboardLayout::query()->updateOrCreate(['user_id' => $this->userKey()], ['layout' => array_values($layout)]));
 
         return response()->noContent();
     }

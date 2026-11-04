@@ -35,6 +35,15 @@ it('explains a database refusal in plain words and reports the original error', 
     'anything else' => ['syntax error near "values"', '42000', 'other'],
 ]);
 
+it('does not take words typed into the form for the reason of the refusal', function (): void {
+    Exceptions::fake();
+    $driver = new PDOException('deadlock found when trying to get lock');
+    $driver->errorInfo = ['40001', 1213, 'deadlock found when trying to get lock'];
+    $exception = new QueryException('mysql', 'insert into things (title) values (?)', ['foreign key, not null, too long'], $driver);
+
+    expect(DatabaseErrors::explain($exception))->toBe(__('fastleo::resources.database_other'));
+});
+
 it('names the column that the database refused as a duplicate', function (string $message, string $sql, ?string $expected): void {
     Exceptions::fake();
     $driver = new PDOException($message);

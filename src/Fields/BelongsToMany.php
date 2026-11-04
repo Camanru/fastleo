@@ -27,6 +27,9 @@ class BelongsToMany extends Field implements SearchesOptions
 {
     use QueriesRelatedRecords;
 
+    /** Больше связей за одно сохранение не принимается: каждая проверяется запросом к базе. */
+    public const int MAX_LINKS = 1000;
+
     /** Длинный список подписей в таблице не нужен. */
     protected bool $showInList = false;
 
@@ -158,7 +161,7 @@ class BelongsToMany extends Field implements SearchesOptions
     #[Override]
     protected function typeRules(): array
     {
-        return ['array'];
+        return ['array', 'max:'.self::MAX_LINKS];
     }
 
     /**

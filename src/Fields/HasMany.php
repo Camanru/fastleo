@@ -173,7 +173,7 @@ class HasMany extends Nested
 
         foreach ($existing as $key => $child) {
             if (! in_array((string) $key, $kept, true) && $child->delete() === false) {
-                throw new OperationCancelled;
+                throw new OperationCancelled();
             }
         }
 

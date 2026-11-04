@@ -27,6 +27,23 @@ it('creates a record and saves changes with Ctrl+S', function (): void {
     expect(Category::query()->sole()->title)->toBe('Статьи');
 });
 
+it('sends the form once when Save is pressed twice in a row', function (): void {
+    $page = signInAndVisit(route('fastleo.resources.create', 'categories'));
+    $submit = "document.querySelector('[x-data=\"fastleoForm\"]').dispatchEvent(new Event('submit', { cancelable: true }))";
+
+    // Первое нажатие уходит на сервер, второе (пока страница не сменилась) отменяется: иначе записей стало бы две.
+    $page->assertScript($submit, true)
+        ->assertScript($submit, false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('does not send the form while a file is still uploading', function (): void {
+    $page = signInAndVisit(route('fastleo.resources.create', 'articles'));
+
+    $page->assertScript("(() => { const file = [...document.querySelectorAll('[x-data]')].find((el) => Alpine.\$data(el)?.uploading !== undefined); Alpine.\$data(file).uploading = true; return document.querySelector('[x-data=\"fastleoForm\"]').dispatchEvent(new Event('submit', { cancelable: true })); })()", false)
+        ->assertNoJavaScriptErrors();
+});
+
 it('warns about unsaved changes only after editing', function (): void {
     $category = Category::factory()->create();
     $page = signInAndVisit(route('fastleo.resources.edit', ['categories', $category->id]));

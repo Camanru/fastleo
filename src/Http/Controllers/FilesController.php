@@ -109,7 +109,8 @@ final class FilesController
         Validator::make($request->all(), [
             'folder' => ['required', 'string'],
             'files' => ['required', 'array', 'max:50'],
-            'files.*' => ['required', 'file', 'extensions:'.implode(',', FileTypes::allowed()), ...($maxSize !== null ? ['max:'.$maxSize] : [])],
+            // Список разрешённых расширений пуст (настройка сайта): «-» не совпадёт ни с чем, а правило без параметров падает с 500.
+            'files.*' => ['required', 'file', 'extensions:'.implode(',', FileTypes::allowed() ?: ['-']), ...($maxSize !== null ? ['max:'.$maxSize] : [])],
         ], ValidationMessages::all(), $attributes)->validate();
 
         $folder = PathGuard::inside($request->input('folder'));

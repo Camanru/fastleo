@@ -172,6 +172,12 @@ class KeyValue extends Field
 
             // «specs.2.key» → пары лежат в «specs».
             $pairs = Arr::get($validator->getData(), Str::beforeLast(Str::beforeLast($attribute, '.'), '.'));
+
+            // Пар больше предела — их уже отклонит `max`; сравнивать каждую с каждой незачем (JSON-тело не ограничено max_input_vars).
+            if (is_array($pairs) && count($pairs) > $this->maxPairs) {
+                return;
+            }
+
             $same = 0;
 
             foreach (is_array($pairs) ? $pairs : [] as $pair) {

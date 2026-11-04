@@ -93,7 +93,15 @@ function options(config) {
 const charts = [];
 
 function draw(canvas) {
-    const config = JSON.parse(canvas.dataset.chart);
+    let config;
+
+    try {
+        config = JSON.parse(canvas.dataset.chart);
+    } catch {
+        // Один испорченный график не должен останавливать остальные и смену темы.
+        return;
+    }
+
     charts.push({ chart: new Chart(canvas, options(config)), config });
     canvas.dataset.ready = '';
 }

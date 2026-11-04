@@ -40,6 +40,6 @@ final class ArticleResource extends Resource
      */
     public function actions(): array
     {
-        return [SetToggle::make('is_featured', 'Сделать важной', true)->icon('star'), new StampArticles];
+        return [SetToggle::make('is_featured', 'Сделать важной', true)->icon('star'), new StampArticles()];
     }
 }

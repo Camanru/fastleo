@@ -42,7 +42,7 @@ beforeEach(function (): void {
 function xlsxFile(array $rows, string $name = 'import.xlsx'): UploadedFile
 {
     $path = tempnam(sys_get_temp_dir(), 'fastleo-xlsx').'.xlsx';
-    $writer = new XlsxWriter;
+    $writer = new XlsxWriter();
     $writer->openToFile($path);
 
     foreach ($rows as $row) {
@@ -153,6 +153,17 @@ it('skips empty rows silently and reports unknown columns', function (): void {
         ->toBe(['processed' => 2, 'created' => 2, 'skipped' => 0, 'unknown_columns' => ['Взлом']]);
 });
 
+it('keeps the list of unknown columns in the report short', function (): void {
+    $headers = ['Заголовок', ...array_map(fn (int $number): string => 'Лишний '.$number.str_repeat('я', 200), range(1, 60))];
+
+    importFile(xlsxFile([$headers, ['Первая', ...array_fill(0, 60, 'x')]]));
+
+    $unknown = lastImport()->unknown_columns;
+
+    expect($unknown)->toHaveCount(50)
+        ->and(mb_strlen($unknown[0]))->toBe(100);
+});
+
 it('fails a file without known columns', function (): void {
     importFile(xlsxFile([['Что-то', 'Ещё'], ['1', '2']]));
 
@@ -187,6 +198,13 @@ it('does not create an empty record for a row that has only a key nobody has', f
     expect(lastImport()->only('created', 'updated', 'skipped'))->toBe(['created' => 1, 'updated' => 1, 'skipped' => 1])
         ->and(lastImport()->errors)->toBe([['row' => 3, 'message' => 'Записи с ключом ghost нет.']])
         ->and(Category::query()->where('code', 'ghost')->exists())->toBeFalse();
+});
+
+it('reports a row whose key the database cannot compare instead of failing the whole import', function (): void {
+    importFile(xlsxFile([['external_id', 'Название'], ['abc', 'Новости']]), 'unreadable-key');
+
+    expect(lastImport()->only('status', 'created', 'skipped'))->toBe(['status' => 'done', 'created' => 0, 'skipped' => 1])
+        ->and(lastImport()->errors)->toBe([['row' => 2, 'message' => 'Записи с ключом abc нет.']]);
 });
 
 it('explains a database error of a row and a save cancelled by the model', function (): void {
@@ -400,7 +418,7 @@ it('leaves a finished import alone when the worker reports a failure afterwards'
 it('refuses a spreadsheet that unpacks into far more than the limit', function (): void {
     config(['fastleo.import.max_unpacked' => 1]);
     $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
     $zip->addFromString('xl/sharedStrings.xml', str_repeat('0', 3 * 1024 * 1024));
     $zip->close();
@@ -414,7 +432,7 @@ it('refuses a spreadsheet that unpacks into far more than the limit', function (
 it('counts the real unpacked size, not the size written in the archive', function (): void {
     config(['fastleo.import.max_unpacked' => 1]);
     $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
     $zip->addFromString('xl/sharedStrings.xml', str_repeat('0', 3 * 1024 * 1024));
     $zip->close();
@@ -472,7 +490,7 @@ it('tells the uploader in the bell when the import could not be made', function 
  */
 function xlsxRows(string $path): array
 {
-    $reader = new Reader;
+    $reader = new Reader();
     $reader->open($path);
     $rows = [];
 
@@ -615,7 +633,7 @@ it('fails a file without a single row', function (): void {
 
 it('fails an archive that is not a spreadsheet', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
     $zip->addFromString('readme.txt', 'это не таблица');
     $zip->close();
@@ -628,7 +646,7 @@ it('fails an archive that is not a spreadsheet', function (): void {
 
 it('fails an archive with an entry that cannot be unpacked', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
     $zip->addFromString('xl/sharedStrings.xml', '<sst/>');
     $zip->setEncryptionName('xl/sharedStrings.xml', ZipArchive::EM_AES_256, 'secret');
@@ -648,7 +666,7 @@ it('skips a row whose key is a number too big for an integer', function (): void
 
 it('fails an archive with damaged data whether or not the server reports PHP warnings', function (int $level): void {
     $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
     $zip->addFromString('xl/sharedStrings.xml', str_repeat('hello world ', 5000));
     $zip->close();

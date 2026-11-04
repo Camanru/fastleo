@@ -74,7 +74,7 @@ class PublicationResource extends Resource
     public function fields(): array
     {
         return [
-            Markdown::make('text', __('fastleo::publishing.text'))->required()->maxLength(20000)->rules([new FitsMessengers])->searchable()
+            Markdown::make('text', __('fastleo::publishing.text'))->required()->maxLength(20000)->rules([new FitsMessengers()])->searchable()
                 ->help(__('fastleo::publishing.text_help')),
             PublicationImages::make('images', __('fastleo::publishing.images'))->directory('publications')->max(Publication::MAX_IMAGES)->extensions(Publication::IMAGE_EXTENSIONS)
                 ->help(__('fastleo::publishing.images_help')),
@@ -95,7 +95,7 @@ class PublicationResource extends Resource
     #[Override]
     public function actions(): array
     {
-        return [new SendPublication, new RetryPublication, new CancelPublication, new SendOverduePublication, new UpdateInChannels, new RemoveFromChannels];
+        return [new SendPublication(), new RetryPublication(), new CancelPublication(), new SendOverduePublication(), new UpdateInChannels(), new RemoveFromChannels()];
     }
 
     /**
@@ -105,6 +105,15 @@ class PublicationResource extends Resource
     public static function inMenu(): bool
     {
         return Channel::anyEnabled();
+    }
+
+    /**
+     * Поставленную на отправку публикацию агент через MCP не правит: человек согласовал один текст, а уйти мог бы другой.
+     */
+    #[Override]
+    public function isLockedForMcp(Model $record): bool
+    {
+        return $record instanceof Publication && in_array($record->status, ['scheduled', 'sending'], true);
     }
 
     /**

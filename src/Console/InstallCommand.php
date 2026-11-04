@@ -282,7 +282,7 @@ final class InstallCommand extends Command
             return false;
         }
 
-        $user = new $model;
+        $user = new $model();
 
         return Schema::hasColumn($user->getTable(), 'fastleo_admin') && $user->newQuery()->where('fastleo_admin', true)->exists();
     }
@@ -310,8 +310,9 @@ final class InstallCommand extends Command
             return false;
         }
 
+        // Администратор уже есть: шаг выполнен, просить «создайте пользователя» в итоге незачем.
         if ($this->adminExists()) {
-            return false;
+            return true;
         }
 
         return $interactive && confirm(__('fastleo::console.install_admin'), default: true) && $this->runStep('fastleo:user', [], $interactive, $child) === self::SUCCESS;

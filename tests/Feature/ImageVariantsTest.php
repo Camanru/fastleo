@@ -97,6 +97,11 @@ it('touches nothing on the disk for a path outside the uploads root', function (
         ->and($this->disk->exists('fastleo/variants/small/keep.txt'))->toBeTrue();
 });
 
+it('gives no sizes for a corrupted path instead of failing the page of the site', function (): void {
+    expect(Variants::sizes('uploads/../secret.jpg', 'small'))->toBe([])
+        ->and(Variants::sizes('../uploads/a.jpg', 'small'))->toBe([]);
+});
+
 it('reads the sizes from the cache and, after it is cleared, from the disk', function (): void {
     putImage('uploads/photo.jpg', 600, 600);
     Variants::generate('uploads/photo.jpg', 'small');

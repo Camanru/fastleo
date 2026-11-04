@@ -90,13 +90,34 @@ final class RecordWriter
                 }
                 $key = $existing->getKey();
 
-                if ($candidate !== '' && Tree::load($resource->newModel()->newQueryWithoutScopes(), $tree, null)->isSelfOrDescendant(is_scalar($key) ? (string) $key : '', $candidate)) {
+                if ($candidate !== '' && self::isSelfOrDescendant($resource, $tree, is_scalar($key) ? (string) $key : '', $candidate)) {
                     $fail(__('fastleo::resources.tree_cycle'));
                 }
             };
         }
 
         return $rules;
+    }
+
+    /**
+     * `$candidate` — сама запись `$key` или её потомок: от кандидата идём вверх по родителям (по запросу на уровень,
+     * а не загрузкой всего дерева — при импорте проверка идёт на каждую строку). Цикл в уже испорченных данных обрывается.
+     */
+    private static function isSelfOrDescendant(Resource $resource, string $treeColumn, string $key, string $candidate): bool
+    {
+        $model = $resource->newModel();
+        $seen = [];
+
+        for ($current = $candidate; $current !== '' && ! isset($seen[$current]); $current = is_scalar($parent) ? (string) $parent : '') {
+            if ($current === $key) {
+                return true;
+            }
+
+            $seen[$current] = true;
+            $parent = $model->newQueryWithoutScopes()->whereKey($current)->value($treeColumn);
+        }
+
+        return false;
     }
 
     /**
@@ -248,7 +269,7 @@ final class RecordWriter
             self::placeAtEnd($resource, $record);
 
             if (! $record->save()) {
-                throw new OperationCancelled;
+                throw new OperationCancelled();
             }
 
             foreach ($fields as $field) {

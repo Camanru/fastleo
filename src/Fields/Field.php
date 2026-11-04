@@ -429,6 +429,10 @@ abstract class Field
             throw new InvalidArgumentException(__('fastleo::exceptions.field_name', ['name' => $field], Fastleo::LOCALE));
         }
 
+        if ($values === []) {
+            throw new InvalidArgumentException(__('fastleo::exceptions.visible_when_empty', ['field' => $field], Fastleo::LOCALE));
+        }
+
         $this->visibleWhen = [
             'field' => $field,
             'values' => array_values(array_unique(array_map(self::conditionValue(...), is_array($values) ? $values : [$values]))),
@@ -1363,7 +1367,16 @@ abstract class Field
             return [];
         }
 
-        $values = array_map(fn (string $value): string => '"'.str_replace('"', '""', $value).'"', $this->visibleWhen['values']);
+        // В списке ключ правила содержит `*`: Laravel прогоняет все параметры через vsprintf, поэтому `%` удваивается, а `*` невозможно.
+        $inList = str_contains($this->rulePrefix, '*');
+
+        $values = array_map(function (string $value) use ($inList): string {
+            if ($inList && str_contains($value, '*')) {
+                throw new LogicException(__('fastleo::exceptions.visible_when_asterisk', ['field' => $this->name, 'value' => $value], Fastleo::LOCALE));
+            }
+
+            return '"'.str_replace('"', '""', $inList ? str_replace('%', '%%', $value) : $value).'"';
+        }, $this->visibleWhen['values']);
 
         return ['exclude_unless:'.$this->rulePrefix.$this->visibleWhen['field'].','.implode(',', $values)];
     }
@@ -1401,6 +1414,17 @@ abstract class Field
     public function untouchedValue(): mixed
     {
         return $this->dehydrate($this->formValue(null));
+    }
+
+    /**
+     * Значение совпадает с нетронутым. Скаляры сравниваются по тексту: целое 0 — не «нетронутое» null (PHP считает 0 == null),
+     * иначе новый элемент списка с единственным нулём пропал бы как пустой.
+     */
+    public function isUntouched(mixed $value): bool
+    {
+        $untouched = $this->untouchedValue();
+
+        return is_scalar($value) && (is_scalar($untouched) || $untouched === null) ? (string) $value === (string) $untouched : $value == $untouched;
     }
 
     /**

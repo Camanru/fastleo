@@ -34,6 +34,19 @@ function threeTopics(): array
     return Topic::factory()->count(3)->sequence(['title' => 'А', 'sort' => 1], ['title' => 'Б', 'sort' => 2], ['title' => 'В', 'sort' => 3])->create()->all();
 }
 
+it('leaves the order as it was when an observer of a neighbour cancels the save', function (): void {
+    [$first, $second] = threeTopics();
+    Topic::saving(fn (Topic $topic): ?bool => $topic->is($second) ? false : null);
+
+    try {
+        $this->post(route('fastleo.resources.reorder', 'topics'), ['id' => $first->id, 'direction' => 'down'])->assertUnprocessable();
+    } finally {
+        Topic::flushEventListeners();
+    }
+
+    expect(topicOrder())->toBe(['А', 'Б', 'В']);
+});
+
 it('shows the records in manual order with arrows', function (): void {
     Topic::factory()->create(['title' => 'Вторая', 'sort' => 2]);
     Topic::factory()->create(['title' => 'Первая', 'sort' => 1]);

@@ -48,6 +48,7 @@ use Illuminate\Database\Migrations\MigrationRepositoryInterface;
 use Illuminate\Database\Migrations\Migrator;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use ReflectionClass;
@@ -215,7 +216,7 @@ final class Doctor
         }
 
         $class = UserModel::fastleoClassName();
-        $user = $class === null ? null : new $class;
+        $user = $class === null ? null : new $class();
 
         if ($user instanceof Model) {
             $this->rolesOfAdmins($user);
@@ -299,8 +300,12 @@ final class Doctor
             $this->add('error', 'site', 'guard_driver', ['driver' => is_string($driver) ? $driver : 'не задан'], 'guard_driver_hint');
         }
 
-        if (UserModel::fastleoClassName() === null) {
+        $userClass = UserModel::fastleoClassName();
+
+        if ($userClass === null) {
             $this->add('error', 'site', 'user_model', hint: 'user_model_hint');
+        } elseif (new $userClass()->isFillable('fastleo_admin')) {
+            $this->add('error', 'site', 'admin_fillable', hint: 'admin_fillable_hint');
         }
 
         // Опечатка вроде 'modall' молча работала бы как страница просмотра.
@@ -310,6 +315,7 @@ final class Doctor
             $this->add('error', 'site', 'record_view_unknown', ['value' => is_scalar($view) ? var_export($view, true) : gettype($view)], 'record_view_unknown_hint');
         }
 
+        $this->routeCache();
         $this->tables();
         $this->assets();
         $this->softNetica();
@@ -337,6 +343,23 @@ final class Doctor
 
         if (config()->has('fastleo.activity')) {
             $this->add('warning', 'site', 'activity_config', hint: 'activity_config_hint');
+        }
+    }
+
+    /**
+     * Маршруты закешированы (`route:cache`), а адрес или домен админки в конфиге с тех пор изменили: кеш держит старые.
+     */
+    private function routeCache(): void
+    {
+        if (! app()->routesAreCached()) {
+            return;
+        }
+
+        $route = Route::getRoutes()->getByName('fastleo.dashboard');
+        $domain = config('fastleo.domain');
+
+        if ($route !== null && (trim($route->uri(), '/') !== trim(config()->string('fastleo.path', 'fastleo'), '/') || $route->getDomain() !== (is_string($domain) && $domain !== '' ? $domain : null))) {
+            $this->add('warning', 'site', 'routes_cached_stale', hint: 'routes_cached_stale_hint');
         }
     }
 
@@ -639,6 +662,13 @@ final class Doctor
             if ($column !== null && ! isset($columns[$column])) {
                 $this->add('error', $scope, $key, ['column' => $column, 'table' => $model->getTable()]);
             }
+        }
+
+        // Ключ uuid без HasUuids: адрес с произвольной строкой на PostgreSQL падает ошибкой базы (500) вместо «не найдено».
+        $keyType = $columns[$model->getKeyName()]['type_name'] ?? null;
+
+        if (is_string($keyType) && strtolower($keyType) === 'uuid' && RecordKey::strict($model, '') === null) {
+            $this->add('warning', $scope, 'key_uuid_trait', ['column' => $model->getKeyName()], 'key_uuid_trait_hint');
         }
 
         $readColumn = $resource::readColumn();

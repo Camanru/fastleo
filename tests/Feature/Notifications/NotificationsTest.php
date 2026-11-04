@@ -9,6 +9,7 @@ use Fastleo\Notifications\FastleoMessage;
 use Fastleo\Notifications\MessageMailNotification;
 use Fastleo\Notifications\MessageNotification;
 use Fastleo\Notifications\SendAdminMessage;
+use Illuminate\Foundation\Application;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Mail;
@@ -36,6 +37,7 @@ describe('message', function (): void {
         'data' => ['data:text/html,<script>', null],
         'protocol-relative' => ['//evil.example', null],
         'backslash' => ['/\\evil.example', null],
+        'tab hides the second slash' => ["/\t/evil.example", null],
         'plain word' => ['evil', null],
         'null' => [null, null],
     ]);
@@ -204,6 +206,22 @@ describe('notifyAdmins()', function (): void {
         Bus::assertNotDispatched(SendAdminMessage::class);
     });
 
+    it('sends to messengers after the response on a web request with the sync queue, so the page does not wait for them', function (): void {
+        Bus::fake();
+        config(['queue.default' => 'sync']);
+        notificationBot(['recipients' => ['12345']]);
+        $console = new ReflectionProperty(Application::class, 'isRunningInConsole');
+        $console->setValue($this->app, false);
+
+        try {
+            Fastleo::notifyAdmins('Привет');
+        } finally {
+            $console->setValue($this->app, true);
+        }
+
+        Bus::assertDispatchedAfterResponse(SendAdminMessage::class, 1);
+    });
+
     it('sends the text in the background to every chat of every enabled bot, one job per chat', function (): void {
         Bus::fake();
         notificationBot(['recipients' => ['12345', '-100200300']]);
@@ -244,8 +262,8 @@ describe('channel', function (): void {
         NotificationFacade::send([$this->me], $notification);
         expect(AdminNotification::query()->sole()->data['title'])->toBe('Своё уведомление');
 
-        $channel = new FastleoChannel;
-        $channel->send(new stdClass, $notification);
+        $channel = new FastleoChannel();
+        $channel->send(new stdClass(), $notification);
         $channel->send($this->me, new class extends Notification {});
         $channel->send($this->me, new class extends Notification
         {
@@ -303,7 +321,7 @@ describe('bell', function (): void {
         AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Плохое', 'url' => $url], 'created_at' => now()]);
 
         expect($this->getJson(route('fastleo.notifications.index'))->json('items.0.url'))->toBeNull();
-    })->with(['javascript' => 'javascript:alert(1)', 'protocol-relative' => '//evil.example', 'backslash' => '/\\evil.example']);
+    })->with(['javascript' => 'javascript:alert(1)', 'protocol-relative' => '//evil.example', 'backslash' => '/\\evil.example', 'tab hides the second slash' => "/\t/evil.example"]);
 
     it('marks one own notification as read', function (): void {
         Fastleo::notifyAdmins('Раз');

@@ -140,7 +140,7 @@ it('shows the pairs in the form and on the record page', function (): void {
 });
 
 it('needs the array cast of the column', function (string $field): void {
-    $record = new Article;
+    $record = new Article();
     $instance = $field === 'repeater' ? Repeater::make('excerpt')->fields([Text::make('a')]) : KeyValue::make('excerpt');
 
     $instance->fill($record, []);

@@ -27,6 +27,6 @@ final class MakeFilterCommand extends Command
      */
     public function handle(): int
     {
-        return new SiteClassGenerator($this, $this->components)->generate(directory: 'Filters', stub: 'filter', suffix: '', view: 'fastleo.filters.{kebab}', nextKey: 'make_next_filter');
+        return new SiteClassGenerator($this, $this->components, $this->input->isInteractive())->generate(directory: 'Filters', stub: 'filter', suffix: '', view: 'fastleo.filters.{kebab}', nextKey: 'make_next_filter');
     }
 }

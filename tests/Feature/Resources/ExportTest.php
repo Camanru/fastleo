@@ -74,7 +74,7 @@ it('keeps text that looks like a number or a formula as text', function (): void
     $response = exportArticles();
     $path = tempnam(sys_get_temp_dir(), 'fastleo-export');
     file_put_contents($path, $response->streamedContent());
-    $zip = new ZipArchive;
+    $zip = new ZipArchive();
     $zip->open($path);
     $sheet = (string) $zip->getFromName('xl/worksheets/sheet1.xml');
     $zip->close();

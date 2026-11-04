@@ -47,7 +47,7 @@ final class SendDelivery implements ShouldQueue
      */
     public static function targetQueue(): Queue
     {
-        return QueueFacade::connection(resolve(Dispatcher::class)->resolveConnectionFromQueueRoute(new self(new Delivery)));
+        return QueueFacade::connection(resolve(Dispatcher::class)->resolveConnectionFromQueueRoute(new self(new Delivery())));
     }
 
     /**
@@ -81,7 +81,7 @@ final class SendDelivery implements ShouldQueue
                 throw new MessengerFailed(__('fastleo::publishing.channel_disabled', [], Fastleo::LOCALE));
             }
 
-            $done = [...($delivery->message_ids ?? []), 'media' => $delivery->media_tokens];
+            $done = [...($delivery->message_ids ?? []), 'media' => $delivery->media_tokens, 'layout' => $delivery->layout];
             $channel->bot()->publish($channel->chat_id, $publication->html(), $publication->imageFiles(), $publication->button(), $done, function (array $step, string $layout) use ($delivery): void {
                 if (array_key_exists('media', $step)) {
                     $delivery->media_tokens = is_array($step['media']) ? array_values(array_filter($step['media'], is_string(...))) : null;

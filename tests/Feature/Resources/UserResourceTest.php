@@ -11,6 +11,7 @@ use Fastleo\Tests\Fixtures\Policies\SelfOnlyUserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -129,7 +130,7 @@ it('takes the access away from another admin and he drops out of the list', func
 });
 
 it('writes the access flag even though it is not fillable', function (): void {
-    expect((new User)->isFillable('fastleo_admin'))->toBeFalse();
+    expect(new User()->isFillable('fastleo_admin'))->toBeFalse();
 
     $this->post(route('fastleo.resources.store', 'users'), adminForm())->assertSessionHasNoErrors();
 
@@ -185,6 +186,25 @@ it('names the last admin as the reason when the access is taken from them by som
     expect($removal->fails())->toBeTrue()
         ->and($removal->errors()->first('fastleo_admin'))->toBe(__('fastleo::users.last_admin', [], Fastleo::LOCALE))
         ->and(Validator::make(['fastleo_admin' => '1'], $rules)->passes())->toBeTrue();
+});
+
+it('checks again, inside the transaction of the save, that an admin is left when the access is taken away', function (): void {
+    $field = AdminAccess::make('fastleo_admin', 'Доступ');
+    $other = admin(['email' => 'other@example.com']);
+    $this->me->forceFill(['fastleo_admin' => false])->save();
+    $other->forceFill(['fastleo_admin' => false])->save();
+
+    expect(fn () => $field->afterSave($other, false))->toThrow(ValidationException::class);
+
+    $other->forceFill(['fastleo_admin' => true])->save();
+    $field->afterSave($this->me->refresh(), false);
+
+    expect(UserGuard::mayDelete($other))->toBeFalse()
+        ->and(UserGuard::mayDelete($this->me->refresh()))->toBeTrue();
+
+    admin(['email' => 'third@example.com']);
+
+    expect(UserGuard::mayDelete($other))->toBeTrue();
 });
 
 it('refuses an email sent as a list instead of a string', function (): void {

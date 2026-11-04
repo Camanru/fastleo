@@ -6,15 +6,24 @@
 <title>{{ $title ? $title.' — ' : '' }}{{ \Fastleo\Support\Branding::name() }}</title>
 <script>
     (function () {
-        var mode = localStorage.getItem('fastleo-theme');
+        // Закрытое хранилище браузера не должно ронять страницу: тогда действуют значения по умолчанию.
+        function stored(key) {
+            try {
+                return localStorage.getItem(key);
+            } catch (error) {
+                return null;
+            }
+        }
+
+        var mode = stored('fastleo-theme');
         if (['light', 'dark', 'system'].indexOf(mode) === -1) {
             mode = document.documentElement.dataset.theme;
         }
         var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.classList.toggle('dark', dark);
 
-        var sidebar = localStorage.getItem('fastleo-sidebar');
-        document.documentElement.classList.toggle('fl-compact', localStorage.getItem('fastleo-density') === 'compact');
+        var sidebar = stored('fastleo-sidebar');
+        document.documentElement.classList.toggle('fl-compact', stored('fastleo-density') === 'compact');
         document.documentElement.classList.toggle('fl-collapsed', sidebar === null ? {!! match (config('fastleo.menu.collapsed')) { true => 'true', false => 'false', default => 'window.innerWidth < 1280' } !!} : sidebar === '1');
     })();
 </script>

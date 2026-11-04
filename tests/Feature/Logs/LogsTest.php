@@ -51,6 +51,15 @@ describe('page', function (): void {
         $this->get(route('fastleo.logs.index'))->assertSee('Не вышло')->assertSee('RuntimeException')->assertSee('#0 /app/file.php(10)');
     });
 
+    it('does not take a bracket on a later line for the end of a record header', function (): void {
+        // Шапка вида «[2026-10-03 10:00:00» без закрывающей скобки в строке не запись: иначе разбор по всему окну дорог.
+        file_put_contents($this->dir.'/laravel.log', logLine('2026-10-02 10:00:00', 'ERROR', 'Настоящая')."[2026-10-03 10:00:00\n] testing.ERROR: Склеенная\n");
+
+        $entries = new LogReader($this->dir)->read($this->dir.'/laravel.log', null, 10)['entries'];
+
+        expect($entries)->toHaveCount(1)->and($entries[0]['message'])->toBe('Настоящая');
+    });
+
     it('pages back through a long journal from the byte where the previous page ended', function (): void {
         $content = '';
         foreach (range(1, 120) as $number) {

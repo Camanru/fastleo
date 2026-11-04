@@ -28,7 +28,7 @@ final class SettingsRecord extends Model
      */
     public static function from(array $values, array $fields): self
     {
-        $record = new self;
+        $record = new self();
         $record->mergeCasts(array_fill_keys($fields, PassThroughCast::class));
         $record->setRawAttributes(array_intersect_key($values, array_flip($fields)), true);
         $record->exists = true;

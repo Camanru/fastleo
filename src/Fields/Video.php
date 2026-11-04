@@ -31,7 +31,7 @@ class Video extends Url
     #[Override]
     protected function typeRules(): array
     {
-        return [...parent::typeRules(), new VideoLinkRule];
+        return [...parent::typeRules(), new VideoLinkRule()];
     }
 
     /**

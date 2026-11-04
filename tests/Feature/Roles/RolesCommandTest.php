@@ -21,7 +21,7 @@ beforeEach(function (): void {
  */
 function roleProblems(): array
 {
-    return collect((new Doctor)->run())->where('scope', 'roles')->pluck('message')->values()->all();
+    return collect(new Doctor()->run())->where('scope', 'roles')->pluck('message')->values()->all();
 }
 
 it('creates the owner role and hands it to the named administrator', function (): void {

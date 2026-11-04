@@ -98,7 +98,7 @@ final class InlineEdit
     {
         $key = $resource::slug().'.'.$field->name;
         $request = request();
-        $memo = self::$memo ??= new WeakMap;
+        $memo = self::$memo ??= new WeakMap();
         $cached = $memo[$request] ?? [];
 
         if (! array_key_exists($key, $cached)) {

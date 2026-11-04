@@ -31,6 +31,9 @@ final class HealthText
         $text = (string) preg_replace('/\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{1,4}\b/i', '[скрыто]', $text);
         $text = (string) preg_replace('~(?<![\w:/])/(?:[\w.-]+/)+[\w.-]*~', '[путь]', $text);
         $text = (string) preg_replace('~\b[A-Za-z]:\\\\[^\s]*~', '[путь]', $text);
+        // Сетевой путь Windows (\\server\share\file) и относительный путь с расширением файла (storage/logs/laravel.log).
+        $text = (string) preg_replace('~\\\\\\\\[\w.$-]+(?:\\\\[^\s\\\\]+)+~', '[путь]', $text);
+        $text = (string) preg_replace('~(?<![\w/:.])(?:[\w.-]+/)+[\w-]+\.[A-Za-z0-9]{1,5}\b~', '[путь]', $text);
         $text = (string) preg_replace('/\b[A-Za-z0-9+_-]{32,}\b/', '[скрыто]', $text);
         $text = trim((string) preg_replace('/\s+/u', ' ', $text));
 

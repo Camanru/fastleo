@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Installer;
 
+use Fastleo\Fastleo;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
@@ -92,13 +93,19 @@ final class ModuleInstaller
             }
         }
 
+        // Кеш списка разделов (`fastleo:cache`) не знает новых классов: разделы появятся только после его обновления.
+        if (is_file(Fastleo::resources()->cachePath())) {
+            $this->notes[] = __('fastleo::console.module_cache');
+        }
+
         $widgets = array_merge(...array_map(fn (Module $module): array => $module->widgets, $modules));
 
         if ($widgets !== []) {
-            $dashboard = new DashboardPatcher;
+            $dashboard = new DashboardPatcher();
             $existed = File::exists($dashboard->path());
 
-            array_push($this->notes, ...($dashboard->add($widgets)
+            // Файл или папка недоступны для записи: модули уже записаны, виджеты остаются на ручное добавление.
+            array_push($this->notes, ...(rescue(fn (): bool => $dashboard->add($widgets), false, false)
                 ? [__('fastleo::console.module_dashboard')]
                 : [__('fastleo::console.module_dashboard_manual'), ...$widgets]));
 
@@ -291,7 +298,8 @@ final class ModuleInstaller
             return File::exists($target) ? $target : null;
         }
 
-        $found = File::glob(str_replace('{timestamp}', '*', $target))[0] ?? null;
+        // Путь сайта может содержать `[`, `*`, `?`: в шаблоне glob они экранируются, подставляется только метка времени.
+        $found = File::glob(implode('*', array_map(fn (string $part): string => addcslashes($part, '[]*?\\'), explode('{timestamp}', $target, 2))))[0] ?? null;
 
         return is_string($found) ? $found : null;
     }

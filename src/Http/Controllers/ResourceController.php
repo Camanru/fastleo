@@ -153,7 +153,7 @@ final class ResourceController
                 $resource->beforeDelete($record);
 
                 if ($record->delete() === false) {
-                    throw new OperationCancelled;
+                    throw new OperationCancelled();
                 }
             });
         } catch (QueryException $exception) {
@@ -183,7 +183,7 @@ final class ResourceController
         try {
             DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
                 if (! $this->restoreRecord($record)) {
-                    throw new OperationCancelled;
+                    throw new OperationCancelled();
                 }
 
                 RecordWriter::moveToEnd($resource, $record);
@@ -217,7 +217,7 @@ final class ResourceController
                 $resource->beforeDelete($record);
 
                 if ($record->forceDelete() === false) {
-                    throw new OperationCancelled;
+                    throw new OperationCancelled();
                 }
             });
         } catch (QueryException $exception) {

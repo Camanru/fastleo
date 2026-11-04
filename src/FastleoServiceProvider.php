@@ -34,6 +34,7 @@ use Fastleo\Health\HealthChecks;
 use Fastleo\Http\ErrorPage;
 use Fastleo\Http\Middleware\SecurityHeaders;
 use Fastleo\Notifications\FastleoChannel;
+use Fastleo\Publishing\Channel;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\Status;
 use Fastleo\SoftNetica\SyncState;
@@ -80,6 +81,7 @@ final class FastleoServiceProvider extends ServiceProvider
         $this->app->singleton(SettingsStore::class);
         $this->app->singleton(HealthChecks::class);
         $this->app->scoped(SyncState::class);
+        $this->app->scoped(Channel::ANY_ENABLED, fn (): bool => Channel::lookUpAnyEnabled());
 
         $config = $this->app->make('config');
 
@@ -139,7 +141,7 @@ final class FastleoServiceProvider extends ServiceProvider
         // Страницы ошибок 403, 404, 419 и 429 внутри админки: в оформлении админки, а не голая страница Laravel.
         $this->app->make(ExceptionHandler::class)->renderable(fn (HttpExceptionInterface $exception, Request $request): ?Response => ErrorPage::render($exception, $request));
 
-        Notification::extend('fastleo', fn (): FastleoChannel => new FastleoChannel);
+        Notification::extend('fastleo', fn (): FastleoChannel => new FastleoChannel());
         View::composer('fastleo::settings.softnetica', fn (\Illuminate\View\View $view) => $view->with('status', Status::current()));
         $this->limitRequests();
 

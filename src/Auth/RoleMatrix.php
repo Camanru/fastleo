@@ -120,7 +120,7 @@ final class RoleMatrix
     public static function roleModel(): ?Model
     {
         $class = UserModel::fastleoClassName();
-        $user = $class === null ? null : new $class;
+        $user = $class === null ? null : new $class();
         $relation = $user !== null && method_exists($user, 'roles') ? $user->roles() : null;
 
         return $relation instanceof MorphToMany ? $relation->getRelated() : null;
