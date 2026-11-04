@@ -599,9 +599,13 @@ it('gives out repeater and blocks values in the shape that update accepts, neste
 
     mcp()->tool(GetRecord::class, ['resource' => 'site-pages', 'id' => (string) $page->id])
         ->assertHasNoErrors()
-        ->assertSee(['"type":"note","note":{"text":"Заранее"}', '"type":"plans","plans":{"title":"Базовый","items":[{"name":"Осмотр"']);
+        ->assertSee(['Заранее', 'Осмотр']);
 
     $values = json_decode(json_encode(RecordData::detail(Fastleo::resources()->find('site-pages') ?? throw new LogicException, $page)['values'], JSON_THROW_ON_ERROR), true, flags: JSON_THROW_ON_ERROR);
+
+    // Порядок ключей объекта JSON зависит от базы (MySQL сортирует их), поэтому форма сверяется по значению.
+    expect($values['faq'][0]['extras'])->toEqual([['type' => 'note', 'note' => ['text' => 'Заранее']]])
+        ->and($values['content'][0])->toEqual(['type' => 'plans', 'plans' => ['title' => 'Базовый', 'items' => [['name' => 'Осмотр', 'price' => '500', 'about' => null]]]]);
 
     mcp()->tool(UpdateRecord::class, ['resource' => 'site-pages', 'id' => (string) $page->id, 'values' => ['faq' => $values['faq'], 'content' => $values['content']]])
         ->assertHasNoErrors();
