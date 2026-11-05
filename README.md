@@ -58,42 +58,42 @@ Open `https://example.com/fastleo` and log in.
 A section is a class in `app/Fastleo` on top of an ordinary model and table. Create the model and the migration, migrate, then generate a stub with fields based on the table columns; adjust the labels and the icon — you will get something like this:
 
 ```bash
-php artisan make:model Doctor -m                       # model and migration: add the columns, then migrate
+php artisan make:model Product -m                      # model and migration: add the columns, then migrate
 php artisan migrate
-php artisan fastleo:make-resource Doctor --generate    # app/Fastleo/DoctorResource.php
+php artisan fastleo:make-resource Product --generate   # app/Fastleo/ProductResource.php
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 namespace App\Fastleo;
 
-use App\Models\Doctor;
+use App\Models\Product;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
 
-final class DoctorResource extends Resource
+final class ProductResource extends Resource
 {
-    protected static string $model = Doctor::class;
+    protected static string $model = Product::class;
 
-    protected static ?string $label = 'Doctors';
+    protected static ?string $label = 'Products';
 
-    protected static ?string $singular = 'Doctor';
+    protected static ?string $singular = 'Product';
 
-    protected static string $icon = 'stethoscope';
+    protected static string $icon = 'package';
 
     public function fields(): array
     {
         return [
             Text::make('name', 'Name')->required()->searchable()->sortable(),
-            Text::make('specialty', 'Specialty'),
+            Text::make('sku', 'SKU'),
             Toggle::make('is_active', 'Show on the site'),
         ];
     }
 }
 ```
 
-The section appears in the menu and opens at `/fastleo/doctors`. The fields must be in the model's `$fillable`.
+The section appears in the menu and opens at `/fastleo/products`. The fields must be in the model's `$fillable`.
 
 Check the result with `php artisan fastleo:doctor` — it reports mistakes in sections and site setup ([commands](docs/claude.md#команды)). Without a Policy on the model, any admin has full access to the section ([authorization](docs/authorization.md)).
 
