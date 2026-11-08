@@ -26,11 +26,13 @@ describe('a saved value that is not among the options', function (): void {
     it('stays selected in the form of a list, a multiple list and radio buttons', function (): void {
         $this->article->update(['layout' => 'archive']);
 
-        $this->get(route('fastleo.resources.edit', ['saved-options', $this->article->id]))
+        $html = (string) $this->get(route('fastleo.resources.edit', ['saved-options', $this->article->id]))
             ->assertOk()
             ->assertSee('<option value="legacy" selected>legacy</option>', false)
-            ->assertSee('<option value="old" selected>old</option>', false)
-            ->assertSee('value="archive"', false);
+            ->assertSee('value="archive"', false)
+            ->getContent();
+
+        expect($html)->toMatch('/value="old"\s+class="sr-only"\s+checked\s*>\s*<svg[^>]*>.*?<\/svg>\s*<span>old<\/span>/s');
     });
 
     it('survives saving the record without changes', function (): void {

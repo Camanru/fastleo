@@ -41,7 +41,7 @@ final class PathGuard
      * Путь внутри корня (сам корень тоже подходит) или null.
      *
      * ```php
-     * PathGuard::inside('uploads/doctors');   // 'uploads/doctors'
+     * PathGuard::inside('uploads/products');  // 'uploads/products'
      * PathGuard::inside('uploads/../.env');   // null
      * ```
      */
@@ -67,11 +67,12 @@ final class PathGuard
     }
 
     /**
-     * Все сегменты непустые, без `.`/`..`, не скрытые, без `\` и управляющих символов.
+     * Все сегменты непустые, без `.`/`..`, не скрытые, без `\`, управляющих и невидимых символов Unicode (`\p{C}`:
+     * U+200B, U+202E, U+FEFF… — на них Flysystem отвечает исключением, то есть 500) и без неверного UTF-8.
      */
     private static function validSegments(string $path): bool
     {
-        if (str_contains($path, '\\') || preg_match('/[\x00-\x1F\x7F]/', $path) === 1) {
+        if (str_contains($path, '\\') || preg_match('/\p{C}/u', $path) !== 0) {
             return false;
         }
 

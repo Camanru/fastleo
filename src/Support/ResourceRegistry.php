@@ -26,8 +26,8 @@ use Symfony\Component\Finder\Finder;
  * из кеша `bootstrap/cache/fastleo.php` (`php artisan fastleo:cache`, входит в `optimize`).
  *
  * ```php
- * Fastleo::resources()->all();          // ['doctors' => DoctorResource::class, ...]
- * Fastleo::resources()->find('doctors'); // объект DoctorResource или null
+ * Fastleo::resources()->all();          // ['products' => ProductResource::class, ...]
+ * Fastleo::resources()->find('products'); // объект ProductResource или null
  * ```
  */
 final class ResourceRegistry
@@ -42,11 +42,12 @@ final class ResourceRegistry
     public const array BUILT_IN = ['fastleo.notifications.bots', 'fastleo.publishing.channels', 'fastleo.publishing.publications'];
 
     /**
-     * Адреса, которые админка занимает сама или займёт на следующих этапах, — их нельзя брать ресурсу.
+     * Адреса, которые админка занимает сама, и `up` — проверка работы сайта Laravel (иначе при админке на корне
+     * домена её адрес достался бы разделам). Их нельзя брать ресурсу.
      */
     public const array RESERVED_SLUGS = [
         'login', 'logout', 'dashboard', 'files', 'search', 'settings', 'pages', 'logs', 'notifications',
-        'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica',
+        'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica', 'up',
     ];
 
     /**
@@ -392,6 +393,12 @@ final class ResourceRegistry
                 }
             }
 
+            $order = $class::defaultOrder();
+
+            if ($order !== null && ! $this->isValidOrder($order)) {
+                throw new LogicException($this->message('resource_default_order', ['class' => $class]));
+            }
+
             if (isset($resources[$slug]) && in_array($class, $builtIn, true)) {
                 continue;
             }
@@ -445,7 +452,8 @@ final class ResourceRegistry
     }
 
     /**
-     * Первый зарегистрированный раздел модели или null: куда вести ссылку на связанную запись.
+     * Первый зарегистрированный раздел модели или null: куда вести ссылку на связанную запись, когда права не важны.
+     * Права на связанные записи проверяются по всем разделам модели (`allForModel()`).
      *
      * ```php
      * Fastleo::resources()->forModel(Category::class);   // CategoryResource
@@ -465,6 +473,32 @@ final class ResourceRegistry
     }
 
     /**
+     * Все зарегистрированные разделы модели в порядке регистрации (у одной модели их может быть несколько:
+     * «Статьи» и «Новости»; встроенные «Администраторы» идут последними).
+     *
+     * ```php
+     * Fastleo::resources()->allForModel(Article::class);   // [ArticleResource, NewsResource]
+     * ```
+     *
+     * @param  class-string<Model>  $model
+     * @return list<Resource>
+     */
+    public function allForModel(string $model): array
+    {
+        $resources = [];
+
+        foreach ($this->all() as $slug => $class) {
+            $resource = $class::model() === $model ? $this->find($slug) : null;
+
+            if ($resource instanceof Resource) {
+                $resources[] = $resource;
+            }
+        }
+
+        return $resources;
+    }
+
+    /**
      * Ресурс модели-дерева (с `$treeColumn`) для класса модели или null.
      *
      * @param  class-string<Model>  $model
@@ -478,6 +512,23 @@ final class ResourceRegistry
         }
 
         return null;
+    }
+
+    /**
+     * `$defaultOrder` ресурса сайта — ровно `[колонка, 'asc'|'desc']` (регистр направления не важен). Колонка — имя,
+     * имя с таблицей и базой (`categories.name`, `shop.categories.name`) или ключ JSON-колонки (`data->title`,
+     * `data->first-name`, `data->items[0]`): так её принимала и прежняя версия.
+     *
+     * Значение пишет разработчик сайта, типам PHPDoc доверять нельзя: проверка на `mixed`.
+     */
+    private function isValidOrder(mixed $order): bool
+    {
+        return is_array($order)
+            && array_keys($order) === [0, 1]
+            && is_string($order[0])
+            && preg_match('/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*){0,2}(?:->[\w-]+(?:\[\d+\])*)*$/', $order[0]) === 1
+            && is_string($order[1])
+            && in_array(strtolower($order[1]), ['asc', 'desc'], true);
     }
 
     /**

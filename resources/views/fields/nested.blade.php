@@ -62,6 +62,8 @@
         >
             @if ($writable)
                 <input type="hidden" name="{{ $name }}" value="">
+                {{-- Ключи строк при открытии формы: удаляются только они, строку другого администратора устаревшая форма не стирает. --}}
+                <input type="hidden" name="{{ $field->seenInputName() }}" value="{{ $field->seenInputValue($children->map(fn ($child) => (string) $child->getKey())->implode(',')) }}">
             @endif
             <div x-ref="list" class="flex flex-col gap-3">
                 @foreach ($blocks as $block)

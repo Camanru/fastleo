@@ -13,7 +13,7 @@ beforeEach(function (): void {
 it('adds repeater items and key value rows and saves them', function (): void {
     $page = signInAndVisit(route('fastleo.resources.create', 'site-pages'));
 
-    $page->fill('input[name="title[ru]"]', 'О клинике')
+    $page->fill('input[name="title[ru]"]', 'О магазине')
         ->click('[data-blocks=faq] [data-block-add]')
         ->click('[data-blocks=faq] [data-block-add]')
         ->fill('[data-blocks=faq] [data-block]:nth-child(1) input[name$="[question]"]', 'Первый')
@@ -40,10 +40,10 @@ it('switches the language tabs of a translatable field', function (): void {
         ->assertVisible('input[name="title[en]"]')
         ->fill('input[name="title[en]"]', 'About')
         ->click('[data-translatable=title] [data-locale=ru]')
-        ->fill('input[name="title[ru]"]', 'О клинике')
+        ->fill('input[name="title[ru]"]', 'О магазине')
         ->press('Сохранить')
         ->assertSee('Сохранено')
         ->assertNoJavaScriptErrors();
 
-    expect(Page::query()->firstOrFail()->only('title', 'slug'))->toBe(['title' => ['ru' => 'О клинике', 'en' => 'About'], 'slug' => 'o-klinike']);
+    expect(Page::query()->firstOrFail()->only('title', 'slug'))->toBe(['title' => ['ru' => 'О магазине', 'en' => 'About'], 'slug' => 'o-magazine']);
 });

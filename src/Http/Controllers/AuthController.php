@@ -60,7 +60,10 @@ final class AuthController
 
         $user = UserLookup::byEmail($email);
 
-        $account = $user instanceof Authenticatable ? 'id:'.$this->identifierOf($user) : $email;
+        // Найденный пользователь — по номеру, остальные — по хешу введённого адреса. Сам адрес в ключе нельзя: Laravel схлопывает
+        // в нём «á» в «a», и по ответу «слишком много попыток» можно было бы узнать, что «admin@» есть, а «ádmin@» — нет; а адрес
+        // вида «id:1» попадал бы в счётчик настоящего пользователя.
+        $account = $user instanceof Authenticatable ? 'id:'.$this->identifierOf($user) : 'email:'.hash('sha256', $email);
 
         $seconds = $throttle->availableIn($account, $ip) ?? $throttle->hit($account, $ip);
 

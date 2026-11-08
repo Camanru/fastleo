@@ -252,7 +252,7 @@ final class TelegramBot extends Bot
             return is_array($result) ? $result : [];
         }
 
-        throw $this->failure($response);
+        throw $this->failure($response, true);
     }
 
     /**
@@ -277,19 +277,21 @@ final class TelegramBot extends Bot
             return is_array($result) ? $result : [];
         }
 
-        throw $this->failure($response);
+        throw $this->failure($response, $sending);
     }
 
     /**
-     * Ошибка из ответа Telegram: описание или код ответа; при 429 — сколько ждать.
+     * Ошибка из ответа Telegram: описание или код ответа; при 429 — сколько ждать. Сбой сервера (5xx) при отправке
+     * сообщения не значит, что оно не дошло: повтор мог бы продублировать пост.
      */
-    private function failure(Response $response): MessengerFailed
+    private function failure(Response $response, bool $sending): MessengerFailed
     {
         $description = $response->json('description');
         $retryAfter = $response->json('parameters.retry_after');
 
         return new MessengerFailed(
             $this->clean(is_string($description) ? $description : 'HTTP '.$response->status()),
+            uncertain: $sending && $response->serverError(),
             retryAfter: is_int($retryAfter) ? $retryAfter : null,
         );
     }

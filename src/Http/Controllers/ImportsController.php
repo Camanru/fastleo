@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Http\Controllers;
 
+use Fastleo\Exports\SpreadsheetFormats;
 use Fastleo\Fastleo;
 use Fastleo\Imports\Import;
 use Fastleo\Imports\ImportRecords;
@@ -23,7 +24,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 final class ImportsController
 {
     /**
-     * `POST /fastleo/{resource}/import` с файлом `file` (xlsx или csv): сохранить файл на закрытый диск,
+     * `POST /fastleo/{resource}/import` с файлом `file` (csv; xlsx — только если он включён настройкой `fastleo.xlsx`): сохранить файл на закрытый диск,
      * записать импорт и запустить задачу. Право на загрузку — метод `import` Policy, если он есть,
      * иначе `viewAny`; каждая строка дополнительно проверяет `create`/`update`.
      */
@@ -34,7 +35,7 @@ final class ImportsController
         abort_unless(Authorization::allowsOwnOr('import', 'viewAny', $resource), 403);
 
         $request->validate(
-            ['file' => ['required', 'file', 'extensions:xlsx,csv', 'max:'.max(1, config()->integer('fastleo.import.max_size', 10240))]],
+            ['file' => ['required', 'file', 'extensions:'.implode(',', SpreadsheetFormats::all()), 'max:'.max(1, config()->integer('fastleo.import.max_size', 10240))]],
             attributes: ['file' => __('fastleo::imports.file')],
         );
 
@@ -79,7 +80,7 @@ final class ImportsController
     }
 
     /**
-     * `GET /fastleo/{resource}/imports/{import}/errors` — xlsx со всеми пропущенными строками импорта
+     * `GET /fastleo/{resource}/imports/{import}/errors` — csv со всеми пропущенными строками импорта
      * (столбцы исходного файла и «Ошибка»). Только тому, кто загрузил файл; файла нет — 404.
      */
     public function errors(string $resource, string $import): StreamedResponse
@@ -87,7 +88,7 @@ final class ImportsController
         $record = $this->own($this->resource($resource), $import);
         abort_unless($record->status === 'done' && Import::disk()->exists($record->errorsPath()), 404);
 
-        return Import::disk()->download($record->errorsPath(), pathinfo($record->file_name, PATHINFO_FILENAME).'-errors.xlsx');
+        return Import::disk()->download($record->errorsPath(), pathinfo($record->file_name, PATHINFO_FILENAME).'-errors.csv');
     }
 
     /**
@@ -124,8 +125,8 @@ final class ImportsController
 
         Import::query()
             ->where('created_at', '<', now()->subDays(max(1, config()->integer('fastleo.import.keep_days', 30))))
-            ->each(function (Import $old) use ($disk): void {
-                $disk->delete([$old->path, $old->errorsPath()]);
+            ->eachById(function (Import $old) use ($disk): void {
+                $disk->delete($old->files());
                 $old->delete();
             });
     }

@@ -9,22 +9,22 @@ use Workbench\App\Models\Category;
 
 it('uploads into the folder of the field inside the uploads root', function (): void {
     expect(Image::make('photo')->uploadFolder())->toBe('uploads')
-        ->and(Image::make('photo')->directory('/doctors/')->uploadFolder())->toBe('uploads/doctors')
-        ->and(Image::make('photo')->directory('doctors/2026-photos')->uploadFolder())->toBe('uploads/doctors/2026-photos');
+        ->and(Image::make('photo')->directory('/products/')->uploadFolder())->toBe('uploads/products')
+        ->and(Image::make('photo')->directory('products/2026-photos')->uploadFolder())->toBe('uploads/products/2026-photos');
 });
 
 it('refuses a folder name that the file manager would not create', function (string $directory): void {
     Image::make('photo')->directory($directory);
 })->throws(LogicException::class)->with([
-    'capital letters' => ['Doctors'],
-    'underscore' => ['doctor_photos'],
+    'capital letters' => ['Products'],
+    'underscore' => ['product_photos'],
     'parent folder' => ['../secret'],
-    'empty segment' => ['doctors//photos'],
+    'empty segment' => ['products//photos'],
 ]);
 
 it('suggests the right folder name in the message', function (): void {
-    expect(fn (): Image => Image::make('photo')->directory('Doctor_Photos/2026'))
-        ->toThrow(LogicException::class, 'doctor-photos/2026');
+    expect(fn (): Image => Image::make('photo')->directory('Product_Photos/2026'))
+        ->toThrow(LogicException::class, 'product-photos/2026');
 });
 
 it('takes only pictures for images and the allowed extensions for files', function (): void {
@@ -37,9 +37,9 @@ it('takes only pictures for images and the allowed extensions for files', functi
 });
 
 it('opens the picker in the folder of the field or of the current file', function (): void {
-    $image = Image::make('photo')->directory('doctors');
+    $image = Image::make('photo')->directory('products');
 
-    expect($image->pickerUrl())->toBe(route('fastleo.files.index', ['picker' => 'field', 'accept' => 'images', 'folder' => 'uploads/doctors']))
+    expect($image->pickerUrl())->toBe(route('fastleo.files.index', ['picker' => 'field', 'accept' => 'images', 'folder' => 'uploads/products']))
         ->and($image->pickerUrl('uploads/a.jpg'))->toBe(route('fastleo.files.index', ['picker' => 'field', 'accept' => 'images', 'current' => 'uploads/a.jpg']))
         ->and(File::make('price')->pickerUrl(multiple: true))->toBe(route('fastleo.files.index', ['picker' => 'field', 'multiple' => '1', 'folder' => 'uploads']));
 });

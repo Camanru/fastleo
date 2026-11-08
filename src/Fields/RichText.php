@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Fastleo\Fields;
 
 use Closure;
+use Fastleo\Fastleo;
 use Fastleo\Files\FileTypes;
+use Fastleo\Support\Html\DepthLimitedParser;
 use Fastleo\Support\HtmlSanitizer;
 use Fastleo\Support\ValidationMessages;
 use Illuminate\Contracts\Support\Htmlable;
@@ -114,14 +116,46 @@ class RichText extends Field
         return is_string($value) ? $this->sanitize($value) : null;
     }
 
+    /**
+     * `required`; у записи, у которой сохранён текст, слишком сложный для редактора, поле можно не присылать: форма его
+     * не отправляет (`resources/views/fields/rich-text.blade.php`), и обязательное поле иначе нельзя было бы сохранить.
+     * Присланное пустое значение при этом по-прежнему отклоняется: `sometimes` проверяет поле, только если оно прислано.
+     *
+     * @return string|list<string>
+     */
+    #[Override]
+    protected function presenceRule(?Model $record): string|array
+    {
+        if (! $this->required) {
+            return 'nullable';
+        }
+
+        $stored = $record?->getAttribute($this->name);
+
+        return is_string($stored) && HtmlSanitizer::tooComplex($stored) ? ['sometimes', 'required'] : 'required';
+    }
+
     #[Override]
     protected function typeRules(): array
     {
         return [
+            // Дальше текст разбирается (дважды-трижды за запрос), поэтому слишком длинный и слишком сложный отсекается первым.
+            'bail',
             'string',
             'max:'.HtmlSanitizer::MAX_LENGTH,
+            // Тысячи вложенных тегов роняют PHP-процесс в санитайзере, а тысячи лишних тегов занимают воркер: такой текст отклоняется до очистки.
+            function (string $attribute, mixed $value, Closure $fail): void {
+                if (is_string($value) && HtmlSanitizer::tooComplex($value)) {
+                    $fail(__('fastleo::resources.rich_text_too_complex', ['depth' => DepthLimitedParser::MAX_DEPTH, 'tags' => number_format(DepthLimitedParser::MAX_TAGS, 0, ',', ' '), 'attributes' => number_format(DepthLimitedParser::MAX_ATTRIBUTES, 0, ',', ' ')], Fastleo::LOCALE));
+                }
+            },
             // Текст из одних пробелов и пустых тегов (`<p>&nbsp;</p>`) после очистки пуст: обязательное поле остаётся незаполненным.
+            // У многоязычного обязателен только основной язык: в остальных языках пустой текст допустим.
             ...($this->isRequired() ? [function (string $attribute, mixed $value, Closure $fail): void {
+                if ($this->translatable && ! str_ends_with($attribute, '.'.Fastleo::locales()[0])) {
+                    return;
+                }
+
                 if (is_string($value) && trim($value) !== '' && $this->sanitize($value) === null) {
                     $fail(ValidationMessages::line('required'));
                 }

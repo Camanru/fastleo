@@ -23,7 +23,7 @@ final class FileName
      * Имя файла для сохранения.
      *
      * ```php
-     * FileName::sanitize('Фото врача.JPG'); // 'foto-vracha.jpg'
+     * FileName::sanitize('Фото товара.JPG'); // 'foto-tovara.jpg'
      * ```
      */
     public static function sanitize(string $original): string

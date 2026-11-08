@@ -46,19 +46,26 @@
         @if ($resource::isExportable() && \Fastleo\Support\Authorization::allowsOwnOr('export', 'viewAny', $resource))
             @php
                 $exportQuery = \Illuminate\Support\Arr::except(request()->query(), ['page', 'per_page', 'parent', 'resource', 'format']);
+                $exportFormats = \Fastleo\Exports\SpreadsheetFormats::all();
             @endphp
+            @if (count($exportFormats) === 1)
+                <x-fastleo::button icon="download" :href="route('fastleo.resources.export', ['resource' => $slug, ...$exportQuery, 'format' => $exportFormats[0]])">
+                    {{ __('fastleo::resources.export') }}
+                </x-fastleo::button>
+            @else
             <div x-data="fastleoMenu" @keydown.escape="menu = false" @click.outside="menu = false" @scroll.window="place()">
                 <x-fastleo::button icon="download" x-ref="button" x-on:click="toggle()" x-bind:aria-expanded="menu" aria-haspopup="menu">
                     {{ __('fastleo::resources.export') }}
                 </x-fastleo::button>
                 <div x-show="menu" x-cloak role="menu" :style="style" class="fixed z-40 w-48 rounded-[10px] border border-line bg-surface p-1 text-base shadow-pop">
-                    @foreach (\Fastleo\Exports\Exporter::FORMATS as $format)
+                    @foreach ($exportFormats as $format)
                         <a role="menuitem" href="{{ route('fastleo.resources.export', ['resource' => $slug, ...$exportQuery, 'format' => $format]) }}" class="flex h-8 items-center rounded-[6px] px-2 hover:bg-hover" x-on:click="menu = false">
                             {{ __('fastleo::resources.export_'.$format) }}
                         </a>
                     @endforeach
                 </div>
             </div>
+            @endif
         @endif
 
         @if ($resource::isImportable() && ! $trashed && \Fastleo\Support\Authorization::allowsOwnOr('import', 'viewAny', $resource))

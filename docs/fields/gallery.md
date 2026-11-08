@@ -1,19 +1,19 @@
 # Gallery
 
-Несколько картинок из [файлового менеджера](../files.md) с ручным порядком: фото клиники, галерея работ.
+Несколько картинок из [файлового менеджера](../files.md) с ручным порядком: фото товара, галерея работ.
 
 ```php
 use Fastleo\Fields\Gallery;
 
-Gallery::make('photos', 'Фото клиники')
-    ->directory('clinic')
+Gallery::make('photos', 'Фото товара')
+    ->directory('products')
     ->max(20);
 ```
 
 **Колонка:** `$table->json('photos')->nullable()` и **обязательно** каст в модели `'photos' => 'array'`. Без каста сохранение остановится с понятной ошибкой. Хранится массив путей в порядке формы:
 
 ```json
-["uploads/clinic/hall.jpg", "uploads/clinic/room-1.jpg"]
+["uploads/products/kettle-front.jpg", "uploads/products/kettle-side.jpg"]
 ```
 
 **Проверка:** массив; каждый путь — внутри корня загрузок (`fastleo.files.root`, по умолчанию `uploads`; [файлы](../files.md#настройка)), с расширением картинки; не больше `max()`.
@@ -31,7 +31,7 @@ Gallery::make('photos', 'Фото клиники')
 **Вывод на сайте:**
 
 ```blade
-@foreach ($clinic->photos ?? [] as $photo)
+@foreach ($product->photos ?? [] as $photo)
     <x-fastleo::picture :src="$photo" preset="photo" alt="" sizes="(min-width: 768px) 33vw, 100vw" />
 @endforeach
 ```
@@ -39,7 +39,7 @@ Gallery::make('photos', 'Фото клиники')
 | Метод | Что делает |
 |---|---|
 | `max(20)` | Наибольшее число картинок (без `max()` — 100) |
-| `directory('clinic')` | Папка внутри корня загрузок для загруженных в поле файлов. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `directory('products')` | Папка внутри корня загрузок для загруженных в поле файлов. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `products/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
 | `extensions(['jpg', 'webp'])` | Только эти форматы (из разрешённых картинок) |
 | `variants('photo')` | WebP-варианты для сайта размеров из `fastleo.images.presets` ([files.md](../files.md#картинки-для-сайта-варианты-и-x-fastleopicture)) |
 

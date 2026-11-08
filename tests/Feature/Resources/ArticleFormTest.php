@@ -23,7 +23,7 @@ function articlePayload(array $overrides = []): array
 {
     return [
         'type' => 'news',
-        'title' => 'Открытие клиники',
+        'title' => 'Открытие магазина',
         'excerpt' => "Первая строка\nвторая строка",
         'status' => 'review',
         'views' => '15',
@@ -94,12 +94,16 @@ it('shows saved values in the edit form in the admin time zone', function (): vo
     $this->post(route('fastleo.resources.store', 'articles'), articlePayload());
     $article = Article::query()->sole();
 
-    $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+    $html = (string) $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
         ->assertOk()
         ->assertSee('value="2026-03-08T12:30"', false)
         ->assertSee('value="09:00"', false)
-        ->assertSee('<option value="sale" selected', false)
-        ->assertSee('<option value="review" selected', false);
+        ->assertSee('<option value="review" selected', false)
+        ->getContent();
+
+    // Метки — плашки-галочки: выбранная отмечена, остальные нет.
+    expect($html)->toMatch('/name="tags\[\]"\s+value="sale"\s+class="sr-only"\s+checked/')
+        ->and($html)->toMatch('/name="tags\[\]"\s+value="guide"\s+class="sr-only"\s*>/');
 });
 
 it('clears a multiple select and unchecks a toggle', function (): void {

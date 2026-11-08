@@ -10,6 +10,7 @@ use Fastleo\Tests\Fixtures\Policies\NoListProductPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Gate;
@@ -19,7 +20,8 @@ use Illuminate\Testing\TestResponse;
 use OpenSpout\Common\Entity\Cell;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
-use OpenSpout\Reader\XLSX\Reader;
+use OpenSpout\Reader\CSV\Options as CsvOptions;
+use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
@@ -32,6 +34,8 @@ use Workbench\App\Models\User;
 beforeEach(function (): void {
     useFixtureResources('Imports');
     Storage::fake('local');
+    // xlsx в админке отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
+    config(['fastleo.xlsx' => true]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });
 
@@ -154,6 +158,46 @@ it('skips empty rows silently and reports unknown columns', function (): void {
         ->toBe(['processed' => 2, 'created' => 2, 'skipped' => 0, 'unknown_columns' => ['Взлом']]);
 });
 
+it('names the row of the bad one as Excel numbers it when the file has empty rows', function (): void {
+    importFile(xlsxFile([
+        ['Заголовок', 'Просмотры'],
+        ['Первая', 1],
+        ['', ''],
+        ['', ''],
+        ['Отрицательная', -1],
+    ]));
+
+    expect(lastImport()->errors)->toBe([['row' => 5, 'message' => 'Поле «Просмотры» должно быть не меньше 0.']])
+        ->and(Article::query()->pluck('title')->all())->toBe(['Первая']);
+});
+
+it('names the row of the bad one in a csv with empty lines, too', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок;Просмотры\nПервая;1\n\n\nОтрицательная;-1\n"));
+
+    expect(lastImport()->errors)->toBe([['row' => 5, 'message' => 'Поле «Просмотры» должно быть не меньше 0.']]);
+});
+
+it('takes the first filled row for the header when the file starts with empty rows', function (): void {
+    importFile(xlsxFile([[''], [''], ['Заголовок', 'Просмотры'], ['Первая', -1]]));
+
+    expect(lastImport()->errors)->toBe([['row' => 4, 'message' => 'Поле «Просмотры» должно быть не меньше 0.']]);
+});
+
+it('counts only filled rows against the limit, not the empty ones in the file', function (): void {
+    config(['fastleo.import.max_rows' => 2]);
+
+    importFile(xlsxFile([['Заголовок'], ['Раз'], [''], [''], [''], ['Два'], ['Три']]));
+
+    expect(lastImport()->message)->toBe('Обработаны первые 2 строк — остальные не загружены.')
+        ->and(Article::query()->pluck('title')->all())->toBe(['Раз', 'Два']);
+});
+
+it('fails a file of empty rows only as a file without columns', function (): void {
+    importFile(xlsxFile([[''], ['']]));
+
+    expect(lastImport()->status)->toBe('failed');
+});
+
 it('keeps the list of unknown columns in the report short', function (): void {
     $headers = ['Заголовок', ...array_map(fn (int $number): string => 'Лишний '.$number.str_repeat('я', 200), range(1, 60))];
 
@@ -191,6 +235,16 @@ it('matches records by its own key, creates missing ones at the end of the order
         ->and(Category::query()->where('code', 'promo')->value('sort'))->toBe(3);
 });
 
+it('does not create a duplicate of a record that exists but is outside the section', function (): void {
+    Category::factory()->create(['code' => 'secret', 'title' => 'Скрытая']);
+
+    importFile(xlsxFile([['Код', 'Название'], ['secret', 'Дубль'], ['promo', 'Акции']]), 'categories');
+
+    expect(lastImport()->only('created', 'updated'))->toBe(['created' => 1, 'updated' => 0])
+        ->and(lastImport()->errors)->toBe([['row' => 2, 'message' => 'Запись с ключом secret есть, но раздел её не показывает (она в корзине или вне выборки раздела): строка не загружена, чтобы не создать дубль.']])
+        ->and(Category::query()->where('code', 'secret')->count())->toBe(1);
+});
+
 it('does not create an empty record for a row that has only a key nobody has', function (): void {
     Category::factory()->create(['code' => 'news', 'title' => 'Старое', 'sort' => 1]);
 
@@ -221,6 +275,18 @@ it('explains a database error of a row and a save cancelled by the model', funct
 
     expect(lastImport()->only('created', 'skipped'))->toBe(['created' => 1, 'skipped' => 2])
         ->and(array_column(lastImport()->errors ?? [], 'row'))->toBe([2, 3]);
+});
+
+it('writes only the first database failures of an import to the error log, not one for every row', function (): void {
+    Article::saving(function (): never {
+        throw new UniqueConstraintViolationException('testing', 'insert', [], new PDOException('UNIQUE constraint failed'));
+    });
+    Exceptions::fake();
+
+    importFile(xlsxFile([['Заголовок'], ...array_map(fn (int $number): array => ['Строка '.$number], range(1, 8))]));
+
+    expect(lastImport()->only('created', 'skipped'))->toBe(['created' => 0, 'skipped' => 8]);
+    Exceptions::assertReportedCount(3);
 });
 
 it('keeps text that is longer than an excel cell when its own export comes back', function (): void {
@@ -320,6 +386,58 @@ it('takes the first of two columns with the same header', function (): void {
     importFile(xlsxFile([['Заголовок', 'Заголовок', 'Просмотры'], ['Первый', 'Второй', 3]]));
 
     expect(Article::query()->pluck('title')->all())->toBe(['Первый']);
+});
+
+it('refuses a csv with a line wider than the last column of Excel, which would take the memory of the worker', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок;Просмотры\nПервая;1\n".str_repeat(';', 16_385)."\n"));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'В таблице слишком много столбцов (в строке больше 16384 ячеек). Оставьте только нужные столбцы или разделите файл.'])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('lets through a csv with a long text that has many commas in one cell', function (): void {
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок,Просмотры\n\"".str_repeat('слово, ', 3000)."\",5\n"));
+
+    expect(lastImport()->status)->toBe('done');
+});
+
+it('refuses a csv record that is wider than the last column of Excel and is spread over many lines of the file by quoted line breaks', function (): void {
+    // Одна запись из 16 385 полей, в каждом перевод строки: в любой строке файла один разделитель, а читалка отдаёт одну строку из всех полей.
+    $record = implode(',', array_fill(0, 16_385, "\"\n\""));
+
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок,Просмотры\n".$record."\n"));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'В таблице слишком много столбцов (в строке больше 16384 ячеек). Оставьте только нужные столбцы или разделите файл.'])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('refuses a csv record whose line breaks sit in fields that the reader does not take for quoted, behind a stray quote', function (): void {
+    // Кавычка в середине поля без кавычек — обычный символ: читалка не считает её началом поля, а запись по-прежнему продолжается на следующей строке.
+    $line = 'x"y'.str_repeat(',', 9000).",\"\n\"";
+    $record = implode(',', array_fill(0, 3, $line));
+
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок,Просмотры\n".$record."\n"));
+
+    expect((string) lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('checks a csv with a byte order mark and a byte that is not utf-8 by the bytes the reader sees, which does not skip the mark in Windows-1251', function (): void {
+    // Для проверки это одно поле в кавычках; читалка в режиме Windows-1251 оставляет метку в данных, и кавычка уже не в начале поля.
+    $content = "\xEF\xBB\xBF\"".str_repeat(',', 20_000)."\"\xFF\n";
+
+    importFile(UploadedFile::fake()->createWithContent('import.csv', $content));
+
+    expect((string) lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('lets through a csv with line breaks, doubled quotes and thousands of commas inside quoted fields', function (): void {
+    $text = '"'.str_repeat("слово, \"\"цитата\"\",\n", 9000).'"';
+
+    importFile(UploadedFile::fake()->createWithContent('import.csv', "Заголовок,Просмотры\n".$text.",5\nВторая,6\n"));
+
+    // Защита пропустила файл; первая строка не прошла проверку длины заголовка, вторая сохранена.
+    expect(lastImport()->status)->toBe('done')
+        ->and(Article::query()->pluck('title')->all())->toBe(['Вторая']);
 });
 
 it('does not split a one-column csv at a semicolon in the text', function (): void {
@@ -568,6 +686,397 @@ it('adds up the unpacked size of all files of the archive and allows a megabyte 
     expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл слишком большой после распаковки (больше 1 МБ). Разделите его на части.']);
 });
 
+it('runs the rows of a worker as the uploader in the guard and the language of the form', function (): void {
+    Queue::fake();
+    importFile(xlsxFile([['Заголовок'], ['Одна']]));
+    $import = lastImport();
+    $seen = [];
+    Article::creating(function () use (&$seen): void {
+        $seen = ['user' => auth()->id(), 'locale' => app()->getLocale()];
+    });
+    // Воркер очереди: ни guard админки, ни её языка по умолчанию нет.
+    Auth::shouldUse('web');
+    app()->setLocale('en');
+
+    new ImportRecords($import->id)->handle();
+
+    expect($import->fresh()?->status)->toBe('done')
+        ->and($seen)->toBe(['user' => (int) $import->user_id, 'locale' => 'ru'])
+        ->and(Auth::getDefaultDriver())->toBe('web')
+        ->and(app()->getLocale())->toBe('en');
+});
+
+/**
+ * Архив xlsx с одним листом, написанным вручную: читалка дойдёт до него, только если защита его пропустит.
+ */
+function xlsxWithSheet(string $sheet, string $entry = 'xl/worksheets/sheet1.xml'): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString($entry, $sheet);
+    $zip->close();
+
+    return new UploadedFile($path, 'sheet.xlsx', null, null, true);
+}
+
+const SHEET_NAMESPACE = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+
+it('refuses a sheet with a row of thousands of empty cells that would keep the worker busy for hours', function (): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1">'.str_repeat('<c/>', 1001).'</row></sheetData></worksheet>'));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'В таблице слишком много столбцов (в строке больше 1000 ячеек). Оставьте только нужные столбцы или разделите файл.'])
+        ->and(Article::query()->count())->toBe(0);
+});
+
+it('counts the cells of every row separately and reads a row of exactly the limit', function (): void {
+    $row = fn (int $number): string => '<row r="'.$number.'">'.str_repeat('<c/>', 1000).'</row>';
+
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData>'.$row(1).$row(2).'</sheetData></worksheet>'));
+
+    // Защита пропустила: дальше таблицу не открывает читалка (в архиве нет книги), а не защита.
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('refuses a row that claims a span of hundreds of millions of columns', function (): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="1:900000000"><c r="A1"/></row></sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('reads the span the way the sheet reader does, so no spelling of a huge number gets past the guard', function (string $spans): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="'.$spans.'"><c r="A1"/></row></sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+})->with([
+    'an exponent' => '1:9e8',
+    'a plus sign' => '1:+900000000',
+    'a space after the colon' => '1: 900000000',
+    'a space at the end' => '1:900000000 ',
+]);
+
+it('checks every part of the archive, whatever its extension: the sheet is taken by the path from the workbook relations', function (): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="1:900000000"><c r="A1"/></row></sheetData></worksheet>', 'xl/worksheets/sheet1.dat'));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('refuses a row far beyond the last row of Excel: the reader would hand over every empty row in between', function (): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"><c r="A1"/></row><row r="9000000000000"><c r="A1"/></row></sheetData></worksheet>'));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'В таблице больше строк, чем вмещает Excel (1 048 576), или строка стоит дальше последней. Проверьте файл.']);
+});
+
+it('refuses more rows than Excel holds even when the rows carry no numbers, and allows the last row itself', function (): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData>'.str_repeat('<row/>', 1_048_577).'</sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toContain('больше строк, чем вмещает Excel');
+
+    // Защита пропустила: дальше таблицу не открывает читалка (в архиве нет книги), а не защита.
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1048576"><c r="A1"/></row></sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('refuses a cell far beyond the last column of Excel and allows the last column itself', function (string $address, bool $refused): void {
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="1:16384"><c r="'.$address.'"/></row></sheetData></worksheet>'));
+
+    expect(str_contains((string) lastImport()->message, 'слишком много столбцов'))->toBe($refused);
+})->with([
+    'the last column' => ['XFD1', false],
+    'one past the last column' => ['XFE1', true],
+    'four letters' => ['AAAA1', true],
+    'a column with no row number' => ['B', false],
+    'an address that is not a cell address' => ['1', false],
+]);
+
+it('looks for rows in any xml file and by the local name of the element', function (): void {
+    importFile(xlsxWithSheet('<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><x:sheetData><x:row>'.str_repeat('<x:c/>', 1001).'</x:row></x:sheetData></x:worksheet>', 'xl/anywhere/else.xml'));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('does not take the entries of the calculation chain for the cells of a row, however many there are', function (): void {
+    importFile(xlsxWithSheet('<calcChain '.SHEET_NAMESPACE.'>'.str_repeat('<c r="A1" i="1"/>', 50_000).'</calcChain>', 'xl/calcChain.xml'));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+/**
+ * Архив xlsx с настоящей книгой и одним листом под любым именем: читалка откроет лист, если защита его пропустит.
+ */
+function xlsxWithWorkbook(string $sheet, string $entry = 'worksheets/sheet1.xml'): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>');
+    $zip->addFromString('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    $zip->addFromString('xl/workbook.xml', '<workbook '.SHEET_NAMESPACE.' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="'.$entry.'"/></Relationships>');
+    $zip->addFromString('xl/'.$entry, $sheet);
+    $zip->close();
+
+    return new UploadedFile($path, 'book.xlsx', null, null, true);
+}
+
+it('checks a sheet whose name has a hash in it: the archive opens such a part and the sheet reader takes it by the path from the relations', function (): void {
+    importFile(xlsxWithWorkbook('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="1:900000000"><c r="A1"/></row></sheetData></worksheet>', 'worksheets/s#1.xml'));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+});
+
+it('imports a sheet whose name has a hash in it', function (): void {
+    $cell = fn (string $address, string $text): string => '<c r="'.$address.'" t="inlineStr"><is><t>'.$text.'</t></is></c>';
+
+    importFile(xlsxWithWorkbook('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1">'.$cell('A1', 'Заголовок').'</row><row r="2">'.$cell('A2', 'Из листа с решёткой').'</row></sheetData></worksheet>', 'worksheets/s#1.xml'));
+
+    expect(lastImport()->status)->toBe('done')
+        ->and(Article::query()->pluck('title')->all())->toBe(['Из листа с решёткой']);
+});
+
+it('refuses cells outside of a row in numbers that keep the reader busy: each one copies the cells of the row so far', function (): void {
+    $sheet = fn (string $address): string => '<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"><c r="A1"/></row>'.str_repeat('<c r="'.$address.'"/>', 125_000).'<row r="2"><c r="A2"/></row></sheetData></worksheet>';
+
+    importFile(xlsxWithWorkbook($sheet('XFD1')));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Таблица слишком тяжёлая для чтения: в ней слишком много ячеек, широких строк или лишних столбцов. Оставьте только нужные данные или разделите файл.']);
+
+    // Те же ячейки в первом столбце копируют один элемент: это не нагрузка.
+    importFile(xlsxWithWorkbook($sheet('A1')));
+
+    expect(lastImport()->message)->not->toContain('слишком тяжёлая');
+});
+
+it('refuses many rows that claim the widest span with a single cell: the reader fills the whole width in every row', function (): void {
+    $sheet = fn (int $rows): string => '<worksheet '.SHEET_NAMESPACE.'><sheetData>'.str_repeat('<row spans="1:16384"><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>', $rows).'</sheetData></worksheet>';
+
+    importFile(xlsxWithWorkbook($sheet(25_000)));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+
+    importFile(xlsxWithWorkbook($sheet(1000)));
+
+    expect(lastImport()->message)->not->toContain('слишком тяжёлая');
+});
+
+it('counts the sheet dimension as the width of every row, as the reader does, and refuses a dimension beyond the last column', function (): void {
+    $sheet = fn (string $reference, int $rows): string => '<worksheet '.SHEET_NAMESPACE.'><dimension ref="'.$reference.'"/><sheetData>'.str_repeat('<row><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>', $rows).'</sheetData></worksheet>';
+
+    importFile(xlsxWithWorkbook($sheet('A1:XFD25000', 25_000)));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+
+    importFile(xlsxWithWorkbook($sheet('A1:ZZZZZZZZ1', 1)));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+
+    importFile(xlsxWithWorkbook($sheet('A1:C3', 3)));
+
+    expect(lastImport()->message)->not->toContain('слишком');
+
+    importFile(xlsxWithWorkbook($sheet('A1', 3)));
+
+    expect(lastImport()->message)->not->toContain('слишком');
+});
+
+it('counts a cell without an address the way the sheet reader does, one column to the right of the previous one, even outside any row', function (): void {
+    $cells = fn (int $count): string => '<worksheet '.SHEET_NAMESPACE.'><sheetData>'.str_repeat('<c t="inlineStr"><is><t>a</t></is></c>', $count).'</sheetData></worksheet>';
+
+    // Без адреса читалка кладёт каждую следующую ячейку в новый столбец, копируя весь массив: время растёт как квадрат числа ячеек.
+    importFile(xlsxWithWorkbook($cells(16_385)));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+
+    // Защита пропустила: дальше таблицу не открывает читалка (в архиве нет книги), а не защита.
+    importFile(xlsxWithSheet($cells(16_384)));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('starts counting the cells without an address from the first column again in every row', function (): void {
+    $row = fn (int $number): string => '<row r="'.$number.'">'.str_repeat('<c/>', 1000).'</row>';
+
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData>'.implode('', array_map($row, range(1, 20))).'</sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('reads the dimension of the sheet the way the sheet reader does: capital letters only, and a later one that is not a range changes nothing', function (): void {
+    $sheet = fn (string $dimensions, int $rows): string => '<worksheet '.SHEET_NAMESPACE.'>'.$dimensions.'<sheetData>'.str_repeat('<row spans="1:1"><c r="A1" t="inlineStr"><is><t>x</t></is></c></row>', $rows).'</sheetData></worksheet>';
+
+    // Читалка видит в «a1:b2 A1:XFE9» только второй диапазон (буквы в нижнем регистре она пропускает), а не первый.
+    importFile(xlsxWithWorkbook($sheet('<dimension ref="a1:b2 A1:XFE9"/>', 1)));
+
+    expect(lastImport()->message)->toContain('слишком много столбцов');
+
+    // Второй `<dimension>` без диапазона читалка пропускает: ширина остаётся от первого.
+    importFile(xlsxWithWorkbook($sheet('<dimension ref="A1:XFD1"/><dimension ref="A1"/>', 25_000)));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+});
+
+/**
+ * Архив xlsx без книги, в оглавлении которого одно имя встречается много раз (`ZipArchive` так не умеет: он заменяет запись,
+ * поэтому архив собирается вручную). `zip://` отдаёт первую запись с этим именем.
+ */
+function zipWithDuplicateNames(string $name, string $first, int $duplicates): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $entries = [$first, ...array_fill(0, $duplicates, '<worksheet/>')];
+    $archive = '';
+    $directory = '';
+
+    foreach ($entries as $data) {
+        $header = pack('VvvvvvVVVvv', 0x04034B50, 20, 0, 0, 0, 0x21, crc32($data), strlen($data), strlen($data), strlen($name), 0).$name;
+        $directory .= pack('VvvvvvvVVVvvvvvVV', 0x02014B50, 20, 20, 0, 0, 0, 0x21, crc32($data), strlen($data), strlen($data), strlen($name), 0, 0, 0, 0, 0, strlen($archive)).$name;
+        $archive .= $header.$data;
+    }
+
+    file_put_contents($path, $archive.$directory.pack('VvvvvVVv', 0x06054B50, 0, 0, count($entries), count($entries), strlen($directory), strlen($archive), 0));
+
+    return new UploadedFile($path, 'duplicates.xlsx', null, null, true);
+}
+
+it('reads each name of the archive once, however many entries repeat it: the archive opens the first one, so repeats only make the guard read it again', function (): void {
+    $sheet = '<worksheet '.SHEET_NAMESPACE.'><sheetData>'.str_repeat('<c r="A1"/>', 30_000).'</sheetData></worksheet>';
+
+    // 30 000 ячеек стоят около 6 · 10⁶, четыреста чтений одной записи — 2,4 · 10⁹, больше предела.
+    importFile(zipWithDuplicateNames('xl/worksheets/sheet1.xml', $sheet, 400));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('refuses a single cell or a single shared string split into a huge number of text runs: the reader goes through them in a time that grows as their square', function (): void {
+    $runs = fn (int $count): string => str_repeat('<r><t/></r>', $count);
+
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"><c r="A1" t="inlineStr"><is>'.$runs(70_000).'</is></c></row></sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+
+    importFile(xlsxWithSheet('<sst '.SHEET_NAMESPACE.'><si>'.$runs(70_000).'</si></sst>', 'xl/sharedStrings.xml'));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+});
+
+/**
+ * Архив xlsx с настоящей книгой, перед которой лежит лишняя часть: читалка её не открывает, а защита читает все части.
+ */
+function xlsxWithDecoy(string $decoy, string $sheet): UploadedFile
+{
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('customXml/item1.xml', $decoy);
+    $zip->addFromString('[Content_Types].xml', '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>');
+    $zip->addFromString('_rels/.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    $zip->addFromString('xl/workbook.xml', '<workbook '.SHEET_NAMESPACE.' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="S" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>');
+    $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
+    $zip->close();
+
+    return new UploadedFile($path, 'book.xlsx', null, null, true);
+}
+
+it('does not let a negative span of one part cancel the estimate of the work for the sheet that follows it', function (): void {
+    $heavy = '<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"><c r="A1" t="inlineStr"><is>'.str_repeat('<r><t/></r>', 70_000).'</is></c></row></sheetData></worksheet>';
+
+    importFile(xlsxWithDecoy('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1" spans="1:-2000000000000000000"><c r="A1"/></row></sheetData></worksheet>', $heavy));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+});
+
+it('refuses an archive of thousands of entries before reading any of them: each entry costs the guard a new opening of the archive', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+
+    foreach (range(1, 1001) as $number) {
+        $zip->addFromString('docProps/part'.$number.'.xml', '<a/>');
+    }
+
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'many.xlsx', null, null, true));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+});
+
+it('refuses a workbook of hundreds of sheets or relations: the reader goes through all the relations again for every sheet', function (string $book): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/workbook.xml', '<workbook '.SHEET_NAMESPACE.' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'.($book === 'sheets' ? str_repeat('<sheet name="S" sheetId="1" r:id="rId1"/>', 257) : '<sheet name="S" sheetId="1" r:id="rId1"/>').'</sheets></workbook>');
+    $zip->addFromString('xl/_rels/workbook.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.str_repeat('<Relationship Id="rId1" Type="x" Target="worksheets/sheet1.xml"/>', $book === 'relations' ? 1001 : 1).'</Relationships>');
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'book.xlsx', null, null, true));
+
+    expect(lastImport()->message)->toContain('слишком тяжёлая');
+})->with(['sheets', 'relations']);
+
+it('does not count the relations of a sheet: a sheet with thousands of hyperlinks is an ordinary table', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/worksheets/_rels/sheet1.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'.str_repeat('<Relationship Id="rId1" Type="x" Target="https://example.com" TargetMode="External"/>', 5000).'</Relationships>');
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'links.xlsx', null, null, true));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('lets through cells and shared strings with as many text runs as a real document has', function (): void {
+    $runs = str_repeat('<r><t>слово </t></r>', 2000);
+
+    importFile(xlsxWithSheet('<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"><c r="A1" t="inlineStr"><is>'.$runs.'</is></c></row></sheetData></worksheet>'));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+
+    importFile(xlsxWithSheet('<sst '.SHEET_NAMESPACE.'>'.str_repeat('<si>'.$runs.'</si>', 20).'</sst>', 'xl/sharedStrings.xml'));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
+it('stops an import whose file takes too long to read, and keeps the rows written before that', function (): void {
+    config(['fastleo.import.max_read_seconds' => 0.001]);
+    $cell = fn (string $address, string $text): string => '<c r="'.$address.'" t="inlineStr"><is><t>'.$text.'</t></is></c>';
+    $rows = '<row r="1">'.$cell('A1', 'Заголовок').'</row>';
+
+    foreach (range(2, 400) as $number) {
+        $rows .= '<row r="'.$number.'">'.$cell('A'.$number, 'Статья '.$number).'</row>';
+    }
+
+    importFile(xlsxWithWorkbook('<worksheet '.SHEET_NAMESPACE.'><sheetData>'.$rows.'</sheetData></worksheet>'));
+
+    expect(lastImport()->only('status', 'message'))->toBe(['status' => 'failed', 'message' => 'Файл читается слишком долго (больше 0.001 с) — импорт остановлен, уже записанные строки остались. Оставьте только нужные данные или разделите файл.'])
+        ->and(Article::query()->count())->toBeLessThan(399);
+});
+
+it('lets through a wide table of thousands of rows that stays within the budget', function (): void {
+    $row = fn (int $number): string => '<row r="'.$number.'">'.implode('', array_map(fn (int $column): string => '<c r="'.chr(64 + intdiv($column, 26)).chr(65 + $column % 26).$number.'" t="inlineStr"><is><t>x</t></is></c>', range(26, 125))).'</row>';
+
+    importFile(xlsxWithWorkbook('<worksheet '.SHEET_NAMESPACE.'><sheetData>'.implode('', array_map($row, range(1, 2000))).'</sheetData></worksheet>'));
+
+    expect(lastImport()->message)->not->toContain('слишком');
+});
+
+it('does not fail on an empty row or an entry the archive cannot give', function (): void {
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-zip').'.xlsx';
+    $zip = new ZipArchive();
+    $zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+    $zip->addFromString('xl/worksheets/sheet1.xml', '<worksheet '.SHEET_NAMESPACE.'><sheetData><row r="1"/><row r="2"><c r="A2"/></row></sheetData></worksheet>');
+    $zip->addFromString('xl/worksheets/broken.xml', '<worksheet><sheetData><row><c></worksheet>');
+    $zip->addFromString('xl/secret.xml', '<a/>');
+    $zip->setEncryptionName('xl/secret.xml', ZipArchive::EM_AES_256, 'password');
+    $zip->close();
+
+    importFile(new UploadedFile($path, 'odd.xlsx', null, null, true));
+
+    expect(lastImport()->message)->toBe('Файл не читается: нужен xlsx или csv.');
+});
+
 it('fails an import that crashed and reports the error', function (): void {
     Queue::fake();
     importFile(xlsxFile([['Заголовок'], ['Одна']]));
@@ -602,13 +1111,13 @@ it('tells the uploader in the bell when the import could not be made', function 
 });
 
 /**
- * Строки xlsx-файла на диске.
+ * Строки csv-файла на диске (разделитель «;», как у выгрузки).
  *
  * @return list<list<mixed>>
  */
-function xlsxRows(string $path): array
+function csvRows(string $path): array
 {
-    $reader = new Reader();
+    $reader = new CsvReader(new CsvOptions(FIELD_DELIMITER: ';'));
     $reader->open($path);
     $rows = [];
 
@@ -625,6 +1134,21 @@ function xlsxRows(string $path): array
     return $rows;
 }
 
+it('stops writing the file of skipped rows when it grows past a limit of cells, and says so in its last row', function (): void {
+    // Заголовок в 16 тысяч столбцов: каждая пропущенная строка занимает в файле тысячи ячеек, а строк до 50 000.
+    $header = 'Заголовок;Просмотры;'.implode(';', array_map(fn (int $number): string => 'c'.$number, range(1, 16_000)));
+    $path = tempnam(sys_get_temp_dir(), 'fastleo-csv').'.csv';
+    file_put_contents($path, $header."\n".str_repeat(";-1\n", 400));
+    importFile(new UploadedFile($path, 'wide.csv', null, null, true));
+    $import = lastImport();
+    // Файл читается строками, а не читалкой таблиц: пять миллионов ячеек она разбирала бы несколько секунд.
+    $lines = file(Storage::disk('local')->path($import->errorsPath()), FILE_IGNORE_NEW_LINES) ?: [];
+
+    expect($import->skipped)->toBe(400)
+        ->and(count($lines))->toBeLessThan(400)
+        ->and(end($lines))->toContain('Файл неполный: дальше пропущенные строки не записаны (слишком много ячеек). Исправьте эти строки и загрузите файл снова.');
+});
+
 it('keeps every skipped row with its reason in a file for the author', function (): void {
     $rows = [['Заголовок', 'Просмотры', 'Статус']];
 
@@ -636,27 +1160,28 @@ it('keeps every skipped row with its reason in a file for the author', function 
     $rows[] = ['=1+1', -1, 'draft'];
     importFile(xlsxFile($rows, 'статьи.xlsx'));
     $import = lastImport();
-    $file = xlsxRows(Storage::disk('local')->path($import->errorsPath()));
+    $file = csvRows(Storage::disk('local')->path($import->errorsPath()));
 
+    // Файл csv: числа читаются строками, а текст, похожий на формулу, начинается с «'» (при загрузке файла обратно он снимается).
     expect($import->skipped)->toBe(Import::MAX_ERRORS + 6)
         ->and($import->errors)->toHaveCount(Import::MAX_ERRORS)
         ->and($file)->toHaveCount(Import::MAX_ERRORS + 7)
         ->and($file[0])->toBe(['Заголовок', 'Просмотры', 'Статус', 'Ошибка'])
-        ->and($file[1])->toBe(['', 1, 'draft', 'Заполните поле «Заголовок».'])
-        ->and(end($file))->toBe(['=1+1', -1, 'draft', 'Поле «Просмотры» должно быть не меньше 0.'])
+        ->and($file[1])->toBe(['', '1', 'draft', 'Заполните поле «Заголовок».'])
+        ->and(end($file))->toBe(["'=1+1", '-1', 'draft', 'Поле «Просмотры» должно быть не меньше 0.'])
         ->and($import->progress()['errors_file'])->toBeTrue();
 
     $this->get(route('fastleo.resources.imports.show', ['articles', $import->id]))->assertOk();
     $this->get(route('fastleo.resources.imports.errors', ['articles', $import->id]))
         ->assertOk()
-        ->assertDownload('stati-errors.xlsx');
+        ->assertDownload('stati-errors.csv');
 });
 
 it('puts the reason into its own column when a row of the file is shorter or longer than the header', function (): void {
     $path = tempnam(sys_get_temp_dir(), 'fastleo-csv').'.csv';
     file_put_contents($path, "Заголовок;Просмотры;Статус\n;5\n;7;draft;лишнее\n");
     importFile(new UploadedFile($path, 'short.csv', null, null, true));
-    $file = xlsxRows(Storage::disk('local')->path(lastImport()->errorsPath()));
+    $file = csvRows(Storage::disk('local')->path(lastImport()->errorsPath()));
 
     expect(lastImport()->skipped)->toBe(2)
         ->and($file[0])->toBe(['Заголовок', 'Просмотры', 'Статус', 'Ошибка'])
@@ -678,7 +1203,7 @@ it('removes the temporary file with skipped rows when the import crashes halfway
         ->filter(fn (string $file): bool => filemtime($file) >= $started)
         ->filter(function (string $file): bool {
             try {
-                return in_array('leak-marker-9f3a', array_merge(...xlsxRows($file)), true);
+                return in_array('leak-marker-9f3a', array_merge(...csvRows($file)), true);
             } catch (Throwable) {
                 return false;
             }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo;
 
 use Fastleo\Auth\LoginHistory;
+use Fastleo\Auth\UserCleanup;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Console\CacheCommand;
 use Fastleo\Console\ClearCommand;
@@ -133,6 +134,11 @@ final class FastleoServiceProvider extends ServiceProvider
                 SchedulerPulse::beat();
             }
         });
+        Event::listen('eloquent.deleted: *', function (string $event, array $payload): void {
+            if (($payload[0] ?? null) instanceof Model) {
+                UserCleanup::forget($payload[0]);
+            }
+        });
         Event::listen(['eloquent.saved: *', 'eloquent.deleted: *', 'eloquent.restored: *'], function (string $event, array $payload): void {
             if (($payload[0] ?? null) instanceof Model) {
                 Sitemap::touched($payload[0]);
@@ -217,6 +223,10 @@ final class FastleoServiceProvider extends ServiceProvider
             ];
         });
 
+        // Установка нового пароля по токену из письма: только по IP. Токен длинный и случайный, поэтому часовой лимит по адресу здесь
+        // не защищает, а мешает владельцу: десять запросов ссылки на его адрес закрыли бы ему и ввод нового пароля.
+        RateLimiter::for('fastleo-password-reset', fn (Request $request): Limit => Limit::perMinute(5)->by('fastleo-password-reset-ip:'.$request->ip()));
+
         // Лимиты по администратору (а не по IP): перебор текущего пароля в профиле и проверки связи с внешними сервисами.
         $adminKey = function (Request $request): string {
             $user = $request->user(Fastleo::GUARD);
@@ -225,6 +235,8 @@ final class FastleoServiceProvider extends ServiceProvider
         };
 
         RateLimiter::for('fastleo-profile', fn (Request $request): Limit => Limit::perMinute(5)->by('fastleo-profile:'.$adminKey($request)));
+        // Выгрузка и загрузка таблиц: тяжёлые запросы (потоковый экспорт, разбор файла), по администратору.
+        RateLimiter::for('fastleo-transfer', fn (Request $request): Limit => Limit::perMinute(10)->by('fastleo-transfer:'.$adminKey($request)));
         RateLimiter::for('fastleo-integrations', fn (Request $request): Limit => Limit::perMinute(10)->by('fastleo-integrations:'.$adminKey($request)));
     }
 

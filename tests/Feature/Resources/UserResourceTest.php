@@ -6,7 +6,9 @@ use Fastleo\Auth\TwoFactor;
 use Fastleo\Fastleo;
 use Fastleo\Resources\UserResource;
 use Fastleo\Resources\Users\AdminAccess;
+use Fastleo\Resources\Users\EmailAvailable;
 use Fastleo\Resources\Users\UserGuard;
+use Fastleo\Tests\Fixtures\Models\ScopedUser;
 use Fastleo\Tests\Fixtures\Policies\SelfOnlyUserPolicy;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
@@ -83,6 +85,17 @@ it('keeps the password when it is left empty and changes it when filled', functi
 
     $this->put(route('fastleo.resources.update', ['users', $boris->id]), adminForm());
     expect(Hash::check('secret-pass-1', $boris->refresh()->password))->toBeTrue();
+});
+
+it('does not set a password of spaces: it skips the length rule and the confirmation', function (): void {
+    $boris = admin(['email' => 'boris@example.com']);
+
+    $this->put(route('fastleo.resources.update', ['users', $boris->id]), adminForm(['password' => '        ', 'password_confirmation' => 'other']))
+        ->assertSessionHasNoErrors();
+    expect(Hash::check('password', $boris->refresh()->password))->toBeTrue();
+
+    $this->post(route('fastleo.resources.store', 'users'), adminForm(['email' => 'new@example.com', 'password' => '        ', 'password_confirmation' => '        ']))
+        ->assertSessionHasErrors('password');
 });
 
 it('hides the password field on the own record and ignores a posted one', function (): void {
@@ -277,4 +290,12 @@ it('says that the address is taken instead of asking for a valid address', funct
 
     $this->post(route('fastleo.resources.store', 'users'), adminForm(['email' => 'BORIS@example.com']))
         ->assertSessionHasErrors(['email' => 'Такое значение поля «Email» уже есть.']);
+});
+
+it('counts a user hidden by a global scope of the model as holding the address', function (): void {
+    User::factory()->create(['name' => 'Призрак', 'email' => 'taken@example.com']);
+
+    $validator = Validator::make(['email' => 'Taken@Example.com'], ['email' => [new EmailAvailable(ScopedUser::class, null)]]);
+
+    expect($validator->fails())->toBeTrue();
 });

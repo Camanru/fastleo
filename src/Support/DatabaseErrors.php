@@ -20,8 +20,11 @@ final class DatabaseErrors
      * ```php
      * DatabaseErrors::explain($exception); // 'Не удалось сохранить: такое значение уже есть у другой записи.'
      * ```
+     *
+     * Сбой попадает в журнал ошибок; `$report = false` — когда вызов повторяется для тысяч записей (импорт) и одинаковая
+     * ошибка заполнила бы журнал.
      */
-    public static function explain(QueryException $exception): string
+    public static function explain(QueryException $exception, bool $report = true): string
     {
         $state = $exception->errorInfo[0] ?? $exception->getCode();
         $state = is_scalar($state) ? (string) $state : '';
@@ -35,7 +38,9 @@ final class DatabaseErrors
             default => 'other',
         };
 
-        report($exception);
+        if ($report) {
+            report($exception);
+        }
 
         $columns = $reason === 'unique' ? self::uniqueColumns($exception) : null;
 

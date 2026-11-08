@@ -38,7 +38,7 @@ function fakeTelegramChannelCheck(array $rights = [], string $status = 'administ
 {
     Http::fake([
         'api.telegram.org/*/getMe' => Http::response(['ok' => true, 'result' => ['id' => 777, 'username' => 'site_bot']]),
-        'api.telegram.org/*/getChat' => Http::response(['ok' => true, 'result' => ['id' => -1001234567890, 'type' => $type, 'title' => 'Новости клиники']]),
+        'api.telegram.org/*/getChat' => Http::response(['ok' => true, 'result' => ['id' => -1001234567890, 'type' => $type, 'title' => 'Новости магазина']]),
         'api.telegram.org/*/getChatMember' => Http::response(['ok' => true, 'result' => [
             'status' => $status,
             ...['can_post_messages' => true, 'can_edit_messages' => true, 'can_delete_messages' => true, ...$rights],
@@ -53,7 +53,7 @@ it('checks the bot in the channel and saves the permanent number and the title',
 
     $channel = Channel::query()->sole();
     expect($channel->chat_id)->toBe('-1001234567890')
-        ->and($channel->name)->toBe('Новости клиники')
+        ->and($channel->name)->toBe('Новости магазина')
         ->and($channel->token)->toBe(TELEGRAM_TOKEN)
         ->and((string) DB::table('fastleo_channels')->value('token'))->not->toContain('AAAAAAAAAAAA');
 

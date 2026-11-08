@@ -47,10 +47,12 @@ final class ResourceInspector
 
     /**
      * Описание раздела. Если раздел описан с ошибкой, вместо полей вернётся ключ `error` с текстом.
+     * `$forAdmin` — описание для вошедшего администратора (MCP): без полей и фильтров, скрытых от него (`hidden()`);
+     * `fastleo:inspect` описывает всё, как есть.
      *
      * @return array<string, mixed>
      */
-    public function resource(Resource $resource): array
+    public function resource(Resource $resource, bool $forAdmin = false): array
     {
         $info = [
             'slug' => $resource::slug(),
@@ -84,8 +86,8 @@ final class ResourceInspector
                 'import_key' => $resource::importKey(),
                 'mcp' => $resource->isAvailableInMcp(),
                 'poll' => $resource::poll(),
-                'fields' => $this->fields($resource->schema()->fields()),
-                'filters' => array_values(array_map($this->filter(...), $resource->allFilters())),
+                'fields' => $this->fields($forAdmin ? array_values(array_filter($resource->schema()->fields(), fn (Field $field): bool => ! $field->isHidden())) : $resource->schema()->fields()),
+                'filters' => array_values(array_map($this->filter(...), $forAdmin ? $resource->listFilters() : $resource->allFilters())),
                 'actions' => array_values(array_map($this->action(...), $resource->listActions())),
                 'relations' => array_values(array_map($this->related(...), $resource->listRelations())),
             ];

@@ -5,6 +5,9 @@
 #
 #   composer test:databases
 #
+# Прогоны идут одновременно, а `Storage::fake()` кладёт файлы в одну и ту же папку `storage/framework/testing/disks`:
+# без отдельного `TEST_TOKEN` (Laravel добавляет его к имени папки) прогоны стирают друг у друга загруженные файлы.
+#
 # Параметры подключения переопределяются переменными окружения (значения по умолчанию — локальные серверы).
 # Базы `fastleo_test` пересоздаются тестами: рабочие базы здесь не указывать.
 
@@ -16,12 +19,12 @@ log_dir="$(mktemp -d)"
 suite=(vendor/bin/pest --exclude-testsuite=Browser)
 
 run_mysql() {
-    DB_CONNECTION=mysql DB_HOST="${MYSQL_HOST:-127.0.0.1}" DB_PORT="${MYSQL_PORT:-3306}" DB_DATABASE="${MYSQL_DATABASE:-fastleo_test}" \
+    TEST_TOKEN=mysql DB_CONNECTION=mysql DB_HOST="${MYSQL_HOST:-127.0.0.1}" DB_PORT="${MYSQL_PORT:-3306}" DB_DATABASE="${MYSQL_DATABASE:-fastleo_test}" \
         DB_USERNAME="${MYSQL_USERNAME:-root}" DB_PASSWORD="${MYSQL_PASSWORD:-root}" "${suite[@]}" >"$log_dir/mysql.log" 2>&1
 }
 
 run_pgsql() {
-    DB_CONNECTION=pgsql DB_HOST="${PGSQL_HOST:-127.0.0.1}" DB_PORT="${PGSQL_PORT:-5432}" DB_DATABASE="${PGSQL_DATABASE:-fastleo_test}" \
+    TEST_TOKEN=pgsql DB_CONNECTION=pgsql DB_HOST="${PGSQL_HOST:-127.0.0.1}" DB_PORT="${PGSQL_PORT:-5432}" DB_DATABASE="${PGSQL_DATABASE:-fastleo_test}" \
         DB_USERNAME="${PGSQL_USERNAME:-$USER}" DB_PASSWORD="${PGSQL_PASSWORD:-}" "${suite[@]}" >"$log_dir/pgsql.log" 2>&1
 }
 

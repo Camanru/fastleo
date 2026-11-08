@@ -509,11 +509,11 @@ protected static int $position = 10; // меньше — выше
 Укажите имя любой иконки из набора [Lucide](https://lucide.dev/icons) в `$icon`.
 
 ```php
-// app/Fastleo/DoctorResource.php
-protected static string $icon = 'stethoscope';
+// app/Fastleo/ProductResource.php
+protected static string $icon = 'shopping-bag';
 ```
 
-В своих шаблонах иконка выводится компонентом `<x-fastleo::icon name="stethoscope" />`. Неизвестное имя даёт исключение со ссылкой на список. Подробнее — [иконки](../configuration.md#иконки).
+В своих шаблонах иконка выводится компонентом `<x-fastleo::icon name="shopping-bag" />`. Неизвестное имя даёт исключение со ссылкой на список. Подробнее — [иконки](../configuration.md#иконки).
 
 ### Как убрать раздел из меню, оставив его доступным по адресу?
 
@@ -538,7 +538,7 @@ public static function inMenu(): bool
 ```php
 // config/fastleo.php
 'brand' => [
-    'name' => 'Стоматология',
+    'name' => 'Мой сайт',
     'logo' => '/images/admin-logo.svg',
     'color' => '#0ea5e9',
 ],

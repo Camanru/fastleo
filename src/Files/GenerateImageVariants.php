@@ -13,7 +13,7 @@ use Illuminate\Queue\Attributes\Tries;
  * С очередью выполняется в фоне, без неё (`sync`) — сразу после сохранения записи.
  *
  * ```php
- * GenerateImageVariants::dispatch('uploads/doctors/ivanov.jpg', ['card', 'hero'])->afterCommit();
+ * GenerateImageVariants::dispatch('uploads/products/kettle.jpg', ['card', 'hero'])->afterCommit();
  * ```
  */
 #[Tries(2)]

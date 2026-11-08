@@ -118,10 +118,10 @@ final class FastleoMessage
                 'danger' => 'error',
                 default => 'info',
             })
-            ->greeting($this->plain($this->title));
+            ->greeting(self::plain($this->title));
 
         if ($this->body !== '') {
-            $mail->line($this->plain($this->body));
+            $mail->line(self::plain($this->body));
         }
 
         if ($this->url !== null) {
@@ -132,9 +132,18 @@ final class FastleoMessage
     }
 
     /**
-     * Текст без разметки Markdown: экранирует `\`, `[` и `]` — без них не получится ни ссылки `[текст](адрес)`, ни картинки.
+     * Текст без разметки Markdown для строк письма: экранирует `\`, `[` и `]` — без них не получится ни ссылки
+     * `[текст](адрес)`, ни картинки. Для всего, что приходит от посетителя сайта (текст заявки, строка браузера):
+     * Laravel разбирает строки письма как Markdown. Знаки `<` и `>` Laravel уже заменяет на `&lt;` и `&gt;`
+     * (автоссылка `<https://адрес>` и теги не работают), поэтому здесь они не трогаются: иначе в письме читалось бы
+     * «&lt;» вместо «<». В текстовой (text/plain) части письма Markdown не разбирается, и знаки там видны с косой
+     * чертой (`\[`): Laravel строит обе части из одних и тех же строк, и развести их можно только своим шаблоном письма.
+     *
+     * ```php
+     * $mail->line(FastleoMessage::plain($lead->message));
+     * ```
      */
-    private function plain(string $text): string
+    public static function plain(string $text): string
     {
         return strtr($text, ['\\' => '\\\\', '[' => '\\[', ']' => '\\]']);
     }

@@ -206,6 +206,35 @@ trait StoresJsonItems
     }
 
     /**
+     * Пути картинок подполей Image и Gallery с их размерами (`variants()`), в том числе во вложенных Repeater и Blocks:
+     * путь → размеры. Для `fastleo:images`, которая пересоздаёт варианты.
+     *
+     * @param  list<Field>  $fields
+     * @param  list<array<array-key, mixed>>  $items  значения элементов
+     * @return array<string, list<string>>
+     */
+    protected static function itemVariantPaths(array $fields, array $items): array
+    {
+        $result = [];
+
+        foreach ($fields as $field) {
+            if ($field instanceof Repeater || $field instanceof Blocks) {
+                $found = $field->variantPathsOf(self::flatItems(array_column($items, $field->name)));
+            } elseif ($field instanceof Image || $field instanceof Gallery) {
+                $found = array_fill_keys(self::paths(array_column($items, $field->name)), $field->getVariants());
+            } else {
+                continue;
+            }
+
+            foreach ($found as $path => $presets) {
+                $result[$path] = array_values(array_unique([...$result[$path] ?? [], ...$presets]));
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Элементы вложенного списка из значений подполя всех внешних элементов — одним списком.
      *
      * @param  array<array-key, mixed>  $values

@@ -60,6 +60,33 @@ describe('report', function (): void {
         expect(reportRow('Очередь')['status'])->toBe('ok');
     });
 
+    it('says that the queue is off instead of failing when QUEUE_CONNECTION is null', function (): void {
+        config(['queue.default' => null]);
+
+        expect(reportRow('Очередь'))->toMatchArray(['value' => 'null', 'status' => 'warning'])
+            ->and(reportRow('Очередь')['hint'])->toContain('отбрасываются');
+    });
+
+    it('warns when the request came through a proxy that Laravel does not trust', function (string $header, string $value): void {
+        request()->headers->set($header, $value);
+
+        $row = reportRow('Адрес посетителя');
+
+        expect($row['status'])->toBe('warning')
+            ->and($row['value'])->toBe('127.0.0.1')
+            ->and($row['hint'])->toContain('trustProxies')->toContain('127.0.0.1');
+    })->with([
+        'cloudflare' => ['CF-Connecting-IP', '203.0.113.7'],
+        'forwarded list' => ['X-Forwarded-For', '203.0.113.7, 10.0.0.9'],
+    ]);
+
+    it('says nothing about proxies without forwarded headers or when the address is the same', function (): void {
+        expect(fn (): array => reportRow('Адрес посетителя'))->toThrow(RuntimeException::class, 'Нет строки Адрес посетителя');
+
+        request()->headers->set('X-Forwarded-For', '127.0.0.1');
+        expect(fn (): array => reportRow('Адрес посетителя'))->toThrow(RuntimeException::class, 'Нет строки Адрес посетителя');
+    });
+
     it('asks for cached config and a real mailer only on production', function (): void {
         config(['mail.default' => 'log']);
         $this->app['env'] = 'local';
@@ -149,6 +176,36 @@ describe('widget', function (): void {
         $response = $this->get(route('fastleo.dashboard'));
 
         $response->assertOk()->assertDontSee('data-status="danger"', false);
+    });
+});
+
+describe('storage link', function (): void {
+    beforeEach(function (): void {
+        // Публичная папка во временной папке: общий каркас Testbench читают параллельные процессы тестов.
+        $this->publicDir = sys_get_temp_dir().'/fastleo-public-'.getmypid().'-'.uniqid();
+        File::ensureDirectoryExists($this->publicDir);
+        $this->app->usePublicPath($this->publicDir);
+    });
+
+    afterEach(function (): void {
+        File::deleteDirectory($this->publicDir);
+    });
+
+    it('warns about a missing public/storage link when the files are on the public disk', function (): void {
+        config(['fastleo.files.disk' => 'public', 'filesystems.disks.public.driver' => 'local']);
+
+        expect(reportRow('Ссылка storage'))->toMatchArray(['status' => 'warning'])
+            ->and(reportRow('Ссылка storage')['hint'])->toContain('storage:link');
+
+        File::ensureDirectoryExists($this->publicDir.'/storage');
+
+        expect(reportRow('Ссылка storage'))->toMatchArray(['status' => 'ok', 'hint' => null]);
+    });
+
+    it('does not ask for the link when the files are not on the public disk', function (): void {
+        config(['fastleo.files.disk' => 's3', 'filesystems.disks.s3' => ['driver' => 's3']]);
+
+        expect(reportRow('Ссылка storage'))->toMatchArray(['status' => 'ok', 'hint' => null]);
     });
 });
 
@@ -264,6 +321,23 @@ describe('clearing the cache', function (): void {
         ]);
 
         expect(CacheCleaner::size())->toBe(700);
+    });
+
+    it('counts the size for the dashboard once a minute and again after clearing', function (): void {
+        file_put_contents($this->sandbox.'/views/a.php', str_repeat('x', 1000));
+        expect(CacheCleaner::cachedSize())->toBe(1000);
+
+        file_put_contents($this->sandbox.'/views/b.php', str_repeat('x', 500));
+        expect(CacheCleaner::cachedSize())->toBe(1000);
+
+        $this->travel(61)->seconds();
+        expect(CacheCleaner::cachedSize())->toBe(1500);
+
+        file_put_contents($this->sandbox.'/views/c.php', str_repeat('x', 100));
+        CacheCleaner::clear();
+        file_put_contents($this->sandbox.'/views/d.php', str_repeat('x', 40));
+
+        expect(CacheCleaner::cachedSize())->toBe(40);
     });
 
     it('clears the cache by POST and reports the freed size', function (): void {

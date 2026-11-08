@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace Fastleo\Auth;
 
 use Fastleo\Fastleo;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
  * Письмо со ссылкой для сброса пароля администратора.
+ *
+ * Не `ShouldQueue`: токен ссылки лежал бы в таблице `jobs` (и в `failed_jobs`) открытым текстом. Контроллер отправляет письмо
+ * после ответа (`defer()`), так что запрос оно не задерживает и без очереди.
  */
-final class ResetPasswordNotification extends Notification implements ShouldQueue
+final class ResetPasswordNotification extends Notification
 {
-    use Queueable;
-
     /**
      * @param  string  $token  токен брокера паролей
      * @param  string  $email  адрес, для которого запрошен сброс
@@ -28,7 +27,6 @@ final class ResetPasswordNotification extends Notification implements ShouldQueu
         private readonly int $minutes,
     ) {
         $this->locale = Fastleo::LOCALE;
-        $this->afterCommit();
     }
 
     /**

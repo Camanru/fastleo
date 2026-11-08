@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Closure;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
@@ -45,6 +46,10 @@ class Code extends Textarea
     #[Override]
     public function listDisplay(Model $record): string|Htmlable|null
     {
+        if ($this->formatUsing instanceof Closure) {
+            return parent::display($record);
+        }
+
         $value = $record->getAttribute($this->name);
 
         return is_string($value) && $value !== '' ? Str::limit($value, 100) : null;

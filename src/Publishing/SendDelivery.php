@@ -15,6 +15,7 @@ use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\NullQueue;
 use Illuminate\Queue\SyncQueue;
 use Illuminate\Support\Facades\Queue as QueueFacade;
@@ -97,7 +98,9 @@ final class SendDelivery implements ShouldQueue
 
             $delivery->update(['status' => 'sent', 'sent_at' => now()]);
         } catch (MessengerFailed $exception) {
-            if ($exception->retryAfter !== null && $this->job !== null && $this->attempts() < 5) {
+            // Задача на очереди sync/deferred/background «возвращается» в никуда: release() у SyncJob ничего не откладывает, и доставка
+            // осталась бы «в очереди» навсегда. Там сбой сразу виден (failed) и повторяется кнопкой.
+            if ($exception->retryAfter !== null && $this->job !== null && ! $this->job instanceof SyncJob && $this->attempts() < 5) {
                 $delivery->update(['status' => 'pending', 'error' => $exception->getMessage()]);
                 $this->release($exception->retryAfter);
 

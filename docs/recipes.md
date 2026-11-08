@@ -352,14 +352,14 @@ Number::make('lat', 'Широта')->min(-90)->max(90)
 
 ## Недельное расписание
 
-День недели и интервалы приёма — `Repeater` из дней, в каждом день `Repeater` из интервалов (два уровня, [подробнее](fields/repeater.md#список-внутри-элемента)).
+День недели и интервалы работы — `Repeater` из дней, в каждом день `Repeater` из интервалов (два уровня, [подробнее](fields/repeater.md#список-внутри-элемента)).
 
 ```php
 use Fastleo\Fields\Repeater;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Time;
 
-Repeater::make('schedule', 'Расписание приёма')
+Repeater::make('schedule', 'Часы работы магазина')
     ->fields([
         Select::make('day', 'День')->required()->options([
             'mon' => 'Понедельник', 'tue' => 'Вторник', 'wed' => 'Среда', 'thu' => 'Четверг',
@@ -375,7 +375,7 @@ Repeater::make('schedule', 'Расписание приёма')
     ->max(7);
 ```
 
-**Колонка:** `$table->json('schedule')->nullable()`, в модели `'schedule' => 'array'`. На сайте: `@foreach ($doctor->schedule ?? [] as $day) {{ $day['day'] }}: @foreach ($day['slots'] ?? [] as $slot) {{ $slot['from'] }}–{{ $slot['to'] }} @endforeach @endforeach`.
+**Колонка:** `$table->json('schedule')->nullable()`, в модели `'schedule' => 'array'`. На сайте: `@foreach ($shop->schedule ?? [] as $day) {{ $day['day'] }}: @foreach ($day['slots'] ?? [] as $slot) {{ $slot['from'] }}–{{ $slot['to'] }} @endforeach @endforeach`.
 
 ## Галерея с подписями
 

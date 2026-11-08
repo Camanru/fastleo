@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Closure;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
@@ -12,7 +13,7 @@ use Override;
 
 /**
  * Текст в разметке Markdown: вкладки «Текст» и «Просмотр». Хранится исходный Markdown;
- * на сайте его выводят через `Str::markdown()` (или `Markdown::render()` — с теми же настройками безопасности).
+ * на сайте его выводят через `Markdown::render()` этого класса (сырой HTML экранируется, опасные ссылки отбрасываются). Голый `Str::markdown()` пропускает сырой HTML и ссылки `javascript:` — это дыра на публичной странице.
  *
  * ```php
  * Markdown::make('body', 'Текст')->rows(15);
@@ -51,7 +52,7 @@ class Markdown extends Textarea
     {
         $value = $record->getAttribute($this->name);
 
-        if ($this->formatUsing instanceof \Closure || ! is_string($value) || $value === '') {
+        if ($this->formatUsing instanceof Closure || ! is_string($value) || $value === '') {
             return parent::display($record);
         }
 
@@ -64,6 +65,10 @@ class Markdown extends Textarea
     #[Override]
     public function listDisplay(Model $record): string|Htmlable|null
     {
+        if ($this->formatUsing instanceof Closure) {
+            return parent::display($record);
+        }
+
         $value = $record->getAttribute($this->name);
 
         return is_string($value) && $value !== '' ? Str::limit($value, 100) : null;

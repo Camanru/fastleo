@@ -38,14 +38,14 @@ it('refuses a column of the alt that another field already uses', function (): v
 })->throws(InvalidArgumentException::class);
 
 it('saves the alt together with the picture and shows it under the picture', function (): void {
-    $this->post(route('fastleo.resources.store', 'articles'), articleData(['cover' => 'uploads/articles/a.jpg', 'cover_alt' => ' Фасад клиники ']))->assertSessionHasNoErrors();
+    $this->post(route('fastleo.resources.store', 'articles'), articleData(['cover' => 'uploads/articles/a.jpg', 'cover_alt' => ' Фасад магазина ']))->assertSessionHasNoErrors();
 
-    expect(Article::query()->firstOrFail()->only('cover', 'cover_alt'))->toBe(['cover' => 'uploads/articles/a.jpg', 'cover_alt' => 'Фасад клиники']);
+    expect(Article::query()->firstOrFail()->only('cover', 'cover_alt'))->toBe(['cover' => 'uploads/articles/a.jpg', 'cover_alt' => 'Фасад магазина']);
 
     $this->get(route('fastleo.resources.edit', ['articles', Article::query()->firstOrFail()->id]))
         ->assertOk()
         ->assertSee('name="cover_alt"', false)
-        ->assertSee('value="Фасад клиники"', false)
+        ->assertSee('value="Фасад магазина"', false)
         ->assertSee('Описание картинки (alt)');
 });
 

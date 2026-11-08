@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Notifications\NotificationBot;
 use Fastleo\Tests\Fixtures\Policies\ReadOnlyBotPolicy;
+use Fastleo\Tests\Fixtures\Policies\UpdateOnlyBotPolicy;
 use Illuminate\Http\Client\Request as HttpRequest;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Http;
@@ -69,6 +70,25 @@ it('does not use the saved token without the right to change the bot', function 
     $bot = notificationBot();
 
     findChats(['messenger' => 'telegram', 'record' => (string) $bot->id])->assertForbidden();
+    Http::assertNothingSent();
+});
+
+it('asks the policy about a saved bot only and does not fail when it needs the bot to answer', function (): void {
+    fakeTelegramChannel();
+    Gate::policy(NotificationBot::class, UpdateOnlyBotPolicy::class);
+    $bot = notificationBot();
+
+    // Нового бота завести нельзя: ответ 403, а не 500 от метода Policy, которому не дали запись.
+    findChats(['messenger' => 'telegram', 'token' => TELEGRAM_TOKEN])->assertForbidden();
+    // Сохранённого бота менять можно: токен из запроса и сохранённый проверяются.
+    findChats(['messenger' => 'telegram', 'token' => TELEGRAM_TOKEN, 'record' => (string) $bot->id])->assertOk()->assertJsonPath('chats.0.id', '-100200300');
+    findChats(['messenger' => 'telegram', 'token' => '', 'record' => (string) $bot->id])->assertOk();
+});
+
+it('answers 404 for a record that is not in the section', function (): void {
+    Http::fake();
+
+    findChats(['messenger' => 'telegram', 'token' => TELEGRAM_TOKEN, 'record' => '99999'])->assertNotFound();
     Http::assertNothingSent();
 });
 

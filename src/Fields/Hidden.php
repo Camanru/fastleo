@@ -15,7 +15,7 @@ use Override;
  * Обычно — значение по умолчанию при создании:
  *
  * ```php
- * Hidden::make('type')->default('news');
+ * Hidden::make('type')->default('news')->rules(['in:news']);
  * ```
  */
 class Hidden extends Field

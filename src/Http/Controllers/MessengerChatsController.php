@@ -32,8 +32,11 @@ final class MessengerChatsController
         $resource = Fastleo::resources()->find($resource);
         abort_unless($resource instanceof Resource, 404);
         Authorization::authorize('viewAny', $resource);
-        // Токен из запроса — чужой ввод для обращения к мессенджеру: проверять чужие токены может тот, кто вправе завести или изменить бота.
-        abort_unless(Authorization::allows('create', $resource) || Authorization::allows('update', $resource), 403);
+
+        $record = $this->record($request, $resource);
+        // Токен из запроса — чужой ввод для обращения к мессенджеру: проверять чужие токены может тот, кто вправе завести бота
+        // или изменить того, для которого открыта форма (Policy `update` спрашивается про запись: без неё её метод не вызвать).
+        abort_unless($record instanceof Model ? Authorization::allows('update', $resource, $record) : Authorization::allows('create', $resource), 403);
 
         $field = $resource->schema()->field($field);
         abort_unless($field instanceof ChatIds && $field->isFormField() && $field->isWritable(), 404);
@@ -47,7 +50,7 @@ final class MessengerChatsController
         $token = trim((string) $request->string('token'));
 
         if ($token === '') {
-            $token = $this->savedToken($request, $resource, $field);
+            $token = $this->savedToken($record, $field);
         }
 
         if ($token === '') {
@@ -74,21 +77,28 @@ final class MessengerChatsController
     }
 
     /**
-     * Токен, сохранённый в записи (`record`): только если админ может её изменять.
+     * Запись, для которой открыта форма (`record`), или null для новой. Ключа, которого нет в разделе, — 404.
      */
-    private function savedToken(Request $request, Resource $resource, ChatIds $field): string
+    private function record(Request $request, Resource $resource): ?Model
     {
         $key = $request->input('record');
 
         if (! is_string($key) || $key === '' || ! RecordKey::valid($resource->newModel(), $key)) {
-            return '';
+            return null;
         }
 
         $record = $resource->newQuery()->whereKey($key)->first();
         abort_unless($record instanceof Model, 404);
-        Authorization::authorize('update', $resource, $record);
 
-        $token = $record->getAttribute($field->getTokenField());
+        return $record;
+    }
+
+    /**
+     * Токен, сохранённый в записи: право её изменять уже проверено.
+     */
+    private function savedToken(?Model $record, ChatIds $field): string
+    {
+        $token = $record?->getAttribute($field->getTokenField());
 
         return is_string($token) ? trim($token) : '';
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Imports;
 
 use Fastleo\Auth\FastleoUser;
+use Fastleo\Exports\SpreadsheetFormats;
 use Fastleo\Fastleo;
 use Fastleo\Notifications\FastleoMessage;
 use Fastleo\Resource;
@@ -13,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
 use Throwable;
 
@@ -43,9 +45,9 @@ final class ImportRecords implements ShouldQueue
             return;
         }
 
-        // Большой файл идёт дольше max_execution_time (при очереди sync; воркер лимита не имеет).
+        // Большой файл идёт дольше max_execution_time (при очереди sync; воркер ограничен #[Timeout]): тот же час, а не бесконечность.
         if (function_exists('set_time_limit')) {
-            set_time_limit(0);
+            set_time_limit(3600);
         }
 
         $import->update(['status' => 'running']);
@@ -58,6 +60,10 @@ final class ImportRecords implements ShouldQueue
         $guard = Fastleo::guard();
         // Задача на воркере живёт дольше одного импорта: вошедшим от имени загрузившего остаёмся только на время работы.
         $previous = $guard->hasUser() ? $guard->user() : null;
+        // Воркер не проходит middleware админки: без этого `auth()` и `__()` в observers и правилах сайта видели бы
+        // другой guard (auth()->id() = null) и язык сайта, а не тот же guard и язык, что у формы.
+        $previousDriver = Auth::getDefaultDriver();
+        $previousLocale = app()->getLocale();
 
         try {
             $resource = Fastleo::resources()->find($import->resource);
@@ -67,16 +73,19 @@ final class ImportRecords implements ShouldQueue
                 throw new ImportFailed(__('fastleo::imports.unavailable', locale: Fastleo::LOCALE));
             }
 
-            $stream = $disk->readStream($import->path);
+            // Формат, который админка не принимает (xlsx при `fastleo.xlsx` = false), не читается и у задания, поставленного в очередь раньше.
+            $stream = in_array($extension, SpreadsheetFormats::all(), true) ? $disk->readStream($import->path) : null;
 
             if (! is_resource($stream) || $local === false) {
-                throw new ImportFailed(__('fastleo::imports.unreadable', locale: Fastleo::LOCALE));
+                throw new ImportFailed(__('fastleo::imports.unreadable', ['formats' => SpreadsheetFormats::label()], Fastleo::LOCALE));
             }
 
             file_put_contents($local, $stream);
             fclose($stream);
 
             $guard->setUser($user);
+            Auth::shouldUse(Fastleo::GUARD);
+            app()->setLocale(Fastleo::LOCALE);
             $this->forgetCachedPermissions($user);
             $importer = new Importer($resource, $import);
             $importer->run($local, $extension);
@@ -98,6 +107,8 @@ final class ImportRecords implements ShouldQueue
             }
 
             $previous instanceof Authenticatable ? $guard->setUser($previous) : $guard->forgetUser();
+            Auth::shouldUse($previousDriver);
+            app()->setLocale($previousLocale);
             $import->finished_at = now();
             $import->save();
             $disk->delete($import->path);
@@ -126,7 +137,7 @@ final class ImportRecords implements ShouldQueue
         $import->message = __('fastleo::imports.crashed', locale: Fastleo::LOCALE);
         $import->finished_at = now();
         $import->save();
-        Import::disk()->delete([$import->path, $import->errorsPath()]);
+        Import::disk()->delete($import->files());
 
         $this->notifyUploader($import);
     }
@@ -142,7 +153,7 @@ final class ImportRecords implements ShouldQueue
     }
 
     /**
-     * Положить xlsx с пропущенными строками рядом с файлом импорта (`Import::errorsPath()`).
+     * Положить csv с пропущенными строками рядом с файлом импорта (`Import::errorsPath()`).
      */
     private function keepSkippedRows(Import $import, ?string $local): void
     {

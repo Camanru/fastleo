@@ -30,7 +30,7 @@ function faqStep(int $n, int $m): string
 it('adds and saves items of a list inside the items of another list', function (): void {
     $page = signInAndVisit(route('fastleo.resources.create', 'site-pages'));
 
-    $page->fill('input[name="title[ru]"]', 'О клинике')
+    $page->fill('input[name="title[ru]"]', 'О магазине')
         ->click('[data-blocks=faq] > div > [data-block-add]')
         ->click('[data-blocks=faq] > div > [data-block-add]')
         ->fill(faqItem(1).' input[name$="[question]"]', 'Первый')
@@ -55,7 +55,7 @@ it('adds and saves items of a list inside the items of another list', function (
 it('moves an inner item without moving the outer one', function (): void {
     $page = signInAndVisit(route('fastleo.resources.create', 'site-pages'));
 
-    $page->fill('input[name="title[ru]"]', 'О клинике')
+    $page->fill('input[name="title[ru]"]', 'О магазине')
         ->click('[data-blocks=faq] > div > [data-block-add]')
         ->fill(faqItem(1).' input[name$="[question]"]', 'Вопрос')
         ->click(faqItem(1).' [data-blocks$=".steps"] > div > [data-block-add]')
@@ -76,7 +76,7 @@ it('moves an inner item without moving the outer one', function (): void {
 it('keeps the key of every nested item apart and removes only the item that was clicked', function (): void {
     $page = signInAndVisit(route('fastleo.resources.create', 'site-pages'));
 
-    $page->fill('input[name="title[ru]"]', 'О клинике')
+    $page->fill('input[name="title[ru]"]', 'О магазине')
         ->click('[data-blocks=faq] > div > [data-block-add]')
         ->fill(faqItem(1).' input[name$="[question]"]', 'Вопрос')
         ->click(faqItem(1).' [data-blocks$=".steps"] > div > [data-block-add]')

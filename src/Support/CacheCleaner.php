@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Finder\Finder;
 
 /**
@@ -19,6 +20,12 @@ use Symfony\Component\Finder\Finder;
  */
 final class CacheCleaner
 {
+    /** Ключ, под которым дашборд помнит размер кеша: обход файлов кеша и шаблонов на каждое открытие главной долог. */
+    private const string SIZE_KEY = 'fastleo.cache-size';
+
+    /** Сколько секунд дашборд не пересчитывает размер. */
+    private const int SIZE_SECONDS = 60;
+
     /**
      * Админу можно очищать кеш: Gate `clearFastleoCache`, если сайт его описал, иначе любому админу (при включённых ролях — только владельцу).
      *
@@ -56,6 +63,14 @@ final class CacheCleaner
     }
 
     /**
+     * Размер для дашборда: пересчитывается не чаще раза в минуту и после очистки кеша.
+     */
+    public static function cachedSize(): int
+    {
+        return Cache::remember(self::SIZE_KEY, self::SIZE_SECONDS, self::size(...));
+    }
+
+    /**
      * Очистить кеш и вернуть, сколько байт освободилось.
      */
     public static function clear(): int
@@ -65,6 +80,8 @@ final class CacheCleaner
         foreach (['cache:clear', 'view:clear', 'fastleo:clear'] as $command) {
             Artisan::call($command);
         }
+
+        Cache::forget(self::SIZE_KEY);
 
         return $size;
     }

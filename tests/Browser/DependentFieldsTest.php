@@ -46,3 +46,24 @@ it('reloads the subcategories when the category changes', function (): void {
 
     expect(Article::query()->sole()->only('category_id', 'subcategory_id'))->toBe(['category_id' => $news->id, 'subcategory_id' => $events->id]);
 });
+
+it('resets a chain of dependent lists: changing the first one clears the second and reloads the third', function (): void {
+    useFixtureResources('DependentChain');
+
+    $page = signInAndVisit(route('fastleo.resources.create', 'chain-articles'));
+    $options = fn (string $field): string => "[...document.querySelectorAll('#field-{$field} option')].map((option) => option.value).join(',')";
+
+    // Вид «Акция» по умолчанию: страница — с баннером, у тона — выбор для «баннера» после выбора страницы.
+    $page->assertScript($options('layout'), ',banner')
+        ->select('layout', 'banner')
+        ->assertScript($options('color'), ',calm')
+        ->select('color', 'calm')
+        ->select('type', 'news')
+        ->wait(0.5)
+        ->assertScript($options('layout'), ',wide,narrow')
+        ->assertScript("document.querySelector('#field-layout').value", '')
+        // Страницу сбросил скрипт: зависимый от неё «Тон» должен узнать об этом и загрузить варианты для пустого значения.
+        ->assertScript($options('color'), ',loud,quiet')
+        ->assertScript("document.querySelector('#field-color').value", '')
+        ->assertNoJavaScriptErrors();
+});

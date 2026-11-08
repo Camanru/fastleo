@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use Fastleo\Files\FileRejected;
 use Fastleo\Files\FileStore;
+use Fastleo\Files\ImageSupport;
+use Fastleo\Tests\Fixtures\Files\UndeletableDisk;
 use Fastleo\Tests\Fixtures\Files\UnwritableDisk;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 
 /**
  * PNG с верным заголовком (размер читается), но без данных: GD её не откроет.
@@ -46,6 +49,70 @@ it('reports a disk that cannot write instead of returning a path of a missing fi
     'a picture' => ['photo.png', fn () => UploadedFile::fake()->image('a.png', 20, 20)->getContent()],
 ]);
 
+it('waits for a taken lock of the name before it gives up and writes without it', function (): void {
+    Sleep::fake(syncWithCarbon: true);
+    $lock = Cache::lock('fastleo.upload.'.md5('uploads/price.txt'), 30);
+    $lock->get();
+
+    $path = FileStore::store(UploadedFile::fake()->createWithContent('price.txt', 'text'), 'uploads');
+
+    expect($path)->toBe('uploads/price.txt')
+        ->and($this->disk->get($path))->toBe('text');
+    // Пять секунд ожидания шагами по 250 мс (шаг ожидания блокировки задаёт Laravel): запись не обошла блокировку сразу.
+    Sleep::assertSleptTimes(19);
+});
+
+it('writes under the lock when it is free soon, and releases it', function (): void {
+    $path = FileStore::store(UploadedFile::fake()->createWithContent('price.txt', 'text'), 'uploads');
+
+    expect($path)->toBe('uploads/price.txt')
+        ->and(Cache::lock('fastleo.upload.'.md5('uploads/price.txt'), 1)->get())->toBeTrue();
+});
+
+it('encodes the path of a file in its address so that a space, a hash or a question mark do not break the link', function (): void {
+    expect(FileStore::url('uploads/My file #1?.jpg'))->toBe('/storage/uploads/My%20file%20%231%3F.jpg')
+        ->and(FileStore::url('uploads/Фото 100%.jpg'))->toBe('/storage/uploads/%D0%A4%D0%BE%D1%82%D0%BE%20100%25.jpg')
+        ->and(FileStore::url('uploads/a.jpg'))->toBe('/storage/uploads/a.jpg');
+});
+
+it('makes no thumbnail when GD is built without WebP, so the manager shows the original instead of an error', function (): void {
+    $this->disk->put('uploads/photo.jpg', UploadedFile::fake()->image('a.jpg', 800, 600)->getContent());
+    app()->instance(ImageSupport::class, new ImageSupport(['gd', 'exif'], IMG_JPG | IMG_PNG));
+
+    expect(FileStore::thumbnail('uploads/photo.jpg'))->toBeNull()
+        ->and($this->disk->allFiles('fastleo'))->toBe([]);
+});
+
+it('refuses a picture that GD cannot save in the format of its name instead of failing with an error of PHP', function (): void {
+    app()->instance(ImageSupport::class, new ImageSupport(['gd', 'exif'], IMG_JPG | IMG_PNG));
+    // Файл по содержимому PNG, по имени WebP: декодер его прочтёт, а `imagewebp()` в этой GD нет.
+    $png = UploadedFile::fake()->image('a.png', 40, 30)->getContent();
+
+    expect(fn (): string => FileStore::store(UploadedFile::fake()->createWithContent('photo.webp', $png), 'uploads'))
+        ->toThrow(FileRejected::class, 'не открывается как картинка')
+        ->and($this->disk->allFiles('uploads'))->toBe([]);
+
+    $this->disk->put('uploads/photo.webp', $png);
+
+    expect(fn (): string => FileStore::crop('uploads/photo.webp', 0, 0, 10, 10))->toThrow(FileRejected::class);
+});
+
+it('reports a disk that cannot create a folder instead of returning its path', function (): void {
+    Storage::set('public', UndeletableDisk::at($this->disk->path('')));
+
+    expect(fn (): string => FileStore::makeFolder('uploads', 'Новости'))
+        ->toThrow(FileRejected::class, 'Папку «novosti» не удалось создать');
+});
+
+it('reports a disk that does not let a file or a folder go instead of saying it is deleted', function (string $path): void {
+    $this->disk->put('uploads/docs/a.txt', 'x');
+    Storage::set('public', UndeletableDisk::at($this->disk->path('')));
+
+    expect(fn (): bool => FileStore::delete($path))->toThrow(FileRejected::class, 'не удалось удалить');
+
+    expect($this->disk->exists('uploads/docs/a.txt'))->toBeTrue();
+})->with(['a file' => 'uploads/docs/a.txt', 'a folder' => 'uploads/docs']);
+
 it('refuses to crop a picture whose data does not decode', function (): void {
     $this->disk->put('uploads/photo.png', truncatedPng());
 
@@ -63,6 +130,14 @@ it('reports a disk that cannot write the crop instead of returning a path of a m
         ->toThrow(FileRejected::class, '«photo.png» не удалось записать на диск.');
 
     expect($this->disk->allFiles('uploads'))->toBe(['uploads/photo.png']);
+});
+
+it('gives no thumbnail when the disk cannot write it, so the manager shows the original', function (): void {
+    $this->disk->put('uploads/a.jpg', UploadedFile::fake()->image('a.jpg', 800, 600)->getContent());
+    Storage::set('public', UnwritableDisk::at($this->disk->path('')));
+
+    expect(FileStore::thumbnail('uploads/a.jpg'))->toBeNull()
+        ->and($this->disk->exists('fastleo/thumbs/uploads/a.jpg.webp'))->toBeFalse();
 });
 
 it('returns the existing thumbnail without making it again', function (): void {
@@ -179,4 +254,20 @@ it('makes the folder of the upload when it does not exist yet', function (): voi
     FileStore::store(UploadedFile::fake()->createWithContent('price.txt', 'x'), 'uploads/new');
 
     expect($this->disk->directoryExists('uploads/new'))->toBeTrue();
+});
+
+it('refuses an animated gif whose frame lies outside its canvas instead of failing the whole request', function (): void {
+    $frame = imagecreatetruecolor(40, 40);
+    $second = imagecreatetruecolor(40, 40);
+    ob_start();
+    imagegif($frame);
+    $gif = (string) ob_get_clean();
+    // Экран 20×20 при кадре 40×40: такой файл читается по заголовку, а кадр декодер вырезает за пределами холста.
+    $gif = substr($gif, 0, 6).pack('vv', 20, 20).substr($gif, 10);
+    unset($second);
+
+    expect(fn (): string => FileStore::store(UploadedFile::fake()->createWithContent('anim.gif', $gif), 'uploads'))
+        ->toThrow(FileRejected::class, '«anim.gif» не открывается как картинка — не загружен.');
+
+    expect($this->disk->exists('uploads/anim.gif'))->toBeFalse();
 });

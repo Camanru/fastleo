@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Auth\LoginRecord;
 use Fastleo\Fastleo;
+use Fastleo\Tests\Fixtures\Models\ScopedUser;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Workbench\App\Models\User;
@@ -152,4 +153,22 @@ it('lists the devices and marks the current one', function (): void {
     $this->withHeader('User-Agent', 'Tablet')->get(route('fastleo.profile.show'))
         ->assertSee('Phone')
         ->assertDontSee('Это устройство');
+});
+
+it('asks for an address instead of failing when the email arrives as a list', function (): void {
+    $this->put(route('fastleo.profile.update'), ['name' => 'Анна', 'email' => ['x@example.com']])
+        ->assertSessionHasErrorsIn('profile', ['email']);
+
+    expect($this->admin->refresh()->email)->toBe('anna@example.com');
+});
+
+it('does not let the address of a user that the model scopes hide be taken in the profile', function (): void {
+    User::factory()->create(['name' => 'Призрак', 'email' => 'taken@example.com']);
+    $me = ScopedUser::query()->findOrFail($this->admin->getKey());
+    $this->actingAs($me, Fastleo::GUARD);
+
+    $this->put(route('fastleo.profile.update'), ['name' => 'Анна', 'email' => 'taken@example.com', 'current_password' => 'password'])
+        ->assertSessionHasErrorsIn('profile', ['email']);
+
+    expect($me->refresh()->email)->toBe('anna@example.com');
 });

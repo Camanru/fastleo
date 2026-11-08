@@ -1,6 +1,7 @@
 {{-- Окно загрузки файла импорта в раздел. На телефоне — нижний лист. --}}
 @php
     $importKey = $resource::importKey();
+    $formats = \Fastleo\Exports\SpreadsheetFormats::all();
 @endphp
 <dialog id="fastleo-import" class="m-auto w-full max-w-[560px] overflow-hidden rounded-dialog border border-line bg-surface p-0 text-ink shadow-pop backdrop:bg-[rgb(10_12_16/.45)] backdrop:backdrop-blur-[3px] max-sm:mb-0 max-sm:max-w-none max-sm:rounded-b-none">
     <form method="POST" action="{{ route('fastleo.resources.import', $resource::slug()) }}" enctype="multipart/form-data" class="flex flex-col" x-data="{ name: '' }">
@@ -17,11 +18,11 @@
                 <span class="mb-1 flex size-9 items-center justify-center rounded-[10px] bg-surface text-ink-2 shadow-card"><x-fastleo::icon name="upload" class="size-[18px]" /></span>
                 <span class="text-base font-semibold" x-text="name || @js(__('fastleo::imports.drop'))">{{ __('fastleo::imports.drop') }}</span>
                 <span class="text-sm text-ink-2">{{ __('fastleo::imports.choose') }}</span>
-                <span class="text-xs text-ink-2">{{ __('fastleo::imports.hint_short', ['size' => round(config()->integer('fastleo.import.max_size', 10240) / 1024, 1)]) }}</span>
-                <input type="file" name="file" accept=".xlsx,.csv" required class="sr-only" x-on:change="name = $event.target.files[0]?.name ?? ''">
+                <span class="text-xs text-ink-2">{{ __('fastleo::imports.hint_short', ['formats' => strtoupper(implode(', ', $formats)), 'size' => round(config()->integer('fastleo.import.max_size', 10240) / 1024, 1)]) }}</span>
+                <input type="file" name="file" accept="{{ implode(',', array_map(fn (string $format): string => '.'.$format, $formats)) }}" required class="sr-only" x-on:change="name = $event.target.files[0]?.name ?? ''">
             </label>
             <p class="text-sm text-ink-2">
-                {{ __('fastleo::imports.hint', ['size' => round(config()->integer('fastleo.import.max_size', 10240) / 1024, 1), 'key' => $resource->newModel()->getKeyName()]) }}
+                {{ __('fastleo::imports.hint', ['formats' => \Fastleo\Exports\SpreadsheetFormats::label(), 'size' => round(config()->integer('fastleo.import.max_size', 10240) / 1024, 1), 'key' => $resource->newModel()->getKeyName()]) }}
                 @if ($importKey !== null)
                     {{ __('fastleo::imports.hint_key', ['key' => $importKey]) }}
                 @endif

@@ -7,6 +7,7 @@ namespace Fastleo\Console;
 use BackedEnum;
 use Fastleo\Fastleo;
 use Fastleo\Resource;
+use Fastleo\Support\ResourceRegistry;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -25,14 +26,14 @@ use function Laravel\Prompts\text;
  * Создаёт класс ресурса в папке ресурсов сайта; с `--generate` собирает поля по колонкам таблицы модели.
  *
  * ```bash
- * php artisan fastleo:make-resource Doctor --generate
- * php artisan fastleo:make-resource Doctor --model="App\Models\Staff\Doctor" --force
+ * php artisan fastleo:make-resource Product --generate
+ * php artisan fastleo:make-resource Product --model="App\Models\Shop\Product" --force
  * ```
  */
 #[AsCommand(name: 'fastleo:make-resource')]
 #[Description('Создать раздел админки (ресурс) для модели; --generate — поля по колонкам таблицы')]
 #[Signature('fastleo:make-resource
-        {name? : Имя раздела латиницей: Doctor → DoctorResource}
+        {name? : Имя раздела латиницей: Product → ProductResource}
         {--model= : Класс модели (по умолчанию App\Models\{name})}
         {--generate : Собрать поля по колонкам таблицы}
         {--force : Перезаписать существующий файл}')]
@@ -80,7 +81,7 @@ final class MakeResourceCommand extends Command
 
         // Спросить некого (--no-interaction, запуск без терминала): понятная ошибка вместо трассировки.
         if ($input === null) {
-            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-resource Doctor']));
+            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-resource Product']));
 
             return self::FAILURE;
         }
@@ -113,6 +114,14 @@ final class MakeResourceCommand extends Command
         $fields = [];
         $this->properties = [];
 
+        // Адрес по имени модели (`Page` → pages) бывает занят самой админкой: ресурс без своего адреса сломал бы все её страницы.
+        $slug = Str::kebab(Str::pluralStudly(class_basename($model)));
+
+        if (in_array($slug, ResourceRegistry::RESERVED_SLUGS, true)) {
+            $slug = 'site-'.$slug;
+            $this->properties['slug'] = $slug;
+        }
+
         if ($this->option('generate')) {
             $fields = $this->generateFields(new $model());
 
@@ -127,7 +136,7 @@ final class MakeResourceCommand extends Command
 
         $this->components->info(__('fastleo::console.make_created', ['path' => $path]));
         $this->components->bulletList([__('fastleo::console.make_next', [
-            'url' => route('fastleo.resources.index', Str::kebab(Str::pluralStudly(class_basename($model)))),
+            'url' => route('fastleo.resources.index', $slug),
         ])]);
 
         return self::SUCCESS;
@@ -203,7 +212,9 @@ final class MakeResourceCommand extends Command
         $texts = array_values(array_filter(array_map(fn (array $field): ?string => $field[0] === 'Text' ? $field[2] : null, $fields)));
         $source = array_values(array_intersect(['title', 'name'], $texts))[0] ?? $texts[0] ?? null;
 
-        $fields = array_map(fn (array $field): array => [$field[0], str_replace('{{ from }}', $source === null ? '' : '->from('.var_export($source, true).')', $field[1]), $field[2]], $fields);
+        // Метка стоит только в конце кода поля «Slug»: такой же текст в подписи (комментарий колонки) не должен меняться.
+        $from = $source === null ? '' : '->from('.var_export($source, true).')';
+        $fields = array_map(fn (array $field): array => [$field[0], $field[0] === 'Slug' ? substr($field[1], 0, -strlen('{{ from }}')).$from : $field[1], $field[2]], $fields);
 
         $this->components->info(__('fastleo::console.make_generated', ['table' => $table, 'count' => count($fields)]));
 

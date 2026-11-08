@@ -16,11 +16,13 @@ final class FileTypes
 {
     /** Расширения, которые нельзя разрешить даже в конфиге. */
     public const array FORBIDDEN = [
-        'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'pht', 'phtml', 'phar', 'phps', 'inc',
-        'html', 'htm', 'xhtml', 'xht', 'shtml', 'xml', 'xsl', 'xslt', 'svg', 'svgz', 'js', 'mjs',
+        'php', 'php2', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8', 'pht', 'phtm', 'phtml', 'phar', 'phps', 'inc',
+        'html', 'htm', 'xhtml', 'xht', 'shtml', 'shtm', 'xml', 'xsl', 'xslt', 'svg', 'svgz', 'js', 'mjs',
         // XML-форматы, которые веб-сервер отдаёт как `*+xml`: браузер выполнит в них <script>.
         'rss', 'atom', 'rdf', 'kml', 'mml', 'xspf',
         'htaccess', 'htpasswd', 'ini', 'user', 'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'exe', 'swf',
+        // Исполняются на машине посетителя или в браузере как программа.
+        'hta', 'jar', 'wasm',
     ];
 
     /** Форматы картинок, которые пакет проверяет и пересохраняет. */

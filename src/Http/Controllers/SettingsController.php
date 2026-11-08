@@ -17,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Страницы настроек сайта: форма на полях и сохранение в `fastleo_settings`.
@@ -65,7 +66,14 @@ final readonly class SettingsController
             $attributes = [...$attributes, ...$field->validationAttributes()];
         }
 
-        $input = RecordWriter::inInputOrder(Validator::make($request->all(), $rules, ValidationMessages::all($rules), $attributes)->validate(), $request->all());
+        $validator = Validator::make($request->all(), $rules, ValidationMessages::all($rules), $attributes);
+
+        if ($validator->fails()) {
+            // Зашифрованные в базе поля не возвращаются в форму через сессию: хранилище сессий их значение не шифрует.
+            throw new ValidationException($validator, back()->withInput($request->except($settings->encrypted()))->withErrors($validator));
+        }
+
+        $input = RecordWriter::inInputOrder($validator->validated(), $request->all());
         $dehydrated = [];
 
         foreach ($fields as $field) {
@@ -87,6 +95,9 @@ final readonly class SettingsController
             }
 
             $this->store->save($settings, $values);
+            // Запись настроек не сохраняется как модель, и «что изменилось» ей неоткуда взять: поля (картинки с размерами)
+            // по `wasChanged()` решают, что делать после записи.
+            $record->syncChanges();
 
             foreach ($fields as $field) {
                 if (array_key_exists($field->name, $dehydrated)) {

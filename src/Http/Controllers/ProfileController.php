@@ -58,7 +58,8 @@ final readonly class ProfileController
     public function update(Request $request): RedirectResponse
     {
         $user = $this->user();
-        $request->merge(['email' => Str::lower(trim($request->string('email')->toString()))]);
+        // Массив вместо строки (`email[]=x`) — пустой адрес, а не ошибка преобразования: правила ниже ответят «обязательно».
+        $request->merge(['email' => is_string($request->input('email')) ? Str::lower(trim($request->input('email'))) : '']);
         $changesEmail = $request->string('email')->toString() !== Str::lower($this->attribute($user, 'email'));
 
         $validator = validator($request->all(), [
@@ -71,7 +72,7 @@ final readonly class ProfileController
         // Без учёта регистра: на PostgreSQL и SQLite «Anna@» и «anna@» — разные строки.
         $validator->after(function (Validator $validator) use ($user, $request): void {
             if (! $validator->errors()->has('email')
-                && $user::query()->whereRaw('lower(email) = ?', [Str::lower($request->string('email')->toString())])->whereKeyNot($user->getKey())->exists()) {
+                && $user::query()->withoutGlobalScopes()->whereRaw('lower(email) = ?', [Str::lower($request->string('email')->toString())])->whereKeyNot($user->getKey())->exists()) {
                 $validator->errors()->add('email', ValidationMessages::line('unique'));
             }
         });

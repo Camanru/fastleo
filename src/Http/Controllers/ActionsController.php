@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
@@ -97,7 +98,8 @@ final class ActionsController
         $validator = ActionInput::validator($action, $request->all());
 
         if ($validator->fails()) {
-            $input = $request->except(['data.password', 'data.password_confirmation', 'data.current_password']);
+            // Тело запроса без файлов: загруженный файл не сериализуется в сессию (драйвер file, database) и ломает ответ 500.
+            $input = Arr::except($request->request->all(), ['data.password', 'data.password_confirmation', 'data.current_password']);
             $relation = $request->input('_related');
             $parent = $request->input('_related_parent', '');
 

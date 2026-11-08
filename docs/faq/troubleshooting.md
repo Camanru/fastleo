@@ -60,7 +60,7 @@ php artisan storage:link
 
 ### Что делать, если адрес раздела отвечает 404?
 
-Посмотрите настоящий адрес раздела: он берётся из имени модели во множественном числе (`Doctor` → `doctors`, `News` → `news`).
+Посмотрите настоящий адрес раздела: он берётся из имени модели во множественном числе (`Product` → `products`, `News` → `news`).
 
 ```bash
 php artisan fastleo:inspect
@@ -69,7 +69,7 @@ php artisan fastleo:inspect
 Нужен другой адрес — задайте его в ресурсе:
 
 ```php
-protected static ?string $slug = 'doctors';
+protected static ?string $slug = 'products';
 ```
 
 404 на странице одной записи значит, что запись не попадает в выборку `query()` ресурса.
@@ -133,8 +133,8 @@ it('has no fastleo configuration errors', function (): void {
 Добавьте имя поля в `$fillable` модели:
 
 ```php
-// app/Models/Doctor.php
-protected $fillable = ['name', 'specialty', 'photo', 'accepts_appointments'];
+// app/Models/Product.php
+protected $fillable = ['name', 'category', 'photo', 'is_active'];
 ```
 
 Если поле только показывается и не должно записываться — сделайте его `->readonly()`. `fastleo_admin` в `$fillable` не добавляйте никогда.
@@ -431,7 +431,6 @@ php artisan fastleo:doctor
 2. Оставьте `searchable()` одному-двум коротким полям (заголовок, email): поиск по подстроке индексом не ускоряется.
 3. Держите `badge()` ресурсов лёгким — он считается на каждой странице админки (индекс по колонке условия).
 4. Уменьшите кнопку «Все»: `'list' => ['max_all' => 300]` в `config/fastleo.php`.
-5. Большие выгрузки делайте в csv, а не в xlsx.
 
 Подробнее — [большие таблицы](../list.md#большие-таблицы), [экспорт больших таблиц](../import-export.md#большие-таблицы), [`badge()`](../resources.md#badge).
 

@@ -6,6 +6,7 @@ use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Select;
 use Fastleo\Fields\Time;
 
 describe('checkbox', function (): void {
@@ -57,5 +58,21 @@ describe('lists', function (): void {
     it('gives an empty list for an empty cell of a field with several values', function (): void {
         expect(BelongsToMany::make('topics')->importValue(null))->toBe([])
             ->and(BelongsToMany::make('topics')->importValue('1, 2'))->toBe(['1', '2']);
+    });
+});
+
+describe('select', function (): void {
+    it('imports a select whose labels are numbers', function (): void {
+        $field = Select::make('year')->options([2024 => 2024, 2025 => 2025])->multiple(false);
+
+        expect($field->importValue('2025'))->toBe('2025')
+            ->and($field->importValue(2024))->toBe('2024')
+            ->and($field->importValue('1999'))->toBe('1999');
+    });
+
+    it('imports several numeric labels of a multiple select', function (): void {
+        $field = Select::make('years')->options(fn (): array => [1 => 100, 2 => 250])->multiple();
+
+        expect($field->importValue('100, 250'))->toBe(['1', '2']);
     });
 });

@@ -44,6 +44,79 @@ it('syncs and clears the topics', function (): void {
     expect($article->topics()->count())->toBe(0);
 });
 
+it('puts the saved topics into the form so that only they can be unlinked by it', function (): void {
+    [$first, $second] = Topic::factory()->count(2)->create()->all();
+    $article = Article::factory()->create();
+    $article->topics()->attach([$first->id, $second->id]);
+
+    $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+        ->assertOk()
+        ->assertSee('<input type="hidden" name="topics__seen" value="'.collect([$first->id, $second->id])->sort()->implode(',').'">', false);
+});
+
+it('does not unlink a topic that another administrator linked after the form was opened', function (): void {
+    [$first, $second, $third] = Topic::factory()->count(3)->create()->all();
+    $article = Article::factory()->create();
+    $article->topics()->attach([$first->id, $second->id]);
+    $seen = $first->id.','.$second->id;
+    // Пока форма была открыта, другой администратор связал третью тему.
+    $article->topics()->attach($third->id);
+
+    // Форма (устаревшая) сохраняет только первую: вторую убрали сами, третьей в ней не было.
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['topics' => [(string) $first->id], 'topics__seen' => $seen]))
+        ->assertSessionHasNoErrors();
+
+    expect($article->topics()->pluck('topics.id')->sort()->values()->all())->toBe([$first->id, $third->id]);
+});
+
+it('does not unlink a topic that another administrator linked to a form that was opened with no topics at all', function (): void {
+    $article = Article::factory()->create();
+    $article->topics()->attach($added = Topic::factory()->create());
+
+    // Пустой список в форме — это `topics__seen=""`; Laravel превращает пустую строку в null, и это не «поля нет».
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['topics' => '', 'topics__seen' => '']))
+        ->assertSessionHasNoErrors();
+
+    expect($article->topics()->pluck('topics.id')->all())->toBe([$added->id]);
+});
+
+it('shows the form again after a validation error even if the service field was forged into a list', function (): void {
+    $article = Article::factory()->create();
+    $article->topics()->attach($topic = Topic::factory()->create());
+
+    $this->from(route('fastleo.resources.edit', ['articles', $article->id]))
+        ->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => '', 'topics__seen' => ['x']]))
+        ->assertSessionHasErrors('title');
+
+    $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+        ->assertOk()
+        ->assertSee('name="topics__seen" value="'.$topic->id.'"', false);
+});
+
+it('replaces the whole list as before when the form sends no list of seen topics', function (): void {
+    [$first, $second] = Topic::factory()->count(2)->create()->all();
+    $article = Article::factory()->create();
+    $article->topics()->attach([$first->id, $second->id]);
+
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['topics' => [(string) $first->id]]))->assertSessionHasNoErrors();
+
+    expect($article->topics()->pluck('topics.id')->all())->toBe([$first->id]);
+});
+
+it('rejects a list of seen topics that is not a string and drops its empty and too long keys', function (): void {
+    [$first, $second] = Topic::factory()->count(2)->create()->all();
+    $article = Article::factory()->create();
+    $article->topics()->attach([$first->id, $second->id]);
+
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['topics' => [(string) $first->id], 'topics__seen' => ['x']]))
+        ->assertSessionHasErrors('topics__seen');
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['topics' => [(string) $first->id], 'topics__seen' => ',,'.str_repeat('9', 65).','.$second->id]))
+        ->assertSessionHasNoErrors();
+
+    // Пустые и слишком длинные ключи отброшены, вторая тема была в форме и отвязана.
+    expect($article->topics()->pluck('topics.id')->all())->toBe([$first->id]);
+});
+
 it('leaves the topics alone when the field is not sent', function (): void {
     $article = Article::factory()->create();
     $article->topics()->attach(Topic::factory()->create());
@@ -98,4 +171,16 @@ describe('field query', function (): void {
         $response->assertOk()->assertSee('Открытая А, Открытая Б');
         expect($queries)->toHaveCount(1);
     });
+});
+
+it('puts the id of the combobox into its script expressions as a string literal, whatever characters it holds', function (): void {
+    $html = view('fastleo::fields.combobox-control', [
+        'combobox' => [], 'multiple' => false, 'required' => false, 'placeholder' => '', 'invalid' => false,
+        'name' => 'topic', 'path' => 'topic', 'id' => "x'+alert(1)+'",
+    ])->render();
+
+    // Апостроф в id не должен закрывать строку в выражении Alpine: id уходит в JS только через @js (апостроф становится \u0027).
+    expect($html)->toContain(':id="\'x\\u0027+alert(1)+\\u0027-option-\' + index"')
+        ->and($html)->toContain('? \'x\\u0027+alert(1)+\\u0027-option-\' + active : null"')
+        ->and($html)->not->toContain("'x'+alert(1)+'");
 });

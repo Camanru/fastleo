@@ -6,6 +6,7 @@ namespace Fastleo\Auth;
 
 use Carbon\CarbonInterface;
 use Fastleo\Fastleo;
+use Fastleo\Notifications\FastleoMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -51,8 +52,9 @@ final class NewLoginNotification extends Notification implements ShouldQueue
             ->subject(__('fastleo::auth.new_login_subject', ['site' => config()->string('app.name')]))
             ->line(__('fastleo::auth.new_login_intro'))
             ->line(__('fastleo::auth.new_login_time', ['time' => $this->at->copy()->timezone(Fastleo::timezone())->format('d.m.Y H:i')]))
-            ->line(__('fastleo::auth.new_login_ip', ['ip' => $this->ip]))
-            ->line(__('fastleo::auth.new_login_device', ['device' => $this->userAgent === '' ? '—' : $this->userAgent]))
+            ->line(__('fastleo::auth.new_login_ip', ['ip' => FastleoMessage::plain($this->ip)]))
+            // Строку браузера присылает тот, кто вошёл: без экранирования в письме появилась бы его ссылка или картинка.
+            ->line(__('fastleo::auth.new_login_device', ['device' => $this->userAgent === '' ? '—' : FastleoMessage::plain(mb_strimwidth($this->userAgent, 0, 255, '…'))]))
             ->line(__('fastleo::auth.new_login_warning'))
             ->action(__('fastleo::auth.new_login_action'), Fastleo::mailUrl('fastleo.profile.show'));
     }

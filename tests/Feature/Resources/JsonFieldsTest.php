@@ -29,7 +29,7 @@ beforeEach(function (): void {
  */
 function pageData(array $overrides = []): array
 {
-    return ['title' => ['ru' => 'О клинике'], 'slug' => 'about', 'faq' => '', 'specs' => '', ...$overrides];
+    return ['title' => ['ru' => 'О магазине'], 'slug' => 'about', 'faq' => '', 'specs' => '', ...$overrides];
 }
 
 it('saves repeater items in the order of the form with only the described sub-fields', function (): void {

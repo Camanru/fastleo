@@ -51,7 +51,7 @@
                 aria-autocomplete="list"
                 aria-controls="{{ $id }}-listbox"
                 :aria-expanded="open"
-                :aria-activedescendant="open && options[active] ? '{{ $id }}-option-' + active : null"
+                :aria-activedescendant="open && options[active] ? @js($id.'-option-') + active : null"
                 :placeholder="selected.length ? '' : @js($placeholder)"
                 @if ($invalid) aria-invalid="true" aria-describedby="{{ $id }}-error" @endif
                 class="w-full border-0 bg-transparent p-0.5 text-base outline-none focus:ring-0 sm:text-sm"
@@ -76,7 +76,7 @@
         <template x-for="(option, index) in options" :key="option.value">
             <li
                 role="option"
-                :id="'{{ $id }}-option-' + index"
+                :id="@js($id.'-option-') + index"
                 :aria-selected="isSelected(option)"
                 @mousedown.prevent="choose(index)"
                 @mouseenter="active = index"

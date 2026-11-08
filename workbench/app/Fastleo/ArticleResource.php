@@ -83,7 +83,7 @@ final class ArticleResource extends Resource
     public function fields(): array
     {
         return [
-            Hidden::make('type')->default('news'),
+            Hidden::make('type')->default('news')->rules(['in:news']),
             Tabs::make([
                 Tab::make('Основное', [
                     Text::make('title', 'Заголовок')->required()->searchable()->sortable(),

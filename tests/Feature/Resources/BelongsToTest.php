@@ -201,12 +201,12 @@ it('shows the related title in the list with one query for all rows', function (
 
 describe('options', function (): void {
     it('finds categories by title', function (): void {
-        Category::factory()->create(['title' => 'Новости клиники']);
+        Category::factory()->create(['title' => 'Новости магазина']);
         Category::factory()->create(['title' => 'Акции']);
 
         $this->getJson(route('fastleo.resources.options', ['articles', 'category_id', 'q' => 'НОВОСТИ']))
             ->assertOk()
-            ->assertExactJson(['options' => [['value' => (string) Category::query()->where('title', 'Новости клиники')->value('id'), 'label' => 'Новости клиники']]]);
+            ->assertExactJson(['options' => [['value' => (string) Category::query()->where('title', 'Новости магазина')->value('id'), 'label' => 'Новости магазина']]]);
     });
 
     it('returns at most twenty options', function (): void {

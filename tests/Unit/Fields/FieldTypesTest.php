@@ -133,6 +133,18 @@ describe('Select', function (): void {
             ->and(validator(['tags' => 'a'], $multiple)->fails())->toBeTrue();
     });
 
+    it('takes a string or an integer for an option, not a boolean or a float that only looks like one', function (mixed $value, bool $passes): void {
+        $rules = Select::make('level')->options([1 => 'Один', 2 => 'Два'])->getRules(null);
+
+        expect(validator(['level' => $value], $rules)->passes())->toBe($passes);
+    })->with([
+        'integer' => [1, true],
+        'string' => ['1', true],
+        'true from json' => [true, false],
+        'float from json' => [1.0, false],
+        'unknown integer' => [3, false],
+    ]);
+
     it('turns enum values into strings for the form and labels for the list', function (): void {
         $record = new Article(['status' => ArticleStatus::Review, 'tags' => ['a', 'zzz']]);
         $status = Select::make('status')->options(ArticleStatus::class);
@@ -208,6 +220,47 @@ describe('dates and times', function (): void {
             ->and(DateTime::make('d')->default(fn (): CarbonInterface => now())->formValue(null))->toBe('2026-03-09T00:30')
             ->and(Time::make('t')->default(now())->formValue(null))->toBe('00:30')
             ->and(Time::make('t')->default('09:00')->formValue(null))->toBe('09:00');
+    });
+
+    it('keeps the seconds of a date and time the form did not change, and writes a changed or a new one', function (): void {
+        config(['app.timezone' => 'UTC', 'fastleo.timezone' => 'Europe/Moscow']);
+        $field = DateTime::make('starts_at');
+        $record = new Article();
+        $record->setRawAttributes(['starts_at' => '2026-03-08 09:30:45']);
+        $record->exists = true;
+
+        $field->fill($record, $field->dehydrate('2026-03-08T12:30'));
+        expect($record->getAttributes()['starts_at'])->toBe('2026-03-08 09:30:45');
+
+        $field->fill($record, $field->dehydrate('2026-03-08T13:30'));
+        expect($record->getAttributes()['starts_at'])->toBe('2026-03-08 10:30:00');
+
+        $field->fill($record, $field->dehydrate(''));
+        expect($record->getAttributes()['starts_at'])->toBeNull();
+
+        $new = new Article();
+        $field->fill($new, $field->dehydrate('2026-03-08T12:30'));
+        expect($new->getAttributes()['starts_at'])->toBe('2026-03-08 09:30:00');
+    });
+
+    it('keeps the seconds of a time the form did not change, and writes a changed or a new one', function (): void {
+        $field = Time::make('opens_at');
+        $record = new Article();
+        $record->setRawAttributes(['opens_at' => '09:05:30']);
+        $record->exists = true;
+
+        $field->fill($record, $field->dehydrate('09:05'));
+        expect($record->getAttributes()['opens_at'])->toBe('09:05:30');
+
+        $field->fill($record, $field->dehydrate('10:00'));
+        expect($record->getAttributes()['opens_at'])->toBe('10:00');
+
+        $field->fill($record, $field->dehydrate(''));
+        expect($record->getAttributes()['opens_at'])->toBeNull();
+
+        $new = new Article();
+        $field->fill($new, $field->dehydrate('09:05'));
+        expect($new->getAttributes()['opens_at'])->toBe('09:05');
     });
 
     it('shows time without seconds', function (): void {

@@ -349,7 +349,7 @@ abstract class Field
      * Свои правила валидации Laravel поверх автоматических. Замыкание получает запись (null при создании).
      *
      * ```php
-     * Text::make('code')->rules(fn (?Model $record) => [Rule::unique('doctors')->ignore($record)]);
+     * Text::make('code')->rules(fn (?Model $record) => [Rule::unique('products')->ignore($record)]);
      * ```
      *
      * @param  array<array-key, mixed>|Closure(?Model): array<array-key, mixed>  $rules
@@ -1315,7 +1315,7 @@ abstract class Field
         $custom = $this->rules instanceof Closure ? ($this->rules)($record) : $this->rules;
 
         if ($this->translatable) {
-            $rules = [$this->name => [...$this->conditionRules(), $this->presenceRule($record), 'array']];
+            $rules = [$this->name => [...$this->conditionRules(), ...(array) $this->presenceRule($record), 'array']];
 
             foreach (Fastleo::locales() as $index => $locale) {
                 $rules[$this->name.'.'.$locale] = [$index === 0 && $this->required ? 'required' : 'nullable', ...$this->typeRules(), ...array_values($custom)];
@@ -1326,7 +1326,7 @@ abstract class Field
 
         $rules = [$this->name => [
             ...$this->conditionRules(),
-            $this->presenceRule($record),
+            ...(array) $this->presenceRule($record),
             ...$this->typeRules(),
             ...array_values($custom),
         ]];
@@ -1382,9 +1382,11 @@ abstract class Field
     }
 
     /**
-     * Первое правило поля: `required` или `nullable`.
+     * Первое правило поля: `required` или `nullable` (у подкласса может быть несколько правил: `['sometimes', 'required']`).
+     *
+     * @return string|list<string>
      */
-    protected function presenceRule(?Model $record): string
+    protected function presenceRule(?Model $record): string|array
     {
         return $this->required ? 'required' : 'nullable';
     }

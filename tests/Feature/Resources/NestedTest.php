@@ -35,6 +35,79 @@ describe('has many', function (): void {
             ->assertSee('data-block-handle', false);
     });
 
+    it('puts the ids of the saved blocks into the form so that only they can be removed by it', function (): void {
+        $article = Article::factory()->create();
+        $first = $article->links()->create(['title' => 'Первая', 'sort' => 1]);
+        $second = $article->links()->create(['title' => 'Вторая', 'sort' => 2]);
+
+        $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+            ->assertOk()
+            ->assertSee('<input type="hidden" name="links__seen" value="'.$first->id.','.$second->id.'">', false);
+    });
+
+    it('does not remove a block that another administrator added after the form was opened', function (): void {
+        $article = Article::factory()->create(['title' => 'Было']);
+        $first = $article->links()->create(['title' => 'Первая', 'sort' => 1]);
+        $second = $article->links()->create(['title' => 'Вторая', 'sort' => 2]);
+        // Форма открыта, когда в ней были первая и вторая; затем другой администратор добавил третью.
+        $seen = $first->id.','.$second->id;
+        $third = $article->links()->create(['title' => 'Добавлена другим', 'sort' => 3]);
+
+        $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => 'Стало', 'links__seen' => $seen, 'links' => [
+            '0' => ['id' => (string) $first->id, 'title' => 'Первая'],
+        ]]))->assertSessionHasNoErrors();
+
+        // Вторая была в форме и убрана; третьей в форме не было — она остаётся.
+        expect($article->links()->pluck('title')->sort()->values()->all())->toBe(['Добавлена другим', 'Первая'])
+            ->and($article->links()->whereKey($third->id)->exists())->toBeTrue()
+            ->and($article->links()->whereKey($second->id)->exists())->toBeFalse();
+    });
+
+    it('does not remove a block that another administrator added to a form that was opened with no blocks at all', function (): void {
+        $article = Article::factory()->create(['title' => 'Было']);
+        $added = $article->links()->create(['title' => 'Добавлена другим', 'sort' => 1]);
+
+        // Пустой список в форме — это `links__seen=""`; Laravel превращает пустую строку в null, и это не «поля нет».
+        $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => 'Стало', 'links__seen' => '', 'links' => '']))
+            ->assertSessionHasNoErrors();
+
+        expect($article->links()->whereKey($added->id)->exists())->toBeTrue();
+    });
+
+    it('removes the blocks of the form one by one as before when the form sends no list of seen ids', function (): void {
+        $article = Article::factory()->create();
+        $article->links()->create(['title' => 'Первая', 'sort' => 1]);
+        $article->links()->create(['title' => 'Вторая', 'sort' => 2]);
+
+        $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['links' => '']))->assertSessionHasNoErrors();
+
+        expect(articleLinks($article))->toBe([]);
+    });
+
+    it('keeps the list of seen ids of the first form after a validation error', function (): void {
+        $article = Article::factory()->create();
+        $first = $article->links()->create(['title' => 'Первая', 'sort' => 1]);
+
+        $this->from(route('fastleo.resources.edit', ['articles', $article->id]))
+            ->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => '', 'links__seen' => $first->id.',777', 'links' => ['0' => ['id' => (string) $first->id, 'title' => 'Первая']]]))
+            ->assertSessionHasErrors('title');
+
+        $this->get(route('fastleo.resources.edit', ['articles', $article->id]))->assertSee('name="links__seen" value="'.$first->id.',777"', false);
+    });
+
+    it('shows the form again after a validation error even if the service field was forged into a list', function (): void {
+        $article = Article::factory()->create();
+        $link = $article->links()->create(['title' => 'Первая', 'sort' => 1]);
+
+        $this->from(route('fastleo.resources.edit', ['articles', $article->id]))
+            ->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => '', 'links__seen' => ['x']]))
+            ->assertSessionHasErrors('title');
+
+        $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+            ->assertOk()
+            ->assertSee('name="links__seen" value="'.$link->id.'"', false);
+    });
+
     it('marks the start and the end of the form', function (): void {
         $this->get(route('fastleo.resources.create', 'articles'))
             ->assertSee('name="_fl_begin"', false)

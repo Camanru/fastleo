@@ -3,7 +3,7 @@
     Плеер видео по ссылке на YouTube, Rutube или VK Видео (поле Video). Ссылка не на видео или пустая — ничего не выводится.
     Размер задаёт ширина блока (16:9); стили встроены, чтобы не зависеть от CSS сайта. Свои атрибуты (class) попадают на обёртку.
 
-    <x-fastleo::video :url="$doctor->video" title="Приём у врача" />
+    <x-fastleo::video :url="$product->video" title="Обзор товара" />
 --}}
 @php
     $embed = \Fastleo\Support\Html\VideoUrl::embed($url);

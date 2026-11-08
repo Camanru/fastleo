@@ -16,8 +16,8 @@ use LogicException;
  * ```php
  * 'rich_text' => [
  *     'tags' => ['div', 'span'],
- *     'attributes' => ['class', 'role', 'align', 'data-lpu'],
- *     'iframe_hosts' => ['https://prodoctorov.ru/'],
+ *     'attributes' => ['class', 'role', 'align', 'data-widget'],
+ *     'iframe_hosts' => ['https://yandex.ru/map-widget/'],
  *     'styles' => true,
  *     'content_css' => ['/css/app.css'],
  *     'content_style' => 'img { max-height: 4rem; }',
@@ -42,7 +42,7 @@ final class RichTextSettings
     }
 
     /**
-     * Дополнительные атрибуты на всех разрешённых тегах (точные имена, например `data-lpu`).
+     * Дополнительные атрибуты на всех разрешённых тегах (точные имена, например `data-widget`).
      *
      * @return list<string>
      *

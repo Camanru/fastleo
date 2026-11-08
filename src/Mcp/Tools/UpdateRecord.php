@@ -18,7 +18,7 @@ use Override;
  * Изменение записи: меняются только присланные поля.
  */
 #[Description('Изменить запись. В values передавайте только изменяемые поля; остальные не трогаются, переводы на других языках сохраняются. Но списки (вложенные записи HasMany/HasOne, Repeater, Blocks, Gallery, Tags, KeyValue, связи «многие ко многим», множественный Select) заменяются целиком: передавайте весь список, как вернул get-record; без --allow-delete пропавшие вложенные записи — ошибка.')]
-#[IsDestructive(false)]
+#[IsDestructive]
 #[IsIdempotent]
 final class UpdateRecord extends ResourceTool
 {
@@ -40,9 +40,18 @@ final class UpdateRecord extends ResourceTool
     {
         $resource = $this->resource($request, 'viewAny');
         $record = $this->record($request, $resource, 'update');
-        $request->validate(['values' => ['required', 'array']]);
+        // Пустой values — не ошибка «обязательно» (пустой массив считается отсутствующим), а запись без изменений.
+        $request->validate(['values' => ['present', 'array']]);
         $values = $request->get('values');
-        $record = RecordSaver::save($resource, $record, is_array($values) ? $values : []);
+        $values = is_array($values) ? $values : [];
+
+        // Нечего менять — запись не сохраняется: пустое сохранение запустило бы observers (`saved`) зря, а ответ
+        // «сохранена» ввёл бы агента в заблуждение.
+        if ($values === []) {
+            return Response::json(['message' => __('fastleo::mcp.unchanged'), ...RecordData::detail($resource, $record->refresh())]);
+        }
+
+        $record = RecordSaver::save($resource, $record, $values);
 
         return Response::json(['message' => __('fastleo::mcp.saved'), ...RecordData::detail($resource, $record->refresh())]);
     }

@@ -72,7 +72,8 @@ final class Variants
     /**
      * Создать варианты картинки для размера и вернуть описание: ширина → высота.
      * Ширины больше картинки не создаются (кроме одной — размером с картинку).
-     * Не картинка, файла нет или он слишком большой — пустой массив, старые варианты удаляются.
+     * Не картинка, файла нет или он слишком большой — пустой массив, старые варианты удаляются. Не хватило памяти процесса на
+     * картинку — пустой массив, старые варианты остаются.
      * Путь вне корня загрузок (испорченное значение в базе) — пустой массив, на диске ничего не трогается.
      *
      * @return array<int, int>
@@ -85,14 +86,26 @@ final class Variants
             return [];
         }
 
+        // GD без WebP вариантов не сделает: сайт покажет исходную картинку, а задача не упадёт ошибкой PHP.
+        // Готовые варианты при этом остаются (`fastleo:images` на CLI с другой сборкой GD иначе стёр бы их все).
+        if (! resolve(ImageSupport::class)->canEncodeWebp()) {
+            return [];
+        }
+
         $disk = FileStore::disk();
         $folder = self::folder($preset, $path);
+        $binary = FileTypes::isImage($path) && $disk->fileExists($path) ? (string) $disk->get($path) : '';
+        $problem = $binary === '' ? 'not_image' : Images::problem($binary);
+
+        // Не хватает памяти этому процессу (в консоли предел другой, чем в php-fpm): сама картинка в порядке, готовые варианты остаются.
+        if ($problem === 'no_memory') {
+            return [];
+        }
+
         $disk->deleteDirectory($folder);
         Cache::forget(self::cacheKey($path, $preset));
 
-        $binary = FileTypes::isImage($path) && $disk->fileExists($path) ? (string) $disk->get($path) : '';
-
-        if ($binary === '' || Images::problem($binary) !== null) {
+        if ($problem !== null) {
             return [];
         }
 
@@ -113,7 +126,13 @@ final class Variants
                     self::placeWatermark($variant, $watermark);
                 }
 
-                $disk->put($folder.'/'.$width.'.webp', (string) $variant->encodeUsingFormat(Format::WEBP, quality: self::quality()));
+                // Диск не принял файл (нет места, нет прав): вариантов нет, `<picture>` не должна ссылаться на несуществующие файлы.
+                if ($disk->put($folder.'/'.$width.'.webp', (string) $variant->encodeUsingFormat(Format::WEBP, quality: self::quality())) === false) {
+                    $disk->deleteDirectory($folder);
+
+                    return [];
+                }
+
                 $sizes[$width] = $variant->height();
             }
         } catch (ImageException) {
@@ -122,7 +141,12 @@ final class Variants
             return [];
         }
 
-        $disk->put($folder.'/manifest.json', (string) json_encode($sizes));
+        if ($disk->put($folder.'/manifest.json', (string) json_encode($sizes)) === false) {
+            $disk->deleteDirectory($folder);
+
+            return [];
+        }
+
         Cache::forever(self::cacheKey($path, $preset), $sizes);
 
         return $sizes;

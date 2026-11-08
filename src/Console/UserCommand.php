@@ -7,6 +7,7 @@ namespace Fastleo\Console;
 use Fastleo\Auth\TwoFactor;
 use Fastleo\Fastleo;
 use Fastleo\Support\UserModel;
+use Fastleo\Support\ValidationMessages;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -16,6 +17,7 @@ use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 use function Laravel\Prompts\password;
@@ -102,22 +104,24 @@ final class UserCommand extends Command
             );
         }
 
-        $password = $password === '' ? null : $password;
+        // Пустой или из одних пробелов пароль — «не менять»: правила проверки пропускают такую строку как пустую, и она стала бы паролем.
+        $password = $password === null || trim($password) === '' ? null : $password;
 
         $validator = Validator::make(
             ['email' => $email, 'password' => $password],
             [
                 'email' => ['required', 'email', 'max:255'],
-                'password' => [$isNew ? 'required' : 'nullable', 'string', 'min:'.self::PASSWORD_MIN, 'max:255'],
+                // Правила пароля сайта (`Password::defaults()`) те же, что в профиле и при сбросе: через консоль слабый пароль не задать.
+                'password' => [$isNew ? 'required' : 'nullable', 'string', 'min:'.self::PASSWORD_MIN, 'max:255', Password::defaults()],
             ],
             [
+                ...ValidationMessages::all(),
                 'email.required' => __('fastleo::console.email_invalid'),
                 'email.email' => __('fastleo::console.email_invalid'),
                 'email.max' => __('fastleo::console.email_invalid'),
                 'password.required' => __('fastleo::console.password_required'),
-                'password.min' => __('fastleo::console.password_length', ['min' => self::PASSWORD_MIN]),
-                'password.max' => __('fastleo::console.password_length', ['min' => self::PASSWORD_MIN]),
             ],
+            ['password' => __('fastleo::console.password_label'), 'email' => 'Email'],
         );
 
         if ($validator->fails()) {

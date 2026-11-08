@@ -37,7 +37,7 @@ final class DescribeResource extends ResourceTool
         $resource = $this->resource($request, 'viewAny');
 
         return Response::json([
-            ...new ResourceInspector()->resource($resource),
+            ...new ResourceInspector()->resource($resource, forAdmin: true),
             'can' => ['create' => Authorization::allows('create', $resource)],
             ...(RoleMatrix::enabled() ? ['role_rights' => array_combine(RolePermissions::GROUPS, array_map(fn (string $group): bool => RoleMatrix::allows($group === 'view' ? 'viewAny' : $group, $resource::slug()), RolePermissions::GROUPS))] : []),
         ]);

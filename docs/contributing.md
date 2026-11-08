@@ -30,7 +30,12 @@ composer serve
 
 - `workbench/app/Models/User.php` — модель пользователя с `HasFastleoAccess`;
 - `workbench/app/Fastleo/` — демо-разделы: «Статьи» (все базовые поля, вкладки, корзина, Policy), «Категории» (дерево, вкладки «Статьи» и «Товары» таблицами связанных записей), «Обращения» (только просмотр), «Товары» (вкладки «Основное» и «Отзывы» таблицей с правкой в окне; правка в ячейке, быстрый переключатель, цвет строки, вычисляемый столбец, автообновление), «Отзывы» и «Поставщики» (отдельные разделы); просмотр записи в демо открывается в окне (`fastleo.record_view = 'modal'`);
-- `workbench/app/Providers/WorkbenchServiceProvider.php` — папка ресурсов демо и регистрация Policy;
+- витрина возможностей — разделы-примеры, каждый про одну область пакета; у каждого поля в подсказке (`help()`) написано, какой метод оно показывает:
+  - группа «Витрина: поля» — «Текст и числа» (строки, числа, `Range`, контакты, `Password`, `Secret`, `Code`, `Slug`, `Hidden`, вычисляемый столбец и своё поле `Fields/PromoCode` со своим шаблоном в `workbench/resources/views/fastleo/fields`), «Выбор и даты» (`Select` одиночный, `multiple()`, `badges()`, `dependsOn()`, `emptyValue()`, `Enum` на целочисленном enum, `Radio`, `Checkbox`, `Toggle` с `quickToggle()`, `Tags`, даты, `visibleWhen()`), «Файлы и медиа» (`Image` с `crop()`, вариантами и `alt()`, `Gallery`, `File`, `Video`), «Разметка и JSON» (`translatable()`, `RichText`, `Markdown`, `Repeater` с вложенным `Repeater`, `KeyValue`, `Blocks`, `Seo`); раскладка — вкладки, сетки, секции (с описанием, сворачиваемые, свёрнутые), боковая панель;
+  - группа «Витрина: список и действия» — «Задачи»: фильтры всех видов (в том числе `using()`, `default()` и свой тип `Filters/ContainsText`), число записей на странице, порядок по умолчанию, своя подпись кнопки создания, экспорт и импорт, правка в ячейке, цвет строки, число просроченных в меню (`badge()`), свои действия в `Fastleo/Actions` (с вопросом, с мини-формой, опасное со своим правом Policy, скачивание файла) и `SetToggle`; права — `Policies/TaskPolicy`, время выполнения ставит `Observers/TaskObserver`;
+  - группа «Витрина: отчёты» — «Отчёт по задачам» (`TaskReportPage`: фильтры `Period` и `Choice`, плитки, графики, `Rows` с итогом, `Table`);
+- роли ([roles.md](roles.md)), модули ([modules.md](modules.md)) и закрытие сайта ([site-closing.md](site-closing.md)) в демо не включены: они меняют поведение всей админки и всех тестов, которые идут на демо-сайте;
+- `workbench/app/Providers/WorkbenchServiceProvider.php` — папка ресурсов демо, регистрация Policy и observers;
 - `workbench/database/migrations/`, `factories/`, `seeders/DatabaseSeeder.php` — таблицы и демо-данные;
 - `testbench.yaml` — настройки демо-сайта (провайдеры, миграции, сидер, переменные окружения).
 
@@ -73,7 +78,7 @@ vendor/bin/pint         # исправить оформление кода
 
 Skill для Claude (`resources/boost/skills/fastleo`), гайдлайны Boost и `docs/llms.txt` собираются из `docs/` командой `composer docs:build` и руками не правятся; тест проверяет, что они свежие. Правьте `docs/`, затем пересоберите.
 
-Требования: PHPStan уровня max без baseline, покрытие строк не ниже 95 %, покрытие типами 100 %.
+Требования: PHPStan уровня max без baseline, покрытие строк 100 %, покрытие типами 100 %. Перед выпуском — `composer test:databases` (SQLite, MySQL и PostgreSQL одновременно).
 
 Тесты (Pest):
 

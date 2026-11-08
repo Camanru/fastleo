@@ -29,6 +29,15 @@ it('loads the parent column even when the query of the section selects other col
     expect($tree->ancestors((string) $child->id))->toBe([(string) $parent->id]);
 });
 
+it('drops the order of the section together with its parameters', function (): void {
+    $parent = Category::factory()->create();
+    $child = Category::factory()->create(['parent_id' => $parent->id]);
+
+    $tree = Tree::load(Category::query()->orderByRaw('title = ? desc', ['x']), 'parent_id', 'sort');
+
+    expect($tree->ancestors((string) $child->id))->toBe([(string) $parent->id]);
+});
+
 it('shows one branch with depth counted from it', function (): void {
     $tree = new Tree(['1' => null, '2' => '1', '3' => '2', '4' => null]);
 

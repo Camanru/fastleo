@@ -299,7 +299,8 @@ final class ResourceQuery
         } elseif ($manual !== null) {
             $query->orderBy($query->qualifyColumn($manual));
         } elseif (($order = $this->resource::defaultOrder()) !== null) {
-            $query->orderBy($query->qualifyColumn($order[0]), $order[1]);
+            // Вычисляемый столбец из query() — псевдоним, у него нет префикса таблицы.
+            $query->orderBy($this->resource->schema()->field($order[0])?->isFromQuery() === true ? $order[0] : $query->qualifyColumn($order[0]), $order[1]);
         } else {
             $query->orderByDesc($key);
 

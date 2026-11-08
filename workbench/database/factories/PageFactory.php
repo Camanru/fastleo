@@ -33,8 +33,8 @@ final class PageFactory extends Factory
             'faq' => [['question' => 'Как записаться?', 'answer' => 'По телефону или на сайте.']],
             'specs' => ['Площадь' => '120 м²', 'Этаж' => '2'],
             'content' => [
-                ['type' => 'text', 'data' => ['body' => '<p>Клиника работает с 2005 года.</p>']],
-                ['type' => 'quote', 'data' => ['text' => 'Лучшие врачи города.', 'author' => 'Пациент']],
+                ['type' => 'text', 'data' => ['body' => '<p>Магазин работает с 2005 года.</p>']],
+                ['type' => 'quote', 'data' => ['text' => 'Лучшие цены города.', 'author' => 'Покупатель']],
             ],
         ];
     }

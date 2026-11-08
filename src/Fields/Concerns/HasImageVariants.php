@@ -23,7 +23,7 @@ trait HasImageVariants
 
     /**
      * Создавать для картинок поля варианты этих размеров. Вывод на сайте —
-     * `<x-fastleo::picture :src="$doctor->photo" preset="card" />`.
+     * `<x-fastleo::picture :src="$product->photo" preset="card" />`.
      *
      * ```php
      * Image::make('photo')->variants('card', 'hero');

@@ -7,7 +7,7 @@
 ```php
 // config/fastleo.php
 'brand' => [
-    'name' => 'Стоматология',            // null — config('app.name')
+    'name' => 'Мой сайт',                // null — config('app.name')
     'logo' => '/images/admin-logo.svg',  // null — значок и название
     'color' => '#0ea5e9',                // основной цвет кнопок и ссылок
 ],
@@ -102,9 +102,9 @@ cp vendor/camanru/fastleo/resources/views/auth/login.blade.php resources/views/v
 
 Ошибки админки 403 («Нет доступа»), 404, 419 («Страница устарела») и 429 («Слишком много запросов») показываются в оформлении админки: в меню, если администратор вошёл, на экране входа, если нет, и без меню, если страница открыта в окне. Кнопки ведут на главную админки и назад (при 419 — «Обновить страницу»). Страницы работают только для адресов админки (префикс `fastleo.path`, при заданном `fastleo.domain` — на этом домене): ответ на запрос, который ждёт JSON, и ошибки обычных страниц сайта остаются как есть, 500 и 503 — тоже.
 
-Свой вид — шаблон `resources/views/vendor/fastleo/errors/page.blade.php` (переменные: `status`, `icon`, `title`, `text`, `retry`, `signedIn`, `framed`); тексты — в `resources/lang/vendor/fastleo/ru/errors.php`.
+Свой вид — шаблон `resources/views/vendor/fastleo/errors/page.blade.php` (переменные: `status`, `icon`, `title`, `text`, `retry`, `signedIn`, `framed`); тексты — в `lang/vendor/fastleo/ru/errors.php` (в Laravel 13 это папка `lang/` в корне сайта; не создавайте `resources/lang/vendor/…`: наличие `resources/lang` заставляет Laravel читать переводы только из неё, и пропадут все остальные переводы сайта из `lang/`).
 
 ## Тексты и иконки
 
 - Любую фразу интерфейса можно заменить файлом `lang/vendor/fastleo/ru/*.php` ([настройки](configuration.md#тексты-интерфейса)).
-- Иконки разделов и страниц — любые из набора [Lucide](https://lucide.dev/icons): `protected static string $icon = 'stethoscope';` ([ресурсы](resources.md)).
+- Иконки разделов и страниц — любые из набора [Lucide](https://lucide.dev/icons): `protected static string $icon = 'shopping-bag';` ([ресурсы](resources.md)).

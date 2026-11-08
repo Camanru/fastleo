@@ -14,12 +14,12 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * Создать действие над записями (класс в папке разделов сайта)
  *
  * ```bash
- * php artisan fastleo:make-action PublishDoctors
+ * php artisan fastleo:make-action PublishProducts
  * ```
  */
 #[AsCommand(name: 'fastleo:make-action')]
 #[Description('Создать действие над записями (класс в папке разделов сайта)')]
-#[Signature('fastleo:make-action {name? : имя класса, например PublishDoctors} {--force : перезаписать существующие файлы}')]
+#[Signature('fastleo:make-action {name? : имя класса, например PublishProducts} {--force : перезаписать существующие файлы}')]
 final class MakeActionCommand extends Command
 {
     /**

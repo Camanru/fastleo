@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Resource;
 use Fastleo\Tests\Fixtures\MakeResource\BrokenRelationThing;
@@ -9,6 +10,7 @@ use Fastleo\Tests\Fixtures\Models\Ghost;
 use Fastleo\Tests\Fixtures\Models\LimitedThing;
 use Fastleo\Tests\Fixtures\Models\OpenUser;
 use Fastleo\Tests\Fixtures\Models\Resource as ResourceModel;
+use Fastleo\Tests\Fixtures\Models\SlugCommentThing;
 use Fastleo\Tests\Fixtures\Models\SpatiePage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -191,14 +193,14 @@ it('rejects a wrong name, an unknown model and a missing table', function (array
 
     expect($this->sandbox)->not->toBeDirectory();
 })->with([
-    'name' => [['name' => 'Врач'], 'не подходит'],
-    'model' => [['name' => 'Doctor'], 'Модель App\Models\Doctor не найдена'],
+    'name' => [['name' => 'Товар'], 'не подходит'],
+    'model' => [['name' => 'Product'], 'Модель App\Models\Product не найдена'],
     'table' => [['name' => 'Ghost', '--model' => Ghost::class, '--generate' => true], 'Таблицы ghosts нет в базе'],
 ]);
 
 it('asks for the name when it is not given', function (): void {
     $this->artisan('fastleo:make-resource', ['--model' => Category::class])
-        ->expectsQuestion('Имя раздела латиницей, например Doctor', 'Category')
+        ->expectsQuestion('Имя раздела латиницей, например Product', 'Category')
         ->assertSuccessful();
 
     expect($this->sandbox.'/CategoryResource.php')->toBeFile();
@@ -211,6 +213,25 @@ it('recognises the search engine column by the name and the array cast', functio
         ->toContain("Seo::make('seo', 'SEO'),")
         ->toContain('use Fastleo\\Fields\\Seo;')
         ->and(generatedFields($this->sandbox.'/ArticleResource.php', $this->namespace.'\\ArticleResource'))->toMatchArray(['seo' => 'Seo: nullable|array']);
+});
+
+it('gives a model whose default address belongs to the admin an address of its own, so the admin keeps working', function (): void {
+    $this->artisan('fastleo:make-resource', ['name' => 'Page', '--model' => Page::class])
+        ->expectsOutputToContain('/fastleo/site-pages')
+        ->assertSuccessful();
+
+    require_once $this->sandbox.'/PageResource.php';
+
+    expect(File::get($this->sandbox.'/PageResource.php'))->toContain("protected static ?string \$slug = 'site-pages';")
+        ->and(Fastleo::resources()->all())->toHaveKey('site-pages');
+});
+
+it('leaves the address alone for a model whose default address is free', function (): void {
+    $this->artisan('fastleo:make-resource', ['name' => 'Article', '--model' => Article::class])
+        ->expectsOutputToContain('/fastleo/articles')
+        ->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/ArticleResource.php'))->not->toContain('$slug');
 });
 
 it('recognises key value pairs and translatable attributes of spatie models', function (): void {
@@ -234,6 +255,19 @@ it('writes the length of a text column into the field when it differs from the d
         ->toContain("Text::make('title', 'Title')->maxLength(500)")
         ->and(File::get($this->sandbox.'/LimitedResource.php'))->toContain("Tel::make('phone', 'Phone')->maxLength(255)");
 });
+
+it('keeps a label from a column comment as it is, even if the comment looks like the slug marker', function (): void {
+    Schema::create('slug_comment_things', function ($table): void {
+        $table->id();
+        $table->string('title');
+        $table->string('slug')->comment('Адрес {{ from }} страницы');
+    });
+
+    $this->artisan('fastleo:make-resource', ['name' => 'SlugComment', '--model' => SlugCommentThing::class, '--generate' => true])->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/SlugCommentResource.php'))
+        ->toContain("Slug::make('slug', 'Адрес {{ from }} страницы')->from('title')");
+})->skip(fn (): bool => DB::connection()->getDriverName() === 'sqlite', 'SQLite не хранит комментарии колонок');
 
 it('does not fail on a relation method of the model that throws', function (): void {
     Schema::create('broken_relation_things', function ($table): void {

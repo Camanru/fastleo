@@ -27,6 +27,15 @@ function logLine(string $time, string $level, string $message, string $extra = '
     return "[{$time}] testing.{$level}: {$message}\n".($extra === '' ? '' : $extra."\n");
 }
 
+it('skips a log that disappeared between the search and the read, instead of failing the page', function (): void {
+    file_put_contents($this->dir.'/laravel.log', logLine('2026-10-01 10:00:00', 'ERROR', 'Ошибка'));
+    symlink($this->dir.'/gone.log', $this->dir.'/broken.log');
+
+    $this->get(route('fastleo.logs.index'))->assertOk()->assertSee('Ошибка');
+
+    expect(array_column(new LogReader($this->dir)->files(), 'name'))->toBe(['laravel.log']);
+});
+
 describe('page', function (): void {
     it('shows the newest errors first and hides the rest by default', function (): void {
         file_put_contents($this->dir.'/laravel.log', logLine('2026-10-01 10:00:00', 'ERROR', 'Старая ошибка').logLine('2026-10-02 10:00:00', 'INFO', 'Просто info').logLine('2026-10-03 10:00:00', 'ERROR', 'Новая ошибка'));
@@ -49,6 +58,35 @@ describe('page', function (): void {
         file_put_contents($this->dir.'/laravel.log', logLine('2026-10-03 10:00:00', 'ERROR', 'Не вышло {"exception":"[object] (RuntimeException(code: 0): boom)"}', "#0 /app/file.php(10): run()\n#1 {main}"));
 
         $this->get(route('fastleo.logs.index'))->assertSee('Не вышло')->assertSee('RuntimeException')->assertSee('#0 /app/file.php(10)');
+    });
+
+    it('does not fall on a forged record header with a date that does not exist', function (string $time): void {
+        // Посетитель кладёт в поле формы перевод строки и «запись»: после неё журнал не должен перестать открываться.
+        $forged = "x\n[{$time}] production.ERROR: подделка\n";
+        file_put_contents($this->dir.'/laravel.log', logLine('2026-10-02 10:00:00', 'ERROR', 'Настоящая '.$forged).logLine('2026-10-03 10:00:00', 'ERROR', 'Последняя'));
+
+        $this->get(route('fastleo.logs.index'))->assertOk()->assertSee('Последняя')->assertSee('Настоящая');
+
+        $entries = new LogReader($this->dir)->read($this->dir.'/laravel.log', null, 10)['entries'];
+
+        expect($entries)->toHaveCount(2);
+    })->with([
+        'month 99' => '9999-99-99 99:99:99',
+        'month 13' => '2026-13-45 10:00:00',
+        'day 32' => '2026-01-32 10:00:00',
+        'day 00' => '2026-01-00 10:00:00',
+        'hour 24' => '2026-01-01 24:00:00',
+        'minute 60' => '2026-01-01 10:60:00',
+        'second 60' => '2026-01-01 10:00:60',
+        'T separator' => '9999-99-99T99:99:99',
+    ]);
+
+    it('reads a header with a time zone and fractions of a second', function (): void {
+        file_put_contents($this->dir.'/laravel.log', "[2026-12-31T23:59:59.123456+03:00] production.ERROR: С зоной\n[2026-02-28 00:00:00] production.ERROR: Февраль\n");
+
+        $entries = new LogReader($this->dir)->read($this->dir.'/laravel.log', null, 10)['entries'];
+
+        expect($entries)->toHaveCount(2);
     });
 
     it('does not take a bracket on a later line for the end of a record header', function (): void {

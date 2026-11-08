@@ -6,6 +6,7 @@ namespace Fastleo\Imports;
 
 use DateTimeInterface;
 use Fastleo\Exports\SpreadsheetCell;
+use Fastleo\Exports\SpreadsheetFormats;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\MorphTo;
@@ -25,15 +26,17 @@ use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Style;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
+use OpenSpout\Reader\XLSX\Options as XlsxOptions;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
-use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
+use OpenSpout\Writer\CSV\Options as CsvWriterOptions;
+use OpenSpout\Writer\CSV\Writer as CsvWriter;
 use ZipArchive;
 
 /**
- * Загрузка записей раздела из xlsx/csv: строка файла — запись, столбец — поле (по имени или подписи).
+ * Загрузка записей раздела из csv (xlsx — только при `fastleo.xlsx`): строка файла — запись, столбец — поле (по имени или подписи).
  *
  * Каждая строка проходит те же права, правила и запись, что и форма, в своей транзакции;
- * строка с ошибкой пропускается и попадает в отчёт (первые `Import::MAX_ERRORS`) и в xlsx-файл со всеми
+ * строка с ошибкой пропускается и попадает в отчёт (первые `Import::MAX_ERRORS`) и в csv-файл со всеми
  * пропущенными строками: столбцы исходного файла и «Ошибка» (`skippedFile()`). Пустые строки пропускаются молча.
  * CSV: кодировка UTF-8 или Windows-1251 (русский Excel), разделитель «;», «,» или табуляция.
  */
@@ -44,6 +47,15 @@ final class Importer
 
     /** Как часто сохраняется прогресс (строк). */
     private const int PROGRESS_EVERY = 100;
+
+    /**
+     * Сколько ячеек самое большее в файле пропущенных строк: каждая строка дописывается до ширины заголовка, и заголовок
+     * в 16 тысяч столбцов при 50 000 пропущенных строках дал бы сотни секунд и сотни мегабайт (замер: 7 мс на такую строку).
+     */
+    public const int MAX_SKIPPED_CELLS = 5_000_000;
+
+    /** Сколько сбоев базы за один импорт попадает в журнал ошибок. */
+    private const int REPORTED_FAILURES = 3;
 
     /**
      * Столбец файла → поле ресурса, язык многоязычного поля (`[поле, язык]`) или ключ записи (`true`).
@@ -62,6 +74,9 @@ final class Importer
      */
     private array $validationMessages = [];
 
+    /** Сколько сбоев базы уже записано в журнал ошибок в этом импорте. */
+    private int $reported = 0;
+
     /**
      * Ячейки первой строки исходного файла.
      *
@@ -69,16 +84,22 @@ final class Importer
      */
     private array $header = [];
 
-    /** Писатель файла с пропущенными строками; создаётся при первой пропущенной строке. */
-    private ?XlsxWriter $skippedWriter = null;
+    /** Писатель файла с пропущенными строками (csv); создаётся при первой пропущенной строке. */
+    private ?CsvWriter $skippedWriter = null;
 
     /** Временный файл с пропущенными строками. */
     private ?string $skippedPath = null;
 
+    /** Сколько ячеек уже записано в файл пропущенных строк. */
+    private int $skippedCells = 0;
+
+    /** В файл пропущенных строк больше не пишется: он достиг предела ячеек. */
+    private bool $skippedFull = false;
+
     public function __construct(private readonly Resource $resource, private readonly Import $import) {}
 
     /**
-     * Временный xlsx с пропущенными строками (закрыт, готов к копированию) или null, если строк не пропущено.
+     * Временный csv с пропущенными строками (закрыт, готов к копированию) или null, если строк не пропущено.
      * Удалять файл должен вызывающий.
      */
     public function skippedFile(): ?string
@@ -96,22 +117,33 @@ final class Importer
         $reader = $this->reader($path, $extension);
         $csv = $extension === 'csv';
         $max = max(1, config()->integer('fastleo.import.max_rows', 50000));
+        // Секунды могут прийти из env() строкой или целым числом, в тесте — дробью.
+        $configured = config('fastleo.import.max_read_seconds', 600);
+        $readSeconds = max(0.001, is_numeric($configured) ? (float) $configured : 600.0);
         $line = 0;
+        $data = 0;
+        $headerRead = false;
 
         try {
             foreach ($reader->getSheetIterator() as $sheet) {
-                foreach ($sheet->getRowIterator() as $row) {
+                foreach (ReadBudget::metered($sheet->getRowIterator(), $readSeconds) as $row) {
+                    // Читалка отдаёт и пустые строки, иначе «Строка N» в отчёте не совпала бы с номером строки в Excel.
                     $line++;
                     $cells = array_map(fn (mixed $cell): mixed => $csv ? $this->csvCell($cell) : $cell, $row->toArray());
 
-                    if ($line === 1) {
+                    if (array_filter($cells, fn (mixed $cell): bool => $cell !== null && $cell !== '') === []) {
+                        continue;
+                    }
+
+                    if (! $headerRead) {
                         $this->header = array_values(array_map($this->reportCell(...), $cells));
                         $this->mapColumns($cells);
+                        $headerRead = true;
 
                         continue;
                     }
 
-                    if ($line - 1 > $max) {
+                    if (++$data > $max) {
                         $this->import->message = __('fastleo::imports.too_many_rows', ['max' => $max], Fastleo::LOCALE);
 
                         break 2;
@@ -132,7 +164,7 @@ final class Importer
             $this->skippedWriter = null;
         }
 
-        if ($line === 0) {
+        if (! $headerRead) {
             throw new ImportFailed(__('fastleo::imports.no_columns', locale: Fastleo::LOCALE));
         }
     }
@@ -147,19 +179,28 @@ final class Importer
         try {
             if ($extension === 'csv') {
                 $content = (string) file_get_contents($path);
-                $content = str_starts_with($content, "\u{FEFF}") ? substr($content, 3) : $content;
+                $withoutMark = str_starts_with($content, "\u{FEFF}") ? substr($content, 3) : $content;
+                $utf8 = mb_check_encoding($withoutMark, 'UTF-8');
+                // Метку порядка байтов читалка пропускает только в UTF-8; в Windows-1251 она остаётся в данных первой ячейки,
+                // и кавычка после неё уже не в начале поля. Защита смотрит на те же байты, что и читалка.
+                $content = $utf8 ? $withoutMark : $content;
                 $firstLine = strtok($content, "\n") ?: '';
                 $counts = [';' => substr_count($firstLine, ';'), ',' => substr_count($firstLine, ','), "\t" => substr_count($firstLine, "\t")];
                 arsort($counts);
                 $delimiter = (string) array_key_first($counts);
+                $delimiter = $counts[$delimiter] > 0 ? $delimiter : ',';
+
+                // Ячейки считаются по записям, а не по строкам файла: запись растягивается переводами строк в кавычках.
+                XlsxGuard::assertWithin(CsvGuard::widest($content, $delimiter));
 
                 $reader = new CsvReader(new CsvOptions(
-                    FIELD_DELIMITER: $counts[$delimiter] > 0 ? $delimiter : ',',
-                    ENCODING: mb_check_encoding($content, 'UTF-8') ? 'UTF-8' : 'Windows-1251',
+                    SHOULD_PRESERVE_EMPTY_ROWS: true,
+                    FIELD_DELIMITER: $delimiter,
+                    ENCODING: $utf8 ? 'UTF-8' : 'Windows-1251',
                 ));
             } else {
                 $this->assertUnpackedSizeIsSafe($path);
-                $reader = new XlsxReader();
+                $reader = new XlsxReader(new XlsxOptions(SHOULD_PRESERVE_EMPTY_ROWS: true));
             }
 
             $reader->open($path);
@@ -168,14 +209,15 @@ final class Importer
         } catch (ImportFailed $exception) {
             throw $exception;
         } catch (\Throwable) {
-            throw new ImportFailed(__('fastleo::imports.unreadable', locale: Fastleo::LOCALE));
+            throw new ImportFailed(__('fastleo::imports.unreadable', ['formats' => SpreadsheetFormats::label()], Fastleo::LOCALE));
         }
     }
 
     /**
      * Размер xlsx после распаковки не больше `import.max_unpacked` МБ: маленький архив может развернуться
      * в гигабайты и исчерпать память воркера. Размеры из оглавления архива пишет автор файла, поэтому
-     * считаются байты, которые действительно получаются при распаковке.
+     * считаются байты, которые действительно получаются при распаковке. Затем `XlsxGuard` отсекает строки
+     * с тысячами ячеек (время чтения растёт как квадрат их числа).
      *
      * @throws ImportFailed файл не архив или слишком большой после распаковки
      */
@@ -184,7 +226,7 @@ final class Importer
         $zip = new ZipArchive();
 
         if ($zip->open($path, ZipArchive::RDONLY) !== true) {
-            throw new ImportFailed(__('fastleo::imports.unreadable', locale: Fastleo::LOCALE));
+            throw new ImportFailed(__('fastleo::imports.unreadable', ['formats' => SpreadsheetFormats::label()], Fastleo::LOCALE));
         }
 
         $limit = max(1, config()->integer('fastleo.import.max_unpacked', 200));
@@ -216,6 +258,9 @@ final class Importer
 
                 fclose($stream);
             }
+
+            // Размер в байтах — не всё: узкая по байтам таблица с миллионом пустых ячеек в строке тоже занимает воркер на часы.
+            XlsxGuard::assertSafe($path, $zip);
         } finally {
             $zip->close();
         }
@@ -343,18 +388,32 @@ final class Importer
      */
     private function writeSkipped(array $cells, string $error): void
     {
-        if (! $this->skippedWriter instanceof XlsxWriter) {
+        if ($this->skippedFull) {
+            return;
+        }
+
+        if (! $this->skippedWriter instanceof CsvWriter) {
             $this->skippedPath = (string) tempnam(sys_get_temp_dir(), 'fastleo-skipped');
-            $this->skippedWriter = new XlsxWriter();
+            $this->skippedWriter = new CsvWriter(new CsvWriterOptions(FIELD_DELIMITER: ';'));
             $this->skippedWriter->openToFile($this->skippedPath);
             $bold = new Style(fontBold: true);
             $header = [...$this->header, new StringCell(__('fastleo::imports.error', locale: Fastleo::LOCALE), $bold)];
             $this->skippedWriter->addRow(new Row(array_map(fn (Cell $cell): Cell => $cell instanceof StringCell ? new StringCell($cell->getValue(), $bold) : $cell, $header)));
+            $this->skippedCells = count($header);
+        }
+
+        $this->skippedCells += count($this->header) + 1;
+
+        if ($this->skippedCells > self::MAX_SKIPPED_CELLS) {
+            // Последняя строка файла говорит, что дальше строки не записаны; число пропущенных в отчёте считается по-прежнему.
+            $this->skippedFull = true;
+            $cells = [];
+            $error = __('fastleo::imports.skipped_truncated', locale: Fastleo::LOCALE);
         }
 
         // Ячейки ровно по ширине заголовка: «Ошибка» всегда в своём столбце, даже если строка файла короче или длиннее.
         $cells = array_slice(array_pad(array_values($cells), count($this->header), null), 0, count($this->header));
-        $this->skippedWriter->addRow(new Row([...array_map($this->reportCell(...), $cells), SpreadsheetCell::make($error)]));
+        $this->skippedWriter->addRow(new Row([...array_map($this->reportCell(...), $cells), SpreadsheetCell::make($error, true)]));
     }
 
     /**
@@ -367,7 +426,7 @@ final class Importer
             is_string($cell), is_int($cell), is_float($cell) => $cell,
             is_bool($cell) => $cell ? '1' : '0',
             default => null,
-        });
+        }, true);
     }
 
     /**
@@ -400,10 +459,19 @@ final class Importer
         } elseif ($importKey !== null && $key !== null) {
             try {
                 // В транзакции: на PostgreSQL упавший запрос иначе отравляет внешнюю транзакцию (сохранение строки там же).
-                $existing = DB::transaction(fn (): ?Model => $this->resource->newQuery()->where($model->qualifyColumn($importKey), $key)->first());
+                [$existing, $hidden] = DB::transaction(function () use ($model, $importKey, $key): array {
+                    $found = $this->resource->newQuery()->where($model->qualifyColumn($importKey), $key)->first();
+
+                    // Запись с таким ключом есть, но раздел её не видит (корзина, `query()`): новая стала бы дублем.
+                    return [$found, ! $found instanceof Model && $model->newQuery()->withoutGlobalScopes()->where($model->qualifyColumn($importKey), $key)->exists()];
+                });
             } catch (QueryException) {
                 // База не сравнивает ключ со значением ячейки (PostgreSQL: число и слово) — это ошибка строки, а не сбой импорта.
                 return __('fastleo::imports.record_missing', ['key' => $key], Fastleo::LOCALE);
+            }
+
+            if ($hidden) {
+                return __('fastleo::imports.record_hidden', ['key' => $key], Fastleo::LOCALE);
             }
 
             $writesKey = in_array($importKey, array_map(fn (Field $field): string => $field->name, $this->fields()), true);
@@ -479,7 +547,8 @@ final class Importer
         try {
             RecordWriter::write($this->resource, $record, $fields, RecordWriter::inInputOrder($validator->validated(), $input));
         } catch (QueryException $exception) {
-            return DatabaseErrors::explain($exception);
+            // Одинаковая ошибка на каждой из тысяч строк заполнила бы журнал: в нём остаются первые случаи.
+            return DatabaseErrors::explain($exception, report: $this->reported++ < self::REPORTED_FAILURES);
         } catch (OperationCancelled) {
             return __('fastleo::resources.save_cancelled', locale: Fastleo::LOCALE);
         }

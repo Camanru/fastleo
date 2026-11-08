@@ -358,6 +358,35 @@ class Blocks extends Field
     }
 
     /**
+     * Пути картинок блоков всех типов с их размерами (`variants()`) по сохранённому значению колонки.
+     *
+     * @return array<string, list<string>>
+     */
+    public function variantPaths(mixed $stored): array
+    {
+        return $this->variantPathsOf(self::storedItems($stored));
+    }
+
+    /**
+     * Пути картинок блоков (уже разобранных) с их размерами.
+     *
+     * @param  list<array<array-key, mixed>>  $blocks
+     * @return array<string, list<string>>
+     */
+    public function variantPathsOf(array $blocks): array
+    {
+        $result = [];
+
+        foreach (array_keys($this->types) as $type) {
+            foreach (self::itemVariantPaths($this->typeFields($type), $this->dataOf($blocks, $type)) as $path => $presets) {
+                $result[$path] = array_values(array_unique([...$result[$path] ?? [], ...$presets]));
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * На просмотре — блоки по порядку: подпись типа и значения полей.
      */
     #[Override]

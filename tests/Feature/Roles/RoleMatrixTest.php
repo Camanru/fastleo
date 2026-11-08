@@ -61,6 +61,21 @@ it('maps every ability to a group of the matrix', function (string $ability, str
     ['delete', 'delete'], ['forceDelete', 'delete'],
 ]);
 
+it('denies an ability to a role that has every group but its own', function (string $ability, string $group): void {
+    $others = array_map(
+        fn (string $other): string => 'articles.'.$other,
+        array_values(array_diff(['view', 'create', 'update', 'delete'], [$group])),
+    );
+    $this->actingAs(roleAdmin(role('without-'.$group, $others)), Fastleo::GUARD);
+
+    expect(RoleMatrix::allows($ability, 'articles'))->toBeFalse();
+})->with([
+    ['viewAny', 'view'], ['view', 'view'], ['export', 'view'],
+    ['create', 'create'], ['import', 'create'],
+    ['update', 'update'], ['reorder', 'update'], ['restore', 'update'], ['custom', 'update'],
+    ['delete', 'delete'], ['forceDelete', 'delete'],
+]);
+
 it('does not give other groups', function (): void {
     $this->actingAs(roleAdmin(role('editor', ['articles.view', 'articles.update'])), Fastleo::GUARD);
 

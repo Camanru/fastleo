@@ -25,10 +25,13 @@ use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Server\Testing\PendingTestResponse;
+use Laravel\Mcp\Server\Testing\TestResponse;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Page;
@@ -64,6 +67,24 @@ it('hides sections the Policy closes for viewing', function (): void {
 
     mcp()->tool(ListResources::class)->assertSee('"resource":"articles"')->assertDontSee('"resource":"categories"');
     mcp()->tool(DescribeResource::class, ['resource' => 'categories'])->assertHasErrors(['Нет права «viewAny»']);
+});
+
+it('does not name a section in the error when the Policy closes it for the admin', function (): void {
+    Gate::policy(Category::class, HiddenCategoryPolicy::class);
+
+    mcp()->tool(DescribeResource::class, ['resource' => 'nothing'])
+        ->assertHasErrors(['Раздела «nothing» нет. Доступные адреса:'])
+        ->assertSee('articles')
+        ->assertDontSee('categories');
+});
+
+it('describes only the fields and filters that are not hidden from the admin', function (): void {
+    useFixtureResources('HiddenFilter');
+
+    mcp()->tool(DescribeResource::class, ['resource' => 'articles'])
+        ->assertHasNoErrors()
+        ->assertSee(['"name":"title"', '"name":"status"'])
+        ->assertDontSee(['category_id', 'Рубрика']);
 });
 
 it('describes a section with fields, rules and the rights of the admin', function (): void {
@@ -142,6 +163,36 @@ it('creates a record with the checks and defaults of the form', function (): voi
     expect($article->views)->toBe(5)
         ->and($article->is_published)->toBeTrue()
         ->and($article->type)->toBe('news');
+});
+
+it('takes an empty set of values for a record without changes or for a section where nothing is required', function (): void {
+    $article = Article::factory()->create(['title' => 'Прежний']);
+
+    $saved = 0;
+    Event::listen('eloquent.saved: '.Article::class, function () use (&$saved): void {
+        $saved++;
+    });
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'articles', 'id' => (string) $article->id, 'values' => []])
+        ->assertHasNoErrors()->assertSee(['Запись не изменена', '"title":"Прежний"'])->assertDontSee('Запись сохранена');
+
+    // Ничего не изменилось — observers сайта (`saved`) не вызываются.
+    expect($saved)->toBe(0);
+
+    mcp()->tool(CreateRecord::class, ['resource' => 'articles', 'values' => []])
+        ->assertHasErrors(['Проверка не пройдена'])->assertSee('title')->assertDontSee('values');
+
+    expect($article->refresh()->title)->toBe('Прежний');
+});
+
+it('refuses a page number that would overflow the offset', function (): void {
+    mcp()->tool(ListRecords::class, ['resource' => 'articles', 'page' => PHP_INT_MAX])->assertHasErrors();
+    mcp()->tool(ListRecords::class, ['resource' => 'articles', 'page' => 1_000_000])->assertHasNoErrors();
+});
+
+it('tells the client that an update may overwrite, and a creation only adds', function (): void {
+    expect(new UpdateRecord()->annotations())->toMatchArray(['destructiveHint' => true])
+        ->and(new CreateRecord()->annotations())->toMatchArray(['destructiveHint' => false]);
 });
 
 it('returns validation errors by field and writes nothing', function (): void {
@@ -269,6 +320,20 @@ it('follows the Policy when updating', function (): void {
     expect($closed->refresh()->title)->toBe('Закрыто');
 });
 
+it('does not let an empty set of values past the checks of the update: the Policy and the lock of the record come first', function (): void {
+    Gate::policy(Category::class, RestrictedCategoryPolicy::class);
+    $closed = Category::factory()->create(['title' => 'Закрыто']);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'categories', 'id' => (string) $closed->id, 'values' => []])
+        ->assertHasErrors(['Нет права «update»']);
+
+    useFixtureResources('McpGuard');
+    $locked = Article::factory()->create(['title' => 'Согласовано']);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'articles', 'id' => (string) $locked->id, 'values' => []])
+        ->assertHasErrors(['закрыта для правки агентом']);
+});
+
 it('hides the delete tool unless deletion is enabled', function (): void {
     $article = Article::factory()->create();
 
@@ -298,6 +363,63 @@ it('does not delete a record that has nested ones', function (): void {
     mcp()->tool(DeleteRecord::class, ['resource' => 'categories', 'id' => (string) $parent->id])->assertHasErrors(['вложенные']);
 
     expect(Category::query()->count())->toBe(2);
+});
+
+it('asks the beforeDelete hook of the section before it deletes, as the delete button does', function (): void {
+    useFixtureResources('DeleteHook');
+    config(['fastleo.mcp.allow_delete' => true]);
+    $kept = Category::factory()->create(['code' => 'keep']);
+    $other = Category::factory()->create(['code' => 'other']);
+
+    mcp()->tool(DeleteRecord::class, ['resource' => 'categories', 'id' => (string) $kept->id])->assertHasErrors(['Категория нужна сайту.']);
+    mcp()->tool(DeleteRecord::class, ['resource' => 'categories', 'id' => (string) $other->id])->assertHasNoErrors()->assertSee('Запись удалена');
+
+    expect(Category::query()->pluck('id')->all())->toBe([$kept->id]);
+});
+
+it('says that the deletion was cancelled when the model refuses it without a reason', function (): void {
+    config(['fastleo.mcp.allow_delete' => true]);
+    $article = Article::factory()->create(['is_published' => false]);
+    Article::deleting(fn (): bool => false);
+
+    mcp()->tool(DeleteRecord::class, ['resource' => 'articles', 'id' => (string) $article->id])->assertHasErrors(['Сайт отменил удаление']);
+
+    expect(Article::query()->count())->toBe(1);
+});
+
+it('does not delete a record that is closed for the agent, such as a publication waiting to be sent', function (): void {
+    config(['fastleo.mcp.allow_delete' => true]);
+    $publication = Publication::query()->create(['text' => 'Ждёт отправки', 'channel_ids' => [(string) publishingChannel()->id], 'status' => 'scheduled']);
+
+    mcp()->tool(DeleteRecord::class, ['resource' => 'publications', 'id' => (string) $publication->id])->assertHasErrors(['закрыта для правки агентом']);
+
+    expect(Publication::query()->count())->toBe(1);
+});
+
+it('does not run an action on a record that is closed for the agent', function (): void {
+    useFixtureResources('McpGuard');
+    $closed = Article::factory()->create(['title' => 'Согласовано']);
+    $open = Article::factory()->create(['title' => 'Черновик']);
+    $run = fn (array $ids): TestResponse => mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'append-mark', 'ids' => $ids]);
+
+    $run([(string) $closed->id])->assertHasErrors(['закрыта для правки агентом']);
+    $run([(string) $closed->id, (string) $open->id])->assertHasNoErrors()->assertSee(['"processed":1', '"skipped":1']);
+
+    expect($closed->refresh()->title)->toBe('Согласовано')
+        ->and($open->refresh()->title)->toBe('Черновик ✔');
+});
+
+it('keeps an action with a confirmation in the admin away from the agent unless deletion is enabled', function (): void {
+    useFixtureResources('McpGuard');
+    $article = Article::factory()->create(['title' => 'Заголовок']);
+    $run = fn (): TestResponse => mcp()->tool(RunAction::class, ['resource' => 'articles', 'action' => 'wipe-titles', 'ids' => [(string) $article->id]]);
+
+    $run()->assertHasErrors(['требует подтверждения']);
+    expect($article->refresh()->title)->toBe('Заголовок');
+
+    config(['fastleo.mcp.allow_delete' => true]);
+    $run()->assertHasNoErrors()->assertSee('Стёрто');
+    expect($article->refresh()->title)->toBe('—');
 });
 
 it('does not delete from read-only sections', function (): void {
@@ -462,6 +584,17 @@ it('refuses to drop nested records by an incomplete list while deletion is off',
         ->assertHasErrors(['удаление отключено']);
 
     expect($article->links()->pluck('id')->all())->toBe([$first->id, $second->id]);
+});
+
+it('reports a value of a nested record that is not a date as a validation error, not as an internal error, while deletion is off', function (): void {
+    useFixtureResources('McpNestedDate');
+    $article = Article::factory()->create();
+    $link = $article->links()->create(['title' => 'First', 'url' => '2026-01-01 10:00:00']);
+
+    mcp()->tool(UpdateRecord::class, ['resource' => 'articles', 'id' => (string) $article->id, 'values' => ['links' => [['id' => $link->id, 'title' => 'First', 'url' => 'abc']]]])
+        ->assertHasErrors(['links.0.url']);
+
+    expect($article->links()->sole()->url)->toBe('2026-01-01 10:00:00');
 });
 
 it('refuses to replace a one-to-one record that was sent without its id', function (): void {
@@ -691,4 +824,21 @@ it('keeps the order of the inner items an agent sends without empty sub fields',
     ]]])->assertHasNoErrors();
 
     expect(array_column($page->refresh()->faq[0]['steps'] ?? [], 'title'))->toBe(['Первый', 'Второй']);
+});
+
+it('serves the tools with the admin guard as the default one, as the admin pages do, so that the code of the site sees the admin in auth()', function (): void {
+    $admin = admin();
+    Article::factory()->create();
+    $seen = [];
+    Article::retrieved(function () use (&$seen): void {
+        $seen[] = auth()->id();
+    });
+    Auth::shouldUse('web');
+    Fastleo::guard()->setUser($admin);
+
+    $response = new ListRecords()->handle(new Request(['resource' => 'articles']));
+
+    expect($response->isError())->toBeFalse()
+        ->and($seen)->not->toBeEmpty()
+        ->and(array_unique($seen))->toEqual([$admin->id]);
 });

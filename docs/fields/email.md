@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 Email::make('email', 'Email')->required()->searchable();
 
 // Уникальный адрес: при редактировании своя запись не мешает
-Email::make('email')->rules(fn (?Model $record) => [Rule::unique('doctors', 'email')->ignore($record)]);
+Email::make('email')->rules(fn (?Model $record) => [Rule::unique('products', 'email')->ignore($record)]);
 ```
 
 **Колонка:** `$table->string('email')`.

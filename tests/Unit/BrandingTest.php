@@ -5,8 +5,8 @@ declare(strict_types=1);
 use Fastleo\Support\Branding;
 
 it('takes the admin name from the brand, then from the site name', function (): void {
-    config(['fastleo.brand.name' => 'Клиника', 'app.name' => 'Сайт']);
-    expect(Branding::name())->toBe('Клиника');
+    config(['fastleo.brand.name' => 'Магазин', 'app.name' => 'Сайт']);
+    expect(Branding::name())->toBe('Магазин');
 
     config(['fastleo.brand.name' => null]);
     expect(Branding::name())->toBe('Сайт');

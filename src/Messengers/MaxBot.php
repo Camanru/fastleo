@@ -154,11 +154,13 @@ final class MaxBot extends Bot
 
                 break;
             } catch (MessengerFailed $exception) {
-                if ($attempt >= 3 || ! str_contains($exception->getMessage(), 'attachment.not.ready')) {
+                // Max обрабатывает загруженные картинки не сразу: код `attachment.not.ready` в ответе (а в `message` другой текст) —
+                // подождать и повторить, пауза растёт (1, 2 секунды).
+                if ($attempt >= 3 || ($exception->reason !== 'attachment.not.ready' && ! str_contains($exception->getMessage(), 'attachment.not.ready'))) {
                     throw $exception;
                 }
 
-                Sleep::for(1)->second();
+                Sleep::for($attempt)->seconds();
             }
         }
 
@@ -262,7 +264,7 @@ final class MaxBot extends Bot
         }
 
         if (! $response->successful()) {
-            throw $this->failure($response);
+            throw $this->failure($response, false);
         }
 
         $token = data_get($response->json(), 'token');
@@ -308,7 +310,7 @@ final class MaxBot extends Bot
         }
 
         if (! $response->successful()) {
-            throw $this->failure($response);
+            throw $this->failure($response, $sending);
         }
 
         $data = $response->json();
@@ -328,15 +330,16 @@ final class MaxBot extends Bot
     }
 
     /**
-     * Ошибка из ответа Max: текст `message` или код ответа; при 429 — подождать секунду.
+     * Ошибка из ответа Max: текст `message` или код ответа; при 429 — подождать секунду. Сбой сервера (5xx) при отправке
+     * сообщения не значит, что оно не дошло: повтор мог бы продублировать пост.
      */
-    private function failure(Response $response): MessengerFailed
+    private function failure(Response $response, bool $sending): MessengerFailed
     {
         $message = $response->json('message');
         $code = $response->json('code');
         $text = is_string($message) && $message !== '' ? $message : (is_string($code) ? $code : 'HTTP '.$response->status());
 
-        return new MessengerFailed($this->clean($text), retryAfter: $response->status() === 429 ? 1 : null);
+        return new MessengerFailed($this->clean($text), uncertain: $sending && $response->serverError(), retryAfter: $response->status() === 429 ? 1 : null, reason: is_string($code) && $code !== '' ? $code : null);
     }
 
     /**

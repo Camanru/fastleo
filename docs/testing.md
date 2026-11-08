@@ -24,6 +24,18 @@ $this->actingAs($admin, 'fastleo');
 
 `actingAs($admin)` без второго аргумента входит на сайт, а не в админку — страницы админки ответят переходом на форму входа.
 
+## Сброс пароля в тестах
+
+Запрос ссылки и ввод нового пароля отвечают не быстрее секунды (так по скорости ответа не узнать, есть ли такой администратор). В тесте сайта, который ходит на эти маршруты, подмените паузу, иначе каждый запрос займёт секунду:
+
+```php
+use Illuminate\Support\Sleep;
+
+Sleep::fake();
+
+$this->post(route('fastleo.password.email'), ['email' => 'admin@example.com']);
+```
+
 ## Пример
 
 Тестам нужна чистая база с таблицами: в Pest — `->use(RefreshDatabase::class)` в `tests/Pest.php` (в новом Laravel эта строка закомментирована) или `uses(RefreshDatabase::class);` в файле теста, в PHPUnit — `use RefreshDatabase;` в классе. Без этого тесты на SQLite в памяти падают с «no such table».
@@ -31,54 +43,54 @@ $this->actingAs($admin, 'fastleo');
 Файл теста (Pest или PHPUnit команда выбирает сама, как установлено на сайте):
 
 ```bash
-php artisan make:test Admin/DoctorsTest           # tests/Feature/Admin/DoctorsTest.php
+php artisan make:test Admin/ProductsTest          # tests/Feature/Admin/ProductsTest.php
 ```
 
 Pest:
 
 ```php
-// tests/Feature/Admin/DoctorsTest.php
-use App\Models\Doctor;
+// tests/Feature/Admin/ProductsTest.php
+use App\Models\Product;
 use App\Models\User;
 
 beforeEach(function (): void {
     $this->actingAs(User::factory()->admin()->create(), 'fastleo');
 });
 
-it('shows the doctors list', function (): void {
-    Doctor::factory()->create(['name' => 'Иванов']);
+it('shows the products list', function (): void {
+    Product::factory()->create(['name' => 'Чайник']);
 
-    $this->get(route('fastleo.resources.index', 'doctors'))
+    $this->get(route('fastleo.resources.index', 'products'))
         ->assertOk()
-        ->assertSee('Иванов');
+        ->assertSee('Чайник');
 });
 
-it('creates a doctor', function (): void {
-    $this->post(route('fastleo.resources.store', 'doctors'), [
-        'name' => 'Петров',
-        'specialty' => 'Хирург',
-        'accepts_appointments' => '1',
+it('creates a product', function (): void {
+    $this->post(route('fastleo.resources.store', 'products'), [
+        'name' => 'Пылесос',
+        'category' => 'Электроника',
+        'is_active' => '1',
     ])->assertRedirect();
 
-    expect(Doctor::where('name', 'Петров')->first())
-        ->specialty->toBe('Хирург')
-        ->accepts_appointments->toBeTrue();
+    expect(Product::where('name', 'Пылесос')->first())
+        ->category->toBe('Электроника')
+        ->is_active->toBeTrue();
 });
 
 it('requires a name', function (): void {
-    $this->post(route('fastleo.resources.store', 'doctors'), ['specialty' => 'Хирург'])
+    $this->post(route('fastleo.resources.store', 'products'), ['category' => 'Электроника'])
         ->assertSessionHasErrors('name');
 });
 
-it('updates a doctor', function (): void {
-    $doctor = Doctor::factory()->create();
+it('updates a product', function (): void {
+    $product = Product::factory()->create();
 
-    $this->put(route('fastleo.resources.update', ['doctors', $doctor->id]), [
-        'name' => 'Сидоров',
-        'specialty' => $doctor->specialty,
+    $this->put(route('fastleo.resources.update', ['products', $product->id]), [
+        'name' => 'Утюг',
+        'category' => $product->category,
     ])->assertRedirect();
 
-    expect($doctor->refresh()->name)->toBe('Сидоров');
+    expect($product->refresh()->name)->toBe('Утюг');
 });
 ```
 
@@ -88,7 +100,7 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 
 ## Маршруты
 
-Адрес раздела (`doctors`) — первый параметр, ключ записи — второй.
+Адрес раздела (`products`) — первый параметр, ключ записи — второй.
 
 | Маршрут | Метод | Что |
 |---|---|---|
@@ -101,9 +113,9 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 | `fastleo.resources.destroy` | DELETE | удалить (в корзину при `SoftDeletes`) |
 | `fastleo.resources.restore` | POST | восстановить из корзины |
 | `fastleo.resources.force-delete` | DELETE | удалить навсегда |
-| `fastleo.resources.action` | POST | действие: `route(…, ['doctors', 'publish-doctors'])`, в теле `ids` и поля мини-формы под ключом `data` |
-| `fastleo.resources.toggle` | POST | быстрый переключатель поля с `quickToggle()`: `route(…, ['doctors', $id, 'is_active'])`, в теле `value` = `1` или `0` (JSON → `{"value": true}`) |
-| `fastleo.resources.export` | GET | выгрузка xlsx/csv |
+| `fastleo.resources.action` | POST | действие: `route(…, ['products', 'publish-products'])`, в теле `ids` и поля мини-формы под ключом `data` |
+| `fastleo.resources.toggle` | POST | быстрый переключатель поля с `quickToggle()`: `route(…, ['products', $id, 'is_active'])`, в теле `value` = `1` или `0` (JSON → `{"value": true}`) |
+| `fastleo.resources.export` | GET | выгрузка csv |
 | `fastleo.resources.related.store` | POST | быстрое добавление из [связанной таблицы](related.md#быстрое-добавление) (`quickAdd`): `route(…, ['products', $id, 'reviews'])`, поля в теле под ключом `data`, ответ JSON (201 или 422); отправляйте `postJson` |
 
 Полный список — `php artisan route:list --name=fastleo`.
@@ -113,20 +125,20 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 Если у модели есть Policy, проверьте, что запрет работает — это защищает от ошибки в Policy:
 
 ```php
-it('forbids editors to delete doctors', function (): void {
+it('forbids editors to delete products', function (): void {
     $editor = User::factory()->admin()->create(['role' => 'editor']);
-    $doctor = Doctor::factory()->create();
+    $product = Product::factory()->create();
 
     $this->actingAs($editor, 'fastleo')
-        ->delete(route('fastleo.resources.destroy', ['doctors', $doctor->id]))
+        ->delete(route('fastleo.resources.destroy', ['products', $product->id]))
         ->assertForbidden();
 
-    $this->assertModelExists($doctor);
+    $this->assertModelExists($product);
 });
 
 it('does not let a site user into the admin panel', function (): void {
     $this->actingAs(User::factory()->create(), 'fastleo')
-        ->get(route('fastleo.resources.index', 'doctors'))
+        ->get(route('fastleo.resources.index', 'products'))
         ->assertRedirect(route('fastleo.login'));
 });
 ```
@@ -134,24 +146,24 @@ it('does not let a site user into the admin panel', function (): void {
 ## Действия
 
 ```php
-it('publishes selected doctors', function (): void {
-    $doctors = Doctor::factory()->count(2)->create(['published' => false]);
+it('publishes selected products', function (): void {
+    $products = Product::factory()->count(2)->create(['is_active' => false]);
 
-    $this->post(route('fastleo.resources.action', ['doctors', 'publish-doctors']), [
-        'ids' => $doctors->pluck('id')->all(),
+    $this->post(route('fastleo.resources.action', ['products', 'publish-products']), [
+        'ids' => $products->pluck('id')->all(),
     ])->assertRedirect();
 
-    expect(Doctor::where('published', true)->count())->toBe(2);
+    expect(Product::where('is_active', true)->count())->toBe(2);
 });
 ```
 
-Ключ действия — часть адреса из имени класса (`PublishDoctors` → `publish-doctors`) или свойство `$key` ([действия](actions.md)).
+Ключ действия — часть адреса из имени класса (`PublishProducts` → `publish-products`) или свойство `$key` ([действия](actions.md)).
 
 Если у действия есть мини-форма, её поля передаются под ключом `data`, как в форме админки:
 
 ```php
-$this->post(route('fastleo.resources.action', ['doctors', 'schedule-doctors']), [
-    'ids' => $doctors->pluck('id')->all(),
+$this->post(route('fastleo.resources.action', ['products', 'schedule-products']), [
+    'ids' => $products->pluck('id')->all(),
     'data' => ['published_on' => '2026-11-01'],
 ])->assertRedirect();
 ```
@@ -177,13 +189,13 @@ it('has no fastleo configuration errors', function (): void {
 
 ## Файлы
 
-Поля `Image`, `File` и `Gallery` хранят путь файла на диске `fastleo.files.disk` (`uploads/doctors/ivanov.jpg`). Форма отправляет путь файла из [файлового менеджера](files.md), а наличие файла на диске не проверяет — в тесте достаточно передать путь внутри `fastleo.files.root`:
+Поля `Image`, `File` и `Gallery` хранят путь файла на диске `fastleo.files.disk` (`uploads/products/kettle.jpg`). Форма отправляет путь файла из [файлового менеджера](files.md), а наличие файла на диске не проверяет — в тесте достаточно передать путь внутри `fastleo.files.root`:
 
 ```php
-$this->post(route('fastleo.resources.store', 'doctors'), [
-    'name' => 'Иванов',
-    'specialty' => 'Терапевт',
-    'photo' => 'uploads/doctors/ivanov.jpg',
+$this->post(route('fastleo.resources.store', 'products'), [
+    'name' => 'Чайник',
+    'category' => 'Электроника',
+    'photo' => 'uploads/products/kettle.jpg',
 ])->assertRedirect();
 ```
 

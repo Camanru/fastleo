@@ -1,6 +1,6 @@
 {
     "name": "camanru/fastleo",
-    "description": "Admin panel for Laravel sites: each section is described by a single resource class",
+    "description": "Laravel panel for Eloquent models: admin panels, CRMs and back offices, each section described by a single resource class",
     "keywords": [
         "laravel",
         "fastleo",
@@ -20,10 +20,12 @@
     ],
     "require": {
         "php": "^8.4",
+        "ext-gd": "*",
         "bacon/bacon-qr-code": "^3.1",
         "intervention/image": "^4",
         "laravel/framework": "^13.32",
         "laravel/mcp": "^1.0",
+        "league/commonmark": "^2.10.2",
         "openspout/openspout": "^5.13",
         "pragmarx/google2fa": "^9.1",
         "symfony/html-sanitizer": "^8.1.11"
@@ -41,6 +43,7 @@
         "spatie/laravel-permission": "^8.3"
     },
     "suggest": {
+        "ext-exif": "Rotates phone photos by their EXIF orientation when they are uploaded (fastleo:doctor warns without it).",
         "spatie/laravel-permission": "Roles for administrators: the fastleo.roles.enabled option checks permissions of the fastleo guard roles on top of Policies (docs/roles.md)."
     },
     "autoload": {
@@ -89,7 +92,10 @@
         "test:coverage": "@php vendor/bin/pest --parallel --exclude-testsuite=Browser --coverage --min=100",
         "test:types": "@php vendor/bin/pest --type-coverage --min=100",
         "test:browser": "@php vendor/bin/pest --testsuite=Browser",
-        "test:databases": "scripts/test-databases.sh",
+        "test:databases": [
+            "Composer\\Config::disableProcessTimeout",
+            "scripts/test-databases.sh"
+        ],
         "check": [
             "@lint",
             "@test:types",

@@ -9,6 +9,7 @@ use Illuminate\Foundation\Auth\User as PlainUser;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Workbench\App\Models\User;
 
 it('creates an admin from options', function (): void {
@@ -49,6 +50,16 @@ it('grants access to an existing user and keeps the password when none is entere
     expect($user->fastleo_admin)->toBeTrue()
         ->and($user->name)->toBe('Пётр')
         ->and($user->password)->toBe($hash);
+});
+
+it('keeps the password of an existing user when the new one is only spaces, like an empty one', function (): void {
+    $user = User::factory()->create(['email' => 'user@example.com']);
+    $hash = $user->password;
+
+    $this->artisan('fastleo:user', ['email' => 'user@example.com', '--password' => '        '])->assertSuccessful();
+
+    expect($user->refresh()->password)->toBe($hash)
+        ->and($user->fastleo_admin)->toBeTrue();
 });
 
 it('changes the password of an existing user when given', function (): void {
@@ -164,4 +175,21 @@ it('turns off two-factor protection of a user who lost the phone and keeps every
 
     expect(resolve(TwoFactor::class)->isEnabled($admin))->toBeFalse()
         ->and(Hash::check('password', $admin->refresh()->password))->toBeTrue();
+});
+
+it('applies the password rules of the site, so a weak password cannot be set from the console', function (): void {
+    Password::defaults(fn (): Password => Password::min(12)->mixedCase()->numbers());
+
+    try {
+        $this->artisan('fastleo:user', ['email' => 'admin@example.com', '--password' => 'weakpass1', '--no-interaction' => true])
+            ->expectsOutputToContain('Длина поля «Пароль» должна быть не меньше 12 символов.')
+            ->assertFailed();
+
+        expect(User::query()->count())->toBe(0);
+
+        $this->artisan('fastleo:user', ['email' => 'admin@example.com', '--password' => 'Stronger-pass-12', '--no-interaction' => true])->assertSuccessful();
+        expect(User::query()->count())->toBe(1);
+    } finally {
+        Password::$defaultCallback = null;
+    }
 });

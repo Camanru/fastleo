@@ -7,7 +7,10 @@ use Fastleo\Auth\LoginRecord;
 use Fastleo\Auth\NewLoginNotification;
 use Fastleo\Fastleo;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Workbench\App\Models\User;
 
 beforeEach(function (): void {
     Notification::fake();
@@ -39,6 +42,24 @@ it('updates the same device instead of adding a row', function (): void {
     $record = LoginRecord::query()->sole();
     expect($record->last_seen_at?->gt($record->created_at))->toBeTrue();
     Notification::assertNothingSent();
+});
+
+it('does not fail when the same new device is recorded by a second request at the same moment', function (): void {
+    $user = User::query()->where('email', 'anna@example.com')->sole();
+    $request = Request::create('/', 'GET', server: ['REMOTE_ADDR' => '10.0.0.1', 'HTTP_USER_AGENT' => 'Chrome']);
+    // Второй запрос двойного щелчка «Войти» записывает устройство между проверкой и вставкой первого.
+    LoginRecord::creating(function (LoginRecord $record): void {
+        DB::table('fastleo_logins')->insert(['user_id' => $record->user_id, 'fingerprint' => $record->fingerprint, 'ip' => '10.0.0.1', 'user_agent' => 'Chrome', 'created_at' => now(), 'last_seen_at' => now()]);
+    });
+
+    try {
+        $isNew = resolve(LoginHistory::class)->record($user, $request);
+    } finally {
+        LoginRecord::flushEventListeners();
+    }
+
+    // Для устройства, которое уже записал параллельный запрос, оно не новое: письма «новое устройство» не будет.
+    expect($isNew)->toBeFalse();
 });
 
 it('emails the admin about a login from a new browser or address', function (): void {
@@ -150,4 +171,31 @@ it('keeps at least a day of history whatever the setting', function (): void {
 
     expect(resolve(LoginHistory::class)->prune())->toBe(1)
         ->and(LoginRecord::query()->pluck('fingerprint')->all())->toBe(['today']);
+});
+
+it('does not let the browser string put a link or a picture into the new login mail', function (string $userAgent): void {
+    app()->setLocale('ru');
+    $html = (string) new NewLoginNotification('10.0.0.9', $userAgent, now())->toMail(new stdClass())->render();
+
+    expect($html)->not->toContain('href="https://evil.example')
+        ->and($html)->not->toContain('src="https://evil.example')
+        ->and($html)->toContain('Браузер:');
+})->with([
+    'link' => 'Mozilla [Подтвердите, что это вы](https://evil.example/verify)',
+    'picture' => 'Mozilla ![](https://evil.example/pixel.png)',
+    'autolink' => 'Mozilla <https://evil.example/verify>',
+]);
+
+it('shows a less-than sign in the browser string of the new login mail as it is, not as an escaped entity', function (): void {
+    app()->setLocale('ru');
+    $html = (string) new NewLoginNotification('10.0.0.9', 'Browser 1 < 2 and 3 > 2', now())->toMail(new stdClass())->render();
+
+    // Laravel сам заменяет «<» на «&lt;»: ещё одно экранирование показало бы в письме «&lt;» буквами.
+    expect($html)->toContain('Browser 1 &lt; 2 and 3 &gt; 2')->not->toContain('&amp;lt;');
+});
+
+it('cuts a very long browser string in the new login mail', function (): void {
+    $mail = new NewLoginNotification('10.0.0.9', str_repeat('Я', 5000), now())->toMail(new stdClass());
+
+    expect(mb_strlen(implode(' ', $mail->introLines)))->toBeLessThan(900);
 });

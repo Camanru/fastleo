@@ -11,6 +11,7 @@ use Fastleo\Files\FileStore;
 use Fastleo\Files\FileTypes;
 use Fastleo\Files\PathGuard;
 use Fastleo\Files\UploadLimits;
+use Fastleo\Http\Middleware\SecurityHeaders;
 use Fastleo\Support\ValidationMessages;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -35,7 +36,7 @@ final class FilesController
     private const int MAX_DELETE = 500;
 
     /**
-     * `GET /fastleo/files?folder=uploads/doctors` — страница менеджера.
+     * `GET /fastleo/files?folder=uploads/products` — страница менеджера.
      *
      * В окне выбора (`picker=field`, его открывают поля и редактор) — без меню: `accept=images` показывает только
      * картинки, `multiple=1` разрешает выбрать несколько, `current=путь` открывает папку
@@ -78,15 +79,16 @@ final class FilesController
                 'accept' => $imagesOnly ? 'images' : null,
                 'multiple' => $picker === 'field' && $request->query('multiple') === '1' ? '1' : null,
             ]),
-            'limits' => ['file' => UploadLimits::perFile(), 'total' => UploadLimits::total()],
+            'limits' => ['file' => UploadLimits::perFile(), 'total' => UploadLimits::total(), 'files' => UploadLimits::files()],
         ]);
     }
 
     /**
      * `POST /fastleo/files/upload` с `folder` и `files[]` → `{"files": [{path, url, name, image}], "errors": ["…"]}`.
      *
-     * Папка создаётся, если её ещё нет (папка поля `directory()`). Отклонённые файлы
-     * не мешают остальным: их причины — в `errors`.
+     * Папка создаётся, если её ещё нет (папка поля `directory()`). Недопустимый файл (расширение, размер) или отказ
+     * хранилища остальным не мешает: причина — в `errors`, допустимые файлы сохраняются. Ошибкой проверки (422) отвечает
+     * только сам запрос: нет папки, `files` не список или в нём больше файлов, чем принимает один запрос.
      *
      * @throws ValidationException
      */
@@ -94,24 +96,10 @@ final class FilesController
     {
         abort_unless(RoleMatrix::canWrite(), 403);
 
-        /** @var mixed $files вложенные массивы `files[0][]` тоже возможны — их отвергает проверка */
-        $files = $request->file('files');
-        $attributes = [];
-
-        foreach (is_array($files) ? $files : [] as $index => $file) {
-            if ($file instanceof UploadedFile) {
-                $attributes['files.'.$index] = '«'.$file->getClientOriginalName().'»';
-            }
-        }
-
-        $maxSize = UploadLimits::kilobytes();
-
         Validator::make($request->all(), [
             'folder' => ['required', 'string'],
-            'files' => ['required', 'array', 'max:50'],
-            // Список разрешённых расширений пуст (настройка сайта): «-» не совпадёт ни с чем, а правило без параметров падает с 500.
-            'files.*' => ['required', 'file', 'extensions:'.implode(',', FileTypes::allowed() ?: ['-']), ...($maxSize !== null ? ['max:'.$maxSize] : [])],
-        ], ValidationMessages::all(), $attributes)->validate();
+            'files' => ['required', 'array', 'max:'.UploadLimits::MAX_FILES_PER_REQUEST],
+        ], ValidationMessages::all())->validate();
 
         $folder = PathGuard::inside($request->input('folder'));
 
@@ -122,7 +110,18 @@ final class FilesController
         $stored = [];
         $errors = [];
 
-        foreach (array_filter(is_array($files) ? $files : [], fn (mixed $file): bool => $file instanceof UploadedFile) as $file) {
+        /** @var mixed $files вложенные массивы `files[0][]` тоже возможны — их отвергает проверка файла */
+        $files = $request->file('files');
+
+        foreach (is_array($files) ? $files : [] as $index => $file) {
+            $problems = $this->problemsOf($file, (string) $index);
+
+            if ($problems !== [] || ! $file instanceof UploadedFile) {
+                array_push($errors, ...$problems);
+
+                continue;
+            }
+
             try {
                 $path = FileStore::store($file, $folder);
                 $stored[] = ['path' => $path, 'url' => FileStore::url($path), 'name' => basename($path), 'image' => FileTypes::isImage($path)];
@@ -161,6 +160,25 @@ final class FilesController
         }
 
         return response()->json(['path' => $path]);
+    }
+
+    /**
+     * Причины, по которым файл не принимается: не файл, расширение вне списка сайта, размер больше лимита.
+     *
+     * @return list<string>
+     */
+    private function problemsOf(mixed $file, string $index): array
+    {
+        $maxSize = UploadLimits::kilobytes();
+        // Шаблон сообщения сам берёт подпись в кавычки: «Файл «:attribute» …».
+        $label = $file instanceof UploadedFile ? mb_scrub($file->getClientOriginalName()) : '№'.$index;
+
+        $validator = Validator::make(['file' => $file], [
+            // Список разрешённых расширений пуст (настройка сайта): «-» не совпадёт ни с чем, а правило без параметров падает с 500.
+            'file' => ['required', 'file', 'extensions:'.implode(',', FileTypes::allowed() ?: ['-']), ...($maxSize !== null ? ['max:'.$maxSize] : [])],
+        ], ValidationMessages::all(), ['file' => $label]);
+
+        return array_values($validator->errors()->all());
     }
 
     /**
@@ -247,12 +265,16 @@ final class FilesController
 
         $deleted = 0;
 
-        foreach ((array) $request->input('paths') as $path) {
-            $path = PathGuard::entry($path);
+        try {
+            foreach ((array) $request->input('paths') as $path) {
+                $path = PathGuard::entry($path);
 
-            if ($path !== null && ! FileStore::isHidden($path) && FileStore::delete($path)) {
-                $deleted++;
+                if ($path !== null && ! FileStore::isHidden($path) && FileStore::delete($path)) {
+                    $deleted++;
+                }
             }
+        } catch (FileRejected $rejected) {
+            throw ValidationException::withMessages(['paths' => $rejected->getMessage()]);
         }
 
         return response()->json(['deleted' => $deleted]);
@@ -269,13 +291,14 @@ final class FilesController
 
         $thumbnail = FileStore::thumbnail($path);
 
-        if ($thumbnail !== null) {
-            return redirect()->away(FileStore::url($thumbnail));
+        if ($thumbnail === null) {
+            abort_unless(FileStore::disk()->fileExists($path), 404);
         }
 
-        abort_unless(FileStore::disk()->fileExists($path), 404);
+        // Браузер запоминает только этот переход на публичный файл (SecurityHeaders): переход гостя на вход запоминать нельзя.
+        $request->attributes->set(SecurityHeaders::CACHEABLE_REDIRECT, true);
 
-        return redirect()->away(FileStore::url($path));
+        return redirect()->away(FileStore::url($thumbnail ?? $path));
     }
 
     /**

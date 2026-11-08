@@ -75,7 +75,9 @@ final class EmailAvailable implements ValidationRule, ValidatorAwareRule
             return __('fastleo::users.change_own_email_in_profile', [], Fastleo::LOCALE);
         }
 
+        // Уникальность в базе общая для всех строк: мягко удалённый пользователь тоже держит адрес.
         $taken = $this->model::query()
+            ->withoutGlobalScopes()
             ->whereRaw('lower(email) = ?', [$email])
             ->when($exists, fn (Builder $query) => $query->whereKeyNot($record?->getKey()))
             ->exists();

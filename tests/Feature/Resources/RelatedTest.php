@@ -14,6 +14,7 @@ use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Fastleo\Tests\Fixtures\Related\ArticleResource as ChildArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
 use Fastleo\Tests\Fixtures\RelatedColumns\CategoryResource as ColumnsCategoryResource;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Gate;
 use Workbench\App\Models\Article;
@@ -292,6 +293,20 @@ describe('a failed action form', function (): void {
         $this->get(route('fastleo.resources.create', 'articles'))->assertOk()->assertDontSee('утечка-ввода');
     });
 
+    it('keeps an uploaded file out of the session', function (): void {
+        $article = categoryArticle($this->category);
+        $page = route('fastleo.resources.show', ['categories', $this->category->id]);
+
+        $this->from($page)->post(route('fastleo.resources.action', ['articles', 'stamp-articles']), [
+            'ids' => [(string) $article->id], 'data' => ['code' => 'ошибка-ввода', 'file' => UploadedFile::fake()->image('a.jpg')],
+            '_related' => 'articles', '_related_parent' => (string) $this->category->id,
+        ]);
+
+        $pending = session(RelatedController::pendingKey('articles', (string) $this->category->id));
+
+        expect($pending['input']['data'])->toBe(['code' => 'ошибка-ввода']);
+    });
+
     it('is dropped when it is older than a minute', function (): void {
         $article = categoryArticle($this->category);
         $page = route('fastleo.resources.show', ['categories', $this->category->id]);
@@ -409,7 +424,7 @@ describe('the way back', function (): void {
             ->and(ReturnUrl::sanitize(route('fastleo.dashboard')))->toBeNull()
             ->and(ReturnUrl::sanitize(request()->root().'/fastleo/articles/1'))->toBe(request()->root().'/fastleo/articles/1')
             ->and(ReturnUrl::sanitize(['a']))->toBeNull()
-            ->and(ReturnUrl::sanitize(str_repeat('a', 2100)))->toBeNull();
+            ->and(ReturnUrl::sanitize(route('fastleo.resources.index', 'articles').'?q='.str_repeat('a', 2100)))->toBeNull();
     });
 });
 

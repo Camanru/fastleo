@@ -40,7 +40,7 @@ it('lets the account in from another IP after five failures', function (): void 
 });
 
 it('blocks an IP after 20 attempts across different emails', function (): void {
-    $admin = admin(['email' => 'admin@example.com']);
+    admin(['email' => 'admin@example.com']);
     foreach (range(1, 20) as $number) {
         failLogins(1, "guess{$number}@example.com");
     }
@@ -50,7 +50,6 @@ it('blocks an IP after 20 attempts across different emails', function (): void {
 
     $response->assertSessionHasErrors('email');
     $this->assertGuest(Fastleo::GUARD);
-    expect($admin->exists)->toBeTrue();
 });
 
 it('blocks an account for an hour after 50 attempts from many IPs', function (): void {
@@ -125,3 +124,37 @@ it('rejects an accented email that the MySQL collation treats as the admin email
     $response->assertSessionHasErrors(['email' => 'Неверный email или пароль.']);
     $this->assertGuest(Fastleo::GUARD);
 })->skip(fn (): bool => DB::connection()->getDriverName() !== 'mysql', 'Нестрогое сравнение строк есть только в MySQL');
+
+it('answers a look-alike of an existing and of a made-up email the same way after failures', function (): void {
+    admin(['email' => 'admin@example.com']);
+
+    // Laravel схлопывает «á» в «a» в ключе счётчика: по сообщению «слишком много попыток» узнавали, что адреса «ghost@» нет.
+    foreach (['admin@example.com', 'ghost@example.com'] as $email) {
+        failLogins(5, $email);
+
+        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
+            ->post(route('fastleo.login.store'), ['email' => str_replace('a', 'á', $email), 'password' => 'x'])
+            ->assertSessionHasErrors(['email' => 'Неверный email или пароль.']);
+    }
+});
+
+it('does not let an email that looks like the account key burn the limit of the real user', function (): void {
+    $admin = admin(['email' => 'admin@example.com']);
+
+    foreach (range(1, 50) as $number) {
+        failLogins(1, 'id:'.$admin->getKey(), "10.0.3.{$number}");
+    }
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.4.1'])
+        ->post(route('fastleo.login.store'), ['email' => 'admin@example.com', 'password' => 'password']);
+
+    $this->assertAuthenticatedAs($admin, Fastleo::GUARD);
+});
+
+it('still blocks a made-up email after five failures from one IP', function (): void {
+    failLogins(5, 'ghost@example.com');
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
+        ->post(route('fastleo.login.store'), ['email' => 'ghost@example.com', 'password' => 'x'])
+        ->assertSessionHasErrors(['email' => 'Слишком много попыток входа. Повторите через 1 мин.']);
+});

@@ -134,9 +134,11 @@ final class Chart extends Widget
         $today = CarbonImmutable::now($zone)->startOfDay();
         $start = $today->subDays($days - 1);
 
+        // Группировка по выражению, а не по псевдониму `day`: на PostgreSQL одноимённая колонка таблицы перекрыла бы псевдоним.
+        $bucket = $hour ?? 'date('.$wrapped.')';
         $counts = $query->where($column, '>=', $start->setTimezone($siteZone))->toBase()
-            ->select([new SqlExpression(($hour ?? 'date('.$wrapped.')').' as day'), new SqlExpression('count(*) as total')])
-            ->groupBy('day')
+            ->select([new SqlExpression($bucket.' as day'), new SqlExpression('count(*) as total')])
+            ->groupBy(new SqlExpression($bucket))
             ->pluck('total', 'day');
 
         $perDay = [];
@@ -188,17 +190,16 @@ final class Chart extends Widget
         }
 
         $points = $this->data instanceof Closure ? array_slice(($this->data)(), 0, self::MAX_POINTS, true) : [];
-        $values = array_map(fn (mixed $value): int|float => is_numeric($value) ? $value + 0 : 0, array_values($points));
+        $values = array_map($this->number(...), array_values($points));
 
-        return [
-            'chart' => [
-                'type' => $this->type,
-                'label' => $this->label ?? $this->getTitle(),
-                'labels' => array_map(strval(...), array_keys($points)),
-                'values' => $values,
-            ],
-            'empty' => $values === [],
+        $chart = [
+            'type' => $this->type,
+            'label' => $this->label ?? $this->getTitle(),
+            'labels' => array_map(strval(...), array_keys($points)),
+            'values' => $values,
         ];
+
+        return ['chart' => $chart, 'json' => $this->json($chart), 'empty' => $values === []];
     }
 
     /**
@@ -225,15 +226,33 @@ final class Chart extends Widget
             $byLabel = [];
 
             foreach ($points as $label => $value) {
-                $byLabel[(string) $label] = is_numeric($value) ? $value + 0 : 0;
+                $byLabel[(string) $label] = $this->number($value);
             }
 
             $datasets[] = ['label' => (string) $name, 'values' => array_map(fn (string $label): int|float => $byLabel[$label] ?? 0, $labels)];
         }
 
-        return [
-            'chart' => ['type' => $this->type, 'label' => $this->label ?? $this->getTitle(), 'labels' => array_map(strval(...), $labels), 'datasets' => $datasets],
-            'empty' => $labels === [],
-        ];
+        $chart = ['type' => $this->type, 'label' => $this->label ?? $this->getTitle(), 'labels' => array_map(strval(...), $labels), 'datasets' => $datasets];
+
+        return ['chart' => $chart, 'json' => $this->json($chart), 'empty' => $labels === []];
+    }
+
+    /**
+     * Число для графика: нечисло, бесконечность (`NAN`, `INF`, `1e999`) и не число — 0, иначе JSON не собрать.
+     */
+    private function number(mixed $value): int|float
+    {
+        return is_numeric($value) && is_finite((float) $value) ? $value + 0 : 0;
+    }
+
+    /**
+     * Данные графика строкой JSON для атрибута страницы. Подписи приходят от сайта: текст, обрезанный посреди буквы
+     * (`substr()` по кириллице), получает знак замены, а не роняет всю страницу.
+     *
+     * @param  array<string, mixed>  $chart
+     */
+    private function json(array $chart): string
+    {
+        return json_encode($chart, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE | JSON_THROW_ON_ERROR);
     }
 }

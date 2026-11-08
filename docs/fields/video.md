@@ -5,7 +5,7 @@
 ```php
 use Fastleo\Fields\Video;
 
-Video::make('video', 'Видео о враче')->help('Ссылка на YouTube, Rutube или VK Видео');
+Video::make('video', 'Видео о товаре')->help('Ссылка на YouTube, Rutube или VK Видео');
 ```
 
 **Колонка:** `$table->string('video')->nullable()`. Хранится ссылка так, как её вставил администратор: `https://youtu.be/dQw4w9WgXcQ`. Плеер получается из ссылки при выводе — чужой код вставки в базу не попадает.
@@ -23,7 +23,7 @@ Video::make('video', 'Видео о враче')->help('Ссылка на YouTub
 ## Вывод на сайте
 
 ```blade
-<x-fastleo::video :url="$doctor->video" title="Приём у врача" />
+<x-fastleo::video :url="$product->video" title="Обзор товара" />
 ```
 
 Адаптивный блок 16:9 с `<iframe loading="lazy">`; стили встроены, CSS сайта не нужен. Атрибуты (`class`, `style`) попадают на обёртку — ширину задавайте ей. Пустая или чужая ссылка — компонент ничего не выводит.

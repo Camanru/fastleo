@@ -59,7 +59,8 @@ final class ErrorPage
     }
 
     /**
-     * Запрос к админке: маршрут пакета или адрес под её префиксом (и доменом, если он задан).
+     * Запрос к админке: маршрут пакета или адрес под её префиксом (и доменом, если он задан). Если админка на корне
+     * домена сайта (`path` пустой, `domain` не задан), её — только адреса без маршрута.
      */
     private static function isAdminRequest(Request $request): bool
     {
@@ -78,6 +79,12 @@ final class ErrorPage
 
         $prefix = trim(config()->string('fastleo.path', 'fastleo'), '/');
 
-        return $request->is($prefix, $prefix.'/*');
+        if ($prefix !== '') {
+            return $request->is($prefix, $prefix.'/*');
+        }
+
+        // Админка на корне: на своём домене ей принадлежит любой адрес, на домене сайта — только адрес без маршрута
+        // (ошибки маршрутов сайта остаются страницами сайта).
+        return (is_string($domain) && $domain !== '') || $request->route() === null;
     }
 }

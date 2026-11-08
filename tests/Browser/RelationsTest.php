@@ -35,14 +35,14 @@ it('picks a category from the list with the keyboard', function (): void {
 it('searches categories on the server when there are many', function (): void {
     config(['fastleo.relations.preload' => 1]);
     Category::factory()->create(['title' => 'Акции']);
-    $news = Category::factory()->create(['title' => 'Новости клиники']);
+    $news = Category::factory()->create(['title' => 'Новости магазина']);
     $article = Article::factory()->create();
 
     $page = signInAndVisit(route('fastleo.resources.edit', ['articles', $article->id]));
 
     $page->click('#field-category_id')
-        ->type('#field-category_id', 'клиник')
-        ->assertSeeIn('[data-combobox=category_id] [role=listbox]', 'Новости клиники')
+        ->type('#field-category_id', 'магазин')
+        ->assertSeeIn('[data-combobox=category_id] [role=listbox]', 'Новости магазина')
         ->assertDontSeeIn('[data-combobox=category_id] [role=listbox]', 'Акции')
         ->click('[data-combobox=category_id] [role=option]')
         ->press('Сохранить')
@@ -70,4 +70,18 @@ it('adds, removes and drags nested blocks', function (): void {
         ->assertNoJavaScriptErrors();
 
     expect($article->links()->orderBy('sort')->pluck('title')->all())->toBe(['Третья', 'Вторая']);
+});
+
+it('does not call a search in the list an unsaved change, and does after a pick', function (): void {
+    Category::factory()->create(['title' => 'Акции']);
+    $article = Article::factory()->create();
+    $page = signInAndVisit(route('fastleo.resources.edit', ['articles', $article->id]));
+    $leaving = "(() => { const event = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(event); return event.defaultPrevented; })()";
+
+    $page->click('#field-category_id')
+        ->type('#field-category_id', 'Ак')
+        ->assertScript($leaving, false)
+        ->click('[data-combobox=category_id] [role=option]')
+        ->assertScript($leaving, true)
+        ->assertNoJavaScriptErrors();
 });

@@ -96,6 +96,23 @@ describe('widgets', function (): void {
         expect($html)->toContain('data-chart=')->toContain('Данных пока нет.')->toContain('fastleo-chart.js');
     });
 
+    it('draws a chart from data that cannot be a JSON number or a UTF-8 text instead of failing the page', function (): void {
+        $chart = Chart::make('Сбор')->line()->data(fn (): array => ["Ряд\xB1" => NAN, 'inf' => INF, 'huge' => '1e999', 'ok' => '5', 'float' => 2.5])->resolve();
+
+        expect($chart['failed'])->toBeFalse()
+            ->and(json_decode($chart['json'], true))->toMatchArray(['labels' => ["Ряд\u{FFFD}", 'inf', 'huge', 'ok', 'float'], 'values' => [0, 0, 0, 5, 2.5]]);
+    });
+
+    it('draws several lines from data that cannot be a JSON number', function (): void {
+        $chart = Chart::make('Линии')->series(fn (): array => ['Первая' => ['a' => NAN, 'b' => 3], "Вторая\xB1" => ['a' => 1, 'b' => INF]])->resolve();
+        $datasets = json_decode($chart['json'], true)['datasets'];
+
+        expect($chart['failed'])->toBeFalse()
+            ->and($datasets[0]['values'])->toBe([0, 3])
+            ->and($datasets[1]['values'])->toBe([1, 0])
+            ->and($datasets[1]['label'])->toBe("Вторая\u{FFFD}");
+    });
+
     it('does not load the chart script when there is no chart', function (): void {
         useFixtureResources('Menu');
 

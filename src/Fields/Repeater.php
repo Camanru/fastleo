@@ -301,6 +301,31 @@ class Repeater extends Field
     }
 
     /**
+     * Пути картинок элементов с их размерами (`variants()`) по сохранённому значению колонки.
+     *
+     * ```php
+     * $repeater->variantPaths($page->slides); // ['uploads/a.jpg' => ['card']]
+     * ```
+     *
+     * @return array<string, list<string>>
+     */
+    public function variantPaths(mixed $stored): array
+    {
+        return $this->variantPathsOf(self::storedItems($stored));
+    }
+
+    /**
+     * Пути картинок элементов (уже разобранных) с их размерами.
+     *
+     * @param  list<array<array-key, mixed>>  $items
+     * @return array<string, list<string>>
+     */
+    public function variantPathsOf(array $items): array
+    {
+        return self::itemVariantPaths($this->itemFields(), $items);
+    }
+
+    /**
      * На просмотре — таблица элементов.
      */
     #[Override]

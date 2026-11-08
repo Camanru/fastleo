@@ -114,6 +114,16 @@ class BelongsToFilter extends Filter
     #[Override]
     protected function query(Builder $query, mixed $value): void
     {
+        $relation = $this->relation();
+
+        // Варианты фильтра — первичные ключи связанных записей. Если колонка хранит другой ключ (`belongsTo(Country::class, 'country_code', 'code')`),
+        // сравнение с ней нашло бы чужое или ничего: запись ищется через связь.
+        if ($relation instanceof BelongsTo && ! $relation->isKeyedByPrimaryKey()) {
+            $query->whereHas($relation->getRelationName(), fn (Builder $related): Builder => $related->whereKey($value));
+
+            return;
+        }
+
         $query->where($query->qualifyColumn($this->name), $value);
     }
 

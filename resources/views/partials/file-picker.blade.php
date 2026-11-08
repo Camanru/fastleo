@@ -6,7 +6,7 @@
     'session_expired' => __('fastleo::files.session_expired'),
     'too_many' => __('fastleo::files.too_many'),
     'sizes' => [__('fastleo::files.size_bytes'), __('fastleo::files.size_kb'), __('fastleo::files.size_mb'), __('fastleo::files.size_gb')],
-], JSON_UNESCAPED_UNICODE) }}" data-upload-url="{{ route('fastleo.files.upload') }}" data-thumb-url="{{ route('fastleo.files.thumb') }}" data-max-file="{{ \Fastleo\Files\UploadLimits::perFile() }}" data-max-total="{{ \Fastleo\Files\UploadLimits::total() }}">
+], JSON_UNESCAPED_UNICODE) }}" data-upload-url="{{ route('fastleo.files.upload') }}" data-thumb-url="{{ route('fastleo.files.thumb') }}" data-max-file="{{ \Fastleo\Files\UploadLimits::perFile() }}" data-max-total="{{ \Fastleo\Files\UploadLimits::total() }}" data-max-files="{{ \Fastleo\Files\UploadLimits::files() }}">
     <div class="flex h-full flex-col">
         <div class="flex items-center justify-between gap-2 border-b border-line px-4 py-2">
             <h2 class="font-semibold">{{ __('fastleo::files.picker_title') }}</h2>

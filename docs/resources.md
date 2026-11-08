@@ -7,29 +7,29 @@
 Модель и таблица — обычные, как в любом проекте на Laravel:
 
 ```bash
-php artisan make:model Doctor -m                  # модель и миграция
+php artisan make:model Product -m                 # модель и миграция
 ```
 
 ```php
-// database/migrations/2026_01_01_000000_create_doctors_table.php
-Schema::create('doctors', function (Blueprint $table) {
+// database/migrations/2026_01_01_000000_create_products_table.php
+Schema::create('products', function (Blueprint $table) {
     $table->id();
     $table->string('name');
-    $table->string('specialty')->nullable();
+    $table->string('category')->nullable();
     $table->boolean('is_active')->default(true);
     $table->timestamps();
 });
 ```
 
 ```php
-// app/Models/Doctor.php
+// app/Models/Product.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'specialty', 'is_active'])] // или protected $fillable = [...]
-class Doctor extends Model
+#[Fillable(['name', 'category', 'is_active'])] // или protected $fillable = [...]
+class Product extends Model
 {
     protected function casts(): array
     {
@@ -41,59 +41,59 @@ class Doctor extends Model
 Ресурс — в папке `app/Fastleo` (подхватывается сам, регистрировать не нужно):
 
 ```bash
-php artisan fastleo:make-resource Doctor          # app/Fastleo/DoctorResource.php
+php artisan fastleo:make-resource Product         # app/Fastleo/ProductResource.php
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 namespace App\Fastleo;
 
-use App\Models\Doctor;
+use App\Models\Product;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
 
-final class DoctorResource extends Resource
+final class ProductResource extends Resource
 {
-    protected static string $model = Doctor::class;
+    protected static string $model = Product::class;
 
-    protected static ?string $label = 'Врачи';
+    protected static ?string $label = 'Товары';
 
-    protected static ?string $singular = 'Врач';
+    protected static ?string $singular = 'Товар';
 
-    protected static string $icon = 'stethoscope';
+    protected static string $icon = 'shopping-bag';
 
     public function fields(): array
     {
         return [
-            Text::make('name', 'Имя')->required()->searchable()->sortable(),
-            Text::make('specialty', 'Специальность')->searchable(),
+            Text::make('name', 'Название')->required()->searchable()->sortable(),
+            Text::make('category', 'Категория')->searchable(),
             Toggle::make('is_active', 'Показывать на сайте')->default(true),
         ];
     }
 }
 ```
 
-Раздел открывается по адресу `/fastleo/doctors`.
+Раздел открывается по адресу `/fastleo/products`.
 
 **Права.** Если у модели нет Policy, раздел полностью доступен любому администратору: просмотр, создание, правка, удаление. Ограничить доступ — Policy модели, подробно в [правах доступа](authorization.md).
 
 Поля можно сразу подобрать по колонкам таблицы — ключ `--generate` (после `php artisan migrate`):
 
 ```bash
-php artisan fastleo:make-resource Doctor --generate
+php artisan fastleo:make-resource Product --generate
 ```
 
 ## Команда `fastleo:make-resource`
 
 ```bash
-php artisan fastleo:make-resource Doctor                 # пустой ресурс для App\Models\Doctor
-php artisan fastleo:make-resource Doctor --generate      # поля по колонкам таблицы doctors
-php artisan fastleo:make-resource Doctor --model="App\Models\Staff\Doctor"
-php artisan fastleo:make-resource Doctor --force         # перезаписать существующий файл
+php artisan fastleo:make-resource Product                # пустой ресурс для App\Models\Product
+php artisan fastleo:make-resource Product --generate     # поля по колонкам таблицы products
+php artisan fastleo:make-resource Product --model="App\Models\Catalog\Product"
+php artisan fastleo:make-resource Product --force        # перезаписать существующий файл
 ```
 
-Файл появляется в папке ресурсов (`app/Fastleo/DoctorResource.php`, см. `resources.path` в [настройках](configuration.md)).
+Файл появляется в папке ресурсов (`app/Fastleo/ProductResource.php`, см. `resources.path` в [настройках](configuration.md)).
 
 Как `--generate` выбирает поле:
 
@@ -106,7 +106,7 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 | целое число | `Number::make(...)->integer()` |
 | `decimal`, `float`, `double` | `Number` |
 | `date` / `datetime`, `timestamp` / `time` | `Date` / `DateTime` / `Time` |
-| `text` и его варианты | `Textarea`; с именем `content`, `body`, `html` — `RichText` (с `hideInList()`) |
+| `text` и его варианты | `Textarea`; с именем `content`, `body`, `html` — `RichText` (в списке он скрыт сам) |
 | строка `image`, `photo`, `picture`, `avatar`, `logo`, `cover`, `thumbnail`, `poster`, `banner` (или `…_photo`) | `Image` |
 | строка `file`, `document`, `attachment`, `pdf` (или `…_file`) | `File` |
 | `json` `gallery`, `photos`, `images`, `pictures` с кастом `array` в модели | `Gallery` (с `hideInList()`) |
@@ -121,7 +121,7 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 
 У строковых полей (`Text`, `Email`, `Url`, `Tel`) длина колонки, отличная от обычной (255, у `Tel` — 32), переносится в `maxLength()`. В SQLite длина `varchar` не хранится.
 
-- `NOT NULL` без значения по умолчанию → `required()` (кроме `Toggle` и `Slug`).
+- `NOT NULL` без значения по умолчанию → `required()` (кроме `Toggle`, `Gallery`, `KeyValue` и `Seo`).
 - Целая колонка `sort`, `position` или `sort_order` → `$sortColumn` ресурса (поля для неё нет).
 - Колонка `read_at` (дата со временем, `nullable`) → `$readColumn` ресурса (поля для неё нет).
 - `parent_id` со связью `parent()` на ту же модель → `$treeColumn = 'parent_id'` и поле `BelongsTo` «Parent».
@@ -139,22 +139,22 @@ php artisan fastleo:make-resource Doctor --force         # перезаписа�
 | Свойство | По умолчанию | Что задаёт |
 |---|---|---|
 | `$model` | обязательно | Класс модели Eloquent |
-| `$label` | имя модели во множественном числе | Заголовок раздела и пункт меню: «Врачи» |
-| `$singular` | имя модели | Одна запись: «Создать: Врач» |
+| `$label` | имя модели во множественном числе | Заголовок раздела и пункт меню: «Товары» |
+| `$singular` | имя модели | Одна запись: «Создать: Товар» |
 | `$createLabel` | `null` → «Создать» | Подпись кнопки создания в списке: `'Добавить заявку'` |
 | `$description` | нет | Пояснение под заголовком списка: «Опубликованные статьи видны на сайте» |
 | `$icon` | `'file-text'` | Иконка в меню, имя из [Lucide](https://lucide.dev/icons) |
 | `$group` | `null` | Группа меню («Контент»); `null` — пункт без группы, под «Дашбордом». Группы идут по алфавиту; свой порядок — `menu.groups` в `config/fastleo.php` ([настройки](configuration.md)) |
 | `$position` | `0` | Порядок в меню внутри группы: меньше — выше |
-| `$slug` | имя модели во множественном числе (`doctors`, `blog-posts`) | Часть адреса: `/fastleo/{slug}` |
+| `$slug` | имя модели во множественном числе (`products`, `blog-posts`) | Часть адреса: `/fastleo/{slug}` |
 | `$perPage` | `null` → `fastleo.list.per_page` (25) | Записей на странице списка |
 | `$perPageOptions` | `null` → `fastleo.list.per_page_options` | Варианты «На странице» под списком: `[10, 50]`; `[]` — выбора нет |
-| `$defaultOrder` | `null` — новые сверху | Порядок списка: `['name', 'asc']` |
+| `$defaultOrder` | `null` — новые сверху | Порядок списка: `['name', 'asc']`; колонка может быть с именем таблицы (`categories.name`), ключом JSON-колонки (`data->title`) и вычисляемым столбцом [`fromQuery()`](list.md#вычисляемые-столбцы). Другая форма (без направления, не строка) — ошибка описания |
 | `$readonly` | `false` | Раздел только для просмотра |
 | `$sortColumn` | `null` | Колонка ручного порядка (`'sort'`): стрелки и перетаскивание в списке — [ниже](#ручной-порядок) |
 | `$treeColumn` | `null` | Колонка родителя (`'parent_id'`): список деревом — [ниже](#дерево) |
-| `$exportable` | `true` | Кнопка «Экспорт» в xlsx/csv — [import-export.md](import-export.md) |
-| `$importable` | `false` | Кнопка «Импорт» из xlsx/csv — [import-export.md](import-export.md#импорт) |
+| `$exportable` | `true` | Кнопка «Экспорт» в csv — [import-export.md](import-export.md) |
+| `$importable` | `false` | Кнопка «Импорт» из csv — [import-export.md](import-export.md#импорт) |
 | `$importKey` | `null` — ключ модели | Столбец сопоставления строк файла с записями (`'sku'`) |
 | `$globallySearchable` | `true` | Записи раздела находит [глобальный поиск](list.md#глобальный-поиск) (Ctrl+K) |
 | `$poll` | `null` | Раз в сколько секунд (5–3600) список и [связанные таблицы](related.md) раздела обновляются сами — [list.md](list.md#автообновление-списка) |
@@ -169,7 +169,7 @@ protected static int $position = 10;
 protected static ?array $defaultOrder = ['name', 'asc'];
 ```
 
-Адрес раздела (`$slug`) — латиница в нижнем регистре, цифры и дефис. Нельзя брать адреса, которые занимает сама админка: `login`, `logout`, `dashboard`, `files`, `search`, `settings`, `pages`, `logs`, `notifications`, `profile`, `two-factor`, `forgot-password`, `reset-password`, `sitemap`, `markdown`, `clear-cache`, `softnetica`. Два ресурса с одним адресом — ошибка.
+Адрес раздела (`$slug`) — латиница в нижнем регистре, цифры и дефис. Нельзя брать адреса, которые занимает сама админка: `login`, `logout`, `dashboard`, `files`, `search`, `settings`, `pages`, `logs`, `notifications`, `profile`, `two-factor`, `forgot-password`, `reset-password`, `sitemap`, `markdown`, `clear-cache`, `softnetica`, а также `up` — адрес проверки работы сайта Laravel. Два ресурса с одним адресом — ошибка.
 
 ## Методы
 
@@ -203,7 +203,7 @@ use Fastleo\Filters\SelectFilter;
 public function filters(): array
 {
     return [
-        SelectFilter::make('specialty'),
+        SelectFilter::make('category'),
         BooleanFilter::make('is_active', 'Принимает'),
     ];
 }
@@ -257,7 +257,7 @@ public static function inMenu(): bool
 
 ### `title()`
 
-Название записи: заголовок формы и страницы просмотра, хлебные крошки, подпись «Ветка: …» в дереве и строка результата поиска (Ctrl+K). По умолчанию это значение **первого столбца списка, который не является связью** (`BelongsTo`, `BelongsToMany`), текстом, без тегов; у многоязычного поля — первый язык из `fastleo.locales`. Если первой стоит связь с родителем, заголовком станет следующий столбец. Поэтому в `fields()` первым ставят поле с названием: если первым стоит `Select` или `Image`, в заголовке окажется их значение, а не название.
+Название записи: заголовок формы и страницы просмотра, хлебные крошки, подпись «Ветка: …» в дереве и строка результата поиска (Ctrl+K). По умолчанию это значение **первого столбца списка, который не является связью** (`BelongsTo`, `BelongsToMany`, `MorphTo`), текстом, без тегов; у многоязычного поля — первый язык из `fastleo.locales`. Если первой стоит связь с родителем, заголовком станет следующий столбец. Поэтому в `fields()` первым ставят поле с названием: если первым стоит `Select` или `Image`, в заголовке окажется их значение, а не название.
 
 Если порядок полей менять не хочется, переопределите метод:
 
@@ -281,7 +281,7 @@ use Illuminate\Database\Eloquent\Model;
 
 public function url(Model $record): ?string
 {
-    return route('doctors.show', $record);
+    return route('products.show', $record);
 }
 ```
 
@@ -311,7 +311,15 @@ public function query(Builder $query): Builder
 }
 ```
 
-Так один и тот же класс модели можно показать двумя разделами («Новости» и «Статьи»). Значение `type` при создании задайте скрытым полем: `Hidden::make('type')->default('news')`.
+Так один и тот же класс модели можно показать двумя разделами («Новости» и «Статьи»). Значение `type` при создании задайте скрытым полем с правилом: `Hidden::make('type')->default('news')->rules(['in:news'])` (значение скрытого поля можно подменить запросом, правило `in:` оставляет только своё).
+
+### `can()` и `beforeDelete()`
+
+`can(string $ability, ?Model $record): bool` запрещает действие сверх Policy и ролей, `beforeDelete(Model $record)` проверяет условие в момент удаления (из раздела, корзины, массового действия и MCP) — [authorization.md](authorization.md#ограничение-без-policy-can).
+
+### `rowTone()`
+
+`rowTone(Model $record): ?string` подсвечивает строку списка по состоянию записи (`success`, `warning`, `danger`, `info`, `neutral`) — [list.md](list.md#подсветка-строк).
 
 ## Отметка «просмотрено»
 
@@ -397,8 +405,8 @@ public function parent(): BelongsTo
 `$fillable` модели соблюдается. Если поле ресурса не разрешено моделью, сохранение остановится с ошибкой:
 
 ```
-Поле «specialty» ресурса App\Fastleo\DoctorResource не разрешено моделью App\Models\Doctor.
-Добавьте «specialty» в $fillable модели или уберите поле из ресурса.
+Поле «category» ресурса App\Fastleo\ProductResource не разрешено моделью App\Models\Product.
+Добавьте «category» в $fillable модели или уберите поле из ресурса.
 ```
 
 Так ресурс и модель не расходятся молча (значение не «теряется»). Колонки, которые форма менять не должна (`is_admin`, счётчики), держите вне `$fillable` и не добавляйте в ресурс.
@@ -409,6 +417,10 @@ public function parent(): BelongsTo
 - поле, которого нет в запросе, не меняется;
 - запись и связанные действия идут в одной транзакции;
 - ошибка базы, которую не поймала проверка формы (уникальность, связь, длина), показывается понятным текстом над формой, введённые значения сохраняются — см. [validation.md](validation.md).
+
+## Ключ записи
+
+Адреса записей (`/fastleo/products/12/edit`) принимают ключи трёх видов: число до 18 цифр, UUID/ULID и короткая строка из латиницы, цифр и дефиса (до 36 знаков). Запись с другим ключом — со строковым ключом вроде `en_US` или `SKU_12` (с подчёркиванием или точкой), с ключом длиннее 36 знаков или с 19-значным `bigint` — по адресу не открывается (404) и из админки не правится. Выбирайте ключ из этого набора; для остальных случаев заведите числовой `id`, а прежний ключ оставьте обычной колонкой.
 
 ## События модели
 
@@ -479,7 +491,9 @@ php artisan fastleo:clear     # входит в php artisan optimize:clear
 При открытии раздела:
 
 - два поля с одним именем, недопустимое имя поля;
-- `Grid` или `columnSpan()` вне 1–12, в `Tabs` не только `Tab`.
+- `Grid` или `columnSpan()` вне 1–12.
+
+`Tabs` принимает только `Tab`: другое значение — обычная ошибка PHP (`TypeError`) при разборе `fields()`, а не сообщение раздела — [layout.md](layout.md).
 
 При сохранении:
 

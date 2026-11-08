@@ -10,7 +10,7 @@ use Illuminate\Testing\TestResponse;
 use Workbench\App\Models\Article;
 
 beforeEach(function (): void {
-    config(['app.url' => 'https://site.test', 'app.name' => 'Клиника']);
+    config(['app.url' => 'https://site.test', 'app.name' => 'Магазин']);
 });
 
 /**
@@ -23,16 +23,16 @@ function articlePage(mixed $test, Article $article, string $query = '', array $s
 
 describe('component', function (): void {
     it('prints the values of the Seo field and the Open Graph tags', function (): void {
-        $article = Article::factory()->create(['title' => 'Название', 'seo' => ['title' => 'Лечение зубов', 'description' => 'Описание для поиска', 'image' => 'uploads/articles/a.jpg']]);
+        $article = Article::factory()->create(['title' => 'Название', 'seo' => ['title' => 'Электрочайники', 'description' => 'Описание для поиска', 'image' => 'uploads/articles/a.jpg']]);
 
         articlePage($this, $article)
             ->assertOk()
-            ->assertSee('<title>Лечение зубов</title>', false)
+            ->assertSee('<title>Электрочайники</title>', false)
             ->assertSee('<meta name="description" content="Описание для поиска">', false)
-            ->assertSee('<meta property="og:title" content="Лечение зубов">', false)
+            ->assertSee('<meta property="og:title" content="Электрочайники">', false)
             ->assertSee('<meta property="og:description" content="Описание для поиска">', false)
             ->assertSee('<meta property="og:type" content="article">', false)
-            ->assertSee('<meta property="og:site_name" content="Клиника">', false)
+            ->assertSee('<meta property="og:site_name" content="Магазин">', false)
             ->assertSee('<meta name="twitter:card" content="summary_large_image">', false)
             ->assertSee('<link rel="canonical" href="https://site.test/articles/'.$article->id.'">', false)
             ->assertSee('property="og:image" content="'.SeoTags::absolute(FileStore::url('uploads/articles/a.jpg')).'"', false)
@@ -48,7 +48,7 @@ describe('component', function (): void {
             ->assertSee('<meta name="twitter:card" content="summary">', false)
             ->assertDontSee('og:image');
 
-        expect(SeoTags::resolve()['title'])->toBe('Клиника');
+        expect(SeoTags::resolve()['title'])->toBe('Магазин');
     });
 
     it('asks search engines to skip the page marked noindex', function (): void {
@@ -96,6 +96,27 @@ describe('values', function (): void {
             ->and(SeoTags::excerpt('<p>Коротко &laquo;да&raquo;</p>'))->toBe('Коротко «да»');
     });
 
+    it('does not spend seconds on a text of tags that are never closed', function (string $tag): void {
+        $started = hrtime(true);
+        $description = SeoTags::excerpt(str_repeat("<{$tag}>x", 50_000));
+
+        expect((hrtime(true) - $started) / 1e9)->toBeLessThan(1.0)
+            // Заголовки без закрытия остаются текстом; код (script, style), который не закрыт, текстом не считается.
+            ->and($description === null)->toBe($tag !== 'h2');
+    })->with(['script', 'h2', 'style']);
+
+    it('does not take the contents of a style or a script that is cut off by the length limit as the description', function (string $tag): void {
+        $html = '<p>Начало.</p><'.$tag.'>'.str_repeat('a{}', 7000).'</'.$tag.'><p>Текст после кода</p>';
+
+        expect(SeoTags::excerpt($html))->toBe('Начало.');
+    })->with(['style', 'script', 'noscript', 'template']);
+
+    it('takes the description from the beginning of a very long text', function (): void {
+        $html = '<p>Начало текста.</p>'.str_repeat('<p>Дальше</p>', 10_000);
+
+        expect(SeoTags::excerpt($html))->toStartWith('Начало текста.');
+    });
+
     it('accepts only safe image addresses', function (?string $image, ?string $expected): void {
         expect(SeoTags::resolve(image: $image)['image'])->toBe($expected === 'disk' ? SeoTags::absolute(FileStore::url((string) $image)) : $expected);
     })->with([
@@ -122,7 +143,7 @@ describe('values', function (): void {
 
         $article->setRawAttributes(['seo' => 'не json']);
 
-        expect(SeoTags::resolve($article)['title'])->toBe('Клиника');
+        expect(SeoTags::resolve($article)['title'])->toBe('Магазин');
     });
 
     it('decodes the field of a model that keeps it as a raw JSON column without a cast', function (): void {
@@ -133,7 +154,7 @@ describe('values', function (): void {
 
         $page->setRawAttributes(['seo' => 'не json']);
 
-        expect(SeoTags::resolve($page))->toMatchArray(['title' => 'Клиника', 'noindex' => false]);
+        expect(SeoTags::resolve($page))->toMatchArray(['title' => 'Магазин', 'noindex' => false]);
     });
 });
 

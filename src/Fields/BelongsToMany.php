@@ -6,6 +6,7 @@ namespace Fastleo\Fields;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\QueriesRelatedRecords;
+use Fastleo\Fields\Concerns\TracksSeenKeys;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,7 @@ use LogicException;
 use Override;
 
 /**
- * Связь «многие ко многим» через промежуточную таблицу: статья ↔ темы, врач ↔ услуги.
+ * Связь «многие ко многим» через промежуточную таблицу: статья ↔ темы, товар ↔ метки.
  * Имя поля — метод связи модели. Выбор нескольких записей с поиском; сохраняется `sync()` после записи модели.
  * Связи с записями вне вариантов поля (скрытыми `query()` или удалёнными в корзину) не трогаются.
  *
@@ -26,6 +27,7 @@ use Override;
 class BelongsToMany extends Field implements SearchesOptions
 {
     use QueriesRelatedRecords;
+    use TracksSeenKeys;
 
     /** Больше связей за одно сохранение не принимается: каждая проверяется запросом к базе. */
     public const int MAX_LINKS = 1000;
@@ -62,6 +64,25 @@ class BelongsToMany extends Field implements SearchesOptions
         }
 
         return $relation;
+    }
+
+    /**
+     * Связь идёт по первичному ключу связанной модели. Варианты и запись работают с первичным ключом, а в таблицу связи
+     * пишется ключ `relatedKey`: при другом ключе существующие связи считались бы чужими и не отвязывались, а выбранные
+     * писались бы не теми значениями. Показ записей (список, страница просмотра) этого не требует.
+     *
+     * @throws LogicException связь идёт не по первичному ключу связанной модели
+     */
+    #[Override]
+    public function assertKeyedByPrimaryKey(): void
+    {
+        $relation = $this->relationInstance();
+
+        if ($relation->getRelatedKeyName() !== $relation->getRelated()->getKeyName()) {
+            throw new LogicException(__('fastleo::exceptions.relation_related_key', [
+                'field' => $this->name, 'method' => $this->getRelationName(), 'key' => $relation->getRelatedKeyName(), 'primary' => $relation->getRelated()->getKeyName(),
+            ], Fastleo::LOCALE));
+        }
     }
 
     #[Override]
@@ -117,6 +138,8 @@ class BelongsToMany extends Field implements SearchesOptions
     #[Override]
     public function dehydrate(mixed $value): array
     {
+        $this->assertKeyedByPrimaryKey();
+
         $int = $this->relatedModel()->getKeyType() === 'int';
         $keys = [];
 
@@ -145,16 +168,23 @@ class BelongsToMany extends Field implements SearchesOptions
     }
 
     /**
-     * `sync()` выбранных записей; связи с записями вне вариантов поля остаются как были.
+     * `sync()` выбранных записей; связи с записями вне вариантов поля и добавленные после открытия формы остаются как были.
      */
     #[Override]
     public function afterSave(Model $record, mixed $value): void
     {
+        $this->assertKeyedByPrimaryKey();
+
         $relation = $this->relationInstance($record);
         $linked = $this->strings($relation->newPivotQuery()->pluck($relation->getRelatedPivotKeyName())->all());
         $visible = $linked === [] ? [] : $this->strings($this->baseOptionsQuery()->whereKey($linked)->pluck($this->relatedModel()->getKeyName())->all());
 
-        $relation->sync([...array_diff($linked, $visible), ...(is_array($value) ? $value : [])]);
+        // Связь, добавленную другим администратором за время правки формы, устаревшая форма не отвязывает: убираются только
+        // те связи, что были в ней при открытии (`seenKeys()`); без этих данных (MCP, импорт) список заменяется целиком.
+        $seen = $this->seenKeys();
+        $unseen = $seen === null ? [] : array_diff($linked, $seen);
+
+        $relation->sync([...array_diff($linked, $visible), ...$unseen, ...(is_array($value) ? $value : [])]);
         $record->unsetRelation($this->getRelationName());
     }
 
@@ -172,7 +202,7 @@ class BelongsToMany extends Field implements SearchesOptions
     #[Override]
     public function getRules(?Model $record): array
     {
-        return [...parent::getRules($record), $this->name.'.*' => ['distinct', ...$this->optionRules($record)]];
+        return [...parent::getRules($record), $this->name.'.*' => ['distinct', ...$this->optionRules($record)], ...$this->seenRules()];
     }
 
     /**

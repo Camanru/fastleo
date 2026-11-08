@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Tests;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Orchestra\Testbench\Concerns\WithWorkbench;
 use Orchestra\Testbench\TestCase as Orchestra;
 
@@ -15,4 +16,14 @@ abstract class TestCase extends Orchestra
 {
     use RefreshDatabase;
     use WithWorkbench;
+
+    /**
+     * Любой исходящий запрос без `Http::fake()` — ошибка: тесты не ходят в сеть (Telegram, SoftNetica, Max…).
+     */
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Http::preventStrayRequests();
+    }
 }

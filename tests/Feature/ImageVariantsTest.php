@@ -5,7 +5,10 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Fields\Image;
 use Fastleo\Files\GenerateImageVariants;
+use Fastleo\Files\ImageSupport;
 use Fastleo\Files\Variants;
+use Fastleo\Support\SettingsStore;
+use Fastleo\Tests\Fixtures\Files\UnwritableDisk;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
@@ -13,6 +16,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\View\ViewException;
 use Workbench\App\Models\Article;
+use Workbench\App\Models\Page;
 
 beforeEach(function (): void {
     $this->disk = Storage::fake('public');
@@ -31,6 +35,41 @@ function putImage(string $path, int $width, int $height): void
 {
     test()->disk->put($path, UploadedFile::fake()->image('a.jpg', $width, $height)->getContent());
 }
+
+it('makes no variants and remembers nothing when the disk cannot write them', function (): void {
+    putImage('uploads/photo.jpg', 1600, 900);
+    Storage::set('public', UnwritableDisk::at($this->disk->path('')));
+
+    expect(Variants::generate('uploads/photo.jpg', 'card'))->toBe([])
+        ->and(Variants::sizes('uploads/photo.jpg', 'card'))->toBe([])
+        ->and($this->disk->allFiles('fastleo'))->toBe([]);
+});
+
+it('makes no variants when GD is built without WebP, instead of failing with an error of PHP', function (): void {
+    putImage('uploads/photo.jpg', 1600, 900);
+    app()->instance(ImageSupport::class, new ImageSupport(['gd', 'exif'], IMG_JPG | IMG_PNG));
+
+    expect(Variants::generate('uploads/photo.jpg', 'card'))->toBe([])
+        ->and($this->disk->allFiles('fastleo'))->toBe([]);
+});
+
+it('keeps the variants that are already made when GD is built without WebP, instead of wiping them', function (): void {
+    putImage('uploads/photo.jpg', 1600, 900);
+    expect(Variants::generate('uploads/photo.jpg', 'card'))->not->toBe([]);
+    $made = $this->disk->allFiles('fastleo');
+    app()->instance(ImageSupport::class, new ImageSupport(['gd', 'exif'], IMG_JPG | IMG_PNG));
+
+    expect(Variants::generate('uploads/photo.jpg', 'card'))->toBe([])
+        ->and($this->disk->allFiles('fastleo'))->toEqualCanonicalizing($made);
+});
+
+it('drops the variants when the disk takes the pictures but not the list of their sizes', function (): void {
+    putImage('uploads/photo.jpg', 1600, 900);
+    Storage::set('public', UnwritableDisk::at($this->disk->path(''), only: 'manifest.json'));
+
+    expect(Variants::generate('uploads/photo.jpg', 'card'))->toBe([])
+        ->and($this->disk->allFiles('fastleo'))->toBe([]);
+});
 
 it('makes webp variants in the ratio of the preset, no wider than the picture', function (): void {
     putImage('uploads/photo.jpg', 1600, 900);
@@ -113,9 +152,9 @@ it('reads the sizes from the cache and, after it is cleared, from the disk', fun
 
 it('renders a picture with webp sources once variants exist and the original before', function (): void {
     putImage('uploads/photo.jpg', 600, 600);
-    $render = fn (): string => Blade::render('<x-fastleo::picture :src="$src" preset="small" alt="Врач" sizes="200px" class="rounded" />', ['src' => 'uploads/photo.jpg']);
+    $render = fn (): string => Blade::render('<x-fastleo::picture :src="$src" preset="small" alt="Товар" sizes="200px" class="rounded" />', ['src' => 'uploads/photo.jpg']);
 
-    expect($render())->toContain('<img src="'.$this->disk->url('uploads/photo.jpg').'" alt="Врач"')
+    expect($render())->toContain('<img src="'.$this->disk->url('uploads/photo.jpg').'" alt="Товар"')
         ->toContain('class="rounded"')
         ->toContain('loading="lazy"')
         ->not->toContain('<picture>');
@@ -221,6 +260,45 @@ describe('fastleo:images', function (): void {
         expect(Variants::sizes('uploads/a.jpg', 'card'))->toBe([400 => 240])
             ->and(Variants::sizes('uploads/b.jpg', 'photo'))->toBe([300 => 180])
             ->and(Variants::sizes('uploads/c.jpg', 'card'))->toBe([400 => 240]);
+    });
+
+    it('remakes the variants of pictures inside blocks', function (): void {
+        foreach (['a', 'b', 'c', 'd'] as $name) {
+            putImage("uploads/{$name}.jpg", 1000, 600);
+        }
+        config(['fastleo.images.presets' => ['card' => ['widths' => [400]], 'photo' => ['widths' => [300]]]]);
+        // Блоки страницы сайта из workbench: блок «Картинка» и блок «Галерея» с размерами `card`.
+        Page::factory()->create(['content' => [
+            ['type' => 'image', 'data' => ['src' => 'uploads/a.jpg']],
+            ['type' => 'gallery', 'data' => ['photos' => ['uploads/b.jpg', 'uploads/c.jpg']]],
+        ]]);
+
+        $this->artisan('fastleo:images')->assertSuccessful();
+
+        expect(Variants::sizes('uploads/a.jpg', 'card'))->not->toBe([])
+            ->and(Variants::sizes('uploads/b.jpg', 'card'))->not->toBe([])
+            ->and(Variants::sizes('uploads/c.jpg', 'card'))->not->toBe([])
+            ->and(Variants::sizes('uploads/d.jpg', 'card'))->toBe([]);
+    });
+
+    it('remakes the variants of the pictures of a settings page', function (): void {
+        foreach (['a', 'b', 'c', 'd'] as $name) {
+            putImage("uploads/site/{$name}.jpg", 1000, 600);
+        }
+        config(['fastleo.images.presets' => ['card' => ['widths' => [400]]]]);
+        useFixtureResources('SettingsVariants');
+        resolve(SettingsStore::class)->save(Fastleo::resources()->findSettings('banner'), [
+            'hero' => 'uploads/site/a.jpg',
+            'photos' => ['uploads/site/b.jpg'],
+            'slides' => [['src' => 'uploads/site/c.jpg', 'thumbs' => [['pic' => 'uploads/site/d.jpg']]]],
+        ]);
+
+        $this->artisan('fastleo:images')->expectsOutputToContain('пересозданы: 4')->assertSuccessful();
+
+        expect(Variants::sizes('uploads/site/a.jpg', 'card'))->toBe([400 => 240])
+            ->and(Variants::sizes('uploads/site/b.jpg', 'card'))->toBe([400 => 240])
+            ->and(Variants::sizes('uploads/site/c.jpg', 'card'))->toBe([400 => 240])
+            ->and(Variants::sizes('uploads/site/d.jpg', 'card'))->toBe([400 => 240]);
     });
 
     it('remakes only the given preset', function (): void {

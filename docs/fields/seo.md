@@ -20,7 +20,7 @@ Seo::make('seo', 'Для поисковиков')->directory('articles');
 Объект, в котором только заполненные значения:
 
 ```json
-{"title": "Лечение зубов без боли", "description": "Современная анестезия…", "image": "uploads/articles/a.jpg", "noindex": true}
+{"title": "Электрочайники со скидкой", "description": "Доставка за один день…", "image": "uploads/articles/a.jpg", "noindex": true}
 ```
 
 На сайте поле выводит компонент [`<x-fastleo::seo>`](../seo.md#теги-на-странице), а записи с `noindex` не попадают в [карту сайта](../seo.md#карта-сайта).

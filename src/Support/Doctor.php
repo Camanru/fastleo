@@ -25,12 +25,14 @@ use Fastleo\Fields\Number;
 use Fastleo\Fields\Password;
 use Fastleo\Fields\Repeater;
 use Fastleo\Fields\RichText;
+use Fastleo\Fields\Secret;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Seo;
 use Fastleo\Fields\Slug;
 use Fastleo\Fields\Tags;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
+use Fastleo\Files\ImageSupport;
 use Fastleo\Imports\ImportRecords;
 use Fastleo\Messengers\ChatIds;
 use Fastleo\Page;
@@ -46,7 +48,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\MigrationRepositoryInterface;
 use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Attributes\Timeout;
+use Illuminate\Routing\Route as RouteDefinition;
+use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -316,6 +321,7 @@ final class Doctor
         }
 
         $this->routeCache();
+        $this->rootRoutes();
         $this->tables();
         $this->assets();
         $this->softNetica();
@@ -336,6 +342,8 @@ final class Doctor
         if (self::storageLinkMissing()) {
             $this->add('warning', 'site', 'storage_link', hint: 'storage_link_hint');
         }
+
+        $this->imageSupport();
 
         if ($this->activityTableLeft()) {
             $this->add('warning', 'site', 'activity_table', ['table' => DropActivityCommand::TABLE], 'activity_table_hint');
@@ -360,6 +368,60 @@ final class Doctor
 
         if ($route !== null && (trim($route->uri(), '/') !== trim(config()->string('fastleo.path', 'fastleo'), '/') || $route->getDomain() !== (is_string($domain) && $domain !== '' ? $domain : null))) {
             $this->add('warning', 'site', 'routes_cached_stale', hint: 'routes_cached_stale_hint');
+        }
+    }
+
+    /**
+     * Админка на корне домена сайта (`path` пустой, `domain` не задан): адреса админки и сайта перекрывают друг друга.
+     * Смотрим GET-маршруты сайта без параметров: маршрут на адресе, который есть у админки (`/`, `/login`, `/files`…),
+     * заменяет её маршрут вместе с именем (роутер оставляет последний из одинаковых) — это ошибка: страницы админки строят ссылки
+     * по имени (`route('fastleo.dashboard')`) и падают; остальные адреса роутер может отдать разделам админки — предупреждение.
+     * Адреса админки берём из её файла маршрутов, загруженного в отдельный список: заменённых в общем списке уже нет.
+     */
+    private function rootRoutes(): void
+    {
+        $domain = config('fastleo.domain');
+
+        if (trim(config()->string('fastleo.path', 'fastleo'), '/') !== '' || (is_string($domain) && $domain !== '')) {
+            return;
+        }
+
+        $routes = Route::getRoutes();
+        $siteRouter = Route::getFacadeRoot();
+        $scratch = new Router(resolve('events'), app());
+        Route::swap($scratch);
+
+        try {
+            require dirname(__DIR__, 2).'/routes/fastleo.php';
+        } finally {
+            Route::swap($siteRouter);
+        }
+
+        $adminUris = array_map(fn (RouteDefinition $route): string => trim($route->uri(), '/'), $scratch->getRoutes()->get('GET'));
+
+        $taken = [];
+        $hidden = [];
+
+        foreach ($routes->getRoutes() as $route) {
+            if (str_starts_with((string) $route->getName(), 'fastleo.') || ! in_array('GET', $route->methods(), true) || $route->parameterNames() !== [] || $route->getDomain() !== null) {
+                continue;
+            }
+
+            $uri = trim($route->uri(), '/');
+
+            if (in_array($uri, $adminUris, true)) {
+                $hidden[] = '/'.$uri;
+            } elseif (str_starts_with((string) rescue(fn (): RouteDefinition => $routes->match(Request::create('/'.$uri)), report: false)?->getName(), 'fastleo.')) {
+                $taken[] = '/'.$uri;
+            }
+        }
+
+        if ($taken !== []) {
+            $this->add('warning', 'site', 'root_routes_taken', ['routes' => implode(', ', array_slice(array_unique($taken), 0, 10))], 'root_routes_hint');
+        }
+
+        if ($hidden !== []) {
+            $this->add('error', 'site', 'root_routes_hidden', ['routes' => implode(', ', array_slice(array_unique($hidden), 0, 10))], 'root_routes_hint');
         }
     }
 
@@ -909,7 +971,7 @@ final class Doctor
     {
         foreach ($fields as $field) {
             if ($field instanceof BelongsTo || $field instanceof BelongsToMany || $field instanceof Nested) {
-                $this->relation($field, $scope);
+                $this->relation($field, $scope, $editable);
             }
 
             if ($field instanceof Nested) {
@@ -1023,12 +1085,19 @@ final class Doctor
 
     /**
      * Метод связи существует и подходит полю.
+     *
+     * @param  bool  $editable  раздел не только для чтения: значения полей записываются
      */
-    private function relation(Field $field, string $scope): void
+    private function relation(Field $field, string $scope, bool $editable): void
     {
         try {
             if ($field instanceof BelongsTo || $field instanceof BelongsToMany || $field instanceof Nested) {
                 $field->relationInstance();
+            }
+
+            // Связь по другому ключу ломает запись и выбор, а показ работает: ошибка только у поля, которое есть в форме и пишется.
+            if (($field instanceof BelongsTo || $field instanceof BelongsToMany) && $editable && $field->isFormField() && $field->isWritable()) {
+                $field->assertKeyedByPrimaryKey();
             }
         } catch (Throwable $e) {
             $this->add('error', $scope, 'relation', ['field' => $field->name, 'message' => $e->getMessage()]);
@@ -1129,6 +1198,28 @@ final class Doctor
     }
 
     /**
+     * Расширения PHP для картинок: без GD загрузка любой картинки отклоняется, без exif фото с телефона остаются повёрнутыми.
+     */
+    private function imageSupport(): void
+    {
+        $missing = resolve(ImageSupport::class)->missing();
+
+        if (in_array('gd', $missing, true)) {
+            $this->add('error', 'site', 'image_gd', hint: 'image_gd_hint');
+        }
+
+        $formats = array_values(array_intersect($missing, ['webp', 'jpeg']));
+
+        if ($formats !== []) {
+            $this->add('error', 'site', 'image_gd_formats', ['formats' => implode(', ', array_map(strtoupper(...), $formats))], 'image_gd_formats_hint');
+        }
+
+        if (in_array('exif', $missing, true)) {
+            $this->add('warning', 'site', 'image_exif', hint: 'image_exif_hint');
+        }
+    }
+
+    /**
      * Поле можно записать без колонки: есть мутатор записи, а у readonly-поля — аксессор.
      */
     private function hasMutator(Model $model, Field $field): bool
@@ -1147,6 +1238,11 @@ final class Doctor
 
         if ($field instanceof Enum && ! (is_string($cast) && enum_exists($cast) && is_a($cast, BackedEnum::class, true))) {
             $this->add('error', $scope, 'enum_cast', ['field' => $field->name, 'model' => $model::class], 'enum_cast_hint');
+        }
+
+        // Секрет без шифрования: значение лежало бы в базе открытым текстом (само поле при сохранении откажется его писать).
+        if ($field instanceof Secret && $editable && ! $field->isEncryptedBy($model)) {
+            $this->add('error', $scope, 'secret_cast', ['field' => $field->name, 'model' => $model::class], 'secret_cast_hint');
         }
 
         // Текст на колонке с enum-кастом: любая строка из формы не станет значением enum, и запись упадёт ошибкой 500.

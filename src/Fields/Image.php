@@ -14,12 +14,12 @@ use InvalidArgumentException;
 use Override;
 
 /**
- * Одна картинка из файлового менеджера: фото врача, обложка статьи. В колонке (`string`) —
- * путь относительно диска, например `uploads/doctors/ivanov.jpg`. В форме — превью,
+ * Одна картинка из файлового менеджера: фото товара, обложка статьи. В колонке (`string`) —
+ * путь относительно диска, например `uploads/products/kettle.jpg`. В форме — превью,
  * «Загрузить» и «Выбрать из файлов», в списке — миниатюра.
  *
  * ```php
- * Image::make('photo', 'Фото')->directory('doctors')->crop('3:4')->variants('card')->required();
+ * Image::make('photo', 'Фото')->directory('products')->crop('3:4')->variants('card')->required();
  * ```
  */
 class Image extends File

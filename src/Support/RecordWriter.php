@@ -8,6 +8,7 @@ use BackedEnum;
 use Closure;
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Field;
+use Fastleo\Fields\HasMany;
 use Fastleo\Fields\Nested;
 use Fastleo\Fields\Slug;
 use Fastleo\Resource;
@@ -256,6 +257,12 @@ final class RecordWriter
             $values = [];
 
             foreach ($fields as $field) {
+                if ($field instanceof HasMany || $field instanceof BelongsToMany) {
+                    // Форма с пустым списком присылает `{поле}__seen=""`, а Laravel превращает пустую строку в null: «ключ есть, но пуст»
+                    // значит «в форме ничего не было», и только отсутствие ключа (MCP, импорт, быстрое добавление) — «форма ключей не прислала».
+                    $field->rememberSeen(array_key_exists($field->seenInputName(), $data) ? ($data[$field->seenInputName()] ?? '') : null);
+                }
+
                 if (array_key_exists($field->name, $data)) {
                     $values[$field->name] = $field->dehydrate($data[$field->name]);
                     $field->fill($record, $values[$field->name]);

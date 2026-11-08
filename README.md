@@ -1,12 +1,14 @@
 # Fastleo
 
-An admin panel for Laravel sites. Each admin section is described by a single resource class: fields, list, permissions. The interface is prebuilt (Blade, Tailwind, Alpine.js), so your site does not need npm.
+A Laravel package for building interfaces to work with your Eloquent models: a site admin panel, a CRM, an internal back office. Each section is described by a single resource class: fields, list, permissions. The interface is prebuilt (Blade, Tailwind, Alpine.js), so your application does not need npm.
+
+Fastleo runs at `/fastleo` next to your site, on its own subdomain, or as the whole application at the domain root — for example a CRM with the dashboard at `/` and sign-in at `/login` ([where to place it](docs/configuration.md#адрес)).
 
 > The admin interface and the documentation in [`docs/`](docs/) are in Russian.
 
 What's included:
 
-- **Sections**: a list with search, filters, sorting and pagination; a form with tabs and columns; a detail view, trash, manual ordering and trees; per-record and bulk actions; Excel/CSV export and import.
+- **Sections**: a list with search, filters, sorting and pagination; a form with tabs and columns; a detail view, trash, manual ordering and trees; per-record and bulk actions; CSV export and import.
 - **37 field types and custom fields**: text, numbers, dates, choices, relations (BelongsTo, BelongsToMany, HasMany, HasOne), images with WebP variants, files, gallery, rich text editor, Markdown, JSON fields (Repeater, KeyValue, the Blocks page builder), SEO, translatable fields.
 - **Admin environment**: a dashboard with widgets, site settings, custom pages, an error log, notifications with Telegram and Max bots, publishing to Telegram and Max channels, Ctrl+K search, sitemap and robots.txt, closing the site for visitors, a file manager, and an optional connection to the SoftNetica site maintenance service.
 - **Security**: a separate login with rate limits, two-factor authentication, permissions via model Policies, only declared fields are written, upload protection ([details](docs/security.md)).
@@ -18,8 +20,8 @@ Coming from 2.x or 3.0? 4.0 is a new admin panel, not an upgrade of the old one 
 
 ## Requirements
 
-- PHP 8.4 or newer
-- Laravel 13
+- PHP 8.4 or newer with the GD extension (JPEG and WebP support: every uploaded picture goes through it) and, recommended, exif (rotates phone photos)
+- Laravel 13.32 or newer
 - A queue is optional: with `php artisan queue:work` images, imports and notifications are processed in the background, without it — during the request
 
 ## Installation in 5 minutes

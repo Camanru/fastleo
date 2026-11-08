@@ -23,17 +23,17 @@ beforeEach(function (): void {
  */
 function pageWithBlocks(array $content): array
 {
-    return ['title' => ['ru' => 'О клинике'], 'slug' => 'about', 'faq' => '', 'specs' => '', 'content' => $content];
+    return ['title' => ['ru' => 'О магазине'], 'slug' => 'about', 'faq' => '', 'specs' => '', 'content' => $content];
 }
 
 it('saves blocks in the order of the form with only the fields of their type', function (): void {
     $this->post(route('fastleo.resources.store', 'site-pages'), pageWithBlocks([
-        'q' => ['type' => 'quote', 'quote' => ['text' => ' Лучшие врачи ', 'author' => ''], 'text' => ['body' => '<p>чужое</p>']],
+        'q' => ['type' => 'quote', 'quote' => ['text' => ' Лучшие цены ', 'author' => ''], 'text' => ['body' => '<p>чужое</p>']],
         't' => ['type' => 'text', 'text' => ['body' => '<p>Привет</p>', 'secret' => 'x']],
     ]))->assertSessionHasNoErrors();
 
     expect(Page::query()->firstOrFail()->content)->toBeStoredJson([
-        ['type' => 'quote', 'data' => ['text' => 'Лучшие врачи', 'author' => null]],
+        ['type' => 'quote', 'data' => ['text' => 'Лучшие цены', 'author' => null]],
         ['type' => 'text', 'data' => ['body' => '<p>Привет</p>']],
     ]);
 });
@@ -102,7 +102,7 @@ it('shows the saved blocks in the form, after an error and on the record page', 
         ->assertSee('name="content[new-1][quote][author]"', false)
         ->assertDontSee('name="content[0][type]"', false);
 
-    $this->get(route('fastleo.resources.show', ['site-pages', $page->id]))->assertOk()->assertSee('Лучшие врачи города.');
+    $this->get(route('fastleo.resources.show', ['site-pages', $page->id]))->assertOk()->assertSee('Лучшие цены города.');
 });
 
 it('renders the blocks with the templates of the site and skips the rest', function (): void {
@@ -124,7 +124,7 @@ it('renders the blocks with the templates of the site and skips the rest', funct
 it('shows the blocks on the page of the site', function (): void {
     $page = Page::factory()->create();
 
-    $this->get(route('site-pages.show', $page->slug))->assertOk()->assertSee('Клиника работает с 2005 года.', false);
+    $this->get(route('site-pages.show', $page->slug))->assertOk()->assertSee('Магазин работает с 2005 года.', false);
 });
 
 it('refuses a block type described twice or with a bad name', function (): void {

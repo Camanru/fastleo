@@ -446,7 +446,7 @@ Schema::create('password_reset_tokens', function (Blueprint $table) {
 
 Подробнее — [забыли пароль](../auth.md#забыли-пароль).
 
-### Как сменить адрес админки или вынести её на поддомен?
+### Как сменить адрес админки, вынести её на поддомен или на корень домена?
 
 ```php
 // config/fastleo.php
@@ -460,6 +460,16 @@ Schema::create('password_reset_tokens', function (Blueprint $table) {
 'path' => '',
 'domain' => 'admin.site.ru',     // https://admin.site.ru/
 ```
+
+Или всё приложение на корне домена — когда fastleo и есть продукт (CRM, бэк-офис) и страниц для посетителей нет:
+
+```php
+// config/fastleo.php
+'path' => '',
+'domain' => null,                // https://crm.site.ru/ — дашборд, /login — вход
+```
+
+Уберите welcome-маршрут из `routes/web.php` и проверьте `php artisan fastleo:doctor` — он подскажет, какие маршруты сайта мешают ([подробнее](../configuration.md#всё-приложение-на-корне-домена)).
 
 ```bash
 php artisan optimize   # на боевом сайте: пересобрать кеш конфигурации и маршрутов
@@ -568,32 +578,32 @@ final class AllowOfficeOnly
 Войдите в тесте нужным пользователем через guard `fastleo` и проверьте запрет и то, что запись не изменилась:
 
 ```bash
-php artisan make:test Admin/DoctorsAccessTest --pest   # tests/Feature/Admin/DoctorsAccessTest.php
+php artisan make:test Admin/ProductsAccessTest --pest  # tests/Feature/Admin/ProductsAccessTest.php
 ```
 
 ```php
-// tests/Feature/Admin/DoctorsAccessTest.php
-use App\Models\Doctor;
+// tests/Feature/Admin/ProductsAccessTest.php
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('forbids editors to delete doctors', function (): void {
+it('forbids editors to delete products', function (): void {
     $editor = User::factory()->create(['role' => 'editor']);
     $editor->forceFill(['fastleo_admin' => true])->save();
-    $doctor = Doctor::factory()->create();
+    $product = Product::factory()->create();
 
     $this->actingAs($editor, 'fastleo')
-        ->delete(route('fastleo.resources.destroy', ['doctors', $doctor->id]))
+        ->delete(route('fastleo.resources.destroy', ['products', $product->id]))
         ->assertForbidden();
 
-    $this->assertModelExists($doctor);
+    $this->assertModelExists($product);
 });
 
 it('does not let a site user into the admin panel', function (): void {
     $this->actingAs(User::factory()->create(), 'fastleo')
-        ->get(route('fastleo.resources.index', 'doctors'))
+        ->get(route('fastleo.resources.index', 'products'))
         ->assertRedirect(route('fastleo.login'));
 });
 ```

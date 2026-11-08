@@ -14,10 +14,10 @@ use Illuminate\Support\Str;
 final readonly class DocsBuilder
 {
     /** Описание skill: по нему Claude решает, когда его подключать. */
-    private const string SKILL_DESCRIPTION = 'Use this skill when creating or changing sections (CRUD) of the Fastleo admin panel in a Laravel site: resources in app/Fastleo, fields, filters, actions, dashboard widgets, settings pages, and the migration, model and test for a new section; also for menu items and counters, related tables on a record card, inline editing, computed columns, list filters, report/statistics pages and CRM-style tasks (clients, requests, tasks, leads); also for the fastleo:* artisan commands (make-resource, inspect, doctor). Trigger on: fastleo, админка, раздел админки, ресурс, поле формы, фильтр, действие, виджет, меню, счётчик, связанные таблицы, отчёт, статистика, CRM.';
+    private const string SKILL_DESCRIPTION = 'Use this skill when creating or changing sections (CRUD) of Fastleo, the Laravel panel for Eloquent models (a site admin panel, a CRM or a back office, at /fastleo or at the domain root): resources in app/Fastleo, fields, filters, actions, dashboard widgets, settings pages, and the migration, model and test for a new section; also for menu items and counters, related tables on a record card, inline editing, computed columns, list filters, report/statistics pages and CRM-style tasks (clients, requests, tasks, leads); also for the fastleo:* artisan commands (make-resource, inspect, doctor). Trigger on: fastleo, админка, раздел админки, ресурс, поле формы, фильтр, действие, виджет, меню, счётчик, связанные таблицы, отчёт, статистика, CRM.';
 
     /** Краткое описание пакета для начала skill и llms.txt. */
-    private const string SUMMARY = 'Fastleo — админ-панель для сайтов на Laravel 13. Раздел админки (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.';
+    private const string SUMMARY = 'Fastleo — пакет Laravel 13 для работы с моделями Eloquent: админка сайта, CRM, бэк-офис — рядом с сайтом (/fastleo), на своём поддомене или как всё приложение на корне домена. Раздел (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.';
 
     /** Где лежат docs относительно корня сайта. */
     private const string SITE_DOCS = 'vendor/camanru/fastleo/docs/';
@@ -57,7 +57,7 @@ final readonly class DocsBuilder
         $body[] = "## Поля\n\n".$this->fieldsTable();
         $body[] = "## Документация\n\nПодробности — в docs пакета (читайте нужный файл целиком):\n\n".implode("\n", $this->docIndex(self::SITE_DOCS));
 
-        $text = "# Fastleo — разделы админки\n\n".self::SUMMARY."\n\n".implode("\n\n", $body);
+        $text = "# Fastleo — разделы панели\n\n".self::SUMMARY."\n\n".implode("\n\n", $body);
 
         return "---\nname: fastleo\ndescription: \"".self::SKILL_DESCRIPTION."\"\nlicense: MIT\nmetadata:\n  author: camanru\n---\n"
             .$this->links($text, 'claude.md', self::SITE_DOCS)."\n";
@@ -79,7 +79,7 @@ final readonly class DocsBuilder
             $steps[] = $line;
         }
 
-        $text = "## Fastleo (админка сайта)\n\n"
+        $text = "## Fastleo (панель для моделей Eloquent)\n\n"
             .self::SUMMARY."\n\n"
             ."### Порядок работы\n\n".trim(implode("\n", $steps))."\n\n"
             ."### Правила\n\n".$sections['Правила']."\n\n"

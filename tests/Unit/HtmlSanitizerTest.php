@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fields\RichText;
+use Fastleo\Support\Html\DepthLimitedParser;
 use Fastleo\Support\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
@@ -95,16 +96,16 @@ it('lets the site extend the profile', function (): void {
 it('keeps the tags, attributes and players the site allows in fastleo.rich_text', function (): void {
     config()->set('fastleo.rich_text', [
         'tags' => ['div', 'span', 'p'],
-        'attributes' => ['class', 'role', 'align', 'data-lpu'],
-        'iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+        'attributes' => ['class', 'role', 'align', 'data-widget'],
+        'iframe_hosts' => ['https://yandex.ru/map-widget/'],
     ]);
 
-    $html = '<div class="uk-h3" role="note" data-lpu="123" align="center"><span class="badge">новое</span><p style="color: red; text-align: right">x</p></div>'
-        .'<iframe src="https://prodoctorov.ru/widget/rating/?id=1" width="300"></iframe><iframe src="https://prodoctorov.ru.evil.example/widget/"></iframe>';
+    $html = '<div class="uk-h3" role="note" data-widget="123" align="center"><span class="badge">новое</span><p style="color: red; text-align: right">x</p></div>'
+        .'<iframe src="https://yandex.ru/map-widget/v1/?id=1" width="300"></iframe><iframe src="https://yandex.ru.evil.example/widget/"></iframe>';
 
     expect(HtmlSanitizer::clean($html))->toBe(
-        '<div class="uk-h3" role="note" data-lpu="123" align="center"><span class="badge">новое</span><p style="text-align: right">x</p></div>'
-        .'<iframe src="https://prodoctorov.ru/widget/rating/?id&#61;1" width="300"></iframe><iframe></iframe>',
+        '<div class="uk-h3" role="note" data-widget="123" align="center"><span class="badge">новое</span><p style="text-align: right">x</p></div>'
+        .'<iframe src="https://yandex.ru/map-widget/v1/?id&#61;1" width="300"></iframe><iframe></iframe>',
     );
 });
 
@@ -112,7 +113,7 @@ it('still removes dangerous markup when the site allows more', function (string 
     config()->set('fastleo.rich_text', [
         'tags' => ['div', 'span'],
         'attributes' => ['class', 'role', 'data-x'],
-        'iframe_hosts' => ['https://prodoctorov.ru/'],
+        'iframe_hosts' => ['https://yandex.ru/'],
         'styles' => true,
     ]);
 
@@ -132,7 +133,7 @@ it('still removes dangerous markup when the site allows more', function (string 
     'handler on an image' => '<img src=x onerror=alert(1)>',
     'javascript link' => '<a href="javascript:alert(1)" class="a">x</a>',
     'comment' => '<div><!--><img src=x onerror=alert(1)>--></div>',
-    'foreign iframe' => '<iframe src="https://evil.example/prodoctorov.ru/"></iframe>',
+    'foreign iframe' => '<iframe src="https://evil.example/yandex.ru/"></iframe>',
     'iframe srcdoc' => '<iframe srcdoc="<script>alert(1)</script>"></iframe>',
     'style with url' => '<div style="background: url(https://evil.example/x.png)">x</div>',
     'style with javascript' => '<div style="background: url(javascript:alert(1))">x</div>',
@@ -143,7 +144,7 @@ it('keeps style but drops its dangerous parts when styles is enabled', function 
     config()->set('fastleo.rich_text', ['tags' => ['div'], 'styles' => true]);
 
     expect(HtmlSanitizer::clean('<div style="display: none; COLOR: red; position: fixed; background: url(x.png); width: expression(alert(1))">x</div><p style="text-align: center; z-index: 9">y</p>'))
-        ->toBe('<div style="display: none; color: red">x</div><p style="text-align: center; z-index: 9">y</p>');
+        ->toBe('<div style="display: none; color: red">x</div><p style="text-align: center">y</p>');
 });
 
 it('drops absolute positioning that covers the page when styles is enabled', function (): void {
@@ -152,6 +153,56 @@ it('drops absolute positioning that covers the page when styles is enabled', fun
     expect(HtmlSanitizer::clean('<p style="position: ABSOLUTE; top: 0; width: 100vw; color: red">x</p>'))
         ->toBe('<p style="top: 0; width: 100vw; color: red">x</p>');
 });
+
+it('drops everything that lays a block over the page when styles is enabled', function (string $style): void {
+    config()->set('fastleo.rich_text', ['tags' => ['p'], 'styles' => true]);
+
+    expect(HtmlSanitizer::clean('<p style="'.$style.'; color: red">x</p>'))->toBe('<p style="color: red">x</p>');
+})->with([
+    'relative with a shift' => 'position: relative; top: -500px',
+    'relative' => 'position: Relative',
+    'a layer order' => 'z-index: 2147483647',
+    'a transform' => 'transform: translateY(-100vh)',
+    'a translation' => 'translate: 0 -100vh',
+    'a negative margin' => 'margin: -50vh 0 0 -50vw',
+    'a negative side margin' => 'margin-left: -100vw',
+    'a negative offset' => 'top: -10px',
+    'a negative inset' => 'inset: -1px',
+    'a negative calculation' => 'margin-top: calc(-1 * 100vh)',
+    'a prefixed transform' => '-webkit-transform: translateY(-100vh)',
+    'a prefixed transform of another browser' => '-moz-transform: translateY(-100vh)',
+    'a movement along a path' => 'offset-path: ray(0deg)',
+    'a distance along a path' => 'offset-distance: 100%',
+    'a margin written as a calculation' => 'margin-top: calc(100vh * cos(180deg))',
+    'a margin from a variable' => 'margin-top: var(--shift)',
+    'an offset from a calculation' => 'left: calc(0px - 50vw)',
+    'a shift with a flag' => 'margin: 0 !important',
+]);
+
+it('keeps the usual positive sizes, margins and static positioning when styles is enabled', function (): void {
+    config()->set('fastleo.rich_text', ['tags' => ['p'], 'styles' => true]);
+
+    expect(HtmlSanitizer::clean('<p style="position: static; width: 100vw; margin: 0 auto 1rem; padding-left: 2em; top: 0; margin-bottom: 1.5em; margin-inline: 10vh 5%">x</p>'))
+        ->toBe('<p style="position: static; width: 100vw; margin: 0 auto 1rem; padding-left: 2em; top: 0; margin-bottom: 1.5em; margin-inline: 10vh 5%">x</p>');
+});
+
+it('keeps the lengths that Word writes and the modern units, and still refuses a minus in front of them', function (string $style, bool $kept): void {
+    config()->set('fastleo.rich_text', ['tags' => ['p'], 'styles' => true]);
+
+    $clean = HtmlSanitizer::clean('<p style="'.$style.'">x</p>');
+
+    expect(str_contains((string) $clean, 'style="'.$style.'"'))->toBe($kept);
+})->with([
+    'a number that starts with a point' => ['margin: .5em', true],
+    'a Word margin of a hundredth of a point' => ['margin-bottom: .0001pt', true],
+    'a dynamic viewport unit' => ['margin-top: 2dvh', true],
+    'a line height unit' => ['margin-left: 1lh', true],
+    'a quarter millimetre' => ['margin-right: 4Q', true],
+    'a container unit' => ['margin-top: 3cqw', true],
+    'a point in front of a minus' => ['margin-top: -.5em', false],
+    'a minus in front of a new unit' => ['margin-top: -2dvh', false],
+    'a point and nothing else' => ['margin-top: .em', false],
+]);
 
 it('rejects an unsafe rich_text setting', function (string $key, array $values): void {
     config()->set('fastleo.rich_text.'.$key, $values);
@@ -171,9 +222,9 @@ it('rejects an unsafe rich_text setting', function (string $key, array $values):
     'srcdoc attribute' => ['attributes', ['srcdoc']],
     'style attribute' => ['attributes', ['style']],
     'attribute with a quote' => ['attributes', ['a"b']],
-    'plain http player' => ['iframe_hosts', ['http://prodoctorov.ru/']],
-    'host without a path end' => ['iframe_hosts', ['https://prodoctorov.ru']],
-    'player with a quote' => ['iframe_hosts', ['https://prodoctorov.ru/a"onload=x/']],
+    'plain http player' => ['iframe_hosts', ['http://yandex.ru/']],
+    'host without a path end' => ['iframe_hosts', ['https://yandex.ru']],
+    'player with a quote' => ['iframe_hosts', ['https://yandex.ru/a"onload=x/']],
     'not a string' => ['tags', [123]],
 ]);
 
@@ -192,15 +243,15 @@ it('takes the template of the nearest parent field when the site subclass has no
 });
 
 it('does not take a tag the site allowed for an empty text', function (): void {
-    config()->set('fastleo.rich_text', ['tags' => ['div', 'video'], 'attributes' => ['class', 'data-lpu']]);
+    config()->set('fastleo.rich_text', ['tags' => ['div', 'video'], 'attributes' => ['class', 'data-widget']]);
 
-    expect(HtmlSanitizer::clean('<div class="pd_widget" data-lpu="123"></div>'))->toBe('<div class="pd_widget" data-lpu="123"></div>')
+    expect(HtmlSanitizer::clean('<div class="map_widget" data-widget="123"></div>'))->toBe('<div class="map_widget" data-widget="123"></div>')
         ->and(HtmlSanitizer::clean('<video></video>'))->toBe('<video></video>')
         ->and(HtmlSanitizer::clean('<p><br></p>'))->toBeNull();
 });
 
 it('still treats an empty div as an empty text when the site did not allow it', function (): void {
-    expect(HtmlSanitizer::clean('<div class="x" data-lpu="1"></div>'))->toBeNull();
+    expect(HtmlSanitizer::clean('<div class="x" data-widget="1"></div>'))->toBeNull();
 });
 
 it('skips empty and malformed declarations when styles is enabled', function (): void {
@@ -208,4 +259,128 @@ it('skips empty and malformed declarations when styles is enabled', function ():
 
     expect(HtmlSanitizer::clean('<div style="color: red;; just words; 12px; display: none;">x</div>'))
         ->toBe('<div style="color: red; display: none">x</div>');
+});
+
+it('does not parse a text nested deeper than the limit: the sanitizer would crash the whole process', function (): void {
+    $deep = str_repeat('<b>', 30_000).'x';
+
+    expect(HtmlSanitizer::tooComplex($deep))->toBeTrue()
+        ->and(HtmlSanitizer::clean($deep))->toBeNull()
+        ->and(HtmlSanitizer::clean(str_repeat('<blockquote>', 20_000).'x'))->toBeNull();
+});
+
+it('allows nesting up to the limit and stops one level above it', function (): void {
+    // Корень (body) — первый уровень, самый вложенный тег с текстом — последний.
+    expect(HtmlSanitizer::tooComplex(str_repeat('<b>', 199).'x'))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex(str_repeat('<b>', 200).'x'))->toBeTrue()
+        ->and(HtmlSanitizer::clean(str_repeat('<blockquote>', 20).'x'))->not->toBeNull();
+});
+
+it('rejects thousands of nested div tags by the text alone: parsing them costs seconds that no execution limit interrupts', function (): void {
+    $deep = str_repeat('<div>', 100_000).'x';
+    $started = hrtime(true);
+
+    expect(HtmlSanitizer::tooComplex($deep))->toBeTrue()
+        ->and(HtmlSanitizer::clean($deep))->toBeNull()
+        // Разбор такого текста занимал около пяти секунд, прикидка по тексту — тысячные доли.
+        ->and((hrtime(true) - $started) / 1e9)->toBeLessThan(1.0);
+});
+
+it('rejects by the text alone every markup that makes the parser spend seconds, however it closes its tags', function (string $html): void {
+    $started = hrtime(true);
+
+    expect(HtmlSanitizer::tooComplex($html))->toBeTrue()
+        ->and(HtmlSanitizer::clean($html))->toBeNull()
+        ->and((hrtime(true) - $started) / 1e9)->toBeLessThan(1.0);
+})->with([
+    'closing tags that close nothing' => fn (): string => str_repeat('<div></x>', 110_000),
+    'closing tags of another element' => fn (): string => str_repeat('<div></p>', 110_000),
+    'foreign elements with stray closing tags' => fn (): string => '<svg>'.str_repeat('<g></x>', 100_000),
+    'a closing tag inside a comment' => fn (): string => str_repeat('<div><!--</div>-->', 55_000),
+    'a closing tag inside an attribute' => fn (): string => str_repeat('<div title="</div>">', 55_000),
+    'a closing tag the parser skips inside a table cell' => fn (): string => str_repeat('<div><table><tr><td></div>', 40_000),
+    'a closing tag inside a bogus comment' => fn (): string => str_repeat('<div><!</div>', 60_000),
+    'formatting the parser creates again in every paragraph' => fn (): string => '<p>'.implode('', array_map(fn (int $i): string => '<b a='.$i.'>', range(1, 190))).str_repeat('</p><p>x', 3000),
+]);
+
+it('lets through the texts of real documents, however sloppy their markup', function (string $html): void {
+    expect(HtmlSanitizer::tooComplex($html))->toBeFalse();
+})->with([
+    'paragraphs pasted from Word' => fn (): string => str_repeat('<p class=MsoNormal><span style="x">t<o:p></o:p></span></p>', 1500),
+    'paragraphs with no closing tag' => fn (): string => str_repeat('<p>para text ', 1100),
+    'list items with no closing tag' => fn (): string => '<ul>'.str_repeat('<li>x', 1100).'</ul>',
+    'a big table' => fn (): string => '<table>'.str_repeat('<tr>'.str_repeat('<td>1</td>', 6).'</tr>', 400).'</table>',
+    'a price list of five thousand rows, every tag closed' => fn (): string => '<table>'.str_repeat('<tr>'.str_repeat('<td>1</td>', 5).'</tr>', 4900).'</table>',
+    'a drawing with many paths' => fn (): string => '<svg>'.str_repeat('<path d="M0 0"/>', 1100).'</svg>',
+    'a less-than sign in the text' => fn (): string => str_repeat('1 < 2 and 3 <5, a &lt; b &amp;&amp; c &lt; d. ', 600),
+    'bold words, italics and links' => fn (): string => str_repeat('<p>one <b>two</b> <i>three</i> <a href="/x">four</a></p>', 3500),
+    'a few formatting tags left open' => fn (): string => '<b><i>'.str_repeat('<p>text</p>', 5000),
+]);
+
+it('counts the opening tags of the text and the closing ones separately, nothing else', function (): void {
+    expect(DepthLimitedParser::markupTooHeavy(str_repeat('<br>', DepthLimitedParser::MAX_TAGS)))->toBeFalse()
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('<br>', DepthLimitedParser::MAX_TAGS + 1)))->toBeTrue()
+        // Закрытые теги не считаются дважды: пары <p></p> на пределе проходят.
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('<p></p>', DepthLimitedParser::MAX_TAGS)))->toBeFalse()
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('<p></p>', DepthLimitedParser::MAX_TAGS + 1)))->toBeTrue()
+        // Лишние закрывающие разбору почти ничего не стоят, но и их число ограничено: список совпадений занял бы память.
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('</x>', DepthLimitedParser::MAX_TAGS)))->toBeFalse()
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('</x>', DepthLimitedParser::MAX_TAGS + 1)))->toBeTrue()
+        ->and(DepthLimitedParser::markupTooHeavy('a < b and 3 <5 <> text'))->toBeFalse();
+});
+
+it('estimates what the parser creates again for formatting that is left open, and forgets what was closed', function (): void {
+    $open = fn (int $tags): string => str_repeat('<b>', $tags);
+
+    // 100 открытых <b> и 1000 абзацев — ровно предел (100 000), на один абзац больше — отказ.
+    expect(DepthLimitedParser::markupTooHeavy($open(100).str_repeat('<p>', 1000)))->toBeFalse()
+        ->and(DepthLimitedParser::markupTooHeavy($open(100).str_repeat('<p>', 1001)))->toBeTrue()
+        // Закрытое форматирование не считается; закрывающий тег чужого имени тоже ничего не закрывает.
+        ->and(DepthLimitedParser::markupTooHeavy($open(100).str_repeat('</b>', 100).str_repeat('<p>', 3000)))->toBeFalse()
+        ->and(DepthLimitedParser::markupTooHeavy($open(100).str_repeat('</i>', 100).str_repeat('<P>', 1001)))->toBeTrue()
+        // Лишний закрывающий тег не уходит в минус и не прячет следующие открытые.
+        ->and(DepthLimitedParser::markupTooHeavy(str_repeat('</b>', 500).$open(100).str_repeat('<p>', 1001)))->toBeTrue();
+});
+
+it('does not take an empty text or a text that is not utf-8 for too deep, but still refuses a heavy one in a wrong encoding', function (): void {
+    expect(HtmlSanitizer::tooComplex(''))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex("  \n"))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex("\xB1".str_repeat('<b>', 500)))->toBeFalse()
+        // Без этого проверка формы пропустила бы такой текст, а очистка молча сохранила бы пустоту.
+        ->and(HtmlSanitizer::tooComplex("\xB1".str_repeat('<div>', DepthLimitedParser::MAX_TAGS + 1)))->toBeTrue();
+});
+
+it('refuses a text longer than the sanitizer reads without parsing it', function (): void {
+    $limit = HtmlSanitizer::MAX_LENGTH * 4;
+
+    expect(HtmlSanitizer::tooComplex(str_repeat('a', $limit + 1)))->toBeTrue()
+        ->and(HtmlSanitizer::tooComplex(str_repeat('a', $limit)))->toBeFalse();
+});
+
+it('refuses a tag with more attributes than a living text has, whatever separates them, before the parser spends minutes on it', function (): void {
+    $names = fn (int $count, string $separator): string => implode($separator, array_map(fn (int $number): string => 'a'.$number, range(1, $count)));
+    $limit = DepthLimitedParser::MAX_ATTRIBUTES;
+
+    expect(HtmlSanitizer::tooComplex('<p '.$names($limit, ' ').'>x</p>'))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex('<p '.$names($limit + 1, ' ').'>x</p>'))->toBeTrue()
+        // Через слэш, переводом строки и вплотную к закрывающей кавычке: разбор считает их отдельными атрибутами.
+        ->and(HtmlSanitizer::tooComplex('<p a/'.$names($limit + 1, '/').'>x</p>'))->toBeTrue()
+        ->and(HtmlSanitizer::tooComplex("<p\n".$names($limit + 1, "\n").'>x</p>'))->toBeTrue()
+        ->and(HtmlSanitizer::tooComplex('<p '.implode('', array_map(fn (int $number): string => 'a'.$number.'="1"', range(1, $limit + 1))).'>x</p>'))->toBeTrue()
+        // «>» внутри значения не закрывает тег, а имя может начинаться с «=».
+        ->and(HtmlSanitizer::tooComplex('<p '.implode(' ', array_map(fn (int $number): string => 'a'.$number.'=">"', range(1, $limit + 1))).'>x</p>'))->toBeTrue()
+        ->and(HtmlSanitizer::tooComplex('<p '.implode(' ', array_map(fn (int $number): string => '=a'.$number.'="1"', range(1, $limit + 1))).'>x</p>'))->toBeTrue()
+        ->and(HtmlSanitizer::tooComplex('<svg '.$names($limit + 1, ' ').'></svg>'))->toBeTrue();
+});
+
+it('counts the attributes of one tag, not of the whole text, and leaves a long value and a living markup alone', function (): void {
+    $limit = DepthLimitedParser::MAX_ATTRIBUTES;
+    $tags = str_repeat('<img src="a.png" alt="Фото" width="10" height=20 data-x=\'y\' hidden>', 1000);
+    // Значение в кавычках с «>» и пробелами — один атрибут, даже если оно огромно; закрывающий тег с именами не считается.
+    $long = '<a title="'.str_repeat('a b > c ', 5000).'" href="/x">link</a></p '.str_repeat('a ', $limit + 1).'>';
+
+    expect(HtmlSanitizer::tooComplex($tags))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex($long))->toBeFalse()
+        ->and(HtmlSanitizer::tooComplex('1 < 2 and 3 > 2 <3'))->toBeFalse()
+        ->and(HtmlSanitizer::clean('<p '.implode(' ', array_map(fn (int $number): string => 'a'.$number, range(1, $limit + 1))).'>x</p>'))->toBeNull();
 });

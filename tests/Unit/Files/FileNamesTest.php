@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Storage;
 it('makes a safe latin file name', function (string $original, string $expected): void {
     expect(FileName::sanitize($original))->toBe($expected);
 })->with([
-    ['Фото врача.JPG', 'foto-vracha.jpg'],
+    ['Фото товара.JPG', 'foto-tovara.jpg'],
     ['shell.php.txt', 'shell-php.txt'],
     ['  Прайс (2026)!.PDF ', 'prays-2026.pdf'],
     ['report', 'report'],
@@ -54,6 +54,12 @@ it('never allows executable formats and treats only known formats as pictures', 
         ->and(FileTypes::images())->toBe(['jpg', 'png']);
 });
 
+it('refuses the rarer names of executable files that a server or a visitor machine runs', function (): void {
+    config(['fastleo.files.extensions' => ['pdf', 'php2', 'php6', 'phtm', 'shtm', 'hta', 'jar', 'wasm']]);
+
+    expect(FileTypes::allowed())->toBe(['pdf']);
+});
+
 it('refuses an empty root or the service folder as the uploads root', function (string $root): void {
     config(['fastleo.files.root' => $root]);
 
@@ -77,9 +83,23 @@ it('names the wrong root in the error', function (): void {
 
 it('lets through the root and what is inside it, but not a sibling folder that starts the same', function (): void {
     expect(PathGuard::inside('uploads'))->toBe('uploads')
-        ->and(PathGuard::inside('uploads/doctors/a.jpg'))->toBe('uploads/doctors/a.jpg')
+        ->and(PathGuard::inside('uploads/products/a.jpg'))->toBe('uploads/products/a.jpg')
         ->and(PathGuard::inside('uploads-evil/a.jpg'))->toBeNull()
         ->and(PathGuard::inside('uploadsx'))->toBeNull();
+});
+
+it('refuses invisible and control characters and broken UTF-8 in a path', function (string $path): void {
+    expect(PathGuard::inside($path))->toBeNull();
+})->with([
+    'zero width space' => ["uploads/a\u{200B}b.jpg"],
+    'right to left override' => ["uploads/a\u{202E}gpj.exe"],
+    'byte order mark' => ["uploads/\u{FEFF}a.jpg"],
+    'new line' => ["uploads/a\nb.jpg"],
+    'broken utf-8' => ["uploads/a\xB1.jpg"],
+]);
+
+it('lets through letters of any language and emoji in a path', function (): void {
+    expect(PathGuard::inside('uploads/Фото товара/ö 🙂.jpg'))->toBe('uploads/Фото товара/ö 🙂.jpg');
 });
 
 it('accepts a path of 1024 characters and refuses 1025', function (): void {

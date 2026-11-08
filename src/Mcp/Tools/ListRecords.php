@@ -25,6 +25,9 @@ final class ListRecords extends ResourceTool
     /** Наибольшее число записей на странице. */
     private const int MAX_PER_PAGE = 100;
 
+    /** Наибольший номер страницы: дальше смещение выборки не помещается в целое число базы. */
+    private const int MAX_PAGE = 1_000_000;
+
     /**
      * @return array<string, mixed>
      */
@@ -51,7 +54,7 @@ final class ListRecords extends ResourceTool
             'filters' => ['nullable', 'array'],
             'sort' => ['nullable', 'string'],
             'direction' => ['nullable', 'in:asc,desc'],
-            'page' => ['nullable', 'integer', 'min:1'],
+            'page' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_PAGE],
             'per_page' => ['nullable', 'integer', 'min:1'],
         ]);
 

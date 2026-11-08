@@ -64,6 +64,11 @@ final class RunAction extends ResourceTool
             throw new ToolFailed(__('fastleo::mcp.delete_disabled'));
         }
 
+        // Действие с подтверждением в админке (`$danger = true`) агенту без окна подтверждения доступно только вместе с удалением.
+        if ($action->isDanger() && ! config()->boolean('fastleo.mcp.allow_delete')) {
+            throw new ToolFailed(__('fastleo::mcp.action_danger'));
+        }
+
         $ids = $request->get('ids');
         $ids = ActionInput::ids($resource, is_array($ids) ? array_map(fn (mixed $id): mixed => is_int($id) ? (string) $id : $id, $ids) : null);
 
@@ -76,10 +81,12 @@ final class RunAction extends ResourceTool
         }
 
         $records = $resource->newQuery()->whereKey($ids)->get();
-        $allowed = $records->filter(fn (Model $record): bool => $action->allows($record))->values();
+        // Записи, закрытые для агента (`isLockedForMcp()`), действие не затрагивает: оно тоже может их изменить.
+        $open = $records->reject(fn (Model $record): bool => $resource->isLockedForMcp($record));
+        $allowed = $open->filter(fn (Model $record): bool => $action->allows($record))->values();
 
         if ($allowed->isEmpty()) {
-            throw new ToolFailed(__('fastleo::mcp.action_no_records'));
+            throw new ToolFailed($records->isNotEmpty() && $open->isEmpty() ? __('fastleo::mcp.locked') : __('fastleo::mcp.action_no_records'));
         }
 
         $input = $request->get('data');

@@ -96,6 +96,8 @@ final class Tree
         $key = $model->getKeyName();
         $query = (clone $query)->toBase();
         $query->orders = null;
+        // Порядок раздела с параметрами (`orderByRaw('… = ?', [...])`) уходит вместе со значениями.
+        $query->bindings['order'] = [];
         // Свой select() раздела не должен лишить дерево колонки родителя.
         $query->columns = null;
         $query->bindings['select'] = [];

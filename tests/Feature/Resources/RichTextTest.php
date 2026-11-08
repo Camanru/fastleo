@@ -6,11 +6,13 @@ use Fastleo\Fastleo;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\RichText;
 use Fastleo\Support\Assets;
+use Fastleo\Support\Html\DepthLimitedParser;
 use Fastleo\Support\Html\RichTextSettings;
 use Fastleo\Tests\Fixtures\Fields\SiteRichText;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\View;
 use Workbench\App\Models\Article;
+use Workbench\App\Models\Page;
 
 beforeEach(function (): void {
     $this->actingAs(admin(), Fastleo::GUARD);
@@ -45,6 +47,14 @@ it('does not take a text of spaces and empty tags for a filled required field', 
 
     expect(validator(['content' => $html], $field->getRules(null))->passes())->toBeFalse();
 })->with(['empty paragraph with a non-breaking space' => '<p>&nbsp;</p>', 'empty tags' => '<p><br></p><p></p>']);
+
+it('requires only the main language of a translatable rich text', function (): void {
+    config(['fastleo.locales' => ['ru', 'en']]);
+    $rules = RichText::make('content')->required()->translatable()->getRules(null);
+
+    expect(validator(['content' => ['ru' => '<p>Текст</p>', 'en' => '<p>&nbsp;</p>']], $rules)->passes())->toBeTrue()
+        ->and(validator(['content' => ['ru' => '<p>&nbsp;</p>', 'en' => '<p>Text</p>']], $rules)->passes())->toBeFalse();
+});
 
 it('accepts a required field with a text or a picture', function (string $html): void {
     expect(validator(['content' => $html], RichText::make('content')->required()->getRules(null))->passes())->toBeTrue();
@@ -155,4 +165,163 @@ it('takes the template of a subclass from the site folder and falls back to the 
     } finally {
         File::deleteDirectory($dir);
     }
+});
+
+it('rejects a text with thousands of nested tags instead of crashing the worker', function (): void {
+    $this->post(route('fastleo.resources.store', 'articles'), articleData(['content' => str_repeat('<b>', 30_000).'x']))
+        ->assertSessionHasErrors(['content' => 'В тексте слишком сложная разметка: теги вложены глубже 200 уровней, их больше 30 000, в одном теге больше 1 000 атрибутов или незакрытое форматирование повторяется в каждом абзаце. Упростите разметку или разбейте текст на части.']);
+
+    expect(Article::query()->count())->toBe(0);
+});
+
+it('rejects a text with a tag of thousands of attributes instead of parsing it for minutes', function (): void {
+    $attributes = implode(' ', array_map(fn (int $number): string => 'a'.$number, range(1, 40_000)));
+
+    $this->post(route('fastleo.resources.store', 'articles'), articleData(['content' => '<p '.$attributes.'>x</p>']))
+        ->assertSessionHasErrors(['content' => 'В тексте слишком сложная разметка: теги вложены глубже 200 уровней, их больше 30 000, в одном теге больше 1 000 атрибутов или незакрытое форматирование повторяется в каждом абзаце. Упростите разметку или разбейте текст на части.']);
+
+    expect(Article::query()->count())->toBe(0);
+});
+
+it('does not open a stored text that is too complex for the cleaner as an empty editor that would erase it on the next save', function (): void {
+    // Текст, записанный до пределов сложности (старый HTML, сидер, импорт прошлой версии).
+    $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+    $article = Article::factory()->create(['title' => 'Было', 'content' => $stored]);
+
+    $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+        ->assertOk()
+        ->assertSee('Текст слишком сложный для редактора', false)
+        ->assertDontSee('name="content"', false);
+
+    // Форма без поля не трогает текст: заголовок меняется, текст остаётся.
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['title' => 'Стало']))->assertSessionHasNoErrors();
+
+    expect(Article::query()->sole()->only('title', 'content'))->toBe(['title' => 'Стало', 'content' => $stored]);
+});
+
+it('opens the editor as usual for a stored text the cleaner takes and for a text the administrator has just sent', function (): void {
+    $article = Article::factory()->create(['content' => '<p>Обычный текст</p>']);
+
+    $this->get(route('fastleo.resources.edit', ['articles', $article->id]))
+        ->assertOk()
+        ->assertSee('name="content"', false)
+        ->assertDontSee('Текст слишком сложный для редактора', false);
+
+    // Слишком сложный текст, который администратор прислал сам, не сохранён: форма остаётся с редактором и ошибкой.
+    $this->followingRedirects()
+        ->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['content' => str_repeat('<b>', 30_000).'x']))
+        ->assertOk()
+        ->assertSee('name="content"', false)
+        ->assertSee('В тексте слишком сложная разметка', false)
+        ->assertDontSee('Текст слишком сложный для редактора', false);
+});
+
+it('does not make a required rich text field unsavable when its stored text is too complex for the editor', function (): void {
+    $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+    $article = Article::factory()->create(['title' => 'Было', 'content' => $stored]);
+    $field = RichText::make('content')->required()->forModel(Article::class);
+
+    expect($field->getRules($article)['content'][0])->toBe('sometimes')
+        ->and($field->getRules(null)['content'][0])->toBe('required')
+        ->and($field->getRules(Article::factory()->create(['content' => '<p>Текст</p>']))['content'][0])->toBe('required');
+});
+
+it('stops at the length limit and does not parse a text that is too long at all', function (): void {
+    $started = hrtime(true);
+
+    $this->post(route('fastleo.resources.store', 'articles'), articleData(['content' => str_repeat('<div></x>', 200_000)]))
+        ->assertSessionHasErrors('content');
+
+    // Одна ошибка по полю — длина: правила разбора (вложенность, обязательность) после неё не запускались.
+    expect(session('errors')->get('content'))->toHaveCount(1)
+        ->and(session('errors')->first('content'))->toContain('1000000')
+        ->and((hrtime(true) - $started) / 1e9)->toBeLessThan(2.0)
+        ->and(Article::query()->count())->toBe(0);
+});
+
+describe('a stored text that is too complex for the editor, where the form cannot leave the field out', function (): void {
+    beforeEach(function (): void {
+        config(['fastleo.locales' => ['ru', 'en']]);
+        useFixtureResources('RichTranslated');
+    });
+
+    it('shows the stored text of a language as html code instead of leaving the language out of the form, which would erase it', function (): void {
+        $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+        $page = Page::factory()->create(['slug' => 'about', 'title' => ['ru' => $stored, 'en' => '<p>Text</p>']]);
+
+        $this->get(route('fastleo.resources.edit', ['rich-pages', $page->id]))
+            ->assertOk()
+            ->assertSee('Показан как HTML-код', false)
+            ->assertSee('name="title[ru]"', false)
+            ->assertSee('name="title[en]"', false);
+    });
+
+    it('does not save a language that is too complex, so that saving another language cannot erase it', function (): void {
+        $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+        $page = Page::factory()->create(['slug' => 'about', 'title' => ['ru' => $stored, 'en' => '<p>Text</p>']]);
+
+        $this->put(route('fastleo.resources.update', ['rich-pages', $page->id]), ['title' => ['ru' => $stored, 'en' => '<p>New</p>'], 'slug' => 'about', 'faq' => ''])
+            ->assertSessionHasErrors('title.ru');
+
+        expect(Page::query()->findOrFail($page->id)->title)->toBeStoredJson(['ru' => $stored, 'en' => '<p>Text</p>']);
+    });
+
+    it('shows the stored text of a repeater item as html code too, and keeps it until the markup is simplified', function (): void {
+        $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+        $page = Page::factory()->create(['slug' => 'about', 'faq' => [['question' => 'Как?', 'answer' => $stored]]]);
+
+        $this->get(route('fastleo.resources.edit', ['rich-pages', $page->id]))
+            ->assertOk()
+            ->assertSee('Показан как HTML-код', false)
+            ->assertSee('name="faq[0][answer]"', false);
+
+        $this->put(route('fastleo.resources.update', ['rich-pages', $page->id]), ['title' => ['ru' => '<p>Заголовок</p>'], 'slug' => 'about', 'faq' => [['question' => 'Как?', 'answer' => $stored]]])
+            ->assertSessionHasErrors('faq.0.answer');
+
+        expect(Page::query()->findOrFail($page->id)->faq)->toBeStoredJson([['question' => 'Как?', 'answer' => $stored]]);
+
+        $this->put(route('fastleo.resources.update', ['rich-pages', $page->id]), ['title' => ['ru' => '<p>Заголовок</p>'], 'slug' => 'about', 'faq' => [['question' => 'Как?', 'answer' => '<p>Коротко</p>']]])
+            ->assertSessionHasNoErrors();
+
+        expect(Page::query()->findOrFail($page->id)->faq)->toBeStoredJson([['question' => 'Как?', 'answer' => '<p>Коротко</p>']]);
+    });
+
+    it('goes on showing the stored text of an item as html code after the form was refused, so that saving again cannot erase it', function (): void {
+        $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+        $page = Page::factory()->create(['slug' => 'about', 'faq' => [['question' => 'Как?', 'answer' => $stored]]]);
+        $edit = route('fastleo.resources.edit', ['rich-pages', $page->id]);
+
+        $this->from($edit)->put(route('fastleo.resources.update', ['rich-pages', $page->id]), ['title' => ['ru' => '<p>Заголовок</p>'], 'slug' => 'about', 'faq' => [['question' => 'Как?', 'answer' => $stored]]])
+            ->assertSessionHasErrors('faq.0.answer');
+
+        // После ошибки повторитель отдаёт подполям пустую запись: пустой редактор стёр бы текст следующим сохранением.
+        $this->get($edit)
+            ->assertOk()
+            ->assertSee('Показан как HTML-код', false)
+            ->assertSee('name="faq[0][answer]"', false)
+            ->assertSee('&lt;p&gt;абзац&lt;/p&gt;', false);
+    });
+
+    it('lets a required field with such a stored text be left out of the form, but refuses to blank it', function (): void {
+        $stored = str_repeat('<p>абзац</p>', DepthLimitedParser::MAX_TAGS + 1);
+        $article = Article::factory()->create(['content' => $stored]);
+        $field = RichText::make('content')->required()->forModel(Article::class);
+        $rules = $field->getRules($article)['content'];
+
+        // Поле можно не присылать (форма его не отправляет), но присланное пустое значение отклоняется.
+        expect($rules[0])->toBe('sometimes')
+            ->and($rules[1])->toBe('required')
+            ->and(validator([], ['content' => $rules])->passes())->toBeTrue()
+            ->and(validator(['content' => ''], ['content' => $rules])->passes())->toBeFalse()
+            ->and(validator(['content' => null], ['content' => $rules])->passes())->toBeFalse();
+    });
+
+    it('opens the editor for a language and an item whose stored text the cleaner takes', function (): void {
+        $page = Page::factory()->create(['slug' => 'about', 'title' => ['ru' => '<p>Обычный</p>'], 'faq' => [['question' => 'Как?', 'answer' => '<p>Ответ</p>']]]);
+
+        $this->get(route('fastleo.resources.edit', ['rich-pages', $page->id]))
+            ->assertOk()
+            ->assertDontSee('Показан как HTML-код', false)
+            ->assertSee('fastleoRichText(', false);
+    });
 });

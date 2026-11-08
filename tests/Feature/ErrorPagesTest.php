@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Illuminate\Routing\RouteCollection;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Js;
+use Illuminate\Support\Sleep;
 
 beforeEach(function (): void {
     useRoles();
@@ -27,7 +31,10 @@ it('shows a styled page for an address of the admin that no route knows', functi
     $this->get('/fastleo/a/b/c/d/e/f/g')
         ->assertNotFound()
         ->assertSee('Страница не найдена')
-        ->assertSee('В админку');
+        ->assertSee('В админку')
+        // Кнопка «Назад» получает адрес готовой строкой JS, а не необработанной директивой Blade.
+        ->assertSee('(location.href = '.Js::from(route('fastleo.dashboard'))->toHtml().')', false)
+        ->assertDontSee('@js(', false);
 });
 
 it('shows a styled page for a section that does not exist', function (): void {
@@ -53,6 +60,7 @@ it('asks to reload the page when the form has no valid token', function (): void
 
 it('says when to try again after too many requests', function (): void {
     $this->startSession();
+    Sleep::fake();
 
     foreach (range(1, 6) as $attempt) {
         $response = $this->post(route('fastleo.password.email'), ['email' => 'nobody@example.com', '_token' => csrf_token()]);
@@ -88,4 +96,41 @@ it('does not take the same path on another domain for the admin', function (): v
     config(['fastleo.domain' => 'admin.example.test']);
 
     $this->get('/fastleo/a/b/c/d/e/f/g')->assertNotFound()->assertDontSee('Страница не найдена');
+});
+
+/**
+ * Админка на корне домена сайта: маршруты пакета загружаются первыми, маршруты сайта — после них.
+ */
+function adminAtSiteRoot(?string $domain = null): void
+{
+    config(['fastleo.path' => '', 'fastleo.domain' => $domain]);
+    Route::setRoutes(new RouteCollection());
+    require dirname(__DIR__, 2).'/routes/fastleo.php';
+    Route::get('/private.html', fn () => abort(403));
+    Route::get('/up', fn (): string => 'healthy');
+    resolve('url')->setRoutes(Route::getRoutes());
+}
+
+it('shows the admin page for an address without a route when the admin sits at the site root', function (): void {
+    adminAtSiteRoot();
+
+    $this->get('/a/b/c/d/e/f/g')->assertNotFound()->assertSee('Страница не найдена');
+});
+
+it('leaves the errors of site routes to the site when the admin sits at the site root', function (): void {
+    adminAtSiteRoot();
+
+    $this->get('/private.html')->assertForbidden()->assertDontSee('Нет доступа');
+});
+
+it('treats any address of its own domain as the admin when the path is empty', function (): void {
+    adminAtSiteRoot('admin.example.test');
+
+    $this->get('http://admin.example.test/private.html')->assertForbidden()->assertSee('Нет доступа');
+});
+
+it('leaves the health check route of the site free when the admin sits at the site root', function (): void {
+    adminAtSiteRoot();
+
+    $this->get('/up')->assertOk()->assertSee('healthy');
 });

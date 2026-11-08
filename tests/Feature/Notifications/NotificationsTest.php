@@ -12,6 +12,7 @@ use Fastleo\Notifications\SendAdminMessage;
 use Illuminate\Foundation\Application;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Workbench\App\Models\User;
@@ -120,6 +121,13 @@ describe('mail copy', function (): void {
             ->and($html)->toContain('Заявка [срочно] a\\b');
     });
 
+    it('does not turn an autolink in the text of a visitor into a link of the letter', function (): void {
+        $html = (string) FastleoMessage::make('Заявка <https://evil.example/title>')->body('Перейдите <https://evil.example/pay> и <b>так</b>')->toMail()->render();
+
+        expect($html)->not->toContain('href="https://evil.example')
+            ->and($html)->toContain('https://evil.example/pay');
+    });
+
     it('makes a letter from the title, the text and the link', function (): void {
         config(['app.url' => 'https://site.test']);
 
@@ -200,6 +208,20 @@ describe('notifyAdmins()', function (): void {
     it('sends nothing to messengers when there are no enabled bots', function (): void {
         Bus::fake();
         notificationBot(['enabled' => false]);
+
+        Fastleo::notifyAdmins('Привет');
+
+        Bus::assertNotDispatched(SendAdminMessage::class);
+    });
+
+    it('does not fail the page of the site when the bots cannot be read', function (): void {
+        Bus::fake();
+        notificationBot(['recipients' => ['12345']]);
+        DB::beforeExecuting(function (string $query): void {
+            if (str_contains($query, 'fastleo_notification_bots')) {
+                throw new RuntimeException('no such table');
+            }
+        });
 
         Fastleo::notifyAdmins('Привет');
 

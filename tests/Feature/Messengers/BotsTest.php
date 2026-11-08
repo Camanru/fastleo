@@ -60,6 +60,13 @@ describe('telegram', function (): void {
             ->and($failure->uncertain)->toBeFalse();
     });
 
+    it('treats a server error on sending a message as uncertain, because the message may have arrived', function (): void {
+        Http::fake(['api.telegram.org/*' => Http::response('Bad gateway', 502)]);
+
+        expect(messengerFailure(fn (): string => new TelegramBot(TELEGRAM_TOKEN)->sendText('1', 'Привет'))->uncertain)->toBeTrue()
+            ->and(messengerFailure(fn (): array => new TelegramBot(TELEGRAM_TOKEN)->me())->uncertain)->toBeFalse();
+    });
+
     it('falls back to the status code when there is no description', function (): void {
         Http::fake(['api.telegram.org/*' => Http::response('Bad gateway', 502)]);
 
@@ -134,6 +141,13 @@ describe('max', function (): void {
         $failure = messengerFailure(fn (): array => new MaxBot(MAX_TOKEN)->me());
 
         expect($failure->getMessage())->toBe('too.many.requests')->and($failure->retryAfter)->toBe(1);
+    });
+
+    it('treats a server error on sending a message as uncertain, because the message may have arrived', function (): void {
+        Http::fake(['platform-api2.max.ru/*' => Http::response('Bad gateway', 502)]);
+
+        expect(messengerFailure(fn (): string => new MaxBot(MAX_TOKEN)->sendText('1', 'Привет'))->uncertain)->toBeTrue()
+            ->and(messengerFailure(fn (): array => new MaxBot(MAX_TOKEN)->me())->uncertain)->toBeFalse();
     });
 
     it('uses the address from the config', function (): void {
@@ -247,6 +261,33 @@ describe('max posts', function (): void {
         expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('attachment.not.ready');
         Sleep::assertSleptTimes(2);
         Http::assertSentCount(3);
+    });
+
+    it('waits for the images by the error code of Max, whatever its message says, and waits longer each time', function (): void {
+        Sleep::fake();
+        Http::fake(['platform-api2.max.ru/messages*' => Http::sequence()
+            ->push(['code' => 'attachment.not.ready', 'message' => 'Key: errors.process.attachment.file.not.processed'], 400)
+            ->push(['code' => 'attachment.not.ready', 'message' => 'Key: errors.process.attachment.file.not.processed'], 400)
+            ->push(['message' => ['body' => ['mid' => 'mid.7']]])]);
+        $steps = [];
+
+        new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], function (array $step) use (&$steps): void {
+            $steps[] = $step;
+        });
+
+        Sleep::assertSequence([Sleep::for(1)->seconds(), Sleep::for(2)->seconds()]);
+        expect($steps)->toContain(['message' => 'mid.7']);
+    });
+
+    it('does not wait for an error with another code', function (): void {
+        Sleep::fake();
+        Http::fake(['platform-api2.max.ru/messages*' => Http::response(['code' => 'chat.not.found', 'message' => 'Key: errors.chat.not.found'], 404)]);
+
+        $failure = messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [], null, [], fn (array $step, string $layout): null => null));
+
+        expect($failure->getMessage())->toBe('Key: errors.chat.not.found')
+            ->and($failure->reason)->toBe('chat.not.found');
+        Sleep::assertNeverSlept();
     });
 
     it('treats an answer without the message id as a failure and remembers nothing', function (): void {

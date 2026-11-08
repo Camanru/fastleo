@@ -9,30 +9,30 @@
 Создайте миграцию, модель с `$fillable` и класс-ресурс в `app/Fastleo` — регистрировать его не нужно. Заготовки:
 
 ```bash
-php artisan make:model Doctor -m                  # модель и миграция
-php artisan fastleo:make-resource Doctor          # app/Fastleo/DoctorResource.php
+php artisan make:model Product -m                 # модель и миграция
+php artisan fastleo:make-resource Product         # app/Fastleo/ProductResource.php
 ```
 
 ```php
-// database/migrations/2026_01_01_000000_create_doctors_table.php
-Schema::create('doctors', function (Blueprint $table) {
+// database/migrations/2026_01_01_000000_create_products_table.php
+Schema::create('products', function (Blueprint $table) {
     $table->id();
     $table->string('name');
-    $table->string('specialty')->nullable();
+    $table->string('category')->nullable();
     $table->boolean('is_active')->default(true);
     $table->timestamps();
 });
 ```
 
 ```php
-// app/Models/Doctor.php
+// app/Models/Product.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['name', 'specialty', 'is_active'])]
-class Doctor extends Model
+#[Fillable(['name', 'category', 'is_active'])]
+class Product extends Model
 {
     protected function casts(): array
     {
@@ -42,34 +42,34 @@ class Doctor extends Model
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 namespace App\Fastleo;
 
-use App\Models\Doctor;
+use App\Models\Product;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
 
-final class DoctorResource extends Resource
+final class ProductResource extends Resource
 {
-    protected static string $model = Doctor::class;
+    protected static string $model = Product::class;
 
-    protected static ?string $label = 'Врачи';
+    protected static ?string $label = 'Товары';
 
-    protected static ?string $singular = 'Врач';
+    protected static ?string $singular = 'Товар';
 
     public function fields(): array
     {
         return [
-            Text::make('name', 'Имя')->required()->searchable()->sortable(),
-            Text::make('specialty', 'Специальность'),
+            Text::make('name', 'Название')->required()->searchable()->sortable(),
+            Text::make('category', 'Категория'),
             Toggle::make('is_active', 'Показывать на сайте'),
         ];
     }
 }
 ```
 
-Затем `php artisan migrate` и `php artisan fastleo:doctor` — ошибок быть не должно. Раздел откроется по адресу `/fastleo/doctors`.
+Затем `php artisan migrate` и `php artisan fastleo:doctor` — ошибок быть не должно. Раздел откроется по адресу `/fastleo/products`.
 
 Подробнее — [Разделы](../resources.md#первый-раздел).
 
@@ -78,25 +78,25 @@ final class DoctorResource extends Resource
 Да. Выполните миграцию, затем команду с `--generate` — поля подберутся по колонкам таблицы.
 
 ```bash
-php artisan fastleo:make-resource Doctor --generate
-php artisan fastleo:make-resource Doctor --model="App\Models\Staff\Doctor"   # модель не в App\Models
+php artisan fastleo:make-resource Product --generate
+php artisan fastleo:make-resource Product --model="App\Models\Catalog\Product"   # модель не в App\Models
 ```
 
 После генерации:
 
 1. Переведите подписи: `$label`, `$singular` и вторые аргументы `make()` — они получаются английскими из имён колонок.
 2. Добавьте вручную связи `BelongsToMany`, `HasMany`, `HasOne` — по таблице их не видно.
-3. У `Image` и `Gallery` задайте папку: `->directory('doctors')`.
+3. У `Image` и `Gallery` задайте папку: `->directory('products')`.
 4. Проверьте `php artisan fastleo:doctor`.
 
 Подробнее — [Команда make-resource](../resources.md#команда-fastleomake-resource).
 
 ### Как поменять адрес раздела?
 
-Задайте `$slug`: латиница в нижнем регистре, цифры и дефис. По умолчанию адрес — имя модели во множественном числе (`Doctor` → `doctors`).
+Задайте `$slug`: латиница в нижнем регистре, цифры и дефис. По умолчанию адрес — имя модели во множественном числе (`Product` → `products`).
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 protected static ?string $slug = 'staff';   // /fastleo/staff
 ```
 
@@ -109,13 +109,13 @@ protected static ?string $slug = 'staff';   // /fastleo/staff
 Задайте статические свойства ресурса. Иконка — имя из [Lucide](https://lucide.dev/icons).
 
 ```php
-// app/Fastleo/DoctorResource.php
-protected static ?string $label = 'Врачи';                  // заголовок и пункт меню
-protected static ?string $singular = 'Врач';                // «Создать: Врач»
-protected static ?string $createLabel = 'Добавить врача';   // кнопка в списке
-protected static ?string $description = 'Врачи видны на странице «Команда»';
-protected static string $icon = 'stethoscope';
-protected static ?string $group = 'Клиника';                // группа меню
+// app/Fastleo/ProductResource.php
+protected static ?string $label = 'Товары';                 // заголовок и пункт меню
+protected static ?string $singular = 'Товар';               // «Создать: Товар»
+protected static ?string $createLabel = 'Добавить товар';   // кнопка в списке
+protected static ?string $description = 'Товары видны в каталоге на сайте';
+protected static string $icon = 'shopping-bag';
+protected static ?string $group = 'Каталог';                // группа меню
 protected static int $position = 10;                        // порядок в группе
 ```
 
@@ -128,12 +128,12 @@ protected static int $position = 10;                        // порядок в
 Поставьте поле с названием первым в `fields()` или переопределите `title()`.
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 use Illuminate\Database\Eloquent\Model;
 
 public function title(Model $record): string
 {
-    return $record->name.' — '.$record->specialty;
+    return $record->name.' — '.$record->category;
 }
 ```
 
@@ -168,7 +168,7 @@ public function title(Model $record): string
 Вызовите `required()`. Для галочки «Согласен» `required()` не требует отметки — добавьте правило `accepted`.
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ReviewResource.php — отзыв о товаре
 use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\Text;
 
@@ -429,38 +429,38 @@ BelongsTo::make('category_id', 'Категория')
 
 Подробнее — [BelongsTo](../fields/belongs-to.md).
 
-### Как привязать к врачу несколько услуг (BelongsToMany)?
+### Как привязать к товару несколько меток (BelongsToMany)?
 
 Создайте промежуточную таблицу, метод `belongsToMany` и поле с именем метода. В `$fillable` ничего добавлять не нужно.
 
 ```bash
-php artisan make:migration create_doctor_service_table
+php artisan make:migration create_product_tag_table
 ```
 
 ```php
-// database/migrations/…_create_doctor_service_table.php
-Schema::create('doctor_service', function (Blueprint $table) {
-    $table->foreignId('doctor_id')->constrained()->cascadeOnDelete();
-    $table->foreignId('service_id')->constrained()->cascadeOnDelete();
-    $table->primary(['doctor_id', 'service_id']);
+// database/migrations/…_create_product_tag_table.php
+Schema::create('product_tag', function (Blueprint $table) {
+    $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('tag_id')->constrained()->cascadeOnDelete();
+    $table->primary(['product_id', 'tag_id']);
 });
 ```
 
 ```php
-// app/Models/Doctor.php
+// app/Models/Product.php
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
-public function services(): BelongsToMany
+public function tags(): BelongsToMany
 {
-    return $this->belongsToMany(Service::class);
+    return $this->belongsToMany(Tag::class);
 }
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 use Fastleo\Fields\BelongsToMany;
 
-BelongsToMany::make('services', 'Услуги'),
+BelongsToMany::make('tags', 'Метки'),
 ```
 
 Дополнительные колонки промежуточной таблицы (`price`, `sort`) поле не редактирует — для них сделайте отдельную модель и `HasMany` с полем `BelongsTo` внутри блока.
@@ -472,14 +472,14 @@ BelongsToMany::make('services', 'Услуги'),
 Для списка записей — `HasMany` с полями блока, для одной записи — `HasOne`. Имя поля — метод связи модели.
 
 ```bash
-php artisan make:model DoctorPrice -m             # модель и миграция
+php artisan make:model ProductPrice -m            # модель и миграция
 ```
 
 ```php
-// database/migrations/…_create_doctor_prices_table.php
-Schema::create('doctor_prices', function (Blueprint $table) {
+// database/migrations/…_create_product_prices_table.php
+Schema::create('product_prices', function (Blueprint $table) {
     $table->id();
-    $table->foreignId('doctor_id')->constrained()->cascadeOnDelete();
+    $table->foreignId('product_id')->constrained()->cascadeOnDelete();
     $table->string('title');
     $table->decimal('price', 10, 2)->nullable();
     $table->unsignedInteger('sort')->default(0);
@@ -488,26 +488,26 @@ Schema::create('doctor_prices', function (Blueprint $table) {
 ```
 
 ```php
-// app/Models/Doctor.php
+// app/Models/Product.php
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 public function prices(): HasMany
 {
-    return $this->hasMany(DoctorPrice::class);
+    return $this->hasMany(ProductPrice::class);
 }
 ```
 
 ```php
-// app/Models/DoctorPrice.php
+// app/Models/ProductPrice.php
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['title', 'price'])]   // doctor_id и sort пишет пакет
-class DoctorPrice extends Model {}
+#[Fillable(['title', 'price'])]   // product_id и sort пишет пакет
+class ProductPrice extends Model {}
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Text;
@@ -516,7 +516,7 @@ use Fastleo\Layout\Grid;
 HasMany::make('prices', 'Цены')
     ->fields([
         Grid::make(2, [
-            Text::make('title', 'Услуга')->required(),
+            Text::make('title', 'Вариант')->required(),
             Number::make('price', 'Цена')->min(0),
         ]),
     ])
@@ -578,7 +578,7 @@ $table->json('days')->nullable();
 ```
 
 ```php
-// app/Models/Doctor.php
+// app/Models/Product.php
 protected function casts(): array
 {
     return [

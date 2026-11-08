@@ -54,6 +54,44 @@ function watchField(scope, field, nested, callback) {
     scope?.addEventListener('change', handler);
 }
 
+// Форма, ушедшая на сервер, второй раз не отправляется, пока идёт ответ: двойной щелчок по «Отправить» в окне действия или импорта
+// выполнил бы действие дважды и поставил бы две задачи. Через SENT_LOCK_MS блокировка снимается — ответ-скачивание файла страницу не
+// меняет, и действие нужно уметь запустить снова. Формы с method="dialog" (закрытие окна) не затрагиваются.
+const SENT_LOCK_MS = 10_000;
+
+document.addEventListener(
+    'submit',
+    (event) => {
+        const form = event.target;
+
+        if (!(form instanceof HTMLFormElement) || form.getAttribute('method') === 'dialog') {
+            return;
+        }
+
+        if (form.hasAttribute('data-sent')) {
+            event.preventDefault();
+
+            return;
+        }
+
+        // Отправку могли отменить другие обработчики (подтверждение, проверка): помечаем форму, только если она ушла.
+        setTimeout(() => {
+            if (!event.defaultPrevented) {
+                form.setAttribute('data-sent', '');
+                setTimeout(() => form.removeAttribute('data-sent'), SENT_LOCK_MS);
+            }
+        });
+    },
+    true,
+);
+
+// Возврат кнопкой «Назад» показывает страницу из кеша браузера: формы на ней снова можно отправлять.
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+        document.querySelectorAll('form[data-sent]').forEach((form) => form.removeAttribute('data-sent'));
+    }
+});
+
 const STORAGE_KEY = 'fastleo-theme';
 const MODES = ['light', 'dark', 'system'];
 
@@ -162,10 +200,44 @@ Alpine.data('fastleoShell', () => ({
     menuOpen: false,
     collapsed: document.documentElement.classList.contains('fl-collapsed'),
 
+    // Подсказка пункта свёрнутого меню — fixed (меню прокручивается и обрезало бы её): ставим её справа от пункта.
+    placeTip(link) {
+        const tip = link.querySelector('[data-menu-tip]');
+
+        if (tip) {
+            const rect = link.getBoundingClientRect();
+            tip.style.top = `${rect.top + rect.height / 2}px`;
+            tip.style.left = `${rect.right + 10}px`;
+        }
+    },
+
     toggleCollapsed() {
         this.collapsed = !this.collapsed;
         storage.set(SIDEBAR_KEY, this.collapsed ? '1' : '0');
         document.documentElement.classList.toggle('fl-collapsed', this.collapsed);
+    },
+}));
+
+const MENU_GROUPS_KEY = 'fastleo-menu-groups';
+
+/**
+ * Группа бокового меню: <div x-data="fastleoMenuGroup" data-menu-group="Контент">. Свёрнутые группы — список названий
+ * в localStorage; начальное состояние (data-closed) ставит скрипт под меню до запуска Alpine.
+ */
+Alpine.data('fastleoMenuGroup', () => ({
+    open: true,
+
+    init() {
+        this.open = !this.$el.hasAttribute('data-closed');
+    },
+
+    toggle() {
+        this.open = !this.open;
+        // $root — сама группа: в обработчике клика $el указывает на кнопку.
+        this.$root.toggleAttribute('data-closed', !this.open);
+        const label = this.$root.dataset.menuGroup;
+        const closed = storedList(MENU_GROUPS_KEY).filter((item) => item !== label);
+        storage.set(MENU_GROUPS_KEY, JSON.stringify(this.open ? closed : [...closed, label]));
     },
 }));
 
@@ -184,8 +256,15 @@ Alpine.data('fastleoForm', () => ({
         this.$watch('dirty', (dirty) => (Alpine.store('fastleoForm').dirty = dirty));
         this.dirty = this.$el.hasAttribute('data-dirty');
         Alpine.store('fastleoForm').dirty = this.dirty;
-        this.$el.addEventListener('input', () => (this.dirty = true));
-        this.$el.addEventListener('change', () => (this.dirty = true));
+        // Поле поиска списка и черновик метки не имеют имени и в форму не попадают: набор текста в них — не изменение.
+        // Выбор и добавление метки сообщают форме о себе сами (событие на форме).
+        const touch = (event) => {
+            if (event.target === this.$el || event.target.name) {
+                this.dirty = true;
+            }
+        };
+        this.$el.addEventListener('input', touch);
+        this.$el.addEventListener('change', touch);
         this.$el.addEventListener('submit', (event) => {
             // Второй «Сохранить» (двойной щелчок, Ctrl+S) создал бы вторую запись; файл, который ещё грузится, потерялся бы.
             if (this.submitting || this.isUploading()) {
@@ -195,6 +274,11 @@ Alpine.data('fastleoForm', () => ({
             }
 
             this.submitting = true;
+
+            // «Сохранить» возвращает на ту же форму: вкладка (#ключ) в адресе отправки переживает перенаправление сервера.
+            if (event.submitter?.hasAttribute('data-save') && window.location.hash !== '') {
+                this.$el.action = this.$el.action.split('#')[0] + window.location.hash;
+            }
 
             // Другой обработчик отменил отправку (подтверждение) — форму снова можно отправить.
             setTimeout(() => (this.submitting = !event.defaultPrevented && this.submitting));
@@ -344,7 +428,8 @@ function canRefresh(region) {
         !region.querySelector('.sortable-chosen, .sortable-ghost') &&
         !(region.contains(active) && active.matches('input, select, textarea')) &&
         !document.querySelector('dialog[open]') &&
-        !region.querySelector('[aria-expanded="true"], [aria-busy="true"], [data-inline] :disabled')
+        // Развёрнутая ветка дерева — обычное состояние, а не открытое меню.
+        !region.querySelector('[aria-expanded="true"]:not([data-tree-toggle]), [aria-busy="true"], [data-inline] :disabled')
     );
 }
 
@@ -1153,7 +1238,8 @@ async function requestJson(url, method, body) {
  * Подставить значения в текст: «:name больше :size» + { name, size }.
  */
 function format(text, replace) {
-    return Object.entries(replace).reduce((result, [key, value]) => result.replaceAll(`:${key}`, value), text);
+    // Функция вместо строки: «$&» и «$1» в значении (имя файла) не должны читаться как шаблон подстановки.
+    return Object.entries(replace).reduce((result, [key, value]) => result.replaceAll(`:${key}`, () => String(value)), text);
 }
 
 /**
@@ -1167,38 +1253,82 @@ function humanSize(bytes, units) {
 }
 
 /**
- * Загрузить файлы в папку менеджера с проверкой лимитов PHP на клиенте.
- * → { files: [{ path, url, name, image }], errors: ['…'] }
+ * Разбить файлы на пачки, которые принимает PHP за один запрос: не больше max_file_uploads файлов и не больше
+ * post_max_size байт в пачке (а не во всём выборе).
  */
-export async function uploadFiles(fileList, { url, folder, maxFile, maxTotal, messages }) {
+function uploadBatches(files, maxFiles, maxTotal) {
+    const batches = [];
+    let batch = [];
+    let size = 0;
+
+    for (const file of files) {
+        if (batch.length > 0 && ((maxFiles > 0 && batch.length >= maxFiles) || (maxTotal > 0 && size + file.size > maxTotal))) {
+            batches.push(batch);
+            batch = [];
+            size = 0;
+        }
+
+        batch.push(file);
+        size += file.size;
+    }
+
+    return batch.length > 0 ? [...batches, batch] : batches;
+}
+
+/**
+ * Загрузить файлы в папку менеджера с проверкой лимитов PHP на клиенте.
+ * → { files: [{ path, url, name, image }], errors: ['…'], expired: false }
+ *
+ * Большой выбор уходит пачками (PHP принимает за запрос не больше max_file_uploads файлов и молча отбрасывает остальные).
+ * Отказ одной пачки (файл недопустимого вида, сбой сервера) не отменяет остальные: загруженное остаётся, ошибки копятся.
+ */
+export async function uploadFiles(fileList, { url, folder, maxFile, maxFiles = 0, maxTotal, messages }) {
     const errors = [];
     const accepted = [];
-    let total = 0;
 
     for (const file of fileList) {
         if (maxFile > 0 && file.size > maxFile) {
             errors.push(format(messages.too_big, { name: file.name, size: humanSize(maxFile, messages.sizes) }));
+        } else if (maxTotal > 0 && file.size > maxTotal) {
+            errors.push(format(messages.too_big_total, { name: file.name, size: humanSize(maxTotal, messages.sizes) }));
         } else {
             accepted.push(file);
-            total += file.size;
         }
     }
 
-    if (maxTotal > 0 && total > maxTotal) {
-        return { files: [], errors: [...errors, format(messages.too_big_total, { size: humanSize(maxTotal, messages.sizes) })] };
+    const files = [];
+
+    for (const batch of uploadBatches(accepted, maxFiles, maxTotal)) {
+        const body = new FormData();
+        body.append('folder', folder);
+        batch.forEach((file) => body.append('files[]', file));
+
+        let data;
+
+        try {
+            data = await requestJson(url, 'POST', body);
+        } catch (error) {
+            const failure = requestErrors(error, messages);
+
+            // Сессия истекла: остальные пачки тоже не пройдут. Если ничего не загружено, это ошибка запроса целиком.
+            if (failure.expired) {
+                if (files.length === 0) {
+                    throw error;
+                }
+
+                return { files, errors: [...errors, ...failure.errors], expired: true };
+            }
+
+            errors.push(...failure.errors.filter((message) => !errors.includes(message)));
+
+            continue;
+        }
+
+        files.push(...(data.files ?? []));
+        errors.push(...(data.errors ?? []));
     }
 
-    if (accepted.length === 0) {
-        return { files: [], errors };
-    }
-
-    const body = new FormData();
-    body.append('folder', folder);
-    accepted.forEach((file) => body.append('files[]', file));
-
-    const data = await requestJson(url, 'POST', body);
-
-    return { files: data.files ?? [], errors: [...errors, ...(data.errors ?? [])] };
+    return { files, errors, expired: false };
 }
 
 /**
@@ -1410,6 +1540,7 @@ function pickerSettings() {
         uploadUrl: dialog.dataset.uploadUrl,
         thumbUrl: dialog.dataset.thumbUrl,
         maxFile: Number(dialog.dataset.maxFile),
+        maxFiles: Number(dialog.dataset.maxFiles),
         maxTotal: Number(dialog.dataset.maxTotal),
         messages: JSON.parse(dialog.dataset.messages),
     };
@@ -1877,10 +2008,12 @@ Alpine.data('fastleoFiles', () => ({
                 url: this.$root.dataset.uploadUrl,
                 folder: this.$root.dataset.folder,
                 maxFile: Number(this.$root.dataset.maxFile),
+                maxFiles: Number(this.$root.dataset.maxFiles),
                 maxTotal: Number(this.$root.dataset.maxTotal),
                 messages: this.messages,
             });
             this.errors = result.errors;
+            this.expired = result.expired;
 
             if (result.files.length > 0) {
                 await this.refresh();
@@ -1918,6 +2051,9 @@ Alpine.data('fastleoFiles', () => ({
             await this.refresh();
         } catch (error) {
             this.fail(error);
+            // Часть выбранного могла удалиться до сбоя: список показывает, что осталось на диске, а не прежний набор.
+            this.selected = [];
+            await this.refresh().catch(() => {});
         }
     },
 
@@ -2544,7 +2680,7 @@ Alpine.data('fastleoList', ({ key, url, tree }) => ({
         this.$root.addEventListener('click', (event) => {
             const row = event.target.closest('[data-url]');
 
-            if (row && !event.target.closest('a, button, input, label, select, textarea, form') && !window.getSelection()?.toString()) {
+            if (row && !event.target.closest('a, button, input, label, select, textarea, form, [role="menu"]') && !window.getSelection()?.toString()) {
                 window.location.href = row.dataset.url;
             }
         });
@@ -2679,35 +2815,60 @@ Alpine.data('fastleoVisible', ({ field, values }) => ({
 }));
 
 /**
- * Зависимый Select: <select x-data="fastleoDependentSelect({ url, depends })">.
- * При смене поля-зависимости варианты запрашиваются с сервера, выбор сбрасывается.
+ * Зависимый Select: <select x-data="fastleoDependentSelect({ url, depends })"> или <fieldset> с плашками множественного выбора
+ * (data-chips, шаблон плашки <template data-chip>). При смене поля-зависимости варианты запрашиваются с сервера, выбор сбрасывается.
  */
 Alpine.data('fastleoDependentSelect', ({ url, depends }) => ({
     request: 0,
 
     init() {
-        const select = this.$el;
-        const form = select.closest('form');
+        const root = this.$el;
+        const form = root.closest('form');
+        const chips = root.tagName === 'SELECT' ? null : root.querySelector('[data-chips]');
 
         watchField(form, depends, false, async (value) => {
-            const placeholder = select.multiple ? null : select.options[0]?.cloneNode(true);
             // Ответ на прежний запрос (быстрая смена поля) не должен подменить варианты нового.
             const mine = ++this.request;
+            let options = [];
 
             try {
                 const response = await fetch(`${url}?${new URLSearchParams({ depends: value })}`, { headers: { Accept: 'application/json' } });
-                const options = response.ok ? (await response.json()).options : [];
-
-                if (mine !== this.request) {
-                    return;
-                }
-
-                select.replaceChildren(...(placeholder ? [placeholder] : []), ...options.map((option) => new Option(option.label, option.value)));
+                options = response.ok ? (await response.json()).options : [];
             } catch {
-                select.replaceChildren(...(placeholder ? [placeholder] : []));
+                options = [];
             }
 
-            select.value = '';
+            if (mine !== this.request) {
+                return;
+            }
+
+            if (chips) {
+                const template = root.querySelector('template[data-chip]');
+                // id поля, на который ссылаются подпись и подсказки: у первой галочки, без вариантов — у списка (как в шаблоне).
+                const id = (chips.id || chips.querySelector('input[id]')?.id) ?? '';
+
+                chips.replaceChildren(
+                    ...options.map((option) => {
+                        const chip = template.content.firstElementChild.cloneNode(true);
+                        chip.querySelector('input').value = option.value;
+                        chip.querySelector('[data-chip-label]').textContent = option.label;
+
+                        return chip;
+                    }),
+                );
+                chips.removeAttribute('id');
+                (chips.querySelector('input') ?? chips).id = id;
+                // У контейнера нет имени: о сбросе выбора сообщает скрытое поле «ничего не выбрано».
+                notifyChange(root.querySelector('input[type="hidden"]'));
+
+                return;
+            }
+
+            const placeholder = root.multiple ? null : root.options[0]?.cloneNode(true);
+            root.replaceChildren(...(placeholder ? [placeholder] : []), ...options.map((option) => new Option(option.label, option.value)));
+            root.value = '';
+            // Выбор сброшен скриптом, а не человеком: сообщаем об этом зависимым от этого списка полям (страна → регион → город).
+            notifyChange(root);
         });
     },
 }));

@@ -1,102 +1,102 @@
 # Fastleo
 
-> Fastleo — админ-панель для сайтов на Laravel 13. Раздел админки (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.
+> Fastleo — пакет Laravel 13 для работы с моделями Eloquent: админка сайта, CRM, бэк-офис — рядом с сайтом (/fastleo), на своём поддомене или как всё приложение на корне домена. Раздел (CRUD модели) описывается одним классом-ресурсом в app/Fastleo с типизированными полями; запись идёт через Eloquent, права задаёт Policy модели.
 
 ## Порядок работы
 
 1. Миграция таблицы.
 2. Модель: `$fillable` (или атрибут `#[Fillable([...])]`, как в моделях Laravel 13) со **всеми** полями формы, касты (`array` для JSON-полей, enum-каст для `Enum`, `boolean` для галочек), методы связей.
-3. Ресурс: `php artisan fastleo:make-resource Doctor --generate` собирает поля по таблице, затем их правят: подписи (`$label`, `$singular`, подписи полей) и иконка по умолчанию английские — переведите; `Image` и `Gallery` получают папку методом `directory('doctors')`.
+3. Ресурс: `php artisan fastleo:make-resource Product --generate` собирает поля по таблице, затем их правят: подписи (`$label`, `$singular`, подписи полей) и иконка по умолчанию английские — переведите; `Image` и `Gallery` получают папку методом `directory('products')`.
 4. Тест раздела: сначала посмотрите в `composer.json`, Pest у сайта или PHPUnit, и напишите тест тем же инструментом; примеры тестов (вход, создание, права, действия, файлы) — в [тестах разделов](testing.md).
 5. `php artisan fastleo:doctor` — ошибок быть не должно. Исправить по подсказкам, повторить.
 
-Пример для фразы «раздел Врачи с фото, специальностью и галочкой записи». Файлы создаются командами:
+Пример для фразы «раздел Товары с фото, категорией и галочкой «в продаже»». Файлы создаются командами:
 
 ```bash
-php artisan make:model Doctor -m                       # модель и миграция
+php artisan make:model Product -m                      # модель и миграция
 php artisan migrate                                    # после правки миграции
-php artisan fastleo:make-resource Doctor --generate    # app/Fastleo/DoctorResource.php
-php artisan make:test DoctorsAdminTest                 # tests/Feature/DoctorsAdminTest.php (Pest или PHPUnit — как у сайта)
+php artisan fastleo:make-resource Product --generate   # app/Fastleo/ProductResource.php
+php artisan make:test ProductsAdminTest                # tests/Feature/ProductsAdminTest.php (Pest или PHPUnit — как у сайта)
 ```
 
 ```php
-// database/migrations/…_create_doctors_table.php
-Schema::create('doctors', function (Blueprint $table) {
+// database/migrations/…_create_products_table.php
+Schema::create('products', function (Blueprint $table) {
     $table->id();
     $table->string('name');
-    $table->string('specialty');
+    $table->string('category');
     $table->string('photo')->nullable();
-    $table->boolean('accepts_appointments')->default(true);
+    $table->boolean('is_active')->default(true);
     $table->timestamps();
 });
 
-// app/Models/Doctor.php
+// app/Models/Product.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Doctor extends Model
+class Product extends Model
 {
-    protected $fillable = ['name', 'specialty', 'photo', 'accepts_appointments'];
+    protected $fillable = ['name', 'category', 'photo', 'is_active'];
 
     protected function casts(): array
     {
-        return ['accepts_appointments' => 'boolean'];
+        return ['is_active' => 'boolean'];
     }
 }
 
-// app/Fastleo/DoctorResource.php (адрес раздела — /fastleo/doctors)
+// app/Fastleo/ProductResource.php (адрес раздела — /fastleo/products)
 namespace App\Fastleo;
 
-use App\Models\Doctor;
+use App\Models\Product;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
 
-final class DoctorResource extends Resource
+final class ProductResource extends Resource
 {
-    protected static string $model = Doctor::class;
+    protected static string $model = Product::class;
 
-    protected static ?string $label = 'Врачи';
+    protected static ?string $label = 'Товары';
 
-    protected static ?string $singular = 'Врач';
+    protected static ?string $singular = 'Товар';
 
     public function fields(): array
     {
         return [
-            Text::make('name', 'Имя')->required()->searchable()->sortable(),
-            Text::make('specialty', 'Специальность')->required(),
-            Image::make('photo', 'Фото')->directory('doctors'),
-            Toggle::make('accepts_appointments', 'Запись открыта'),
+            Text::make('name', 'Название')->required()->searchable()->sortable(),
+            Text::make('category', 'Категория')->required(),
+            Image::make('photo', 'Фото')->directory('products'),
+            Toggle::make('is_active', 'В продаже'),
         ];
     }
 }
 
-// tests/Feature/DoctorsAdminTest.php — PHPUnit (стандарт нового Laravel; у сайта с Pest — тот же код в виде it(...))
+// tests/Feature/ProductsAdminTest.php — PHPUnit (стандарт нового Laravel; у сайта с Pest — тот же код в виде it(...))
 namespace Tests\Feature;
 
-use App\Models\Doctor;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
-class DoctorsAdminTest extends TestCase
+class ProductsAdminTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_manages_doctors(): void
+    public function test_admin_manages_products(): void
     {
         $admin = User::factory()->create();
         $admin->forceFill(['fastleo_admin' => true])->save();
         $this->actingAs($admin, 'fastleo');
 
-        $this->get(route('fastleo.resources.index', 'doctors'))->assertOk();
-        $this->get(route('fastleo.resources.create', 'doctors'))->assertOk();
-        $this->post(route('fastleo.resources.store', 'doctors'), ['name' => 'Иванов', 'specialty' => 'Терапевт'])->assertRedirect();
+        $this->get(route('fastleo.resources.index', 'products'))->assertOk();
+        $this->get(route('fastleo.resources.create', 'products'))->assertOk();
+        $this->post(route('fastleo.resources.store', 'products'), ['name' => 'Чайник', 'category' => 'Электроника'])->assertRedirect();
 
-        $doctor = Doctor::where('name', 'Иванов')->firstOrFail();
-        $this->get(route('fastleo.resources.edit', ['doctors', $doctor->id]))->assertOk();
+        $product = Product::where('name', 'Чайник')->firstOrFail();
+        $this->get(route('fastleo.resources.edit', ['products', $product->id]))->assertOk();
     }
 }
 ```
@@ -109,10 +109,10 @@ class DoctorsAdminTest extends TestCase
 - Запись идёт через Eloquent (`fill()->save()`), поэтому работают касты, мутаторы и observers модели. Свою логику сайта вешают на observers, а не на пакет.
 - Права задаёт Policy модели; нет Policy — доступ полный. Раздел только для просмотра: `protected static bool $readonly = true`.
 - Поле выбирают по [таблице полей](fields/README.md#типы): у каждого поля есть страница с колонкой, правилами и примером.
-- Файлы и картинки хранятся путём относительно диска (`uploads/doctors/ivanov.jpg`), галерея — JSON-массивом (нужен каст `array`).
+- Файлы и картинки хранятся путём относительно диска (`uploads/products/kettle.jpg`), галерея — JSON-массивом (нужен каст `array`).
 - Пароли и секреты не показывают полями (кроме `Password`, который хеширует значение).
 - «Галочка» (да/нет) — `Toggle`; `Checkbox` нужен, когда флажок стоит в строке с текстом.
-- Для тестов имена маршрутов: `fastleo.resources.index`, `.create`, `.store`, `.show`, `.edit`, `.update`, `.destroy` (адрес раздела — первым параметром, ключ записи — вторым: `route('fastleo.resources.edit', ['doctors', $id])`). Вход в тесте — `actingAs($admin, 'fastleo')`, администратор — пользователь с `fastleo_admin = true`.
+- Для тестов имена маршрутов: `fastleo.resources.index`, `.create`, `.store`, `.show`, `.edit`, `.update`, `.destroy` (адрес раздела — первым параметром, ключ записи — вторым: `route('fastleo.resources.edit', ['products', $id])`). Вход в тесте — `actingAs($admin, 'fastleo')`, администратор — пользователь с `fastleo_admin = true`.
 - Внешние ключи: миграция таблицы, на которую ссылаются (рубрики), должна выполняться раньше (метка времени меньше), чем миграция таблицы со ссылкой (новости).
 - После каждой правки — `fastleo:doctor`; перед сдачей работы — тест раздела.
 
@@ -123,6 +123,7 @@ class DoctorsAdminTest extends TestCase
 | Нужно | Как | Подробнее |
 |---|---|---|
 | Пункт меню: группа, иконка, позиция; порядок групп; скрыть пункт | в ресурсе `$group`, `$icon`, `$position`, `inMenu()`; порядок групп — `menu.groups` в `config/fastleo.php` | [resources.md](resources.md), [configuration.md](configuration.md) |
+| CRM или бэк-офис как всё приложение: вход сразу на `/login`, дашборд на `/`; админка на поддомене | `'path' => ''` и `'domain' => null` (или `'admin.site.ru'`) в `config/fastleo.php`, убрать welcome-маршрут, проверить `fastleo:doctor` | [configuration.md](configuration.md#всё-приложение-на-корне-домена) |
 | Рабочий раздел сразу после входа; убрать «Дашборд» из меню; меню свёрнуто по умолчанию | `home`, `menu.dashboard`, `menu.collapsed` в `config/fastleo.php` | [configuration.md](configuration.md) |
 | Число у пункта меню («новых 7», «просрочено 26») | `public static function badge(): ?int` в ресурсе | [resources.md](resources.md#badge) |
 | Новые заявки или сообщения: выделить непросмотренные, в меню — их число | `protected static ?string $readColumn = 'read_at';` + колонка `timestamp` nullable | [resources.md](resources.md#отметка-просмотрено) |
@@ -133,7 +134,7 @@ class DoctorsAdminTest extends TestCase
 | Связанные записи таблицей в отдельной вкладке формы (отзывы товара); правка записи в окне или на странице раздела | `Tab::make('Отзывы', [Related::make(…)->editIn('modal')])` в `fields()` внутри `Tabs`; вкладка — либо поля, либо таблицы | [related.md](related.md#таблица-во-вкладке-формы) |
 | Список внутри блока или элемента (тарифы с пунктами, день недели с интервалами) | `Repeater`/`Blocks` среди `fields()` другого `Repeater`/`Block` — два уровня, не глубже | [fields/repeater.md](fields/repeater.md#список-внутри-элемента) |
 | Видео по ссылке (YouTube, Rutube, VK); описание картинки для `alt` | `Video::make('video')`, `<x-fastleo::video :url="…" />`; `Image::make('cover')->alt('cover_alt')` | [fields/video.md](fields/video.md), [fields/image.md](fields/image.md) |
-| Вложенные записи блоками в форме (ссылки статьи, цены услуги, до десятков штук) | поле `HasMany` во вкладке; для сотен записей — таблица `Related` | [fields/has-many.md](fields/has-many.md) |
+| Вложенные записи блоками в форме (ссылки статьи, цены вариантов товара, до десятков штук) | поле `HasMany` во вкладке; для сотен записей — таблица `Related` | [fields/has-many.md](fields/has-many.md) |
 | Ссылка на запись одного из нескольких разделов (заметка на статью или товар) | `MorphTo::make('subject')->types([ArticleResource::class, ProductResource::class])`, колонки `nullableMorphs('subject')` | [fields/morph-to.md](fields/morph-to.md) |
 | Товар в комплекте, количество у связи «многие ко многим», выбор записи другого раздела в каждой строке | отдельная таблица с `id` и моделью; `HasMany` с `BelongsTo` внутри блока | [fields/has-many.md](fields/has-many.md#выбор-записи-в-блоке) |
 | Просмотр записи: окно (по умолчанию `'modal'`), отдельная страница (`'page'`) или без просмотра, только форма | `'record_view' => 'modal'\|'page'\|false` в `config/fastleo.php`; ссылку на запись в уведомлениях — `Fastleo::recordUrl($запись, false)` | [configuration.md](configuration.md#страница-просмотра-записи) |
@@ -156,7 +157,7 @@ class DoctorsAdminTest extends TestCase
 | «Только свои записи», права по ролям | Policy модели + `query()` ресурса | [authorization.md](authorization.md), [recipes.md](recipes.md) |
 | Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](recipes.md) |
 | Готовый раздел «Страницы», «Новости», «Заявки» или «Контакты» в админке (без вёрстки сайта) | `php artisan fastleo:module pages` (или `news`, `leads`, `contacts`) | [modules.md](modules.md) |
-| Выгрузка и загрузка Excel | `$exportable`, `$importable` | [import-export.md](import-export.md) |
+| Выгрузка и загрузка CSV | `$exportable`, `$importable` | [import-export.md](import-export.md) |
 
 ## Поля
 
@@ -267,7 +268,7 @@ Select::make('status', 'Статус')->options(ArticleStatus::class);
 Select::make('city', 'Город')->options(fn () => City::query()->orderBy('name')->pluck('name', 'id')->all());
 
 // Несколько вариантов
-Select::make('days', 'Дни приёма')->options([1 => 'Пн', 2 => 'Вт', 3 => 'Ср'])->multiple();
+Select::make('days', 'Дни доставки')->options([1 => 'Пн', 2 => 'Вт', 3 => 'Ср'])->multiple();
 ```
 
 | Метод | Что делает |
@@ -277,7 +278,7 @@ Select::make('days', 'Дни приёма')->options([1 => 'Пн', 2 => 'Вт', 
 | `placeholder('Выберите')` | Подпись пустого варианта (по умолчанию «—») |
 | `emptyValue(0)` | Что записать вместо `null`, когда выбран пустой вариант: `0`, `'none'`, `''` ([подробнее](fields/select.md#нет-значения-не-null)) |
 | `badges([...])` | Цветные метки статуса вместо текста в списке и на просмотре: `->badges(['new' => 'info', 'done' => 'success'])`; тона `success`, `warning`, `danger`, `info`, `neutral` ([подробнее](fields/select.md#цветные-метки)) |
-| `dependsOn('brand')` | Зависимый список: замыкание вариантов получает значение поля `brand` ([layout.md](layout.md#зависимые-списки)) |
+| `dependsOn('brand')` | Зависимый список: замыкание вариантов получает значение поля `brand` ([layout.md](layout.md#зависимые-списки)); у множественного плашки перестраиваются при смене `brand`. Зависеть от поля с несколькими значениями (`multiple()`, `Tags`, `BelongsToMany`) нельзя — ошибка описания раздела |
 
 Детали: docs/fields/select.md
 
@@ -295,7 +296,7 @@ Date::make('published_on', 'Дата публикации')->default(fn () => no
 
 ### DateTime — дата и время (колонка `dateTime`, `timestamp`)
 
-Дата и время (часы и минуты).
+Дата и время (часы и минуты). Секунд в форме нет, но значение с секундами (`10:00:45`, поставленное кодом сайта) форма не портит: пока время на экране не менять, сохранение записи оставляет его как есть. То же у `Time`.
 
 ```php
 use Fastleo\Fields\DateTime;
@@ -331,7 +332,7 @@ use Illuminate\Validation\Rule;
 Email::make('email', 'Email')->required()->searchable();
 
 // Уникальный адрес: при редактировании своя запись не мешает
-Email::make('email')->rules(fn (?Model $record) => [Rule::unique('doctors', 'email')->ignore($record)]);
+Email::make('email')->rules(fn (?Model $record) => [Rule::unique('products', 'email')->ignore($record)]);
 ```
 
 | Метод | Что делает |
@@ -363,7 +364,7 @@ Url::make('website', 'Сайт')->placeholder('https://');
 ```php
 use Fastleo\Fields\Video;
 
-Video::make('video', 'Видео о враче')->help('Ссылка на YouTube, Rutube или VK Видео');
+Video::make('video', 'Видео о товаре')->help('Ссылка на YouTube, Rutube или VK Видео');
 ```
 
 | Сервис | Принимаются ссылки |
@@ -600,20 +601,20 @@ RichText::make('content', 'Текст')->height(500);
 
 ### Image — картинка из файлового менеджера (колонка `string`)
 
-Одна картинка из [файлового менеджера](files.md): фото врача, обложка статьи.
+Одна картинка из [файлового менеджера](files.md): фото товара, обложка статьи.
 
 ```php
 use Fastleo\Fields\Image;
 
 Image::make('photo', 'Фото')
-    ->directory('doctors')
+    ->directory('products')
     ->crop('3:4')
     ->required();
 ```
 
 | Метод | Что делает |
 |---|---|
-| `directory('doctors')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Выбрать можно файл из любой папки. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `directory('products')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Выбрать можно файл из любой папки. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `products/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
 | `extensions(['jpg', 'png'])` | Только эти форматы (из разрешённых картинок) |
 | `crop('3:4')` | Кнопка «Обрезать» с рамкой в пропорции `ширина:высота` (`'1:1'`, `'16:9'`) |
 | `inTitle()` | В списке миниатюра 40×30 стоит перед заголовком в первой ячейке, а отдельного столбца нет (у записи без картинки — пустая рамка того же размера). Форма и страница просмотра не меняются. Действует для первой такой картинки раздела; сортировки по ней нет (столбца нет) |
@@ -637,26 +638,26 @@ File::make('price', 'Прайс')
 | Метод | Что делает |
 |---|---|
 | `extensions(['pdf', 'xlsx'])` | Какие форматы принимает поле (из разрешённых в конфиге) |
-| `directory('prices')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `directory('prices')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `products/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
 
 Детали: docs/fields/file.md
 
 ### Gallery — несколько картинок с порядком (колонка `json` + каст `array`)
 
-Несколько картинок из [файлового менеджера](files.md) с ручным порядком: фото клиники, галерея работ.
+Несколько картинок из [файлового менеджера](files.md) с ручным порядком: фото товара, галерея работ.
 
 ```php
 use Fastleo\Fields\Gallery;
 
-Gallery::make('photos', 'Фото клиники')
-    ->directory('clinic')
+Gallery::make('photos', 'Фото товара')
+    ->directory('products')
     ->max(20);
 ```
 
 | Метод | Что делает |
 |---|---|
 | `max(20)` | Наибольшее число картинок (без `max()` — 100) |
-| `directory('clinic')` | Папка внутри корня загрузок для загруженных в поле файлов. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `directory('products')` | Папка внутри корня загрузок для загруженных в поле файлов. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `products/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
 | `extensions(['jpg', 'webp'])` | Только эти форматы (из разрешённых картинок) |
 | `variants('photo')` | WebP-варианты для сайта размеров из `fastleo.images.presets` ([files.md](files.md#картинки-для-сайта-варианты-и-x-fastleopicture)) |
 
@@ -664,7 +665,7 @@ Gallery::make('photos', 'Фото клиники')
 
 ### BelongsTo — связь с записью другой таблицы (колонка `foreignId`)
 
-Связь «принадлежит»: запись ссылается на запись другой таблицы — статья на категорию, врач на клинику.
+Связь «принадлежит»: запись ссылается на запись другой таблицы — статья на категорию, товар на бренд.
 
 ```php
 use Fastleo\Fields\BelongsTo;
@@ -672,8 +673,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 BelongsTo::make('category_id', 'Категория')->required();
 
-// Только активные клиники, подпись — короткое название
-BelongsTo::make('clinic_id', 'Клиника')
+// Только активные бренды, подпись — короткое название
+BelongsTo::make('brand_id', 'Бренд')
     ->titleColumn('short_name')
     ->query(fn (Builder $query) => $query->where('is_active', true));
 
@@ -692,7 +693,7 @@ BelongsTo::make('author_id', 'Автор')->relation('author');
 
 ### BelongsToMany — связь многие ко многим (колонка промежуточная таблица)
 
-Связь «многие ко многим»: статья ↔ темы, врач ↔ услуги.
+Связь «многие ко многим»: статья ↔ темы, товар ↔ метки.
 
 ```php
 use Fastleo\Fields\BelongsToMany;
@@ -711,7 +712,7 @@ BelongsToMany::make('topics', 'Темы');
 
 ### MorphTo — запись одного из нескольких разделов (статья или товар) (колонка `nullableMorphs`)
 
-Полиморфная связь «принадлежит»: запись ссылается на запись одного из нескольких разделов — заметка на статью или товар, обращение на услугу или врача. В базе это две колонки: тип (`subject_type`) и ключ (`subject_id`).
+Полиморфная связь «принадлежит»: запись ссылается на запись одного из нескольких разделов — заметка на статью или товар, отзыв на товар или магазин. В базе это две колонки: тип (`subject_type`) и ключ (`subject_id`).
 
 ```bash
 php artisan make:model Remark -m          # модель и миграция таблицы remarks
@@ -895,8 +896,8 @@ Blocks::make('content', 'Содержимое')->blocks([
 - [Настройки](configuration.md) — Файл `config/fastleo.php` появляется после `php artisan fastleo:install` (или `php artisan vendor:publish --tag=fastleo-config`). Без него действуют значения по…
 - [Дашборд](dashboard.md) — Главная страница админки — сетка виджетов: числа, графики, последние записи, плитки разделов, состояние сервера. Без настройки показываются **плитки…
 - [Файлы](files.md) — В админке есть файловый менеджер: пункт меню «Файлы» (`/fastleo/files`). Он работает с одной папкой на диске Laravel Storage — по умолчанию…
-- [Экспорт и импорт](import-export.md) — Раздел можно выгрузить в Excel (xlsx) или CSV и загрузить записи обратно из такого файла. Работают те же поля, что и в форме: выгружаются значения полей, а…
-- [Установка и обновление](installation.md) — | Что | Версия | |---|---| | PHP | 8.4 или новее | | Laravel | 13 | | База данных | MySQL 8, PostgreSQL 16+ или SQLite | | PHP-расширение GD | с поддержкой WebP…
+- [Экспорт и импорт](import-export.md) — Раздел можно выгрузить в CSV и загрузить записи обратно из такого файла. Работают те же поля, что и в форме: выгружаются значения полей, а загруженные…
+- [Установка и обновление](installation.md) — | Что | Версия | |---|---| | PHP | 8.4 или новее | | Laravel | 13.32 или новее | | База данных | MySQL, MariaDB, PostgreSQL или SQLite; тесты пакета идут на…
 - [Раскладка формы](layout.md) — Поля в `fields()` можно группировать: вкладки, секции, колонки, боковая панель. Раскладка влияет только на форму — список и запись в базу от неё не зависят.
 - [Список записей](list.md) — Список раздела строится из тех же полей, что и форма. Столбец — каждое поле, видимое в списке.
 - [Переезд с другой админки](migrating.md) — Памятка для сайта, который уже работает с прежней админкой (MoonShine, самописной или другой) и переходит на fastleo. Разделы описываются классами…

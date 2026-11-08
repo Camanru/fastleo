@@ -49,6 +49,21 @@ describe('showing', function (): void {
     });
 });
 
+describe('default order', function (): void {
+    it('puts the default order by the computed column to the list, the export and the search', function (): void {
+        $this->get(route('fastleo.resources.index', 'ordered-categories'))
+            ->assertOk()
+            ->assertSeeInOrder(['Загруженная', 'Тихая']);
+
+        $rows = exportedRows($this->get(route('fastleo.resources.export', ['resource' => 'ordered-categories', 'format' => 'csv'])), 'csv');
+
+        $position = fn (string $title): int|string|false => collect($rows)->search(fn (array $row): bool => in_array($title, $row, true));
+
+        expect($position('Загруженная'))->toBeLessThan($position('Тихая'));
+        $this->get(route('fastleo.search', ['q' => 'ая']))->assertOk();
+    });
+});
+
 describe('writing', function (): void {
     it('has no input for the computed column in the form', function (): void {
         $this->get(route('fastleo.resources.edit', ['categories', $this->busy->id]))

@@ -19,6 +19,8 @@ use Workbench\App\Models\Topic;
 
 beforeEach(function (): void {
     useFixtureResources('Exports');
+    // xlsx в админке отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
+    config(['fastleo.xlsx' => true]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });
 
@@ -209,4 +211,13 @@ it('exports the object of a record as a section and a key and leaves unknown typ
     $rows = exportedRows($this->get(route('fastleo.resources.export', ['resource' => 'remarks'])));
 
     expect(array_column($rows, 2))->toBe(['О чём', '', '', 'products:'.$product->id, 'articles:'.$article->id]);
+});
+
+it('limits the exports and the imports of one administrator per minute', function (): void {
+    foreach (range(1, 10) as $_) {
+        exportArticles()->assertOk()->streamedContent();
+    }
+
+    exportArticles()->assertTooManyRequests();
+    $this->post(route('fastleo.resources.import', 'articles'))->assertTooManyRequests();
 });

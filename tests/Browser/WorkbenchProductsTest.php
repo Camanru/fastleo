@@ -12,14 +12,6 @@ beforeEach(function (): void {
     $this->product = Product::factory()->create(['title' => 'Кофемашина', 'price' => 1000, 'stock' => 5, 'status' => 'active', 'is_visible' => true, 'note' => null]);
 });
 
-/**
- * Ждём условие в браузере: окно и его iframe открываются и догружаются уже после клика, а assertScript не ждёт.
- */
-function waitUntil(object $page, string $condition): void
-{
-    $page->script("new Promise((resolve) => { const started = Date.now(); const timer = setInterval(() => { if (({$condition}) || Date.now() - started > 5000) { clearInterval(timer); resolve(true); } }, 50); })");
-}
-
 it('edits the price in the cell and switches visibility with the quick toggle', function (): void {
     $page = signInAndVisit(route('fastleo.resources.index', 'products'));
     $price = 'tbody [data-inline="price"] input';
@@ -269,5 +261,18 @@ it('shows an empty frame instead of a broken picture when the photo file is miss
 
     signInAndVisit(route('fastleo.resources.index', 'products'))
         ->assertScript("document.querySelector('tbody img[data-title-thumb]').hidden", true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('stays on the open tab after saving the form', function (): void {
+    $page = signInAndVisit(route('fastleo.resources.edit', ['products', $this->product->id]));
+
+    $page->click('[role=tab]:has-text("Комплект")')
+        ->assertScript('location.hash', '#komplekt')
+        ->click('[data-save]')
+        ->waitForEvent('networkidle')
+        ->assertSee('Сохранено')
+        ->assertScript('location.hash', '#komplekt')
+        ->assertScript("document.querySelector('[role=tab][aria-selected=true]').textContent.trim()", 'Комплект')
         ->assertNoJavaScriptErrors();
 });

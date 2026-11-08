@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Fastleo\Files;
 
 use Closure;
+use ErrorException;
 use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
@@ -17,6 +19,7 @@ use Illuminate\Support\Str;
 use Intervention\Image\Exceptions\ImageException;
 use League\Flysystem\DirectoryAttributes;
 use League\Flysystem\FileAttributes;
+use League\Flysystem\Local\LocalFilesystemAdapter;
 
 /**
  * Файлы на диске `fastleo.files.disk` внутри корня загрузок.
@@ -29,6 +32,9 @@ final class FileStore
 {
     /** Папка служебных копий на диске. */
     public const string SERVICE_ROOT = 'fastleo';
+
+    /** Сколько секунд ждать занятую блокировку имени файла: запись файла — доли секунды. */
+    private const int LOCK_WAIT = 5;
 
     /**
      * Диск файлов.
@@ -58,7 +64,15 @@ final class FileStore
      */
     public static function url(string $path): string
     {
-        return self::disk()->url($path);
+        $disk = self::disk();
+
+        // Адрес локального и FTP-диска Laravel собирает из пути как есть: пробел, `#`, `?` и `%` в имени файла, залитого по FTP,
+        // ломали бы ссылку. Облачные диски кодируют путь сами — их путь не трогаем, иначе он закодируется дважды.
+        $adapter = $disk->getAdapter();
+        // FTP и SFTP — необязательные пакеты: их классы называем строкой.
+        $encode = $adapter instanceof LocalFilesystemAdapter || in_array($adapter::class, ['League\\Flysystem\\Ftp\\FtpAdapter', 'League\\Flysystem\\PhpseclibV3\\SftpAdapter'], true);
+
+        return $disk->url($encode ? implode('/', array_map(rawurlencode(...), explode('/', $path))) : $path);
     }
 
     /**
@@ -127,8 +141,10 @@ final class FileStore
      */
     public static function store(UploadedFile $file, string $folder): string
     {
-        $original = $file->getClientOriginalName();
-        $name = FileName::sanitize($original);
+        $client = $file->getClientOriginalName();
+        // В сообщениях имя показывается как есть, но байты не в UTF-8 заменяются на «?»: иначе JSON-ответ с ним не собирается (500).
+        $original = mb_scrub($client);
+        $name = FileName::sanitize($client);
 
         if (! FileTypes::isAllowed($name)) {
             throw FileRejected::because('rejected_extension', ['name' => $original]);
@@ -157,7 +173,8 @@ final class FileStore
 
         try {
             $binary = Images::normalize($binary, FileTypes::extension($name));
-        } catch (ImageException) {
+        } catch (ImageException|ErrorException) {
+            // `ErrorException` — предупреждение декодера GIF, у которого кадр выходит за холст: файл читается по заголовку, но не декодируется.
             throw FileRejected::because('rejected_not_image', ['name' => $original]);
         }
 
@@ -167,7 +184,8 @@ final class FileStore
 
     /**
      * Свободное имя и запись под блокировкой: два одновременных файла с одним именем не займут одно место
-     * (запись перезаписывает). Кеш без блокировок или занятая блокировка — запись без неё. Null — диск не принял файл.
+     * (запись перезаписывает). Занятая блокировка ждётся до `LOCK_WAIT` секунд, а не обходится сразу. Кеш без блокировок
+     * или блокировка, которая так и не освободилась, — запись без неё. Null — диск не принял файл.
      *
      * @param  Closure(string): bool  $write  записать по свободному пути
      */
@@ -179,8 +197,12 @@ final class FileStore
             return $write($path) ? $path : null;
         };
 
-        // Кеш без блокировок (своё хранилище сайта) даёт то же, что занятая блокировка: запись без неё.
-        $claimed = Cache::getStore() instanceof LockProvider ? Cache::lock('fastleo.upload.'.md5($folder.'/'.$name), 30)->get($claim) : false;
+        // Кеш без блокировок (своё хранилище сайта) даёт то же, что не освободившаяся блокировка: запись без неё.
+        try {
+            $claimed = Cache::getStore() instanceof LockProvider ? Cache::lock('fastleo.upload.'.md5($folder.'/'.$name), 30)->block(self::LOCK_WAIT, $claim) : false;
+        } catch (LockTimeoutException) {
+            $claimed = false;
+        }
 
         if ($claimed === false) {
             return $claim();
@@ -245,7 +267,9 @@ final class FileStore
             throw FileRejected::because('folder_exists', ['name' => $slug]);
         }
 
-        $disk->makeDirectory($path);
+        if (! $disk->makeDirectory($path)) {
+            throw FileRejected::because('folder_failed', ['name' => $slug]);
+        }
 
         return $path;
     }
@@ -253,6 +277,8 @@ final class FileStore
     /**
      * Удалить файл или папку со всем содержимым вместе со служебными копиями.
      * Возвращает false, если такого пути нет.
+     *
+     * @throws FileRejected диск не дал удалить (нет прав, только чтение)
      */
     public static function delete(string $path): bool
     {
@@ -260,7 +286,11 @@ final class FileStore
 
         if ($disk->directoryExists($path)) {
             $files = Variants::names() === [] ? [] : array_values($disk->allFiles($path));
-            $disk->deleteDirectory($path);
+
+            if (! $disk->deleteDirectory($path)) {
+                throw FileRejected::because('delete_failed', ['name' => basename($path)]);
+            }
+
             $disk->deleteDirectory(self::SERVICE_ROOT.'/thumbs/'.$path);
             Variants::delete($path, $files);
 
@@ -271,7 +301,10 @@ final class FileStore
             return false;
         }
 
-        $disk->delete([$path, self::SERVICE_ROOT.'/thumbs/'.$path.'.webp']);
+        if (! $disk->delete([$path, self::SERVICE_ROOT.'/thumbs/'.$path.'.webp'])) {
+            throw FileRejected::because('delete_failed', ['name' => basename($path)]);
+        }
+
         Variants::delete($path);
 
         return true;
@@ -291,6 +324,11 @@ final class FileStore
             return $thumbnail;
         }
 
+        // GD без WebP миниатюру не сделает: менеджер покажет оригинал, а не ответит ошибкой сервера.
+        if (! resolve(ImageSupport::class)->canEncodeWebp()) {
+            return null;
+        }
+
         $binary = FileTypes::isImage($path) && $disk->fileExists($path) ? (string) $disk->get($path) : '';
 
         if ($binary === '' || Images::problem($binary) !== null) {
@@ -298,7 +336,10 @@ final class FileStore
         }
 
         try {
-            $disk->put($thumbnail, Images::thumbnail($binary));
+            // Диск не принял миниатюру: путь несуществующего файла вернуть нельзя — менеджер покажет оригинал.
+            if ($disk->put($thumbnail, Images::thumbnail($binary)) === false) {
+                return null;
+            }
         } catch (ImageException) {
             return null;
         }

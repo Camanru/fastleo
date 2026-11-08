@@ -76,6 +76,18 @@ describe('failures', function (): void {
             ->and(AdminNotification::query()->count())->toBe(0);
     });
 
+    it('fails at once on the sync queue instead of waiting forever for a retry that never comes', function (): void {
+        config(['queue.default' => 'sync']);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Too Many Requests', 'parameters' => ['retry_after' => 9]], 429)]);
+        $delivery = pendingDelivery();
+
+        dispatch(new SendDelivery($delivery));
+
+        expect($delivery->refresh())->status->toBe('failed')->error->toBe('Too Many Requests')
+            ->and($delivery->isRetryable())->toBeTrue()
+            ->and($this->publication->refresh()->status)->toBe('failed');
+    });
+
     it('gives up on the fifth attempt', function (): void {
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Too Many Requests', 'parameters' => ['retry_after' => 9]], 429)]);
         $delivery = pendingDelivery();

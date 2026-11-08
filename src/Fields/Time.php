@@ -46,6 +46,20 @@ class Time extends Field
     }
 
     /**
+     * Форма показывает минуты, а значение в базе может быть с секундами (`09:00:30`). Время, которое на экране не менялось,
+     * сохранение формы не переписывает на `09:00:00`.
+     */
+    #[Override]
+    public function fill(Model $record, mixed $value): void
+    {
+        if ($record->exists && $value !== null && $this->short($record->getAttribute($this->name)) === $value) {
+            return;
+        }
+
+        parent::fill($record, $value);
+    }
+
+    /**
      * Время по умолчанию (`now()`, Carbon) → `ЧЧ:ММ` в поясе админки.
      */
     #[Override]

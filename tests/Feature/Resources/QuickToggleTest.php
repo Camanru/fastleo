@@ -348,3 +348,26 @@ describe('SetToggle action', function (): void {
             ->post(route('fastleo.resources.action', ['broken-toggle', 'set-title-on']), ['ids' => [$article->id]]);
     })->throws(LogicException::class, 'нет поля «title» типа Checkbox');
 });
+
+describe('a field that a rule excludes', function (): void {
+    it('keeps its value when the toggle comes while the rule excludes it, and changes it otherwise', function (): void {
+        $frozen = Article::factory()->create(['title' => 'Заморожено', 'is_featured' => true]);
+        $open = Article::factory()->create(['title' => 'Обычная', 'is_featured' => true]);
+
+        $this->postJson(toggleUrl('excluding-articles', $frozen, 'is_featured'), ['value' => '0'])->assertOk()->assertJson(['value' => true]);
+        $this->postJson(toggleUrl('excluding-articles', $open, 'is_featured'), ['value' => '0'])->assertOk()->assertJson(['value' => false]);
+
+        expect($frozen->refresh()->is_featured)->toBeTrue()
+            ->and($open->refresh()->is_featured)->toBeFalse();
+    });
+
+    it('keeps the value of a cell that comes while the rule excludes it', function (): void {
+        $frozen = Article::factory()->create(['title' => 'Заморожено', 'views' => 5]);
+
+        $this->patchJson(route('fastleo.resources.inline', ['excluding-articles', $frozen->id, 'views']), ['value' => '99'])
+            ->assertOk()
+            ->assertJson(['value' => '5']);
+
+        expect($frozen->refresh()->views)->toBe(5);
+    });
+});

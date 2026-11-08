@@ -71,10 +71,13 @@ final class ToggleController
             return $this->failed($request, $resource, $validator->errors()->first(), 422);
         }
 
-        $value = $field->dehydrate($validator->validated()[$field->name] ?? null);
+        // Правило `exclude_if`/`exclude_unless` исключило поле из проверенных данных: значение не меняется, а не сбрасывается.
+        $validated = $validator->validated();
+        $excluded = ! array_key_exists($field->name, $validated);
+        $value = $excluded ? $field->hydrate($record) : $field->dehydrate($validated[$field->name]);
 
         try {
-            RecordWriter::write($resource, $record, [$field], [$field->name => $value]);
+            RecordWriter::write($resource, $record, [$field], $excluded ? [] : [$field->name => $value]);
         } catch (QueryException $exception) {
             return $this->failed($request, $resource, DatabaseErrors::explain($exception), 422);
         } catch (OperationCancelled) {

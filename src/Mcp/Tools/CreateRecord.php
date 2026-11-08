@@ -43,7 +43,8 @@ final class CreateRecord extends ResourceTool
             throw new ToolFailed(__('fastleo::mcp.forbidden', ['ability' => 'create']));
         }
 
-        $request->validate(['values' => ['required', 'array']]);
+        // Пустой values — не ошибка «обязательно»: разделу, где всё необязательно, достаточно пустой записи.
+        $request->validate(['values' => ['present', 'array']]);
         $values = $request->get('values');
         $record = RecordSaver::save($resource, null, is_array($values) ? $values : []);
 

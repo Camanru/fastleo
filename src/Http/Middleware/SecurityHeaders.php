@@ -15,10 +15,19 @@ use Symfony\Component\HttpFoundation\Response;
  * - `X-Content-Type-Options: nosniff` — браузер не угадывает тип ответа;
  * - `Referrer-Policy: same-origin` — адреса админки не уходят на чужие сайты;
  * - `X-Robots-Tag: noindex, nofollow` — поисковики не индексируют админку;
- * - `Cache-Control: no-store, private` — после выхода страницы не открываются из кеша кнопкой «Назад».
+ * - `Cache-Control: no-store, private` — после выхода страницы не открываются из кеша кнопкой «Назад»; исключение —
+ *   переход на миниатюру менеджера файлов (`private, max-age`): он ведёт на публичный файл, а сетка из сотен картинок
+ *   иначе запускала бы Laravel на каждую. Запоминается только ответ самого контроллера миниатюр (он помечает запрос
+ *   признаком `CACHEABLE_REDIRECT`), а не любой переход на этом адресе: переход гостя на страницу входа остаётся `no-store`.
  */
 final class SecurityHeaders
 {
+    /** Сколько браузер помнит переход на миниатюру. */
+    private const int THUMBNAIL_SECONDS = 300;
+
+    /** Признак запроса: контроллер миниатюр отвечает переходом на публичный файл, и его можно запомнить. */
+    public const string CACHEABLE_REDIRECT = 'fastleo.cacheable_redirect';
+
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -31,7 +40,7 @@ final class SecurityHeaders
         $headers->set('X-Content-Type-Options', 'nosniff');
         $headers->set('Referrer-Policy', 'same-origin');
         $headers->set('X-Robots-Tag', 'noindex, nofollow');
-        $headers->set('Cache-Control', 'no-store, private');
+        $headers->set('Cache-Control', $response->isRedirection() && $request->attributes->get(self::CACHEABLE_REDIRECT) === true ? 'private, max-age='.self::THUMBNAIL_SECONDS : 'no-store, private');
 
         return $response;
     }

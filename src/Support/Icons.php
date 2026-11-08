@@ -15,7 +15,7 @@ use InvalidArgumentException;
  * В шаблонах используется компонент, имена — как на https://lucide.dev/icons:
  *
  * ```blade
- * <x-fastleo::icon name="stethoscope" class="size-5" />
+ * <x-fastleo::icon name="shopping-bag" class="size-5" />
  * ```
  */
 final class Icons

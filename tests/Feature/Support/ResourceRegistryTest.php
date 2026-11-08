@@ -7,12 +7,15 @@ use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\Publishing\ChannelResource;
 use Fastleo\Publishing\PublicationResource;
 use Fastleo\Resources\UserResource;
+use Fastleo\Support\ResourceRegistry;
 use Fastleo\Tests\Fixtures\Registry\Duplicate\FirstResource;
 use Fastleo\Tests\Fixtures\Registry\Duplicate\SecondResource;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
 use Fastleo\Tests\Fixtures\Resources\GuardedCategoryResource;
 use Illuminate\Support\Facades\File;
 use Workbench\App\Fastleo\CategoryResource;
+use Workbench\App\Models\Article;
+use Workbench\App\Models\Category;
 
 it('discovers concrete resource classes in the configured folder', function (): void {
     useFixtureResources('Resources');
@@ -75,6 +78,56 @@ it('explains a manual order column with forbidden characters', function (): void
     useFixtureResources('Registry/BadColumn');
 
     expect(fn (): array => Fastleo::resources()->all())->toThrow(LogicException::class, 'Колонка «sort order; drop»');
+});
+
+it('explains a default order without a direction instead of failing on every list', function (): void {
+    useFixtureResources('Registry/BadDefaultOrder');
+
+    expect(fn (): array => Fastleo::resources()->all())->toThrow(LogicException::class, '$defaultOrder ресурса Fastleo\\Tests\\Fixtures\\Registry\\BadDefaultOrder\\BadDefaultOrderResource недопустим');
+});
+
+it('accepts a default order by a column with a table name and by a key of a JSON column', function (): void {
+    useFixtureResources('Registry/QualifiedDefaultOrder');
+
+    expect(array_keys(Fastleo::resources()->all()))->toBe(['json-order', 'qualified-order']);
+});
+
+it('accepts every spelling of a column that the query builder takes, and refuses what is not a column', function (string $column, bool $accepted): void {
+    $isValid = new ReflectionMethod(ResourceRegistry::class, 'isValidOrder');
+
+    expect($isValid->invoke(Fastleo::resources(), [$column, 'asc']))->toBe($accepted);
+})->with([
+    'a column' => ['created_at', true],
+    'a table and a column' => ['categories.title', true],
+    'a database, a table and a column' => ['shop.categories.title', true],
+    'a key of a JSON column' => ['seo->title', true],
+    'a key with a hyphen' => ['seo->first-name', true],
+    'an index in a JSON column' => ['seo->items[0]', true],
+    'a nested key' => ['seo->a->b', true],
+    'a space' => ['created at', false],
+    'a semicolon' => ['title; drop table x', false],
+    'a function' => ['lower(title)', false],
+    'four parts' => ['a.b.c.d', false],
+    'a quote' => ["title'", false],
+]);
+
+it('sorts the list by a column written with its table name', function (): void {
+    useFixtureResources('Registry/QualifiedDefaultOrder');
+    $this->actingAs(admin(), Fastleo::GUARD);
+    Category::factory()->create(['title' => 'Альфа']);
+    Category::factory()->create(['title' => 'Омега']);
+
+    $this->get(route('fastleo.resources.index', 'qualified-order'))->assertOk()->assertSeeInOrder(['Омега', 'Альфа']);
+});
+
+it('sorts the list by a key of a JSON column, on every database', function (): void {
+    useFixtureResources('Registry/QualifiedDefaultOrder');
+    $this->actingAs(admin(), Fastleo::GUARD);
+    Article::factory()->create(['title' => 'Вторая', 'seo' => ['title' => 'Бета']]);
+    Article::factory()->create(['title' => 'Первая', 'seo' => ['title' => 'Альфа']]);
+    Article::factory()->create(['title' => 'Третья', 'seo' => ['title' => 'Гамма']]);
+
+    $this->get(route('fastleo.resources.index', 'json-order'))->assertOk()->assertSeeInOrder(['Первая', 'Вторая', 'Третья']);
 });
 
 it('explains a custom page with a bad address', function (): void {

@@ -8,6 +8,7 @@ use Fastleo\Fastleo;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
@@ -58,14 +59,20 @@ final readonly class LoginHistory
             return false;
         }
 
-        LoginRecord::query()->create([
-            'user_id' => $key,
-            'fingerprint' => $fingerprint,
-            'ip' => $ip,
-            'user_agent' => $agent === '' ? null : $agent,
-            'created_at' => now(),
-            'last_seen_at' => now(),
-        ]);
+        // Двойной щелчок «Войти» с нового устройства: второй запрос успел записать то же устройство — для него оно уже не новое.
+        // Транзакция нужна PostgreSQL: после нарушения уникальности без точки отката он не принимает следующие запросы.
+        try {
+            LoginRecord::query()->getConnection()->transaction(fn (): LoginRecord => LoginRecord::query()->create([
+                'user_id' => $key,
+                'fingerprint' => $fingerprint,
+                'ip' => $ip,
+                'user_agent' => $agent === '' ? null : $agent,
+                'created_at' => now(),
+                'last_seen_at' => now(),
+            ]));
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
 
         return true;
     }

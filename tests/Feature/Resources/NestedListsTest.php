@@ -25,7 +25,7 @@ beforeEach(function (): void {
  */
 function nestedPage(array $overrides = []): array
 {
-    return ['title' => ['ru' => 'О клинике'], 'slug' => 'about', 'faq' => '', 'content' => '', ...$overrides];
+    return ['title' => ['ru' => 'О магазине'], 'slug' => 'about', 'faq' => '', 'content' => '', ...$overrides];
 }
 
 it('saves a repeater inside a block with the rules of the outer list', function (): void {

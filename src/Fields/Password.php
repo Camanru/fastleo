@@ -80,12 +80,13 @@ class Password extends Field
     }
 
     /**
-     * Пароль не обрезается по краям: пробелы — часть пароля.
+     * Пароль не обрезается по краям: пробелы — часть пароля. Пустое значение и строка из одних пробелов — «не менять»:
+     * Laravel не применяет к такой строке правила длины и подтверждения, и пароль из пробелов обошёл бы политику сайта.
      */
     #[Override]
     public function dehydrate(mixed $value): mixed
     {
-        return $value === '' ? null : $value;
+        return is_string($value) && trim($value) === '' ? null : $value;
     }
 
     /**

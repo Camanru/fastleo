@@ -5,11 +5,16 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\ChoiceSample;
 use Workbench\App\Models\Feedback;
+use Workbench\App\Models\JsonSample;
+use Workbench\App\Models\MediaSample;
 use Workbench\App\Models\Page;
 use Workbench\App\Models\Product;
 use Workbench\App\Models\ProductReview;
 use Workbench\App\Models\Supplier;
+use Workbench\App\Models\Task;
+use Workbench\App\Models\TextSample;
 use Workbench\App\Models\Topic;
 
 beforeEach(function (): void {
@@ -20,6 +25,11 @@ beforeEach(function (): void {
     Topic::factory()->create();
     Feedback::factory()->create();
     Page::factory()->create();
+    TextSample::factory()->create();
+    ChoiceSample::factory()->create();
+    MediaSample::factory()->create();
+    JsonSample::factory()->create();
+    Task::factory()->create(['supplier_id' => $supplier->id]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });
 

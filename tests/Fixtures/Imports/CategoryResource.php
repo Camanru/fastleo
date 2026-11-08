@@ -6,6 +6,8 @@ namespace Fastleo\Tests\Fixtures\Imports;
 
 use Fastleo\Fields\Text;
 use Fastleo\Resource;
+use Illuminate\Database\Eloquent\Builder;
+use Override;
 use Workbench\App\Models\Category;
 
 /**
@@ -20,6 +22,18 @@ final class CategoryResource extends Resource
     protected static ?string $importKey = 'code';
 
     protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Запись с кодом «secret» раздел не показывает.
+     *
+     * @param  Builder<Category>  $query
+     * @return Builder<Category>
+     */
+    #[Override]
+    public function query(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $inner): Builder => $inner->whereNull('code')->orWhere('code', '!=', 'secret'));
+    }
 
     /**
      * Название и код.

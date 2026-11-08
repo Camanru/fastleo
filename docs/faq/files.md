@@ -9,10 +9,10 @@
 Добавьте поле `Image` с папкой загрузки и колонку `string` для пути.
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 use Fastleo\Fields\Image;
 
-Image::make('photo', 'Фото')->directory('doctors'),
+Image::make('photo', 'Фото')->directory('products'),
 ```
 
 ```php
@@ -24,15 +24,15 @@ $table->string('photo')->nullable();
 
 ### Как вывести картинку записи на сайте?
 
-Используйте компонент `<x-fastleo::picture>` или адрес с диска файлов. В колонке лежит путь на диске (`uploads/doctors/ivanov.jpg`), а не готовый адрес.
+Используйте компонент `<x-fastleo::picture>` или адрес с диска файлов. В колонке лежит путь на диске (`uploads/products/kettle.jpg`), а не готовый адрес.
 
 ```blade
-{{-- resources/views/doctors/show.blade.php --}}
-<x-fastleo::picture :src="$doctor->photo" :alt="$doctor->name" class="doctor-photo" />
+{{-- resources/views/products/show.blade.php --}}
+<x-fastleo::picture :src="$product->photo" :alt="$product->name" class="product-photo" />
 
 {{-- или вручную --}}
-@if ($doctor->photo)
-    <img src="{{ Storage::disk(config('fastleo.files.disk'))->url($doctor->photo) }}" alt="{{ $doctor->name }}">
+@if ($product->photo)
+    <img src="{{ Storage::disk(config('fastleo.files.disk'))->url($product->photo) }}" alt="{{ $product->name }}">
 @endif
 ```
 
@@ -43,19 +43,19 @@ $table->string('photo')->nullable();
 Добавьте полю `crop()` — в форме появится кнопка «Обрезать» с рамкой.
 
 ```php
-// app/Fastleo/DoctorResource.php
-Image::make('photo', 'Фото')->directory('doctors')->crop('3:4'),
+// app/Fastleo/ProductResource.php
+Image::make('photo', 'Фото')->directory('products')->crop('3:4'),
 ```
 
-Обрезанная копия сохраняется рядом (`ivanov-crop.jpg`), оригинал не меняется. Если одной картинке нужны разные пропорции (квадрат в карточке, широкая на странице), не режьте вручную — задайте `ratio` у размеров вариантов: [две пропорции из одной картинки](#как-получить-квадратное-превью-и-широкую-картинку-из-одного-фото). Подробнее — [Image](../fields/image.md).
+Обрезанная копия сохраняется рядом (`kettle-crop.jpg`), оригинал не меняется. Если одной картинке нужны разные пропорции (квадрат в карточке, широкая на странице), не режьте вручную — задайте `ratio` у размеров вариантов: [две пропорции из одной картинки](#как-получить-квадратное-превью-и-широкую-картинку-из-одного-фото). Подробнее — [Image](../fields/image.md).
 
 ### Как разрешить только JPG и PNG?
 
 Передайте полю список форматов — из тех, что разрешены как картинки в конфиге.
 
 ```php
-// app/Fastleo/DoctorResource.php
-Image::make('photo', 'Фото')->directory('doctors')->extensions(['jpg', 'jpeg', 'png']),
+// app/Fastleo/ProductResource.php
+Image::make('photo', 'Фото')->directory('products')->extensions(['jpg', 'jpeg', 'png']),
 ```
 
 Подробнее — [Image](../fields/image.md).
@@ -67,17 +67,17 @@ Image::make('photo', 'Фото')->directory('doctors')->extensions(['jpg', 'jpeg
 Добавьте поле `Gallery`, колонку `json` и каст `array`. Порядок фото администратор меняет перетаскиванием.
 
 ```php
-// app/Fastleo/ClinicResource.php
+// app/Fastleo/ProductResource.php
 use Fastleo\Fields\Gallery;
 
-Gallery::make('photos', 'Фото клиники')->directory('clinic')->max(20)->hideInList(),
+Gallery::make('photos', 'Фото товара')->directory('products')->max(20)->hideInList(),
 ```
 
 ```php
 // миграция
 $table->json('photos')->nullable();
 
-// app/Models/Clinic.php
+// app/Models/Product.php
 protected function casts(): array
 {
     return ['photos' => 'array'];
@@ -85,9 +85,9 @@ protected function casts(): array
 ```
 
 ```blade
-{{-- resources/views/clinic.blade.php --}}
+{{-- resources/views/products/show.blade.php --}}
 <div class="gallery">
-    @foreach ($clinic->photos ?? [] as $photo)
+    @foreach ($product->photos ?? [] as $photo)
         <x-fastleo::picture :src="$photo" alt="" loading="lazy" />
     @endforeach
 </div>
@@ -141,12 +141,12 @@ Repeater::make('photos', 'Фото с подписями')->fields([
 ```
 
 ```php
-// app/Fastleo/DoctorResource.php
-Image::make('photo', 'Фото')->directory('doctors')->variants('card'),
+// app/Fastleo/ProductResource.php
+Image::make('photo', 'Фото')->directory('products')->variants('card'),
 ```
 
 ```blade
-<x-fastleo::picture :src="$doctor->photo" preset="card" :alt="$doctor->name" sizes="(min-width: 768px) 400px, 100vw" />
+<x-fastleo::picture :src="$product->photo" preset="card" :alt="$product->name" sizes="(min-width: 768px) 400px, 100vw" />
 ```
 
 Копии создаются после сохранения записи — в очереди, если она настроена, иначе сразу. Для уже загруженных картинок выполните `php artisan fastleo:images`. Подробнее — [варианты и `<x-fastleo::picture>`](../files.md#картинки-для-сайта-варианты-и-x-fastleopicture).
@@ -343,12 +343,12 @@ Repeater::make('documents', 'Документы')->fields([
 Задайте папку у каждого поля через `directory()` — загруженные в поле файлы попадут туда, папка создастся сама.
 
 ```php
-Image::make('photo', 'Фото')->directory('doctors'),
+Image::make('photo', 'Фото')->directory('products'),
 File::make('license', 'Лицензия')->directory('documents/licenses'),
-Gallery::make('photos', 'Фото')->directory('clinic/2026'),
+Gallery::make('photos', 'Фото')->directory('products/2026'),
 ```
 
-Имя папки — строчная латиница, цифры и дефис (`doctor-photos`, не `doctor_photos` и не `Фото`). Выбрать в поле можно файл из любой папки. Подробнее — [Image](../fields/image.md), [имена файлов](../files.md#имена-файлов).
+Имя папки — строчная латиница, цифры и дефис (`product-photos`, не `product_photos` и не `Фото`). Выбрать в поле можно файл из любой папки. Подробнее — [Image](../fields/image.md), [имена файлов](../files.md#имена-файлов).
 
 ### Как увеличить наибольший размер загружаемого файла?
 
@@ -496,7 +496,7 @@ return new class extends Migration
     public function up(): void
     {
         // '/storage/uploads/a.jpg' → 'uploads/a.jpg'
-        DB::table('doctors')
+        DB::table('products')
             ->where('photo', 'like', '/storage/%')
             ->update(['photo' => DB::raw('substr(photo, 10)')]);
     }

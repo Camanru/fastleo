@@ -14,6 +14,6 @@
         @else
             <x-fastleo::button variant="primary" :href="$home" icon="layout-dashboard">{{ $signedIn ? __('fastleo::errors.home') : __('fastleo::errors.enter') }}</x-fastleo::button>
         @endif
-        <x-fastleo::button x-on:click="history.length > 1 ? history.back() : (location.href = @js($home))" icon="arrow-left">{{ __('fastleo::errors.back') }}</x-fastleo::button>
+        <x-fastleo::button x-on:click="history.length > 1 ? history.back() : (location.href = {{ \Illuminate\Support\Js::from($home) }})" icon="arrow-left">{{ __('fastleo::errors.back') }}</x-fastleo::button>
     </div>
 </div>

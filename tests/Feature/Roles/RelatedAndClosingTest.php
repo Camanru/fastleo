@@ -64,6 +64,50 @@ it('puts the labels of an open related section into the form', function (): void
     $this->get(route('fastleo.resources.create', 'articles'))->assertOk()->assertSee('ОткрытаяКатегорияXYZ');
 });
 
+describe('a model with two sections', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('TwoSections');
+        Category::factory()->create(['title' => 'КатегорияДвухРазделов']);
+    });
+
+    it('opens the relation when the second section is open although the first by name is closed', function (): void {
+        $this->actingAs(roleAdmin(role('editor', ['articles.view', 'articles.create', 'categories.view'])), Fastleo::GUARD);
+
+        $this->get(route('fastleo.resources.create', 'articles'))
+            ->assertOk()
+            ->assertSee('КатегорияДвухРазделов')
+            ->assertDontSee('Нет доступа к разделу', false);
+    });
+
+    it('opens the relation when the first section is open and the second is closed', function (): void {
+        $this->actingAs(roleAdmin(role('editor', ['articles.view', 'articles.create', 'archived-categories.view'])), Fastleo::GUARD);
+
+        $this->get(route('fastleo.resources.create', 'articles'))->assertOk()->assertSee('КатегорияДвухРазделов');
+    });
+
+    it('closes the relation only when every section of the model is closed, and names the first one', function (): void {
+        $this->actingAs(roleAdmin(role('editor', ['articles.view', 'articles.create'])), Fastleo::GUARD);
+
+        $this->get(route('fastleo.resources.create', 'articles'))
+            ->assertOk()
+            ->assertDontSee('КатегорияДвухРазделов')
+            ->assertSee('Нет доступа к разделу «Архив категорий»', false);
+    });
+
+    it('links a related record to the first section the administrator may open', function (): void {
+        $category = Category::query()->firstOrFail();
+        $article = Article::factory()->create(['category_id' => $category->id]);
+        $this->actingAs(roleAdmin(role('editor', ['articles.view', 'categories.view'])), Fastleo::GUARD);
+
+        $this->get(route('fastleo.resources.index', 'articles'))
+            ->assertOk()
+            ->assertSee(route('fastleo.resources.show', ['categories', $category->id]), false)
+            ->assertDontSee(route('fastleo.resources.show', ['archived-categories', $category->id]), false);
+
+        expect($article->category_id)->toBe($category->id);
+    });
+});
+
 it('refuses to attach a record of a closed related section and keeps the old one', function (): void {
     $old = Category::factory()->create();
     $closed = Category::factory()->create();

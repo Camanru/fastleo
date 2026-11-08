@@ -64,11 +64,18 @@ final class DeleteRecord extends ResourceTool
         }
 
         try {
-            DB::connection($record->getConnectionName())->transaction(fn (): null => $record->delete() === false ? throw new OperationCancelled() : null);
+            DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
+                // Запрет сайта (заказы, последний владелец) действует и для агента, как для кнопки в админке.
+                $resource->beforeDelete($record);
+
+                if ($record->delete() === false) {
+                    throw new OperationCancelled();
+                }
+            });
         } catch (QueryException $exception) {
             throw new ToolFailed(DatabaseErrors::explain($exception), (int) $exception->getCode(), previous: $exception);
-        } catch (OperationCancelled) {
-            throw new ToolFailed(__('fastleo::resources.delete_cancelled', locale: Fastleo::LOCALE));
+        } catch (OperationCancelled $cancelled) {
+            throw new ToolFailed($cancelled->getMessage() ?: __('fastleo::resources.delete_cancelled', locale: Fastleo::LOCALE), $cancelled->getCode(), $cancelled);
         }
 
         return Response::json(['message' => __('fastleo::mcp.deleted')]);

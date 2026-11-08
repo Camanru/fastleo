@@ -69,8 +69,11 @@ final class InlineController
             return response()->json(['message' => $validator->errors()->first()], 422);
         }
 
+        // Правило `exclude_if`/`exclude_unless` исключило поле из проверенных данных: значение не меняется, а не очищается.
+        $validated = $validator->validated();
+
         try {
-            RecordWriter::write($resource, $record, [$field], [$field->name => $validator->validated()[$field->name] ?? null]);
+            RecordWriter::write($resource, $record, [$field], array_key_exists($field->name, $validated) ? [$field->name => $validated[$field->name]] : []);
         } catch (QueryException $exception) {
             return response()->json(['message' => DatabaseErrors::explain($exception)], 422);
         } catch (OperationCancelled) {

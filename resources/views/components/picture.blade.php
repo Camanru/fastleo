@@ -1,7 +1,7 @@
 @props(['src' => null, 'preset' => null, 'alt' => '', 'sizes' => '100vw'])
 {{--
     Картинка для сайта с WebP-вариантами из fastleo.images.presets:
-    <x-fastleo::picture :src="$doctor->photo" preset="card" alt="Иванов И. И." sizes="(min-width: 768px) 400px, 100vw" class="rounded-lg" />
+    <x-fastleo::picture :src="$product->photo" preset="card" alt="Электрочайник" sizes="(min-width: 768px) 400px, 100vw" class="rounded-lg" />
     Варианты ещё не созданы — выводится оригинал. Атрибуты (class, loading, fetchpriority) уходят в <img>.
 --}}
 @php

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Http\Controllers;
 
+use Closure;
 use Fastleo\Auth\ResetPasswordNotification;
 use Fastleo\Auth\UserLookup;
 use Fastleo\Fastleo;
@@ -19,6 +20,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password as PasswordFacade;
 use Illuminate\Support\Str;
+use Illuminate\Support\Timebox;
 use Illuminate\Validation\Rules\Password;
 
 /**
@@ -29,6 +31,13 @@ use Illuminate\Validation\Rules\Password;
  */
 final class PasswordResetController
 {
+    /**
+     * Наименьшее время ответа в микросекундах, что бы ни стояло в `auth.timebox_duration` (по умолчанию 0,2 с).
+     * Хеш пароля на обычном сервере занимает 0,2–0,4 с, и рамка в 0,2 с вокруг него ничего не скрывает: администратор
+     * и неизвестный адрес отвечали бы за разное время. Секунда с запасом перекрывает любую настройку хеширования.
+     */
+    private const int MIN_RESPONSE_TIME = 1_000_000;
+
     /**
      * Форма «Забыли пароль?».
      */
@@ -45,19 +54,21 @@ final class PasswordResetController
         $request->validate(['email' => ['required', 'string', 'max:255']], $this->messages(), $this->attributes());
 
         $email = Str::lower(trim($request->string('email')->toString()));
-        $user = UserLookup::adminByEmail($email);
 
-        if ($user instanceof CanResetPassword) {
-            // Письмо уходит после ответа: его отправка (SMTP при очереди sync) не должна выдавать существующий адрес временем ответа.
-            $this->broker()->sendResetLink(['email' => $email], function (CanResetPassword $user, string $token): void {
-                defer(fn () => rescue(fn () => Notification::route('mail', $user->getEmailForPasswordReset())->notify(
-                    new ResetPasswordNotification($token, $user->getEmailForPasswordReset(), $this->expireMinutes()),
-                )));
-            });
-        } else {
-            // Для существующего адреса создаётся токен (хеш пароля): столько же работы и для несуществующего.
-            Hash::make(Str::random(40));
-        }
+        // Поиск, брокер паролей (у него своя рамка, но она короче) и работа вместо брокера для неизвестного адреса
+        // укладываются в одну рамку: ответ приходит за одно и то же время, есть такой администратор или нет.
+        // Письмо уходит после ответа: его отправка (SMTP при очереди sync) времени не добавляет.
+        $this->boxed(function () use ($email): void {
+            if (UserLookup::adminByEmail($email) instanceof CanResetPassword) {
+                $this->broker()->sendResetLink(['email' => $email], function (CanResetPassword $user, string $token): void {
+                    defer(fn () => rescue(fn () => Notification::route('mail', $user->getEmailForPasswordReset())->notify(
+                        new ResetPasswordNotification($token, $user->getEmailForPasswordReset(), $this->expireMinutes()),
+                    )));
+                });
+            } else {
+                $this->hashLikeBroker();
+            }
+        });
 
         return back()->with('status', __('fastleo::auth.forgot_sent'));
     }
@@ -67,7 +78,9 @@ final class PasswordResetController
      */
     public function form(Request $request, string $token): View
     {
-        return view('fastleo::auth.reset-password', ['token' => $token, 'email' => $request->string('email')->toString()]);
+        $email = $request->query('email');
+
+        return view('fastleo::auth.reset-password', ['token' => $token, 'email' => is_string($email) ? $email : '']);
     }
 
     /**
@@ -83,20 +96,26 @@ final class PasswordResetController
 
         $email = Str::lower(trim($request->string('email')->toString()));
 
-        if (! UserLookup::adminByEmail($email) instanceof Authenticatable) {
-            return $this->invalid();
-        }
+        $status = $this->boxed(function () use ($request, $email): string {
+            // Модель без CanResetPassword письма не получала (см. send()) и брокер на ней бросил бы исключение.
+            // Неизвестный адрес и не-администратор отвечают за то же время, что и администратор с неверным токеном.
+            if (! UserLookup::adminByEmail($email) instanceof CanResetPassword) {
+                $this->hashLikeBroker();
 
-        $status = $this->broker()->reset(
-            ['email' => $email, 'token' => $request->string('token')->toString(), 'password' => $request->string('password')->toString()],
-            function (CanResetPassword&Authenticatable $user, string $password): void {
-                $user->forceFill(['password' => Hash::make($password)]);
-                $user->setRememberToken(Str::random(60));
-                $user->save();
+                return PasswordFacade::INVALID_USER;
+            }
 
-                event(new PasswordReset($user));
-            },
-        );
+            return $this->broker()->reset(
+                ['email' => $email, 'token' => $request->string('token')->toString(), 'password' => $request->string('password')->toString()],
+                function (CanResetPassword&Authenticatable $user, string $password): void {
+                    $user->forceFill(['password' => Hash::make($password)]);
+                    $user->setRememberToken(Str::random(60));
+                    $user->save();
+
+                    event(new PasswordReset($user));
+                },
+            );
+        });
 
         if ($status !== PasswordFacade::PASSWORD_RESET) {
             return $this->invalid();
@@ -111,6 +130,30 @@ final class PasswordResetController
     private function invalid(): RedirectResponse
     {
         return back()->withErrors(['email' => __('fastleo::auth.reset_invalid')])->onlyInput('email');
+    }
+
+    /**
+     * Выполнить работу не быстрее `MIN_RESPONSE_TIME` (а если сайт задал `auth.timebox_duration` больше — не быстрее него).
+     *
+     * @template TResult
+     *
+     * @param  Closure(): TResult  $callback
+     * @return TResult
+     */
+    private function boxed(Closure $callback): mixed
+    {
+        $duration = config('auth.timebox_duration', 200_000);
+
+        return new Timebox()->call($callback, max(self::MIN_RESPONSE_TIME, is_numeric($duration) ? (int) $duration : 0));
+    }
+
+    /**
+     * Работа брокера паролей для настоящего администратора, сделанная вхолостую: хеш токена (почти всё время брокера).
+     * Нужна адресу, для которого брокер не вызывается, чтобы он не отвечал быстрее на хосте с медленным хешем.
+     */
+    private function hashLikeBroker(): void
+    {
+        Hash::make(Str::random(40));
     }
 
     /**

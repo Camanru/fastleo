@@ -15,10 +15,10 @@ use Override;
 /**
  * Несколько картинок из файлового менеджера с ручным порядком (перетаскиванием).
  * Хранится JSON-массивом путей, поэтому колонке нужен каст `array` в модели
- * (`'photos' => 'array'`): `["uploads/clinic/1.jpg", "uploads/clinic/2.jpg"]`.
+ * (`'photos' => 'array'`): `["uploads/products/1.jpg", "uploads/products/2.jpg"]`.
  *
  * ```php
- * Gallery::make('photos', 'Фото клиники')->directory('clinic')->max(20);
+ * Gallery::make('photos', 'Фото товара')->directory('products')->max(20);
  * ```
  */
 class Gallery extends FileField

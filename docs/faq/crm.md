@@ -1085,7 +1085,7 @@ final class ManagersReportPage extends Page
 
 ### Как выгрузить заявки в Excel с именем клиента и менеджера?
 
-`BelongsTo` выгружается ключом. Поэтому имена добавьте подзапросами в `query()` ресурса и выведите полями `fromQuery()` — они попадут в xlsx и csv.
+`BelongsTo` выгружается ключом. Поэтому имена добавьте подзапросами в `query()` ресурса и выведите полями `fromQuery()` — они попадут в выгрузку.
 
 ```php
 // app/Fastleo/LeadResource.php

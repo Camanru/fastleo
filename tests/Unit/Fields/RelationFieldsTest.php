@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\BelongsToMany;
+use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\HasOne;
@@ -17,6 +18,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Support\FormSchema;
 use Fastleo\Tests\Fixtures\Models\Assignment;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Validator;
 use Workbench\App\Enums\ArticleStatus;
@@ -48,6 +50,37 @@ describe('belongs to', function (): void {
         BelongsTo::make('section_id')->forModel(Assignment::class)->relatedModel();
     })->throws(LogicException::class, 'Назовите поле по колонке: BelongsTo::make(\'category_ref\')');
 
+    it('refuses a relation by a key that is not the primary key of the related model', function (): void {
+        BelongsTo::make('category_code')->relation('byCode')->forModel(Assignment::class)->assertKeyedByPrimaryKey();
+    })->throws(LogicException::class, 'идёт по ключу «code» связанной таблицы, а поле работает с первичным ключом «id»');
+
+    it('refuses to write or to choose by a key that is not the primary key, but still shows the related record', function (): void {
+        $field = BelongsTo::make('category_code')->relation('byCode')->forModel(Assignment::class);
+        $assignment = new Assignment()->forceFill(['category_code' => 'news'])->setRelation('byCode', new Category(['title' => 'Новости']));
+
+        // Список и страница просмотра: Eloquent сам нашёл запись по ключу связи.
+        expect($field->display($assignment))->toBe('Новости')
+            ->and($field->relatedModel())->toBeInstanceOf(Category::class)
+            ->and($field->getTitleColumn())->toBe('title')
+            // Поле, которое не пишется, показывает подписи и в форме.
+            ->and($field->readonly()->baseOptionsQuery()->getModel())->toBeInstanceOf(Category::class);
+
+        expect(fn (): mixed => BelongsTo::make('category_code')->relation('byCode')->forModel(Assignment::class)->dehydrate('news'))
+            ->toThrow(LogicException::class, 'идёт по ключу «code»');
+        expect(fn (): Builder => BelongsTo::make('category_code')->relation('byCode')->forModel(Assignment::class)->optionsQuery())
+            ->toThrow(LogicException::class, 'идёт по ключу «code»');
+    });
+
+    it('does not refuse the options of a field that is only shown, so that a filter by it and the labels of the list still work', function (): void {
+        foreach ([
+            BelongsTo::make('category_code')->relation('byCode')->onlyInList(),
+            BelongsTo::make('category_code')->relation('byCode')->readonly(),
+            BelongsToMany::make('codes')->relation('codes')->onlyInList(),
+        ] as $field) {
+            expect($field->forModel(Assignment::class)->optionsQuery()->getModel())->toBeInstanceOf(Category::class);
+        }
+    });
+
     it('rejects a title column that is not a column name', function (): void {
         BelongsTo::make('category_id')->titleColumn('title; drop');
     })->throws(InvalidArgumentException::class);
@@ -69,6 +102,24 @@ describe('belongs to', function (): void {
 });
 
 describe('belongs to many', function (): void {
+    it('refuses a relation by a key that is not the primary key of the related model', function (): void {
+        BelongsToMany::make('codes')->forModel(Assignment::class)->assertKeyedByPrimaryKey();
+    })->throws(LogicException::class, 'идёт по ключу «code» связанной таблицы, а поле работает с первичным ключом «id»');
+
+    it('refuses to write or to choose by a key that is not the primary key, but still shows the related records', function (): void {
+        $field = BelongsToMany::make('codes')->forModel(Assignment::class);
+        $assignment = new Assignment()->setRelation('codes', new Collection([new Category(['title' => 'Новости'])]));
+
+        expect($field->display($assignment))->toBe('Новости')
+            ->and($field->relatedModel())->toBeInstanceOf(Category::class)
+            ->and($field->readonly()->baseOptionsQuery()->getModel())->toBeInstanceOf(Category::class);
+
+        expect(fn (): array => BelongsToMany::make('codes')->forModel(Assignment::class)->dehydrate(['news']))
+            ->toThrow(LogicException::class, 'идёт по ключу «code»');
+        expect(fn () => BelongsToMany::make('codes')->forModel(Assignment::class)->afterSave(new Assignment(), ['news']))
+            ->toThrow(LogicException::class, 'идёт по ключу «code»');
+    });
+
     it('cleans keys and reads the related records', function (): void {
         $field = BelongsToMany::make('topics')->forModel(Article::class);
         $article = new Article()->setRelation('topics', new Collection([new Topic(['title' => 'А']), new Topic(['title' => 'Б'])]));
@@ -110,12 +161,30 @@ describe('belongs to many', function (): void {
         'belongs to many' => fn (): BelongsToMany => BelongsToMany::make('topics'),
     ]);
 
+    it('rejects a dependency on a field with several values', function (Field $controlling): void {
+        new FormSchema([$controlling, Select::make('kind')->dependsOn($controlling->name)->options(fn (mixed $value): array => [])]);
+    })->throws(InvalidArgumentException::class, 'dependsOn() смотрит на')->with([
+        'multiple select' => fn (): Select => Select::make('tags')->options(['x' => 'X'])->multiple(),
+        'tags' => fn (): Tags => Tags::make('keywords'),
+        'belongs to many' => fn (): BelongsToMany => BelongsToMany::make('topics'),
+    ]);
+
     it('reports a model without the relation', function (): void {
         BelongsToMany::make('category')->forModel(Article::class)->relatedModel();
     })->throws(LogicException::class, 'возвращающего BelongsToMany');
 });
 
 describe('nested', function (): void {
+    it('counts the minimum of blocks without failing on a value of a block field that cannot be read', function (): void {
+        $links = HasMany::make('links')->min(1)->fields([DateTime::make('url')])->forModel(Article::class);
+
+        // Дату «garbage» не разобрать: проверка минимума её пропускает, а ошибку даёт правило самого поля блока.
+        $validator = Validator::make(['links' => [['url' => 'garbage']]], $links->getRules(null));
+
+        expect($validator->errors()->keys())->not->toContain('links')
+            ->and($validator->fails())->toBeTrue();
+    });
+
     it('allows at most 200 blocks unless the site sets its own limit', function (): void {
         $links = HasMany::make('links')->fields([Text::make('title')])->forModel(Article::class);
 
@@ -127,19 +196,46 @@ describe('nested', function (): void {
     it('prefixes the block rules and labels', function (): void {
         $field = HasMany::make('links', 'Ссылки')->fields([Text::make('title', 'Название')->required()])->min(1)->max(3)->forModel(Article::class);
 
-        expect($field->getRules(null))->toBe([
-            'links' => ['required', 'array', 'min:1', 'max:3'],
+        $rules = $field->getRules(null);
+        $minimum = $rules['links'][2];
+        $rules['links'] = array_values(array_filter($rules['links'], is_string(...)));
+
+        expect($rules)->toBe([
+            'links' => ['required', 'array', 'max:3'],
             'links.*.id' => ['nullable', 'integer'],
             'links.*.title' => ['required', 'string', 'max:255'],
-        ])->and($field->validationAttributes())->toBe([
-            'links' => 'Ссылки', 'links.*' => 'Ссылки', 'links.*.title' => 'Название', 'links.*.title.*' => 'Название',
-        ])->and([$field->getMin(), $field->getMax(), $field->getOrderColumn(), $field->isSingle()])->toBe([1, 3, null, false]);
+            'links__seen' => ['nullable', 'string', 'max:65535'],
+        ])->and($minimum)->toBeInstanceOf(Closure::class)
+            ->and($field->validationAttributes())->toBe([
+                'links' => 'Ссылки', 'links.*' => 'Ссылки', 'links.*.title' => 'Название', 'links.*.title.*' => 'Название',
+            ])->and([$field->getMin(), $field->getMax(), $field->getOrderColumn(), $field->isSingle()])->toBe([1, 3, null, false]);
 
         $one = HasOne::make('banner')->fields([Text::make('title')])->forModel(Article::class);
 
         expect(array_keys($one->getRules(null)))->toBe(['banner', 'banner.title'])
             ->and($one->dehydrate(['title' => ' Скидки ', 'extra' => 'x']))->toBe([['id' => null, 'values' => ['title' => 'Скидки']]])
             ->and($one->formValue(null))->toBeEmpty();
+    });
+
+    it('counts only the blocks that survive saving against the minimum', function (array $links, bool $passes): void {
+        $field = HasMany::make('links', 'Ссылки')->fields([Text::make('title', 'Название')])->min(1)->forModel(Article::class);
+
+        expect(validator(['links' => $links], ['links' => $field->getRules(null)['links']], [], ['links' => 'Ссылки'])->passes())->toBe($passes);
+    })->with([
+        'only an empty new block' => [[['title' => '']], false],
+        'a new block with a single space' => [[['title' => ' ']], false],
+        'an empty new block next to nothing else' => [[['id' => '', 'title' => '']], false],
+        'a saved block, even if its title is cleared' => [[['id' => '5', 'title' => '']], true],
+        'a filled new block' => [[['title' => 'Прайс']], true],
+        'an empty block and a filled one' => [[['title' => ''], ['title' => 'Прайс']], true],
+        'no blocks at all' => [[], false],
+    ]);
+
+    it('tells the minimum in the words of the validator', function (): void {
+        $field = HasMany::make('links', 'Ссылки')->fields([Text::make('title')])->min(2)->forModel(Article::class);
+        $validator = validator(['links' => [['title' => 'a']]], ['links' => $field->getRules(null)['links']], [], ['links' => 'Ссылки']);
+
+        expect($validator->errors()->first('links'))->toBe('В поле «Ссылки» должно остаться не меньше 2 блоков (пустые новые блоки не считаются).');
     });
 
     it('allows only simple fields inside blocks', function (Field $inner): void {

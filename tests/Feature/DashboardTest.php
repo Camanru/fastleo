@@ -12,7 +12,7 @@ beforeEach(function (): void {
 
 it('renders the brand, color, theme and site stylesheets from the config', function (): void {
     config([
-        'fastleo.brand.name' => 'Стоматология',
+        'fastleo.brand.name' => 'Мой сайт',
         'fastleo.brand.logo' => '/images/logo.svg',
         'fastleo.brand.color' => '#0ea5e9',
         'fastleo.theme' => 'dark',
@@ -22,7 +22,7 @@ it('renders the brand, color, theme and site stylesheets from the config', funct
     $response = $this->get(route('fastleo.dashboard'));
 
     $response->assertOk()
-        ->assertSee('<title>Дашборд — Стоматология</title>', false)
+        ->assertSee('<title>Дашборд — Мой сайт</title>', false)
         ->assertSee('src="/images/logo.svg"', false)
         ->assertSee('--fastleo-primary: #0ea5e9;', false)
         ->assertSee('data-theme="dark"', false)

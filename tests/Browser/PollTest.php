@@ -55,3 +55,19 @@ it('refreshes a table of related records on the page of a record', function (): 
         ->assertSee('Вторая статья')
         ->assertNoJavaScriptErrors();
 });
+
+it('refreshes a tree whose branches are expanded', function (): void {
+    useFixtureResources('PollTree');
+    $parent = Category::factory()->create(['title' => 'Корневая']);
+    Category::factory()->create(['title' => 'Вложенная', 'parent_id' => $parent->id]);
+
+    $page = signInAndVisit(route('fastleo.resources.index', 'poll-tree'));
+
+    $page->assertSee('Вложенная')->assertDontSee('Добавленная');
+
+    Category::factory()->create(['title' => 'Добавленная']);
+
+    $page->wait(7)
+        ->assertSee('Добавленная')
+        ->assertNoJavaScriptErrors();
+});

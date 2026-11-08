@@ -79,6 +79,20 @@ class DateTime extends Date
     }
 
     /**
+     * Форма показывает минуты, а значение, заданное кодом сайта, может быть с секундами (`10:00:45`). Если на экране
+     * время не менялось, сохранение формы не переписывает его на `10:00:00`.
+     */
+    #[Override]
+    public function fill(Model $record, mixed $value): void
+    {
+        if ($record->exists && $this->sameMinute($record->getAttribute($this->name), $value)) {
+            return;
+        }
+
+        parent::fill($record, $value);
+    }
+
+    /**
      * Дата и время по умолчанию (`now()`, Carbon) → значение поля в поясе админки.
      */
     #[Override]
@@ -102,6 +116,16 @@ class DateTime extends Date
     protected function format(mixed $value): string|Htmlable|null
     {
         return $this->inAdminTimezone($value)?->format('d.m.Y H:i');
+    }
+
+    /**
+     * Оба значения (в поясе сайта) относятся к одной минуте.
+     */
+    private function sameMinute(mixed $stored, mixed $submitted): bool
+    {
+        $stored = $this->inAdminTimezone($stored)?->format('Y-m-d H:i');
+
+        return $stored !== null && $stored === $this->inAdminTimezone($submitted)?->format('Y-m-d H:i');
     }
 
     /**

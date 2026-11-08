@@ -11,6 +11,7 @@ use Fastleo\Resource;
 use Fastleo\Support\Authorization;
 use Fastleo\Support\RecordKey;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -38,6 +39,8 @@ abstract class ResourceTool extends Tool
             }
 
             Fastleo::guard()->setUser($user);
+            // Как в страницах админки (там это делает middleware входа): `auth()` и `Gate` в коде сайта (`query()`, `can()`, observers) видят администратора.
+            Auth::shouldUse(Fastleo::GUARD);
 
             // Права и роли spatie кешируются в памяти процесса: изменённые в админке действуют со следующего вызова.
             if (method_exists($user, 'forgetCachedPermissions')) {
@@ -68,7 +71,12 @@ abstract class ResourceTool extends Tool
         $resource = is_string($slug) ? Fastleo::resources()->find($slug) : null;
 
         if (! $resource instanceof Resource || ! $resource->isAvailableInMcp()) {
-            $slugs = array_filter(array_keys(Fastleo::resources()->all()), fn (string $slug): bool => Fastleo::resources()->find($slug)?->isAvailableInMcp() === true);
+            // Только разделы, которые администратору можно открыть: чужие названия ошибка не раскрывает.
+            $slugs = array_filter(array_keys(Fastleo::resources()->all()), function (string $slug): bool {
+                $other = Fastleo::resources()->find($slug);
+
+                return $other instanceof Resource && $other->isAvailableInMcp() && Authorization::allows('viewAny', $other);
+            });
 
             throw new ToolFailed(__('fastleo::mcp.unknown_resource', ['slug' => is_string($slug) ? $slug : '', 'list' => implode(', ', $slugs)]));
         }
@@ -99,7 +107,7 @@ abstract class ResourceTool extends Tool
             throw new ToolFailed(__('fastleo::mcp.forbidden', ['ability' => $ability]));
         }
 
-        if ($ability === 'update' && $resource->isLockedForMcp($record)) {
+        if (in_array($ability, ['update', 'delete'], true) && $resource->isLockedForMcp($record)) {
             throw new ToolFailed(__('fastleo::mcp.locked'));
         }
 

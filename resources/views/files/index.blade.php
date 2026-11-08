@@ -23,6 +23,7 @@
         data-login-url="{{ route('fastleo.login') }}"
         data-max-file="{{ $limits['file'] }}"
         data-max-total="{{ $limits['total'] }}"
+        data-max-files="{{ $limits['files'] }}"
         data-picker="{{ $picker }}"
         data-multiple="{{ $multiple ? '1' : '' }}"
         data-messages="{{ json_encode($messages, JSON_UNESCAPED_UNICODE) }}"

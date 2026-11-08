@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace Fastleo\Files;
 
-use Intervention\Gif\Decoder as GifDecoder;
-use Intervention\Gif\Exceptions\GifException;
+use Fastleo\Fastleo;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\Exceptions\ImageException;
+use Intervention\Image\Exceptions\MissingDependencyException;
 use Intervention\Image\Format;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Interfaces\ImageInterface;
-use RuntimeException;
 
 /**
  * Работа с картинками через Intervention Image (драйвер GD).
@@ -31,6 +30,12 @@ final class Images
     public const int THUMB_WIDTH = 320;
 
     public const int THUMB_HEIGHT = 240;
+
+    /**
+     * Наибольшее число кадров GIF: на каждый кадр декодер заводит объекты независимо от его размера, и GIF из ста тысяч кадров
+     * 1×1 (2 МБ, всего 100 000 пикселей) исчерпывает память процесса. Живая анимация — до сотен кадров.
+     */
+    public const int MAX_GIF_FRAMES = 5_000;
 
     /**
      * Ширина и высота по заголовку или null, если это не картинка.
@@ -61,9 +66,10 @@ final class Images
             return 'not_image';
         }
 
-        $pixels = $size[0] * $size[1] * self::frames($binary);
+        $frames = self::frames($binary);
+        $pixels = $size[0] * $size[1] * $frames;
 
-        if ($pixels > config()->integer('fastleo.files.max_pixels', 32_000_000)) {
+        if ($frames > self::MAX_GIF_FRAMES || $pixels > config()->integer('fastleo.files.max_pixels', 32_000_000)) {
             return 'too_large';
         }
 
@@ -104,10 +110,14 @@ final class Images
     /**
      * Закодировать картинку в формат по расширению с качеством из конфига.
      *
-     * @throws ImageException
+     * @throws ImageException GD собран без этого формата или не умеет его кодировать
      */
     public static function encode(ImageInterface $image, string $extension): string
     {
+        if (! resolve(ImageSupport::class)->canEncode($extension)) {
+            throw new MissingDependencyException(__('fastleo::exceptions.image_cannot_encode', ['format' => $extension], Fastleo::LOCALE));
+        }
+
         return (string) $image->encodeUsingFileExtension($extension, quality: self::quality());
     }
 
@@ -128,8 +138,9 @@ final class Images
     }
 
     /**
-     * Число кадров: у GIF — по блокам файла (без декодирования картинок), у остальных — 1.
-     * GIF, который не читается, считается одним кадром: его отклонит декодирование.
+     * Число кадров: у GIF — по блокам файла (картинки не декодируются: разбор 100 000 кадров 1×1, 2 МБ, съедал бы 100 МБ
+     * памяти и десятки секунд), у остальных — 1. GIF, который не читается, считается по тому, что удалось прочитать
+     * (не меньше одного кадра): отклонит его декодирование.
      */
     private static function frames(string $binary): int
     {
@@ -137,17 +148,42 @@ final class Images
             return 1;
         }
 
-        $stream = fopen('php://memory', 'r+b') ?: throw new RuntimeException('Поток php://memory недоступен.');
+        $position = 13 + self::paletteSize($binary, 10);
+        $frames = 0;
 
-        try {
-            fwrite($stream, $binary);
+        // Блок: «!» — расширение, «,» — кадр (9 байт описания, палитра, байт размера кода, данные), всё остальное («;» и мусор) — конец.
+        while (in_array($block = $binary[$position] ?? '', ['!', ','], true)) {
+            if ($block === ',') {
+                $frames++;
+                $position += 9 + self::paletteSize($binary, $position + 9) + 1;
+            }
 
-            return max(1, count(GifDecoder::decode($stream)->frames()));
-        } catch (GifException) {
-            return 1;
-        } finally {
-            fclose($stream);
+            $position = self::afterSubBlocks($binary, $position + ($block === '!' ? 2 : 1));
         }
+
+        return max(1, $frames);
+    }
+
+    /**
+     * Размер палитры GIF в байтах по байту флагов в позиции `$flags` (старший бит — палитра есть, младшие три — её размер).
+     */
+    private static function paletteSize(string $binary, int $flags): int
+    {
+        $byte = ord($binary[$flags] ?? "\0");
+
+        return ($byte & 0x80) !== 0 ? 3 * (2 << ($byte & 7)) : 0;
+    }
+
+    /**
+     * Позиция после цепочки блоков данных GIF (байт длины и столько же байт; цепочку завершает нулевая длина).
+     */
+    private static function afterSubBlocks(string $binary, int $position): int
+    {
+        while (($size = ord($binary[$position] ?? "\0")) > 0) {
+            $position += $size + 1;
+        }
+
+        return $position + 1;
     }
 
     /**

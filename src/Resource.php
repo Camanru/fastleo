@@ -36,17 +36,17 @@ use LogicException;
  * Классы лежат в `app/Fastleo` сайта и подхватываются сами:
  *
  * ```php
- * final class DoctorResource extends Resource
+ * final class ProductResource extends Resource
  * {
- *     protected static string $model = Doctor::class;
- *     protected static ?string $label = 'Врачи';
- *     protected static ?string $singular = 'Врач';
- *     protected static string $icon = 'stethoscope';
+ *     protected static string $model = Product::class;
+ *     protected static ?string $label = 'Товары';
+ *     protected static ?string $singular = 'Товар';
+ *     protected static string $icon = 'shopping-bag';
  *
  *     public function fields(): array
  *     {
  *         return [
- *             Text::make('name', 'Имя')->required()->searchable()->sortable(),
+ *             Text::make('name', 'Название')->required()->searchable()->sortable(),
  *             Toggle::make('is_active', 'Показывать на сайте'),
  *         ];
  *     }
@@ -62,10 +62,10 @@ abstract class Resource
      */
     protected static string $model;
 
-    /** Заголовок раздела и пункт меню («Врачи»). По умолчанию — имя модели. */
+    /** Заголовок раздела и пункт меню («Товары»). По умолчанию — имя модели. */
     protected static ?string $label = null;
 
-    /** Название одной записи («Врач»): кнопка «Создать», заголовки форм. */
+    /** Название одной записи («Товар»): кнопка «Создать», заголовки форм. */
     protected static ?string $singular = null;
 
     /** Подпись кнопки создания в списке («Добавить заявку»); null — «Создать». */
@@ -83,7 +83,7 @@ abstract class Resource
     /** Позиция в меню внутри группы: меньше — выше. */
     protected static int $position = 0;
 
-    /** Часть адреса: /fastleo/{slug}. По умолчанию — имя модели во множественном числе (doctors). */
+    /** Часть адреса: /fastleo/{slug}. По умолчанию — имя модели во множественном числе (products). */
     protected static ?string $slug = null;
 
     /** Записей на странице списка; null — из config('fastleo.list.per_page'). */
@@ -118,10 +118,10 @@ abstract class Resource
      */
     protected static ?string $treeColumn = null;
 
-    /** Кнопка «Экспорт» в списке: выгрузка в xlsx/csv ([import-export.md](docs/import-export.md)). */
+    /** Кнопка «Экспорт» в списке: выгрузка в csv ([import-export.md](docs/import-export.md)). */
     protected static bool $exportable = true;
 
-    /** Кнопка «Импорт» в списке: загрузка записей из xlsx/csv ([import-export.md](docs/import-export.md)). */
+    /** Кнопка «Импорт» в списке: загрузка записей из csv ([import-export.md](docs/import-export.md)). */
     protected static bool $importable = false;
 
     /**
@@ -349,7 +349,7 @@ abstract class Resource
      * ```php
      * public function url(Model $record): ?string
      * {
-     *     return route('doctors.show', $record);
+     *     return route('products.show', $record);
      * }
      * ```
      */
@@ -416,7 +416,7 @@ abstract class Resource
     }
 
     /**
-     * Проверка перед удалением записи (из раздела, из корзины и массовым действием): выполняется внутри транзакции
+     * Проверка перед удалением записи (из раздела, из корзины, массовым действием и из MCP): выполняется внутри транзакции
      * удаления. Бросьте `OperationCancelled` с причиной — запись останется, админ увидит причину.
      *
      * ```php
@@ -612,8 +612,9 @@ abstract class Resource
     }
 
     /**
-     * Запись закрыта для правки ИИ-агентом через MCP, пока человек её не откроет (по умолчанию нет). Агент не должен
-     * менять то, что человек уже согласовал: например, публикацию, поставленную на отправку. Человек в админке правит как обычно.
+     * Запись закрыта для ИИ-агента через MCP, пока человек её не откроет (по умолчанию нет): агент не правит её, не удаляет
+     * и не запускает для неё действия. Агент не должен менять то, что человек уже согласовал: например, публикацию,
+     * поставленную на отправку. Человек в админке работает как обычно.
      *
      * ```php
      * public function isLockedForMcp(Model $record): bool
@@ -695,7 +696,7 @@ abstract class Resource
      * Часть адреса раздела.
      *
      * ```php
-     * DoctorResource::slug(); // 'doctors'
+     * ProductResource::slug(); // 'products'
      * ```
      */
     public static function slug(): string

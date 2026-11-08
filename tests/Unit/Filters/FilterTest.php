@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Text;
 use Fastleo\Filters\BelongsToFilter;
 use Fastleo\Filters\BelongsToManyFilter;
@@ -9,6 +10,7 @@ use Fastleo\Filters\BooleanFilter;
 use Fastleo\Filters\Filter;
 use Fastleo\Filters\SelectFilter;
 use Fastleo\Resource;
+use Fastleo\Tests\Fixtures\Models\Assignment;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 
@@ -72,3 +74,36 @@ it('explains a filter described twice', function (): void {
 it('rejects a name that is not a column name', function (): void {
     BooleanFilter::make('is_published; drop');
 })->throws(InvalidArgumentException::class);
+
+it('filters by the primary key of the related record, also when the column keeps another key of it', function (): void {
+    $resource = new class extends Resource
+    {
+        protected static string $model = Assignment::class;
+
+        public function fields(): array
+        {
+            return [
+                BelongsTo::make('category_ref')->relation('section')->onlyInList(),
+                BelongsTo::make('category_code')->relation('byCode')->onlyInList(),
+            ];
+        }
+
+        public function filters(): array
+        {
+            return [BelongsToFilter::make('category_ref'), BelongsToFilter::make('category_code')];
+        }
+    };
+
+    $sql = function (string $name) use ($resource): string {
+        $query = Assignment::query();
+        $resource->listFilters()[$name]->apply($query, '7');
+
+        // Имена в SQL берутся в кавычки по-разному (`"` или обратный апостроф): сравнивается текст без них.
+        return str_replace(['"', '`'], '', $query->toSql());
+    };
+
+    // Колонка хранит первичный ключ: прямое сравнение. Колонка хранит другой ключ (`code`), а фильтр предлагает первичный:
+    // сравнение с колонкой нашло бы чужое или ничего, поэтому запись ищется через связь.
+    expect($sql('category_ref'))->toContain('assignments.category_ref = ?')->not->toContain('exists')
+        ->and($sql('category_code'))->toContain('exists')->toContain('categories.id = ?');
+});

@@ -10,6 +10,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Filters\Filter;
 use Fastleo\Page;
 use Fastleo\Settings;
+use Fastleo\Tests\Fixtures\Models\NoResetUser;
 use Fastleo\Widgets\Widget;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\File;
@@ -36,18 +37,18 @@ afterEach(function (): void {
 });
 
 it('creates an action that runs on records', function (): void {
-    $this->artisan('fastleo:make-action', ['name' => 'PublishDoctors'])
+    $this->artisan('fastleo:make-action', ['name' => 'PublishProducts'])
         ->expectsOutputToContain('Класс создан:')
         ->assertSuccessful();
 
-    $path = $this->sandbox.'/Fastleo/Actions/PublishDoctors.php';
+    $path = $this->sandbox.'/Fastleo/Actions/PublishProducts.php';
     require $path;
-    $class = $this->namespace.'\\Actions\\PublishDoctors';
+    $class = $this->namespace.'\\Actions\\PublishProducts';
     $action = new $class();
 
     expect($action)->toBeInstanceOf(Action::class)
-        ->and($action->key())->toBe('publish-doctors')
-        ->and($action->getLabel())->toBe('Publish Doctors')
+        ->and($action->key())->toBe('publish-products')
+        ->and($action->getLabel())->toBe('Publish Products')
         ->and($action->handle(new Collection([new Article(), new Article()]), []))->toEqual(ActionResult::success('Готово: 2'));
 });
 
@@ -153,6 +154,36 @@ it('does not overwrite an existing view either', function (): void {
         ->and(File::get($this->sandbox.'/views/fastleo/filters/by-city.blade.php'))->toBe('mine');
 });
 
+it('refuses a name that PHP keeps for itself instead of writing a file that cannot be parsed', function (string $command, string $name): void {
+    $this->artisan($command, ['name' => $name])->expectsOutputToContain('занято самим PHP')->assertFailed();
+
+    expect(File::exists($this->sandbox.'/Fastleo'))->toBeFalse();
+})->with([
+    ['fastleo:make-action', 'Print'],
+    ['fastleo:make-filter', 'List'],
+    ['fastleo:make-widget', 'match'],
+    ['fastleo:make-field', 'Static'],
+]);
+
+it('refuses a name of a class that the stub imports: the file would not load', function (string $command, string $name): void {
+    $this->artisan($command, ['name' => $name])->expectsOutputToContain('совпадает с классом')->assertFailed();
+
+    expect(File::exists($this->sandbox.'/Fastleo'))->toBeFalse();
+})->with([
+    ['fastleo:make-action', 'Action'],
+    ['fastleo:make-action', 'ActionResult'],
+    ['fastleo:make-action', 'model'],
+    ['fastleo:make-filter', 'Filter'],
+    ['fastleo:make-filter', 'Builder'],
+    ['fastleo:make-widget', 'Widget'],
+    ['fastleo:make-field', 'Text'],
+    ['fastleo:make-field', 'Override'],
+]);
+
+it('accepts a name that only contains such a word', function (): void {
+    $this->artisan('fastleo:make-action', ['name' => 'PrintLabels'])->assertSuccessful();
+});
+
 it('rejects a bad class name and does not double the Page suffix', function (): void {
     $this->artisan('fastleo:make-widget', ['name' => '1bad name'])->expectsOutputToContain('не подходит')->assertFailed();
 
@@ -223,6 +254,15 @@ describe('policy', function (): void {
         $user = admin();
         expect($policy->viewAny($user))->toBeTrue()
             ->and($policy->update($user, Article::factory()->create()))->toBeTrue();
+    });
+
+    it('orders the imports of the policy alphabetically, so the Pint of the site has nothing to fix', function (): void {
+        config(['auth.providers.users.model' => NoResetUser::class]);
+
+        $this->artisan('fastleo:make-policy', ['name' => 'Article', '--model' => Article::class])->assertSuccessful();
+
+        expect(File::get($this->sandbox.'/app/Policies/ArticlePolicy.php'))
+            ->toContain("use Fastleo\\Tests\\Fixtures\\Models\\NoResetUser;\nuse Workbench\\App\\Models\\Article;\n");
     });
 
     it('refuses an unknown model, a wrong name and an existing file', function (): void {

@@ -8,7 +8,8 @@ use Fastleo\Support\Menu;
 beforeEach(function (): void {
     $this->actingAs(admin(), Fastleo::GUARD);
     useFixtureResources('Menu');
-    config(['fastleo.logs.enabled' => false]);
+    // Порядок групп демо-сайта (workbench) здесь не нужен: каждый тест задаёт свой.
+    config(['fastleo.logs.enabled' => false, 'fastleo.menu.groups' => []]);
 });
 
 it('orders groups as configured and puts links without a group first', function (): void {
@@ -66,4 +67,16 @@ it('marks the open section as active', function (): void {
 
 it('shows no badge for zero', function (): void {
     expect(Menu::groups()[0]['items'][0])->toMatchArray(['label' => 'Новости', 'badge' => null]);
+});
+
+it('renders every named group with a toggle and marks the group of the open section', function (): void {
+    $response = $this->get(route('fastleo.resources.index', 'news'));
+
+    $html = (string) $response->assertOk()->getContent();
+
+    expect(substr_count($html, 'data-menu-group="'))->toBe(2)
+        ->and($html)->toMatch('/data-menu-group="Контент"\s+data-active/')
+        ->and($html)->not->toMatch('/data-menu-group="Медиа"\s+data-active/')
+        ->and($html)->toContain('aria-controls="fastleo-menu-group-1"')
+        ->and($html)->toContain('id="fastleo-menu-group-1"');
 });

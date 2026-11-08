@@ -17,7 +17,7 @@ use Override;
 
 /**
  * Основа полей с файлами из менеджера (Image, File, Gallery). Значение — путь
- * относительно диска `fastleo.files.disk`: `uploads/doctors/ivanov.jpg`.
+ * относительно диска `fastleo.files.disk`: `uploads/products/kettle.jpg`.
  *
  * В форме: «Загрузить» (файл сразу попадает в менеджер, в папку `directory()`)
  * и «Выбрать из файлов» (окно менеджера). Путь из формы проверяется: внутри корня
@@ -40,11 +40,11 @@ abstract class FileField extends Field
      * Выбрать в окне можно файл из любой папки.
      *
      * ```php
-     * Image::make('photo')->directory('doctors'); // uploads/doctors
+     * Image::make('photo')->directory('products'); // uploads/products
      * ```
      *
      * Имя каждой папки — строчная латиница, цифры и дефис (как в менеджере файлов), вложенность через `/`:
-     * `doctor_photos` и `Doctors` не подходят, их заменяют `doctor-photos` и `doctors`.
+     * `product_photos` и `Products` не подходят, их заменяют `product-photos` и `products`.
      *
      * @throws LogicException имя папки не подходит
      */
@@ -57,7 +57,7 @@ abstract class FileField extends Field
                 throw new LogicException(__('fastleo::exceptions.directory_invalid', [
                     'field' => $this->name,
                     'directory' => $directory,
-                    'example' => implode('/', array_filter(array_map(FileName::folder(...), explode('/', $directory))) ?: ['doctors']),
+                    'example' => implode('/', array_filter(array_map(FileName::folder(...), explode('/', $directory))) ?: ['products']),
                 ], Fastleo::LOCALE));
             }
         }

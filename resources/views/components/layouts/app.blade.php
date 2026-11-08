@@ -41,7 +41,7 @@
 
         <aside
             id="fastleo-menu"
-            class="fixed inset-y-0 left-0 z-40 flex w-[248px] -translate-x-full flex-col gap-3.5 border-r border-line bg-sidebar px-3 pt-3.5 pb-3 transition-[transform,width] duration-200 ease-out-quint lg:translate-x-0 lg:collapsed:w-16 lg:collapsed:px-2"
+            class="fixed inset-y-0 left-0 z-40 flex w-[248px] -translate-x-full flex-col gap-3.5 border-r border-line bg-sidebar px-3 pt-3.5 pb-3 transition-[transform,width] duration-200 ease-out-quint lg:translate-none lg:collapsed:w-16 lg:collapsed:px-2"
             :class="menuOpen && 'translate-x-0 shadow-pop'"
         >
             <div class="flex items-center justify-between gap-2 px-1.5 py-0.5 lg:collapsed:justify-center lg:collapsed:px-0">
@@ -58,7 +58,7 @@
                 <kbd class="rounded border border-line-strong px-1.5 text-[11px] text-ink-2 lg:collapsed:hidden" data-mac="⌘K">Ctrl K</kbd>
             </button>
 
-            <nav class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:collapsed:gap-2.5 lg:collapsed:overflow-visible" aria-label="{{ __('fastleo::layout.menu') }}">
+            <nav class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto lg:collapsed:gap-2.5 lg:collapsed:overflow-x-hidden" aria-label="{{ __('fastleo::layout.menu') }}">
                 <div class="flex flex-col gap-px lg:collapsed:items-center">
                     @if (config('fastleo.menu.dashboard', true))
                         @include('fastleo::partials.menu-item', ['url' => route('fastleo.dashboard'), 'icon' => 'layout-dashboard', 'label' => __('fastleo::layout.dashboard'), 'active' => request()->routeIs('fastleo.dashboard'), 'badge' => null])
@@ -68,14 +68,45 @@
                         @include('fastleo::partials.menu-item', ['url' => $item['url'], 'icon' => $item['icon'], 'label' => $item['label'], 'active' => $item['active'], 'badge' => $item['badge']])
                     @endforeach
                 </div>
-                @foreach (collect($menuGroups)->whereNotNull('label') as $group)
-                    <div class="flex flex-col gap-px lg:collapsed:items-center lg:collapsed:border-t lg:collapsed:border-line lg:collapsed:pt-2.5">
-                        <span class="px-2.5 pb-1.5 text-[11px] font-semibold tracking-[.04em] text-ink-3 uppercase lg:collapsed:hidden">{{ $group['label'] }}</span>
-                        @foreach ($group['items'] as $item)
-                            @include('fastleo::partials.menu-item', ['url' => $item['url'], 'icon' => $item['icon'], 'label' => $item['label'], 'active' => $item['active'], 'badge' => $item['badge']])
-                        @endforeach
+                {{-- Группа сворачивается по клику на заголовок, выбор хранится в браузере (fastleo-menu-groups). Группа текущего
+                     раздела на его странице открыта. В полосе 64 px заголовков нет и видны все иконки. --}}
+                @foreach (collect($menuGroups)->whereNotNull('label')->values() as $group)
+                    <div
+                        class="group/menu flex flex-col gap-px lg:collapsed:items-center lg:collapsed:border-t lg:collapsed:border-line lg:collapsed:pt-2.5"
+                        x-data="fastleoMenuGroup"
+                        data-menu-group="{{ $group['label'] }}"
+                        @if (collect($group['items'])->contains('active', true)) data-active @endif
+                    >
+                        <button type="button" class="flex items-center justify-between gap-2 rounded-[6px] px-2.5 pb-1.5 text-left text-[11px] font-semibold tracking-[.04em] text-ink-3 uppercase transition-colors hover:text-ink-2 lg:collapsed:hidden" @click="toggle()" aria-expanded="true" :aria-expanded="open" aria-controls="fastleo-menu-group-{{ $loop->index }}">
+                            <span class="min-w-0 truncate">{{ $group['label'] }}</span>
+                            <x-fastleo::icon name="chevron-down" class="size-3.5 shrink-0 transition-transform group-data-closed/menu:-rotate-90" />
+                        </button>
+                        <div id="fastleo-menu-group-{{ $loop->index }}" class="flex flex-col gap-px group-data-closed/menu:hidden lg:collapsed:items-center lg:collapsed:flex!">
+                            @foreach ($group['items'] as $item)
+                                @include('fastleo::partials.menu-item', ['url' => $item['url'], 'icon' => $item['icon'], 'label' => $item['label'], 'active' => $item['active'], 'badge' => $item['badge']])
+                            @endforeach
+                        </div>
                     </div>
                 @endforeach
+                {{-- Свёрнутые группы прячутся до запуска Alpine, чтобы меню не дёргалось. Названия сравниваются как строки. --}}
+                <script>
+                    (function () {
+                        var closed;
+                        try {
+                            closed = JSON.parse(localStorage.getItem('fastleo-menu-groups') || '[]');
+                        } catch (error) {
+                            closed = [];
+                        }
+                        if (! Array.isArray(closed)) {
+                            return;
+                        }
+                        document.querySelectorAll('[data-menu-group]').forEach(function (group) {
+                            if (! group.hasAttribute('data-active') && closed.indexOf(group.dataset.menuGroup) !== -1) {
+                                group.setAttribute('data-closed', '');
+                            }
+                        });
+                    })();
+                </script>
             </nav>
 
             <div class="flex flex-col gap-2 border-t border-line pt-3 lg:collapsed:items-center">

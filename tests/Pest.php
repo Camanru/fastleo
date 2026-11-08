@@ -236,6 +236,14 @@ function createTreeNodesTable(): void
 }
 
 /**
+ * Ждём условие в браузере: окно и его iframe открываются и догружаются уже после клика, а assertScript не ждёт.
+ */
+function waitUntil(object $page, string $condition): void
+{
+    $page->script("new Promise((resolve) => { const started = Date.now(); const timer = setInterval(() => { if (({$condition}) || Date.now() - started > 5000) { clearInterval(timer); resolve(true); } }, 50); })");
+}
+
+/**
  * Войти в админку и открыть адрес (на форме с RichText — дождаться редактора).
  */
 function signInAndVisit(string $url): mixed

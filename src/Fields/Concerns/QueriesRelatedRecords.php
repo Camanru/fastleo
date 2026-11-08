@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
 use InvalidArgumentException;
+use LogicException;
 use Override;
 
 /**
@@ -96,7 +97,7 @@ trait QueriesRelatedRecords
      * Колонка связанной модели с подписью записи (по умолчанию `title` или `name`, если они в `$fillable`).
      *
      * ```php
-     * BelongsTo::make('clinic_id')->titleColumn('short_name');
+     * BelongsTo::make('brand_id')->titleColumn('short_name');
      * ```
      *
      * @throws InvalidArgumentException имя не похоже на имя колонки
@@ -116,7 +117,7 @@ trait QueriesRelatedRecords
      * Ограничить варианты: замыкание получает запрос связанной модели.
      *
      * ```php
-     * BelongsTo::make('clinic_id')->query(fn (Builder $query) => $query->where('is_active', true));
+     * BelongsTo::make('brand_id')->query(fn (Builder $query) => $query->where('is_active', true));
      * ```
      *
      * @param  Closure(Builder<Model>): mixed  $query
@@ -163,6 +164,13 @@ trait QueriesRelatedRecords
      * Пустой экземпляр связанной модели.
      */
     abstract public function relatedModel(): Model;
+
+    /**
+     * Связь идёт по первичному ключу связанной модели: иначе варианты и запись работают с другими значениями, чем связь.
+     *
+     * @throws LogicException связь идёт не по первичному ключу
+     */
+    abstract public function assertKeyedByPrimaryKey(): void;
 
     /**
      * Колонка подписи записи.
@@ -229,6 +237,12 @@ trait QueriesRelatedRecords
      */
     public function optionsQuery(mixed $dependency = null): Builder
     {
+        // Связь по другому ключу ломает запись и выбор: ошибка у поля, которое есть в форме и пишется. Подписи поля, которое не пишется
+        // (`readonly()`, `onlyInList()`), и фильтры по нему идут через `baseOptionsQuery()` и работают.
+        if ($this->isWritable() && $this->isFormField()) {
+            $this->assertKeyedByPrimaryKey();
+        }
+
         $query = $this->baseOptionsQuery();
 
         if ($this->dependsUsing instanceof Closure) {

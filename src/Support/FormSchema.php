@@ -49,8 +49,14 @@ final readonly class FormSchema
         }
 
         foreach ($fields as $field) {
-            if (($fields[$field->getDependsOn() ?? ''] ?? null) instanceof MorphTo) {
+            $dependency = $fields[$field->getDependsOn() ?? ''] ?? null;
+
+            if ($dependency instanceof MorphTo) {
                 throw new InvalidArgumentException(__('fastleo::exceptions.depends_on_morph', ['field' => $field->name, 'controlling' => $field->getDependsOn()], Fastleo::LOCALE));
+            }
+
+            if ($dependency instanceof Field && $dependency->isMultiple()) {
+                throw new InvalidArgumentException(__('fastleo::exceptions.depends_on_multiple', ['field' => $field->name, 'controlling' => $dependency->name], Fastleo::LOCALE));
             }
 
             $controlling = $fields[$field->getVisibleWhen()['field'] ?? ''] ?? null;

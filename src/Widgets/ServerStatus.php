@@ -54,7 +54,7 @@ final class ServerStatus extends Widget
         return [
             'sections' => $sections,
             'attention' => ServerReport::attention($sections),
-            'cacheSize' => CacheCleaner::format(CacheCleaner::size()),
+            'cacheSize' => CacheCleaner::format(CacheCleaner::cachedSize()),
         ];
     }
 

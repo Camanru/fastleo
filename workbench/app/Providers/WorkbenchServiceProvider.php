@@ -11,11 +11,14 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Workbench\App\Console\BuildDocsCommand;
 use Workbench\App\Models\Article;
+use Workbench\App\Models\Task;
+use Workbench\App\Observers\TaskObserver;
 use Workbench\App\Policies\ArticlePolicy;
+use Workbench\App\Policies\TaskPolicy;
 
 /**
  * Настройки демо-сайта: ресурсы админки лежат в workbench/app/Fastleo, размеры вариантов картинок
- * и водяной знак, права на статьи — ArticlePolicy.
+ * и водяной знак, права на статьи — ArticlePolicy, на задачи витрины — TaskPolicy и TaskObserver.
  */
 final class WorkbenchServiceProvider extends ServiceProvider
 {
@@ -27,6 +30,8 @@ final class WorkbenchServiceProvider extends ServiceProvider
     {
         config([
             'fastleo.locales' => ['ru', 'en'],
+            // Сначала разделы демо-сайта, затем витрины возможностей.
+            'fastleo.menu.groups' => ['Контент', 'Каталог', 'Витрина: поля', 'Витрина: список и действия', 'Витрина: отчёты'],
             'fastleo.resources.path' => __DIR__.'/../Fastleo',
             'fastleo.resources.namespace' => 'Workbench\App\Fastleo',
             'fastleo.images.presets' => [
@@ -42,7 +47,7 @@ final class WorkbenchServiceProvider extends ServiceProvider
     }
 
     /**
-     * Policy моделей демо-сайта.
+     * Policy и observers моделей демо-сайта.
      */
     public function boot(): void
     {
@@ -51,5 +56,7 @@ final class WorkbenchServiceProvider extends ServiceProvider
         }
 
         Gate::policy(Article::class, ArticlePolicy::class);
+        Gate::policy(Task::class, TaskPolicy::class);
+        Task::observe(TaskObserver::class);
     }
 }

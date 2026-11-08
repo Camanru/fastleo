@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Closing\ClosingSettings;
 use Fastleo\Fastleo;
+use Fastleo\Files\ImageSupport;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\SoftNetica\SoftNeticaSettings;
 use Fastleo\Support\Assets;
@@ -17,10 +18,12 @@ use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResou
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Workbench\App\Models\Category;
 use Workbench\App\Models\Product;
@@ -89,6 +92,15 @@ it('reports a field without a column, outside $fillable, without a cast and with
         ->and($errors)->toContain('Связь поля «category_id»')
         ->and($errors)->toContain('Колонка порядка «nope»')
         ->and($errors)->toContain('Колонка отметки «просмотрено» «seen_at»');
+});
+
+it('reports a relation by a key that is not the primary key only for a field that is written', function (): void {
+    useFixtureResources('DoctorCodedRelation');
+
+    // Показ такой связи работает; ошибка нужна полю, которое есть в форме и пишется. Поле только для списка и раздел только для просмотра не пишутся.
+    expect(implode("\n", messages('coded-writable', 'error')))->toContain('идёт по ключу «code»')
+        ->and(messages('coded-list', 'error'))->toBe([])
+        ->and(messages('coded-readonly', 'error'))->toBe([]);
 });
 
 it('reports a read column that cannot hold the time of reading', function (): void {
@@ -187,6 +199,61 @@ it('does not report a text field over an enum column that the form does not writ
         ->and(messages('status-in-list', 'error'))->toBe([])
         ->and(messages('status-readonly-section', 'error'))->toBe([]);
 });
+
+it('reports a secret over a column that is not encrypted and passes one that is', function (): void {
+    useFixtureResources('DoctorSecret');
+
+    expect(implode("\n", messages('plain-secret', 'error')))->toContain('Поле «excerpt» (Secret) хранит секрет, а у колонки в модели Workbench\\App\\Models\\Article нет шифрования')
+        ->and(messages('encrypted-secret', 'error'))->toBe([])
+        ->and(collect(diagnosed()['problems'])->firstWhere('scope', 'plain-secret')['hint'] ?? null)->toContain("'excerpt' => 'encrypted'");
+});
+
+/**
+ * PHP без нужных расширений для картинок.
+ *
+ * @param  list<string>  $missing
+ */
+function phpWithout(array $missing): void
+{
+    $formats = array_sum(array_diff_key(['webp' => IMG_WEBP, 'jpeg' => IMG_JPG], array_flip($missing)));
+
+    app()->instance(ImageSupport::class, new ImageSupport(array_values(array_diff(['gd', 'exif'], $missing)), $formats));
+}
+
+it('says plainly that GD is missing instead of leaving the uploads to fail without a reason', function (): void {
+    phpWithout(['gd']);
+
+    expect(messages('site', 'error'))->toContain('Не установлено расширение PHP GD: любая загруженная картинка отклоняется как «не открывается как картинка», миниатюры и варианты WebP не создаются.')
+        ->and(collect(diagnosed()['problems'])->first(fn (array $problem): bool => str_contains($problem['message'], 'GD'))['hint'] ?? null)->toContain('apt install');
+});
+
+it('names the formats GD is built without', function (array $missing, string $formats): void {
+    phpWithout($missing);
+
+    expect(implode("\n", messages('site', 'error')))->toContain("Расширение GD собрано без поддержки {$formats}")
+        ->and(implode("\n", messages('site', 'error')))->not->toContain('Не установлено расширение PHP GD');
+})->with([
+    'webp' => [['webp'], 'WEBP'],
+    'jpeg' => [['jpeg'], 'JPEG'],
+    'both' => [['webp', 'jpeg'], 'WEBP, JPEG'],
+]);
+
+it('warns that photos from a phone will lie on the side without the exif extension', function (): void {
+    phpWithout(['exif']);
+
+    expect(messages('site', 'warning'))->toContain('Не установлено расширение PHP exif: фото с телефона сохраняются без поворота и могут лежать на боку.')
+        ->and(messages('site', 'error'))->toBe([]);
+});
+
+it('does not complain about the image extensions when PHP has them', function (): void {
+    phpWithout([]);
+
+    expect(implode("\n", [...messages('site', 'error'), ...messages('site', 'warning')]))->not->toContain('GD')->not->toContain('exif');
+});
+
+it('checks the real PHP for the image extensions by default', function (): void {
+    expect(resolve(ImageSupport::class)->missing())->toBe([]);
+})->skip(fn (): bool => ! extension_loaded('gd') || ! extension_loaded('exif') || (imagetypes() & (IMG_WEBP | IMG_JPG)) !== (IMG_WEBP | IMG_JPG), 'нужны GD с WebP и JPEG и exif');
 
 it('warns about a NOT NULL column without required()', function (): void {
     useFixtureResources('Doctor');
@@ -659,7 +726,7 @@ describe('markup of the RichText field', function (): void {
             $table->longText('body')->nullable();
         });
         DB::table('doctor_rich_notes')->insert([
-            ['body' => '<div class="uk-h3" role="note" data-lpu="1"><p>Текст</p></div><iframe src="https://prodoctorov.ru/widget/1/"></iframe>'],
+            ['body' => '<div class="uk-h3" role="note" data-widget="1"><p>Текст</p></div><iframe src="https://yandex.ru/map-widget/v1/"></iframe>'],
             ['body' => '<p>Чистый текст</p>'],
             ['body' => null],
         ]);
@@ -671,8 +738,8 @@ describe('markup of the RichText field', function (): void {
 
         expect($warnings)->toContain('Поле «body» (RichText): в 1 из 2 проверенных записей при сохранении пропадёт разметка')
             ->toContain('теги div')
-            ->toContain('атрибуты class, role, data-lpu')
-            ->toContain('iframe с адресов prodoctorov.ru');
+            ->toContain('атрибуты class, role, data-widget')
+            ->toContain('iframe с адресов yandex.ru');
     });
 
     it('points to the sanitize() method of a field that cleans HTML by its own rules', function (): void {
@@ -685,8 +752,8 @@ describe('markup of the RichText field', function (): void {
     it('stays silent when the site allowed that markup', function (): void {
         config([
             'fastleo.rich_text.tags' => ['div'],
-            'fastleo.rich_text.attributes' => ['class', 'role', 'data-lpu'],
-            'fastleo.rich_text.iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+            'fastleo.rich_text.attributes' => ['class', 'role', 'data-widget'],
+            'fastleo.rich_text.iframe_hosts' => ['https://yandex.ru/map-widget/'],
         ]);
 
         expect(messages('rich-notes', 'warning'))->toBe([]);
@@ -724,8 +791,8 @@ describe('markup of the RichText field', function (): void {
 
         config([
             'fastleo.rich_text.tags' => ['div'],
-            'fastleo.rich_text.attributes' => ['class', 'role', 'data-lpu'],
-            'fastleo.rich_text.iframe_hosts' => ['https://prodoctorov.ru/widget/'],
+            'fastleo.rich_text.attributes' => ['class', 'role', 'data-widget'],
+            'fastleo.rich_text.iframe_hosts' => ['https://yandex.ru/map-widget/'],
         ]);
 
         Artisan::call('fastleo:doctor --sanitize-diff --json');
@@ -1009,4 +1076,46 @@ describe('the MorphTo field', function (): void {
     it('warns about sections whose keys are of different kinds', function (): void {
         expect(implode("\n", messages('mixed', 'warning')))->toContain('ключи разных видов');
     });
+});
+
+/**
+ * Админка на корне домена: маршруты пакета загружаются раньше маршрутов сайта, как в провайдере.
+ *
+ * @param  array<string, string>  $siteRoutes  адрес → ответ
+ */
+function rootWithSiteRoutes(array $siteRoutes, ?string $domain = null): void
+{
+    config(['fastleo.path' => '', 'fastleo.domain' => $domain]);
+    Route::setRoutes(new RouteCollection());
+    require dirname(__DIR__, 3).'/routes/fastleo.php';
+
+    foreach ($siteRoutes as $uri => $body) {
+        Route::get($uri, fn (): string => $body);
+    }
+
+    Route::get('/catalog/{product}', fn (string $product): string => $product);
+}
+
+it('warns that the admin at the site root takes the addresses of site pages', function (): void {
+    rootWithSiteRoutes(['/about' => 'about', '/delivery' => 'delivery', '/up' => 'up', '/robots.html' => 'robots', '/settings' => 'settings']);
+
+    $warnings = implode("\n", messages('site', 'warning'));
+
+    expect($warnings)->toContain('закрывает адреса сайта: /about, /delivery')
+        ->not->toContain('/up')
+        ->not->toContain('/robots.html')
+        ->not->toContain('/catalog')
+        ->not->toContain('/settings');
+});
+
+it('reports as an error that a site route at the root replaces a route of the admin', function (): void {
+    rootWithSiteRoutes(['/' => 'welcome', '/login' => 'site login']);
+
+    expect(implode("\n", messages('site', 'error')))->toContain('заменяют маршруты админки на корне домена: /login, / — админка не откроется');
+});
+
+it('does not warn about routes when the admin at the root has its own domain', function (): void {
+    rootWithSiteRoutes(['/' => 'welcome', '/about' => 'about'], 'admin.example.com');
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('корне домена');
 });

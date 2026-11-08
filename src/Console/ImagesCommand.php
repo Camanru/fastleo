@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace Fastleo\Console;
 
 use Fastleo\Fastleo;
+use Fastleo\Fields\Blocks;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\Gallery;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\Nested;
+use Fastleo\Fields\Repeater;
 use Fastleo\Files\Variants;
 use Fastleo\Resource;
+use Fastleo\Settings;
+use Fastleo\Support\SettingsStore;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -20,8 +24,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Пересоздаёт WebP-варианты картинок всех полей Image и Gallery с `variants()`
- * (в том числе внутри вложенных блоков). Нужна, когда поменяли размеры
+ * Пересоздаёт WebP-варианты картинок всех полей Image и Gallery с `variants()`: в разделах и страницах настроек, во вложенных
+ * записях (HasMany, HasOne) и внутри Repeater и Blocks. Нужна, когда поменяли размеры
  * `fastleo.images.presets` или водяной знак.
  *
  * ```bash
@@ -58,6 +62,18 @@ final class ImagesCommand extends Command
             }
         }
 
+        foreach (array_keys(Fastleo::resources()->settings()) as $slug) {
+            $page = Fastleo::resources()->findSettings($slug);
+
+            if ($page instanceof Settings) {
+                $values = resolve(SettingsStore::class)->values($slug, $page);
+
+                foreach ($page->schema()->fields() as $field) {
+                    $this->addImages($field, $values[$field->name] ?? null, $only, $images);
+                }
+            }
+        }
+
         $bar = $this->output->createProgressBar(count($images));
 
         foreach ($images as $path => $presets) {
@@ -83,17 +99,14 @@ final class ImagesCommand extends Command
      */
     private function collect(Model $model, array $fields, array $only, array &$images): void
     {
+        /** @var array<string, Field> $columns */
         $columns = [];
 
         foreach ($fields as $field) {
             if ($field instanceof Nested) {
                 $this->collect($field->relationInstance($model)->getRelated(), $field->schema()->fields(), $only, $images);
-            } elseif ($field instanceof Image || $field instanceof Gallery) {
-                $presets = $only === [] ? $field->getVariants() : array_values(array_intersect($field->getVariants(), $only));
-
-                if ($presets !== []) {
-                    $columns[$field->name] = $presets;
-                }
+            } elseif ($field instanceof Image || $field instanceof Gallery || $field instanceof Repeater || $field instanceof Blocks) {
+                $columns[$field->name] = $field;
             }
         }
 
@@ -108,14 +121,33 @@ final class ImagesCommand extends Command
         }
 
         foreach ($query->select([$model->getKeyName(), ...array_keys($columns)])->lazyById() as $record) {
-            foreach ($columns as $column => $presets) {
-                $value = $record->getAttribute($column);
+            foreach ($columns as $column => $field) {
+                $this->addImages($field, $record->getAttribute($column), $only, $images);
+            }
+        }
+    }
 
-                foreach (is_array($value) ? $value : [$value] as $path) {
-                    if (is_string($path) && $path !== '') {
-                        $images[$path] = array_values(array_unique([...$images[$path] ?? [], ...$presets]));
-                    }
-                }
+    /**
+     * Добавить пути картинок из значения поля вместе с их размерами (`--preset` оставляет только нужные).
+     *
+     * @param  list<string>  $only
+     * @param  array<string, list<string>>  $images
+     */
+    private function addImages(Field $field, mixed $value, array $only, array &$images): void
+    {
+        if ($field instanceof Repeater || $field instanceof Blocks) {
+            $found = $field->variantPaths($value);
+        } elseif ($field instanceof Image || $field instanceof Gallery) {
+            $found = array_fill_keys(array_filter(is_array($value) ? $value : [$value], fn (mixed $path): bool => is_string($path) && $path !== ''), $field->getVariants());
+        } else {
+            return;
+        }
+
+        foreach ($found as $path => $presets) {
+            $presets = $only === [] ? $presets : array_values(array_intersect($presets, $only));
+
+            if ($presets !== []) {
+                $images[$path] = array_values(array_unique([...$images[$path] ?? [], ...$presets]));
             }
         }
     }

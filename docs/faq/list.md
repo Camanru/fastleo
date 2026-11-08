@@ -155,7 +155,7 @@ public function rowTone(Model $record): ?string
 use Fastleo\Fields\Email;
 use Fastleo\Fields\Text;
 
-Text::make('name', 'Имя')->searchable()->sortable(),
+Text::make('name', 'Название')->searchable()->sortable(),
 Email::make('email', 'Email')->searchable(),
 ```
 
@@ -168,7 +168,7 @@ Email::make('email', 'Email')->searchable(),
 Задайте `$defaultOrder` (по умолчанию новые сверху) и отметьте столбцы `sortable()` — клик по заголовку сортирует.
 
 ```php
-// app/Fastleo/DoctorResource.php
+// app/Fastleo/ProductResource.php
 use Fastleo\Fields\Text;
 
 protected static ?array $defaultOrder = ['name', 'asc'];
@@ -176,7 +176,7 @@ protected static ?array $defaultOrder = ['name', 'asc'];
 public function fields(): array
 {
     return [
-        Text::make('name', 'Имя')->sortable(),
+        Text::make('name', 'Название')->sortable(),
     ];
 }
 ```
@@ -664,7 +664,7 @@ public function actions(): array
 
 ### Как выгрузить список в Excel и как отключить выгрузку?
 
-Кнопка «Экспорт» (xlsx или csv) есть в каждом разделе — выгружается то, что сейчас показывает список. Отключить её для раздела или убрать из файла отдельное поле:
+Кнопка «Экспорт» (csv) есть в каждом разделе — выгружается то, что сейчас показывает список. Отключить её для раздела или убрать из файла отдельное поле:
 
 ```php
 // app/Fastleo/ClientResource.php
@@ -680,7 +680,7 @@ public function fields(): array
 }
 ```
 
-Разрешить выгрузку не всем — метод `export()` в Policy модели ([FAQ: права](access.md)). Для таблиц в сотни тысяч строк выбирайте csv.
+Разрешить выгрузку не всем — метод `export()` в Policy модели ([FAQ: права](access.md)). 
 
 Подробнее — [Экспорт](../import-export.md#экспорт).
 

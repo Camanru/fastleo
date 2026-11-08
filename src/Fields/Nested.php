@@ -333,6 +333,31 @@ abstract class Nested extends Field
     }
 
     /**
+     * Ключи записей, присланных в списке, — без разбора значений полей: список ещё не проверен, и значение, которое не
+     * разбирается (дата `abc`), должно дойти до проверки как ошибка поля, а не как исключение.
+     *
+     * ```php
+     * $field->sentKeys([['id' => 5, 'title' => 'A'], ['title' => 'new']]); // ['5']
+     * ```
+     *
+     * @return list<string>
+     */
+    public function sentKeys(mixed $value): array
+    {
+        $keys = [];
+
+        foreach ($this->isSingle() ? [$value] : (is_array($value) ? $value : []) as $block) {
+            $id = is_array($block) ? ($block['id'] ?? null) : null;
+
+            if (is_int($id) || (is_string($id) && $id !== '')) {
+                $keys[] = (string) $id;
+            }
+        }
+
+        return $keys;
+    }
+
+    /**
      * Блоки пишутся после сохранения родителя.
      */
     #[Override]

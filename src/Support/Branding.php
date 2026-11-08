@@ -21,7 +21,7 @@ final class Branding
      * Название админки: из конфига, иначе название сайта, иначе «Fastleo».
      *
      * ```php
-     * Branding::name(); // 'Стоматология'
+     * Branding::name(); // 'Мой сайт'
      * ```
      */
     public static function name(): string

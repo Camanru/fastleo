@@ -24,7 +24,7 @@ use Override;
  *
  * ```php
  * BelongsTo::make('category_id', 'Категория')->required()->sortable();
- * BelongsTo::make('clinic_id', 'Клиника')->titleColumn('short_name')->query(fn (Builder $q) => $q->where('is_active', true));
+ * BelongsTo::make('brand_id', 'Бренд')->titleColumn('short_name')->query(fn (Builder $q) => $q->where('is_active', true));
  * ```
  */
 class BelongsTo extends Field implements SearchesOptions
@@ -79,6 +79,35 @@ class BelongsTo extends Field implements SearchesOptions
         return $this->relationInstance = $relation;
     }
 
+    /**
+     * Связь идёт по первичному ключу связанной модели. Значения вариантов, проверка и запись работают с первичным ключом:
+     * связь по другому ключу (`belongsTo(Country::class, 'country_code', 'code')`) сбросила бы выбранное значение в NULL при
+     * сохранении. Показ значения (список, страница просмотра) этого не требует: Eloquent сам находит запись по ключу связи.
+     *
+     * @throws LogicException связь идёт не по первичному ключу связанной модели
+     */
+    #[Override]
+    public function assertKeyedByPrimaryKey(): void
+    {
+        if (! $this->isKeyedByPrimaryKey()) {
+            $relation = $this->relationInstance();
+
+            throw new LogicException(__('fastleo::exceptions.relation_owner_key', [
+                'field' => $this->name, 'method' => $this->getRelationName(), 'key' => $relation->getOwnerKeyName(), 'primary' => $relation->getRelated()->getKeyName(),
+            ], Fastleo::LOCALE));
+        }
+    }
+
+    /**
+     * Колонка поля хранит первичный ключ связанной модели (а не другой её ключ, например `code`).
+     */
+    public function isKeyedByPrimaryKey(): bool
+    {
+        $relation = $this->relationInstance();
+
+        return $relation->getOwnerKeyName() === $relation->getRelated()->getKeyName();
+    }
+
     #[Override]
     public function relatedModel(): Model
     {
@@ -107,6 +136,8 @@ class BelongsTo extends Field implements SearchesOptions
     #[Override]
     public function dehydrate(mixed $value): mixed
     {
+        $this->assertKeyedByPrimaryKey();
+
         $value = parent::dehydrate($value);
 
         return is_numeric($value) && $this->relatedModel()->getKeyType() === 'int' ? (int) $value : $value;
@@ -169,9 +200,16 @@ class BelongsTo extends Field implements SearchesOptions
             return null;
         }
 
-        $resource = Fastleo::resources()->forModel($related::class);
+        // Ссылка ведёт в первый раздел модели, который администратору открыт (разделов может быть несколько).
+        foreach (Fastleo::resources()->allForModel($related::class) as $resource) {
+            $url = $resource->viewUrl($related);
 
-        return $resource?->viewUrl($related);
+            if ($url !== null) {
+                return $url;
+            }
+        }
+
+        return null;
     }
 
     /**

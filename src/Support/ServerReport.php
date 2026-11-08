@@ -107,6 +107,8 @@ final class ServerReport
         $cached = app()->configurationIsCached() && app()->routesAreCached();
         $writable = is_writable(storage_path()) && is_writable(app()->bootstrapPath('cache'));
         $disk = self::disk();
+        // Ссылка public/storage нужна только диску public: файлы на s3/r2 или своём диске по ней не отдаются (как в `fastleo:doctor`).
+        $linked = ! Doctor::storageLinkMissing();
 
         return [
             self::row('debug', self::flag($debug), $debug && $production ? 'danger' : 'ok', $debug && $production ? self::text('debug_hint') : null),
@@ -115,12 +117,33 @@ final class ServerReport
             self::queue(),
             self::scheduler(),
             self::row('mail', $mailer, $production && in_array($mailer, ['log', 'array'], true) ? 'warning' : 'ok', $production && in_array($mailer, ['log', 'array'], true) ? self::text('mail_hint') : null),
-            self::row('storage_link', self::flag(file_exists(public_path('storage'))), file_exists(public_path('storage')) ? 'ok' : 'warning', file_exists(public_path('storage')) ? null : self::text('storage_link_hint')),
+            self::row('storage_link', self::flag($linked), $linked ? 'ok' : 'warning', $linked ? null : self::text('storage_link_hint')),
             self::row('writable', self::flag($writable), $writable ? 'ok' : 'danger', $writable ? null : self::text('writable_hint')),
             self::row('disk', $disk['value'], $disk['status'], $disk['hint']),
+            ...self::proxy(),
             self::databasePing(),
             ...self::failedJobs(),
         ];
+    }
+
+    /**
+     * Запрос пришёл через прокси или CDN (Cloudflare, nginx), которому Laravel не доверяет: адрес посетителя — адрес прокси.
+     * Тогда лимит попыток входа общий для всех посетителей сразу, а в истории входов неверные адреса. Видно только на запросе
+     * из браузера (в консоли заголовков нет), поэтому строка появляется лишь при расхождении.
+     *
+     * @return list<Row>
+     */
+    private static function proxy(): array
+    {
+        $request = request();
+        $forwarded = $request->header('CF-Connecting-IP') ?? $request->header('X-Forwarded-For');
+        $forwarded = is_string($forwarded) ? trim(explode(',', $forwarded)[0]) : '';
+
+        if ($forwarded === '' || $forwarded === $request->ip()) {
+            return [];
+        }
+
+        return [self::row('proxy', (string) $request->ip(), 'warning', str_replace(':ip', (string) $request->ip(), self::text('proxy_hint')))];
     }
 
     /**
@@ -130,10 +153,16 @@ final class ServerReport
      */
     private static function queue(): array
     {
-        $driver = config()->string('queue.default', 'sync');
+        // `QUEUE_CONNECTION=null` — поддерживаемое значение: в конфиге оно становится null, а не строкой.
+        $driver = config('queue.default');
+        $driver = is_string($driver) ? $driver : 'null';
 
         if ($driver === 'sync') {
             return self::row('queue', $driver, 'warning', self::text('queue_hint'));
+        }
+
+        if ($driver === 'null') {
+            return self::row('queue', $driver, 'warning', self::text('queue_null_hint'));
         }
 
         try {

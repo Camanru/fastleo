@@ -70,7 +70,7 @@ final class Fastleo
      * Реестр ресурсов сайта.
      *
      * ```php
-     * Fastleo::resources()->find('doctors'); // DoctorResource или null
+     * Fastleo::resources()->find('products'); // ProductResource или null
      * ```
      */
     public static function resources(): ResourceRegistry
@@ -247,7 +247,8 @@ final class Fastleo
         // Очередь sync на веб-запросе: страницы сайта (форма заявки) не ждут ответа мессенджера — отправка идёт после ответа.
         $afterResponse = ! app()->runningInConsole() && config('queue.default') === 'sync';
 
-        foreach (NotificationBot::query()->where('enabled', true)->get() as $bot) {
+        // Боты включены, а миграции для них ещё нет (или база недоступна): форма заявки на сайте не должна отвечать 500.
+        foreach (rescue(fn (): array => NotificationBot::query()->where('enabled', true)->get()->all(), []) as $bot) {
             foreach ($bot->recipients as $chatId) {
                 $pending = dispatch(new SendAdminMessage($bot, $chatId, $text))->afterCommit();
 

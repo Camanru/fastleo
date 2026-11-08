@@ -23,6 +23,9 @@ final class SeoTags
     /** Длина описания, полученного из текста, в символах. */
     public const int DESCRIPTION_LENGTH = 160;
 
+    /** Сколько знаков HTML читается для описания: хватает на первые абзацы, а разбор всей страницы дорог. */
+    public const int EXCERPT_SOURCE = 20_000;
+
     /**
      * Итоговые значения тегов.
      *
@@ -50,7 +53,10 @@ final class SeoTags
      */
     public static function excerpt(?string $html): ?string
     {
-        $withoutHeadings = (string) preg_replace('#<(h[1-6]|script|style|noscript|template)\b[^>]*>.*?</\1\s*>#isu', ' ', (string) $html);
+        // Описанию нужны первые 160 знаков текста; разбор всей страницы дорог: каждый незакрытый тег просматривал бы остаток до конца.
+        $withoutHeadings = (string) preg_replace('#<(h[1-6]|script|style|noscript|template)\b[^>]*>.*?</\1\s*>#isu', ' ', mb_substr((string) $html, 0, self::EXCERPT_SOURCE));
+        // Код, который не закрыт (обрезан по длине или оставлен открытым в тексте), — не текст: браузер тоже читает его до конца.
+        $withoutHeadings = (string) preg_replace('#<(script|style|noscript|template)\b.*$#isu', ' ', $withoutHeadings);
         $text = Str::squish(html_entity_decode(strip_tags(str_replace('<', ' <', $withoutHeadings)), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
         return $text === '' ? null : Str::limit($text, self::DESCRIPTION_LENGTH, '…', preserveWords: true);

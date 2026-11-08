@@ -4,23 +4,29 @@ declare(strict_types=1);
 
 namespace Workbench\Database\Seeders;
 
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Storage;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
+use Workbench\App\Models\ChoiceSample;
 use Workbench\App\Models\Feedback;
+use Workbench\App\Models\JsonSample;
+use Workbench\App\Models\MediaSample;
 use Workbench\App\Models\Page;
 use Workbench\App\Models\Product;
 use Workbench\App\Models\ProductReview;
 use Workbench\App\Models\Remark;
 use Workbench\App\Models\Supplier;
+use Workbench\App\Models\Task;
+use Workbench\App\Models\TextSample;
 use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
 
 /**
- * Данные демо-сайта: администратор admin@example.com / password и примеры записей.
+ * Данные демо-сайта: администратор admin@example.com / password, примеры записей и витрина возможностей.
  */
 final class DatabaseSeeder extends Seeder
 {
@@ -58,6 +64,48 @@ final class DatabaseSeeder extends Seeder
         Article::query()->each(fn (Article $article) => $article->topics()->attach($topics->random(2)->pluck('id')));
 
         $this->seedImages();
+        $this->seedShowcase($suppliers);
+
+        Artisan::call('fastleo:images');
+    }
+
+    /**
+     * Витрина возможностей: по две записи каждого раздела «Витрина: поля» (у файлов — картинки и документ)
+     * и задачи за последний месяц для списка и отчёта.
+     *
+     * @param  EloquentCollection<int, Supplier>  $suppliers
+     */
+    private function seedShowcase(EloquentCollection $suppliers): void
+    {
+        TextSample::factory()->count(2)->create();
+        TextSample::factory()->create(['title' => 'Пример с паролем и ключом', 'password' => 'password', 'api_key' => 'sk_demo_key']);
+        ChoiceSample::factory()->count(3)->create();
+        JsonSample::factory()->count(2)->create();
+
+        $disk = Storage::disk('public');
+        $disk->put('uploads/showcase-docs/price-list.pdf', "%PDF-1.4\n% Fastleo demo\n%%EOF\n");
+        $pictures = [];
+
+        foreach ([[79, 70, 229], [16, 185, 129], [245, 158, 11]] as $index => $color) {
+            $disk->put($pictures[] = 'uploads/showcase/sample-'.($index + 1).'.jpg', $this->picture(1600, 900, $color, 'Showcase '.($index + 1)));
+        }
+
+        MediaSample::factory()->create([
+            'title' => 'Все поля заполнены',
+            'cover' => $pictures[0],
+            'cover_alt' => 'Фиолетовая заглушка',
+            'photo' => $pictures[1],
+            'gallery' => $pictures,
+            'document' => 'uploads/showcase-docs/price-list.pdf',
+        ]);
+        MediaSample::factory()->create(['title' => 'Только видео']);
+
+        Task::factory()->count(20)->create([
+            'supplier_id' => fn () => $suppliers->random()->id,
+            'created_at' => fn () => now()->subDays(random_int(0, 28))->subMinutes(random_int(0, 600)),
+        ]);
+        Task::factory()->done()->count(8)->create(['supplier_id' => fn () => $suppliers->random()->id, 'created_at' => fn () => now()->subDays(random_int(0, 28))]);
+        Task::factory()->overdue()->count(3)->create(['supplier_id' => fn () => $suppliers->random()->id, 'is_urgent' => true]);
     }
 
     /**
@@ -89,8 +137,6 @@ final class DatabaseSeeder extends Seeder
         });
 
         Page::factory()->count(3)->create();
-
-        Artisan::call('fastleo:images');
     }
 
     /**

@@ -77,8 +77,9 @@ it('refuses executable and active files even when the config allows them', funct
     config(['fastleo.files.extensions' => ['jpg', 'php', 'html', 'svg', 'js', 'phtml', 'phar', 'htaccess', 'xht', 'rss', 'atom', 'kml']]);
 
     uploadTo('uploads', [UploadedFile::fake()->createWithContent($name, '<?php echo 1;')])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('files.0');
+        ->assertOk()
+        ->assertJsonPath('files', [])
+        ->assertJsonPath('errors.0', 'Файл «'.$name.'» должен иметь расширение: jpg.');
 
     expect($this->disk->allFiles())->toBe([]);
 })->with(['shell.php', 'page.html', 'icon.svg', 'app.js', 'shell.phtml', 'shell.phar', 'shell.PHP', '.htaccess', 'page.xht', 'feed.rss', 'feed.atom', 'track.kml']);

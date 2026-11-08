@@ -5,11 +5,13 @@ declare(strict_types=1);
 use Fastleo\Fields\BelongsToMany;
 use Fastleo\Fields\Block;
 use Fastleo\Fields\Blocks;
+use Fastleo\Fields\Code;
 use Fastleo\Fields\Date;
 use Fastleo\Fields\Field;
 use Fastleo\Fields\HasMany;
 use Fastleo\Fields\HasOne;
 use Fastleo\Fields\KeyValue;
+use Fastleo\Fields\Markdown;
 use Fastleo\Fields\Password;
 use Fastleo\Fields\Repeater;
 use Fastleo\Fields\RichText;
@@ -101,6 +103,15 @@ it('shows a rich text through formatUsing in the list', function (): void {
     $field = RichText::make('body')->formatUsing(fn (mixed $value): string => 'Свой вывод');
 
     expect($field->listDisplay(new Article(['title' => 'x'])))->toBe('Свой вывод');
+});
+
+it('shows code and markdown through formatUsing in the list, and their own beginning without it', function (): void {
+    $record = new Article(['title' => 'x', 'content' => str_repeat('я', 150)]);
+
+    foreach ([Code::make('content'), Markdown::make('content')] as $field) {
+        expect($field->listDisplay($record))->toBe(str_repeat('я', 100).'...')
+            ->and($field->formatUsing(fn (mixed $value): string => 'Свой вывод')->listDisplay($record))->toBe('Свой вывод');
+    }
 });
 
 it('formats a block with a custom closure instead of its own table', function (Field $field): void {

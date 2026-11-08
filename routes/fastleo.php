@@ -50,7 +50,7 @@ Route::group([
     Route::get('forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
     Route::post('forgot-password', [PasswordResetController::class, 'send'])->middleware('throttle:fastleo-password')->name('password.email');
     Route::get('reset-password/{token}', [PasswordResetController::class, 'form'])->name('password.reset');
-    Route::post('reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:fastleo-password')->name('password.update');
+    Route::post('reset-password', [PasswordResetController::class, 'reset'])->middleware('throttle:fastleo-password-reset')->name('password.update');
 
     Route::middleware(Fastleo::adminMiddleware())->group(function (): void {
         Route::post('logout', [AuthController::class, 'destroy'])->name('logout');
@@ -109,8 +109,8 @@ Route::group([
                 Route::post('/', 'store')->name('store');
                 Route::post('reorder', 'reorder')->name('reorder');
                 Route::get('options/{field}', [OptionsController::class, '__invoke'])->where('field', '[A-Za-z_]\w*(\.[A-Za-z_]\w*)?')->name('options');
-                Route::get('export', [ExportController::class, '__invoke'])->name('export');
-                Route::post('import', [ImportsController::class, 'store'])->name('import');
+                Route::get('export', [ExportController::class, '__invoke'])->middleware('throttle:fastleo-transfer')->name('export');
+                Route::post('import', [ImportsController::class, 'store'])->middleware('throttle:fastleo-transfer')->name('import');
                 Route::get('imports/{import}', [ImportsController::class, 'show'])->name('imports.show');
                 Route::get('imports/{import}/errors', [ImportsController::class, 'errors'])->name('imports.errors');
                 Route::post('actions/{action}', [ActionsController::class, '__invoke'])->where('action', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('action');

@@ -1,17 +1,17 @@
 # Image
 
-Одна картинка из [файлового менеджера](../files.md): фото врача, обложка статьи.
+Одна картинка из [файлового менеджера](../files.md): фото товара, обложка статьи.
 
 ```php
 use Fastleo\Fields\Image;
 
 Image::make('photo', 'Фото')
-    ->directory('doctors')
+    ->directory('products')
     ->crop('3:4')
     ->required();
 ```
 
-**Колонка:** `$table->string('photo')->nullable()`. Хранится путь относительно диска `fastleo.files.disk`: `uploads/doctors/ivanov.jpg`. Адрес на сайте — `Storage::disk('public')->url($doctor->photo)`; с вариантами — компонент `<x-fastleo::picture :src="$doctor->photo" preset="card" />`.
+**Колонка:** `$table->string('photo')->nullable()`. Хранится путь относительно диска `fastleo.files.disk`: `uploads/products/kettle.jpg`. Адрес на сайте — `Storage::disk('public')->url($product->photo)`; с вариантами — компонент `<x-fastleo::picture :src="$product->photo" preset="card" />`.
 
 **Проверка:** путь внутри корня загрузок (`fastleo.files.root`, по умолчанию `uploads`; [файлы](../files.md#настройка)) (`fastleo.files.root`), без `..` и скрытых файлов, с расширением картинки. Подставить в форму чужой путь (`../.env`, файл вне `uploads`) нельзя. Есть ли файл на диске, не проверяется: файл, удалённый в менеджере, не мешает сохранить запись.
 
@@ -28,11 +28,11 @@ Image::make('photo', 'Фото')
 **Описание для сайта.** Поле с `alt('photo_alt')` хранит текст рядом с путём; на сайте он идёт в `alt` картинки:
 
 ```php
-Image::make('photo', 'Фото')->directory('doctors')->alt('photo_alt');
+Image::make('photo', 'Фото')->directory('products')->alt('photo_alt');
 ```
 
 ```blade
-<x-fastleo::picture :src="$doctor->photo" preset="card" :alt="$doctor->photo_alt ?? $doctor->name" />
+<x-fastleo::picture :src="$product->photo" preset="card" :alt="$product->photo_alt ?? $product->name" />
 ```
 
 Галерея с подписями у каждой картинки — рецепт [«Галерея с подписями»](../recipes.md#галерея-с-подписями): [Gallery](gallery.md) хранит только пути.
@@ -41,7 +41,7 @@ Image::make('photo', 'Фото')->directory('doctors')->alt('photo_alt');
 
 | Метод | Что делает |
 |---|---|
-| `directory('doctors')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Выбрать можно файл из любой папки. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `doctors/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
+| `directory('products')` | Папка внутри корня загрузок для файлов, загруженных в этом поле. Выбрать можно файл из любой папки. Имя папки — строчная латиница, цифры и дефис (без `_` и заглавных букв), вложенность через `/`: `products/2026`. Другое имя сразу даёт `LogicException` при описании раздела |
 | `extensions(['jpg', 'png'])` | Только эти форматы (из разрешённых картинок) |
 | `crop('3:4')` | Кнопка «Обрезать» с рамкой в пропорции `ширина:высота` (`'1:1'`, `'16:9'`) |
 | `inTitle()` | В списке миниатюра 40×30 стоит перед заголовком в первой ячейке, а отдельного столбца нет (у записи без картинки — пустая рамка того же размера). Форма и страница просмотра не меняются. Действует для первой такой картинки раздела; сортировки по ней нет (столбца нет) |

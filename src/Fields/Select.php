@@ -373,7 +373,7 @@ class Select extends Field implements SearchesOptions
         $byLabel = [];
 
         foreach ($options as $option => $label) {
-            $byLabel[mb_strtolower($label)] = (string) $option;
+            $byLabel[mb_strtolower((string) $label)] = (string) $option;
             $byLabel[mb_strtolower((string) $option)] = (string) $option;
         }
 
@@ -410,7 +410,8 @@ class Select extends Field implements SearchesOptions
         $saved = $this->savedValues($record);
 
         return new OptionRule(
-            fn (mixed $value, array $data): bool => is_scalar($value) && (
+            // Строка или целое: `true` и `1.0` из JSON (MCP, импорт) приводились бы к «1» и ложились в колонку булевым или дробным.
+            fn (mixed $value, array $data): bool => (is_string($value) || is_int($value)) && (
                 (! $this->required && $this->isEmptyValue($value))
                 || array_key_exists((string) $value, $this->getOptions($this->dependencyFrom($data)))
                 || (in_array((string) $value, $saved, true) && $this->dependencyUnchanged($record, $data))

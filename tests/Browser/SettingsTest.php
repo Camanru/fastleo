@@ -17,7 +17,7 @@ it('saves the settings form, adds a repeater row and shows the values on the sit
         ->fill('lead_email', 'lead@example.com')
         ->click('[data-blocks=socials] [data-block-add]')
         ->fill('[data-blocks=socials] input[name$="[title]"]', 'Telegram')
-        ->fill('[data-blocks=socials] input[name$="[url]"]', 'https://t.me/clinic')
+        ->fill('[data-blocks=socials] input[name$="[url]"]', 'https://t.me/shop')
         ->press('Сохранить')
         ->assertSee('Настройки сохранены.')
         ->assertValue('phone', '+7 111 222-33-44')

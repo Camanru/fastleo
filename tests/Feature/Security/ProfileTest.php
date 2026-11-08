@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Fastleo\Fastleo;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Sleep;
 use Workbench\App\Models\User;
 
 it('limits guessing of the current password from a stolen session', function (): void {
@@ -56,6 +57,7 @@ it('does not change data with GET requests', function (): void {
 
 it('does not reveal an existing account through the reset form message or response code', function (): void {
     admin(['email' => 'anna@example.com']);
+    Sleep::fake();
 
     $known = $this->post(route('fastleo.password.email'), ['email' => 'anna@example.com']);
     $unknown = $this->post(route('fastleo.password.email'), ['email' => 'ghost@example.com']);

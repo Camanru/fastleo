@@ -54,10 +54,10 @@ it('shows the link of a value that is not a video as it is', function (): void {
 });
 
 it('renders the player on the site and skips what is not a video', function (): void {
-    $html = Blade::render('<x-fastleo::video :url="$url" title="Приём" class="my" />', ['url' => 'https://rutube.ru/video/0123456789abcdef0123456789abcdef/']);
+    $html = Blade::render('<x-fastleo::video :url="$url" title="Обзор" class="my" />', ['url' => 'https://rutube.ru/video/0123456789abcdef0123456789abcdef/']);
 
     expect($html)->toContain('src="https://rutube.ru/play/embed/0123456789abcdef0123456789abcdef"')
-        ->toContain('title="Приём"')
+        ->toContain('title="Обзор"')
         ->toContain('loading="lazy"')
         ->toContain('class="my"')
         ->and(trim(Blade::render('<x-fastleo::video :url="$url" />', ['url' => 'https://example.com/x'])))->toBe('')

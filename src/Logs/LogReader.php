@@ -32,8 +32,12 @@ final readonly class LogReader
     /** Самые длинные подробности записи (трассировка). */
     private const int DETAILS_LIMIT = 20480;
 
-    /** Начало записи: «[2026-10-09 15:13:02] production.ERROR: …». */
-    private const string HEADER = '/^\[(\d{4}-\d\d\-\d\d[ T]\d\d:\d\d:\d\d)[^\]\n]*\] ([\w-]+)\.([A-Z]+): /m';
+    /**
+     * Начало записи: «[2026-10-09 15:13:02] production.ERROR: …». Дата настоящая (месяц 01–12, день 01–31, время до 23:59:59):
+     * строку вида «[9999-99-99 99:99:99] x.ERROR:» в журнал может внести посетитель через перевод строки в залогированном
+     * значении, и разбор такой «даты» ронял бы всю страницу.
+     */
+    private const string HEADER = '/^\[(\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])[ T](?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d)[^\]\n]*\] ([\w-]+)\.([A-Z]+): /m';
 
     /**
      * Фильтры уровней: «Ошибки», «Предупреждения и ошибки», «Все» (null).
@@ -82,7 +86,13 @@ final readonly class LogReader
         $files = [];
 
         foreach (glob($this->directory.'/*.log') ?: [] as $path) {
-            $files[] = ['name' => basename($path), 'size' => (int) filesize($path), 'modified' => (int) filemtime($path)];
+            // Файл могли убрать между поиском и чтением (ротация журналов, битая ссылка): предупреждение PHP не должно ронять страницу.
+            $size = @filesize($path);
+            $modified = @filemtime($path);
+
+            if ($size !== false && $modified !== false) {
+                $files[] = ['name' => basename($path), 'size' => $size, 'modified' => $modified];
+            }
         }
 
         usort($files, fn (array $a, array $b): int => $b['modified'] <=> $a['modified']);

@@ -14,6 +14,9 @@ use Fastleo\Fastleo;
  */
 final class UploadLimits
 {
+    /** Сколько файлов принимает один запрос загрузки (проверка `max` в `FilesController`), что бы ни разрешал PHP. */
+    public const int MAX_FILES_PER_REQUEST = 50;
+
     /**
      * Наибольший размер одного файла в байтах (0 — без ограничения).
      */
@@ -26,6 +29,25 @@ final class UploadLimits
         ]);
 
         return $limits === [] ? 0 : min($limits);
+    }
+
+    /**
+     * Сколько файлов принимает один запрос: не больше, чем разрешает PHP (`max_file_uploads`, по умолчанию 20: лишние
+     * он отбрасывает молча), и не больше `MAX_FILES_PER_REQUEST` (больше сервер отклоняет с ошибкой). Менеджер файлов
+     * отправляет большой выбор пачками не больше этого числа.
+     *
+     * ```php
+     * UploadLimits::files(); // 20
+     * UploadLimits::files(100); // 50: значение php.ini 100 не меняет предел сервера
+     * ```
+     *
+     * @param  int|null  $setting  значение `max_file_uploads` (по умолчанию — из php.ini); 0 и меньше не учитываются, остаётся предел сервера
+     */
+    public static function files(?int $setting = null): int
+    {
+        $setting ??= (int) ini_get('max_file_uploads');
+
+        return $setting > 0 ? min($setting, self::MAX_FILES_PER_REQUEST) : self::MAX_FILES_PER_REQUEST;
     }
 
     /**

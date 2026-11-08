@@ -47,10 +47,10 @@ describe('saving', function (): void {
         $article = Article::factory()->create();
 
         $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData([
-            'seo' => ['title' => '  Лечение  ', 'description' => '', 'noindex' => '1', 'evil' => 'x'],
+            'seo' => ['title' => '  Скидки  ', 'description' => '', 'noindex' => '1', 'evil' => 'x'],
         ]))->assertRedirect();
 
-        expect($article->refresh()->seo)->toBe(['title' => 'Лечение', 'noindex' => true]);
+        expect($article->refresh()->seo)->toBe(['title' => 'Скидки', 'noindex' => true]);
     });
 
     it('clears the object when everything was emptied', function (): void {

@@ -7,6 +7,7 @@ use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Password;
 use Fastleo\Fields\Slug;
 use Fastleo\Fields\Text;
+use Fastleo\Files\GenerateImageVariants;
 use Fastleo\Settings;
 use Fastleo\Support\FormSchema;
 use Fastleo\Support\SettingsStore;
@@ -15,6 +16,8 @@ use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
     useFixtureResources('Settings');
@@ -29,7 +32,7 @@ beforeEach(function (): void {
  */
 function siteForm(array $overrides = []): array
 {
-    return ['title' => 'Стоматология', 'email' => 'info@example.com', 'per_page' => '12', 'maintenance' => '0', ...$overrides];
+    return ['title' => 'Мой сайт', 'email' => 'info@example.com', 'per_page' => '12', 'maintenance' => '0', ...$overrides];
 }
 
 describe('page', function (): void {
@@ -51,23 +54,23 @@ describe('page', function (): void {
         $stored = json_decode((string) DB::table('fastleo_settings')->where('slug', 'site')->value('value'), true);
         expect($stored)->toHaveKeys(['title', 'email', 'per_page', 'maintenance', 'keywords'])
             ->not->toHaveKeys(['hacker', 'fastleo_admin'])
-            ->and($stored['title'])->toBe('Стоматология')
+            ->and($stored['title'])->toBe('Мой сайт')
             ->and($stored['per_page'])->toBe(12)
             ->and($stored['maintenance'])->toBeFalse();
 
-        $this->get(route('fastleo.settings.edit', 'site'))->assertSee('value="Стоматология"', false)->assertSee('value="12"', false);
+        $this->get(route('fastleo.settings.edit', 'site'))->assertSee('value="Мой сайт"', false)->assertSee('value="12"', false);
     });
 
     it('forgets the cached settings only after the transaction commits', function (): void {
         $this->put(route('fastleo.settings.update', 'site'), siteForm());
-        expect(fastleo_setting('site.title'))->toBe('Стоматология');
+        expect(fastleo_setting('site.title'))->toBe('Мой сайт');
 
         DB::beginTransaction();
         resolve(SettingsStore::class)->save(new SiteSettings(), ['title' => 'Новое']);
 
         // Читатель сайта до коммита перестроил бы кеш из старых строк и закрепил их.
         expect(Cache::has('fastleo.settings'))->toBeTrue()
-            ->and(fastleo_setting('site.title'))->toBe('Стоматология');
+            ->and(fastleo_setting('site.title'))->toBe('Мой сайт');
 
         DB::commit();
 
@@ -76,7 +79,7 @@ describe('page', function (): void {
     });
 
     it('saves a value with a broken byte sequence instead of failing with a server error', function (): void {
-        $this->put(route('fastleo.settings.update', 'site'), siteForm(['title' => "Клиника \xB1"]))
+        $this->put(route('fastleo.settings.update', 'site'), siteForm(['title' => "Магазин \xB1"]))
             ->assertRedirect(route('fastleo.settings.edit', 'site'))
             ->assertSessionHas('fastleo.success');
 
@@ -89,17 +92,17 @@ describe('page', function (): void {
         $this->put(route('fastleo.settings.update', 'site'), siteForm(['title' => '', 'email' => 'не почта']))
             ->assertSessionHasErrors(['title', 'email']);
 
-        expect(fastleo_setting('site.title'))->toBe('Стоматология');
+        expect(fastleo_setting('site.title'))->toBe('Мой сайт');
     });
 
     it('round-trips list fields: tags, repeater and key-value pairs', function (): void {
         $this->put(route('fastleo.settings.update', 'site'), siteForm([
-            'keywords' => ['врач', 'клиника'],
+            'keywords' => ['чайник', 'магазин'],
             'phones' => [['number' => '111'], ['number' => '222']],
             'meta' => [['key' => 'a', 'value' => '1'], ['key' => 'b', 'value' => '2']],
         ]))->assertSessionHasNoErrors();
 
-        expect(fastleo_setting('site.keywords'))->toBe(['врач', 'клиника'])
+        expect(fastleo_setting('site.keywords'))->toBe(['чайник', 'магазин'])
             ->and(fastleo_setting('site.phones'))->toBe([['number' => '111'], ['number' => '222']])
             ->and(fastleo_setting('site.meta'))->toBe(['a' => '1', 'b' => '2']);
 
@@ -154,6 +157,13 @@ describe('secrets', function (): void {
             ->and(fastleo_setting('site.secret'))->toBe('токен-12345');
 
         $this->get(route('fastleo.settings.edit', 'site'))->assertOk()->assertDontSee('токен-12345');
+    });
+
+    it('does not send a secret back into the form through the session after a validation error', function (): void {
+        $this->put(route('fastleo.settings.update', 'site'), siteForm(['secret' => 'токен-12345', 'title' => '']))
+            ->assertSessionHasErrors('title');
+
+        expect(session()->getOldInput())->toHaveKey('email')->not->toHaveKey('secret');
     });
 
     it('keeps a saved secret when the form comes with an empty field and replaces it with a new one', function (): void {
@@ -284,4 +294,44 @@ it('does not fail when the cache store is unavailable while forgetting the cache
 
     expect(fn () => SettingsStore::forgetCached())->not->toThrow(Throwable::class)
         ->and(fn () => Cache::forget('anything'))->toThrow(QueryException::class);
+});
+
+describe('image variants', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('SettingsVariants');
+        Storage::fake('public');
+        foreach (['a', 'b', 'c', 'd'] as $name) {
+            Storage::disk('public')->put("uploads/site/{$name}.jpg", 'x');
+        }
+        config(['fastleo.images.presets' => ['card' => ['widths' => [400], 'ratio' => null]]]);
+        Queue::fake();
+    });
+
+    it('queues the variants of the pictures saved on a settings page', function (): void {
+        $this->put(route('fastleo.settings.update', 'banner'), [
+            'hero' => 'uploads/site/a.jpg',
+            'photos' => ['uploads/site/b.jpg', 'uploads/site/c.jpg'],
+            'slides' => [['src' => 'uploads/site/d.jpg']],
+        ])->assertSessionHasNoErrors();
+
+        Queue::assertPushed(GenerateImageVariants::class, 4);
+    });
+
+    it('queues nothing again when the same pictures are saved once more', function (): void {
+        $form = ['hero' => 'uploads/site/a.jpg', 'photos' => ['uploads/site/b.jpg'], 'slides' => [['src' => 'uploads/site/d.jpg']]];
+
+        $this->put(route('fastleo.settings.update', 'banner'), $form)->assertSessionHasNoErrors();
+        Queue::assertPushed(GenerateImageVariants::class, 3);
+
+        $this->put(route('fastleo.settings.update', 'banner'), $form)->assertSessionHasNoErrors();
+        Queue::assertPushed(GenerateImageVariants::class, 3);
+    });
+
+    it('queues only the picture that has changed', function (): void {
+        $this->put(route('fastleo.settings.update', 'banner'), ['hero' => 'uploads/site/a.jpg'])->assertSessionHasNoErrors();
+        Queue::assertPushed(GenerateImageVariants::class, 1);
+
+        $this->put(route('fastleo.settings.update', 'banner'), ['hero' => 'uploads/site/b.jpg'])->assertSessionHasNoErrors();
+        Queue::assertPushed(GenerateImageVariants::class, 2);
+    });
 });

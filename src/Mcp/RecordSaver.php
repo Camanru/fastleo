@@ -109,13 +109,7 @@ final class RecordSaver
             }
 
             if ($field instanceof Nested && ! config()->boolean('fastleo.mcp.allow_delete')) {
-                $kept = [];
-
-                foreach ($field->dehydrate($data[$field->name]) as $block) {
-                    if ($block['id'] !== null) {
-                        $kept[] = (string) $block['id'];
-                    }
-                }
+                $kept = $field->sentKeys($data[$field->name]);
 
                 $missing = $field->children($existing)->map(fn (Model $child): string => is_scalar($child->getKey()) ? (string) $child->getKey() : '')->reject(fn (string $key): bool => in_array($key, $kept, true));
 

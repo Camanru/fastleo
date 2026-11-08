@@ -20,7 +20,7 @@ use OpenSpout\Writer\XLSX\Writer as XlsxWriter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Выгрузка записей раздела в xlsx или csv: первая строка — подписи столбцов (ключ записи и поля ресурса),
+ * Выгрузка записей раздела в xlsx или csv (в админке доступен только csv, см. `SpreadsheetFormats`): первая строка — подписи столбцов (ключ записи и поля ресурса),
  * дальше записи по 500 за запрос. Сначала читаются ключи записей в порядке списка, затем записи порциями
  * `whereKey()` — без смещения (`OFFSET`), поэтому порция из конца большой таблицы читается так же быстро, как первая.
  * Время выполнения PHP на выгрузку не ограничивается.
@@ -29,8 +29,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * для очень больших таблиц csv надёжнее: ответ не ждёт таймаута веб-сервера.
  *
  * Защита от формул: в xlsx текст всегда пишется текстовой ячейкой (`=СУММ(...)` не вычисляется),
- * в csv перед `= + - @`, табуляцией и переводом строки в начале значения ставится `'` (OWASP).
- * Строки-числа («007») остаются текстом.
+ * в csv перед `= + - @`, табуляцией и возвратом каретки в начале значения ставится `'` (OWASP).
+ * В xlsx строки-числа («007») остаются текстом; в csv типов ячеек нет, и Excel при открытии файла читает их числами.
  *
  * ```php
  * new Exporter($resource)->download($resource->newQuery(), 'xlsx');
@@ -38,9 +38,6 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 final readonly class Exporter
 {
-    /** Форматы выгрузки. */
-    public const array FORMATS = ['xlsx', 'csv'];
-
     public function __construct(private Resource $resource) {}
 
     /**

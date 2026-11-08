@@ -21,12 +21,12 @@ use function Laravel\Prompts\text;
  * Создать Policy модели со всеми способностями, которые спрашивает админка
  *
  * ```bash
- * php artisan fastleo:make-policy Doctor
+ * php artisan fastleo:make-policy Product
  * ```
  */
 #[AsCommand(name: 'fastleo:make-policy')]
 #[Description('Создать Policy модели (app/Policies) со всеми способностями, которые спрашивает админка')]
-#[Signature('fastleo:make-policy {name? : имя модели, например Doctor} {--model= : класс модели (по умолчанию App\\Models\\{name})} {--force : перезаписать существующий файл}')]
+#[Signature('fastleo:make-policy {name? : имя модели, например Product} {--model= : класс модели (по умолчанию App\\Models\\{name})} {--force : перезаписать существующий файл}')]
 final class MakePolicyCommand extends Command
 {
     /**
@@ -40,7 +40,7 @@ final class MakePolicyCommand extends Command
         $input = is_string($argument) && trim($argument) !== '' ? trim($argument) : ($this->input->isInteractive() ? text(label: __('fastleo::console.make_model_name'), required: true) : null);
 
         if ($input === null) {
-            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-policy Doctor']));
+            $this->components->error(__('fastleo::console.make_name_required', ['example' => 'fastleo:make-policy Product']));
 
             return self::FAILURE;
         }
@@ -74,6 +74,10 @@ final class MakePolicyCommand extends Command
         $user = UserModel::fastleoClassName() ?? Authenticatable::class;
         $sameName = class_basename($user) === class_basename($model) && $user !== $model;
 
+        // Подключения по алфавиту, как их упорядочивает Pint сайта (`ordered_imports`): модель может идти после пользователя.
+        $imports = $sameName || $user === $model ? [$model] : [$model, $user];
+        sort($imports, SORT_NATURAL | SORT_FLAG_CASE);
+
         File::ensureDirectoryExists(dirname($path));
         File::put($path, strtr(File::get(dirname(__DIR__, 2).'/stubs/policy.stub'), [
             '{{ namespace }}' => app()->getNamespace().'Policies',
@@ -82,7 +86,7 @@ final class MakePolicyCommand extends Command
             '{{ modelType }}' => class_basename($model),
             '{{ label }}' => Str::headline(class_basename($model)),
             '{{ userType }}' => $sameName ? '\\'.$user : class_basename($user),
-            '{{ userImport }}' => $sameName || $user === $model ? '' : 'use '.$user.";\n",
+            '{{ imports }}' => implode('', array_map(fn (string $import): string => 'use '.$import.";\n", $imports)),
         ]));
 
         $this->components->info(__('fastleo::console.make_class_created', ['path' => $path]));

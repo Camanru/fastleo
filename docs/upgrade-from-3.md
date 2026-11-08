@@ -21,7 +21,7 @@
 | модели в `app/` (2.x) или в `config('fastleo.models')` (3.0) | ресурсы в `app/Fastleo` (`fastleo.resources.path`); модель указывается в `$model` и может лежать где угодно |
 | `$fastleo_group` | `protected static ?string $group` |
 | `$fastleo_description` (карточка на главной) | `protected static ?string $description` — пояснение под заголовком списка |
-| `$fastleo_icon` (3.0, Font Awesome: `'fa-user-md'`) | `protected static string $icon` — имя иконки [Lucide](https://lucide.dev/icons): `'stethoscope'` |
+| `$fastleo_icon` (3.0, Font Awesome: `'fa-shopping-bag'`) | `protected static string $icon` — имя иконки [Lucide](https://lucide.dev/icons): `'shopping-bag'` |
 | `$fastleo_order` (3.0): `['id', 'desc']` | `protected static ?array $defaultOrder = ['id', 'desc']` (по умолчанию — новые сверху) |
 | `$fastleo_position` (если было в 3.0) | `protected static int $position` |
 | `$fastleo_per_page` (если было в 3.0) | `protected static ?int $perPage` |
@@ -102,7 +102,7 @@
 | Было | Стало в 4.0 |
 |---|---|
 | файловый менеджер `/fastleo/filemanager`, файлы в `storage/app/public/uploads` | менеджер `/fastleo/files` ([файлы](files.md)), та же папка — файлы переносить не нужно |
-| в колонке хранится адрес `/storage/uploads/doctors/ivanov.jpg` | хранится путь относительно диска `uploads/doctors/ivanov.jpg`; старые значения нужно перевести ([шаг 6](#6-файлы)) |
+| в колонке хранится адрес `/storage/uploads/products/kettle.jpg` | хранится путь относительно диска `uploads/products/kettle.jpg`; старые значения нужно перевести ([шаг 6](#6-файлы)) |
 | миниатюры в папках `thumbs` внутри каждой папки загрузок | миниатюры вне корня загрузок, в `storage/app/public/fastleo/thumbs`; старые папки `thumbs` можно удалить |
 | галочка «Уменьшить до 1024 px» при загрузке | картинка шире `images.max_width` (2560) уменьшается сама |
 | водяной знак из «Настроек» (картинка или текст), ставится на оригинал при загрузке | `images.watermark` в конфиге: только картинка и только на WebP-варианты для сайта, оригинал остаётся чистым ([водяной знак](files.md#водяной-знак)) |
@@ -307,7 +307,7 @@ return new class extends Migration
      */
     private array $columns = [
         'articles' => ['image'],
-        'doctors' => ['photo', 'price_file'],
+        'products' => ['photo', 'price_file'],
     ];
 
     /**
@@ -404,14 +404,14 @@ HasMany::make('rows', 'Блоки')->fields([
 
 #### Несколько значений через запятую
 
-`select` с `'multiple' => true` хранил ключи строкой `3,7,12`. В 4.0 связь с записями другой таблицы — промежуточная таблица и поле [BelongsToMany](fields/belongs-to-many.md). Пример переноса для врачей и услуг (колонка `doctors.services`):
+`select` с `'multiple' => true` хранил ключи строкой `3,7,12`. В 4.0 связь с записями другой таблицы — промежуточная таблица и поле [BelongsToMany](fields/belongs-to-many.md). Пример переноса для товаров и меток (колонка `products.tags`):
 
 ```bash
-php artisan make:migration move_doctor_services
+php artisan make:migration move_product_tags
 ```
 
 ```php
-// database/migrations/2026_10_31_000200_move_doctor_services.php
+// database/migrations/2026_10_31_000200_move_product_tags.php
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -420,34 +420,34 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Строку «3,7,12» в doctors.services переносит в таблицу doctor_service.
+     * Строку «3,7,12» в products.tags переносит в таблицу product_tag.
      */
     public function up(): void
     {
-        Schema::create('doctor_service', function (Blueprint $table): void {
-            $table->foreignId('doctor_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('service_id')->constrained()->cascadeOnDelete();
-            $table->primary(['doctor_id', 'service_id']);
+        Schema::create('product_tag', function (Blueprint $table): void {
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('tag_id')->constrained()->cascadeOnDelete();
+            $table->primary(['product_id', 'tag_id']);
         });
 
-        DB::table('doctors')->whereNotNull('services')->orderBy('id')->each(function (object $doctor): void {
-            $ids = array_filter(array_map('intval', explode(',', (string) $doctor->services)));
+        DB::table('products')->whereNotNull('tags')->orderBy('id')->each(function (object $product): void {
+            $ids = array_filter(array_map('intval', explode(',', (string) $product->tags)));
 
-            DB::table('doctor_service')->insert(
-                DB::table('services')->whereIn('id', $ids)->pluck('id')
-                    ->map(fn ($serviceId): array => ['doctor_id' => $doctor->id, 'service_id' => $serviceId])
+            DB::table('product_tag')->insert(
+                DB::table('tags')->whereIn('id', $ids)->pluck('id')
+                    ->map(fn ($tagId): array => ['product_id' => $product->id, 'tag_id' => $tagId])
                     ->all(),
             );
         });
 
-        Schema::table('doctors', function (Blueprint $table): void {
-            $table->dropColumn('services');
+        Schema::table('products', function (Blueprint $table): void {
+            $table->dropColumn('tags');
         });
     }
 };
 ```
 
-В модели `Doctor` — связь `services(): BelongsToMany`, в ресурсе — `BelongsToMany::make('services', 'Услуги')`. Если варианты — фиксированный список, а не записи таблицы, используйте `Select::make(...)->multiple()`: колонка `json` с кастом `'array'`, значение — JSON-массив вместо строки через запятую.
+В модели `Product` — связь `tags(): BelongsToMany`, в ресурсе — `BelongsToMany::make('tags', 'Метки')`. Если варианты — фиксированный список, а не записи таблицы, используйте `Select::make(...)->multiple()`: колонка `json` с кастом `'array'`, значение — JSON-массив вместо строки через запятую.
 
 ### 8. Настройки, главная и свои страницы
 

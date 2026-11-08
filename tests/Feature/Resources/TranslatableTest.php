@@ -20,10 +20,10 @@ beforeEach(function (): void {
 });
 
 it('saves the text of every language and drops empty and unknown ones', function (): void {
-    $this->post(route('fastleo.resources.store', 'site-pages'), ['title' => ['ru' => ' О клинике ', 'en' => '', 'de' => 'Über uns'], 'slug' => ''])
+    $this->post(route('fastleo.resources.store', 'site-pages'), ['title' => ['ru' => ' О магазине ', 'en' => '', 'de' => 'Über uns'], 'slug' => ''])
         ->assertSessionHasNoErrors();
 
-    expect(Page::query()->firstOrFail()->only('title', 'slug'))->toBe(['title' => ['ru' => 'О клинике'], 'slug' => 'o-klinike']);
+    expect(Page::query()->firstOrFail()->only('title', 'slug'))->toBe(['title' => ['ru' => 'О магазине'], 'slug' => 'o-magazine']);
 });
 
 it('requires only the main language and names the language in the errors', function (): void {
@@ -61,7 +61,7 @@ it('shows the main language in the list and on the record page', function (): vo
 });
 
 it('finds records by any language and sorts by the main one', function (): void {
-    Page::factory()->create(['title' => ['ru' => 'Бета', 'en' => 'Clinic']]);
+    Page::factory()->create(['title' => ['ru' => 'Бета', 'en' => 'Shop']]);
     Page::factory()->create(['title' => ['ru' => 'Альфа', 'en' => 'Hospital']]);
 
     $titles = fn (array $query): array => array_map(
@@ -69,7 +69,7 @@ it('finds records by any language and sorts by the main one', function (): void 
         $this->get(route('fastleo.resources.index', ['resource' => 'site-pages', ...$query]))->viewData('records')->all(),
     );
 
-    expect($titles(['q' => 'clinic']))->toBe(['Бета'])
+    expect($titles(['q' => 'shop']))->toBe(['Бета'])
         ->and($titles(['sort' => 'title']))->toBe(['Альфа', 'Бета']);
 });
 
