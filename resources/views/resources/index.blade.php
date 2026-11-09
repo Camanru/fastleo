@@ -126,7 +126,8 @@
                     </x-fastleo::button>
                 @endif
                 @if ($list->isChanged())
-                    <x-fastleo::button variant="ghost" :href="route('fastleo.resources.index', array_filter(['resource' => $slug, 'trashed' => $trashed ? 1 : null]))">
+                    {{-- В режиме «по кнопке» у открытой панели своя «Сбросить» рядом с «Фильтровать»: вторая здесь не нужна. --}}
+                    <x-fastleo::button variant="ghost" :href="route('fastleo.resources.index', array_filter(['resource' => $slug, 'trashed' => $trashed ? 1 : null]))" :x-show="$list->hasFilters() && ! $filtersAuto ? '! filtersOpen' : null" data-search-reset>
                         {{ __('fastleo::resources.search_reset') }}
                     </x-fastleo::button>
                 @endif

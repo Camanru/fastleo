@@ -59,3 +59,21 @@ it('opens a row inside an opened row without touching the outer table', function
         ->assertScript("document.querySelector('{$first}').getAttribute('aria-expanded')", 'true')
         ->assertNoJavaScriptErrors();
 });
+
+it('opens the same rows again after the page is reloaded and forgets a row that was closed', function (): void {
+    $page = signInAndVisit(route('fastleo.resources.show', ['categories', $this->category->id]));
+    $outer = '[data-related="articles"]';
+    $arrow = $outer.' tbody tr:first-child button[data-expand]';
+
+    $page->click($arrow)->waitForText('Паспорт изделия');
+
+    $page->navigate(route('fastleo.resources.show', ['categories', $this->category->id]))
+        ->waitForText('Паспорт изделия')
+        ->assertScript("document.querySelector('{$outer} [data-expansion]').hidden", false)
+        ->click($arrow);
+
+    $page->navigate(route('fastleo.resources.show', ['categories', $this->category->id]))
+        ->waitForText('Решётка')
+        ->assertScript("document.querySelector('{$outer} [data-expansion]').hidden", true)
+        ->assertNoJavaScriptErrors();
+});

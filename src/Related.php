@@ -62,6 +62,9 @@ final class Related
     /** Кнопка «Добавить» над таблицей. */
     private bool $addButton = true;
 
+    /** Строка «Записи 1–3 из 3» под таблицей, когда все записи на одной странице. */
+    private bool $singlePageFooter = true;
+
     /** Ключ вкладки, в которую таблица положена в `fields()` (null — таблица из `relations()`, под формой). */
     private ?string $tabKey = null;
 
@@ -255,6 +258,30 @@ final class Related
     public function hasAddButton(): bool
     {
         return $this->addButton;
+    }
+
+    /**
+     * Убрать строку «Записи 1–3 из 3» под таблицей, когда все записи помещаются на одну страницу: в небольших вложенных
+     * таблицах (позиции заказа, варианты позиции) она только занимает место, а число записей и так стоит рядом с заголовком.
+     * Если страниц больше одной или выбран режим «Все», строка со страницами остаётся.
+     *
+     * ```php
+     * Related::make('variants', VariantResource::class)->withoutSinglePageFooter();
+     * ```
+     */
+    public function withoutSinglePageFooter(bool $without = true): self
+    {
+        $this->singlePageFooter = ! $without;
+
+        return $this;
+    }
+
+    /**
+     * Строка «Записи 1–3 из 3» показывается и тогда, когда все записи помещаются на одну страницу.
+     */
+    public function hasSinglePageFooter(): bool
+    {
+        return $this->singlePageFooter;
     }
 
     /**

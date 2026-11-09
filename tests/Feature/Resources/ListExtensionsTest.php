@@ -39,7 +39,9 @@ describe('filters applied by a button', function (): void {
         $filtered = (string) $this->get(route('fastleo.resources.index', ['articles', 'filter' => ['status' => 'draft']]))->getContent();
 
         expect(preg_match('/data-filters-actions.*?Сбросить/s', $plain))->toBe(0)
-            ->and(preg_match('/data-filters-actions.*?Сбросить/s', $filtered))->toBe(1);
+            ->and(preg_match('/data-filters-actions.*?Сбросить/s', $filtered))->toBe(1)
+            // Вторая «Сбросить» у кнопки «Фильтры» прячется, пока открыта панель со своей.
+            ->and(preg_match('/x-show="! filtersOpen"[^>]*data-search-reset/', $filtered))->toBe(1);
     });
 
     it('keeps the immediate filters and has no button in a section that did not ask for it', function (): void {
@@ -140,6 +142,28 @@ describe('record page hooks', function (): void {
         $url = route('fastleo.resources.related', ['categories', $this->open->id, 'articles']);
 
         $this->get($url)->assertOk()->assertDontSee(route('fastleo.resources.create', 'articles'), false);
+    });
+});
+
+describe('related table without the footer on a single page', function (): void {
+    it('can be switched on and off', function (): void {
+        $related = Related::make('articles', ArticleResource::class);
+
+        expect($related->hasSinglePageFooter())->toBeTrue()
+            ->and($related->withoutSinglePageFooter()->hasSinglePageFooter())->toBeFalse()
+            ->and($related->withoutSinglePageFooter(false)->hasSinglePageFooter())->toBeTrue();
+    });
+
+    it('hides the line of records while they fit on one page and keeps it for pages and the full list', function (): void {
+        $url = route('fastleo.resources.related', ['categories', $this->open->id, 'articles']);
+        Article::factory()->count(2)->create(['category_id' => $this->open->id]);
+
+        $this->get($url)->assertOk()->assertDontSee('Записи 1–2 из 2');
+
+        Article::factory()->create(['category_id' => $this->open->id]);
+
+        $this->get($url)->assertOk()->assertSee('Записи 1–2 из 3');
+        $this->get($url.'?per_page=all')->assertOk()->assertSee('Записи 1–3 из 3');
     });
 });
 

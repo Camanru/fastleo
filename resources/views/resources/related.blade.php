@@ -141,9 +141,12 @@
                     </tbody>
                 </table>
             </div>
-            <div data-related-nav>
-                @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions(), 'inline' => true])
-            </div>
+            {{-- withoutSinglePageFooter(): строки «Записи 1–3 из 3» нет, пока все записи на одной странице и не выбран режим «Все». --}}
+            @if ($related->hasSinglePageFooter() || $records->hasPages() || $list->all)
+                <div data-related-nav>
+                    @include('fastleo::partials.pagination', ['paginator' => $records, 'all' => $list->all, 'sizes' => $resource::perPageOptions(), 'inline' => true])
+                </div>
+            @endif
         </div>
     @endif
     @if ($canAdd && $related->hasQuickAdd() && $related->quickAddFields() !== [])

@@ -11,7 +11,8 @@
     ];
     $tones = array_map(fn (string $tone): string => $toneClasses[$tone] ?? $toneClasses['neutral'], $inline['tones']);
     $width = match ($inline['kind']) {
-        'number' => 'w-32 min-w-32',
+        // Число — у правого края ячейки, под заголовком столбца (столбцы чисел выровнены вправо).
+        'number' => 'ml-auto w-32 min-w-32',
         'select' => 'min-w-32',
         default => 'min-w-40',
     };

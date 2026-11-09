@@ -18,6 +18,13 @@
         foreach ($children->values() as $index => $child) {
             $blocks[] = ['key' => (string) $index, 'child' => $child, 'blockId' => (string) $child->getKey()];
         }
+
+        // Пустой список с min(): сразу столько пустых блоков, сколько нужно, — не надо сначала нажимать «Добавить».
+        if ($writable && $children->isEmpty()) {
+            for ($i = 0; $i < ($field->getMin() ?? 0); $i++) {
+                $blocks[] = ['key' => 'new-'.$i, 'child' => null, 'blockId' => null];
+            }
+        }
     }
 
     $sortable = ! $field->isSingle() && $writable && $field->getOrderColumn() !== null;

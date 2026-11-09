@@ -498,6 +498,35 @@ Alpine.data('fastleoPoll', ({ interval }) => ({
 }));
 
 /**
+ * Раскрытые строки связанных таблиц этой страницы (адреса их раскрытий) — помнятся на время вкладки браузера.
+ */
+const expandedKey = () => `fastleo.expanded.${location.pathname}`;
+
+function expandedRows() {
+    try {
+        const rows = JSON.parse(sessionStorage.getItem(expandedKey()) || '[]');
+
+        return Array.isArray(rows) ? rows : [];
+    } catch {
+        return [];
+    }
+}
+
+function rememberExpanded(url, open) {
+    try {
+        const rows = expandedRows().filter((saved) => saved !== url);
+
+        if (open) {
+            rows.push(url);
+        }
+
+        sessionStorage.setItem(expandedKey(), JSON.stringify(rows.slice(-50)));
+    } catch {
+        // Хранилище недоступно (приватный режим): строки просто не запоминаются.
+    }
+}
+
+/**
  * Связанная таблица на странице записи: <section x-data="fastleoRelated({ url, error, poll })"> с контейнером x-ref="body".
  * Таблица приходит отдельным запросом (url) и подставляется в body; ссылки в [data-related-nav] (сортировка, страницы)
  * и форма поиска [data-related-search] подгружают её заново, остальные формы и ссылки работают как обычно.
@@ -556,6 +585,10 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
             this.html = html;
             this.$refs.body.innerHTML = html;
             this.url = target;
+
+            if (!quiet) {
+                this.restoreExpanded();
+            }
         } catch {
             if (!quiet) {
                 this.$refs.body.textContent = error;
@@ -605,6 +638,22 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
     },
 
     /**
+     * Снова раскрыть строки, которые были раскрыты до перезагрузки страницы (например, после действия «Продать»):
+     * администратор остаётся там, где работал. Вложенные таблицы раскрывают свои строки сами, когда загрузятся.
+     */
+    restoreExpanded() {
+        const saved = expandedRows();
+
+        this.$refs.body.querySelectorAll('tr[data-expansion]').forEach((expansion) => {
+            const button = expansion.previousElementSibling?.querySelector('button[data-expand]');
+
+            if (expansion.hidden && saved.includes(expansion.dataset.url) && button && this.owns(button)) {
+                this.expand(button);
+            }
+        });
+    },
+
+    /**
      * Элемент относится к этой таблице, а не к вложенной в раскрытую строку (события всплывают к внешней).
      */
     owns(element) {
@@ -628,6 +677,7 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
         expansion.hidden = !open;
         row.setAttribute('aria-expanded', String(open));
         button.setAttribute('aria-expanded', String(open));
+        rememberExpanded(expansion.dataset.url, open);
 
         const body = expansion.querySelector('[data-expansion-body]');
 

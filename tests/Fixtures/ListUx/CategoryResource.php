@@ -36,10 +36,10 @@ final class CategoryResource extends Resource
     }
 
     /**
-     * Статьи рубрики без кнопки «Добавить» над таблицей.
+     * Статьи рубрики без кнопки «Добавить» над таблицей, по две на странице, без строки «Записи 1–2 из 2» на единственной странице.
      */
     public function relations(): array
     {
-        return [Related::make('articles', ArticleResource::class)->withoutAddButton()];
+        return [Related::make('articles', ArticleResource::class)->withoutAddButton()->perPage(2)->withoutSinglePageFooter()];
     }
 }

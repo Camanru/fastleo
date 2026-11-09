@@ -4,6 +4,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The admin interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
+## [Unreleased]
+
+## [4.9.3] — 2026-11-09
+
+### Added
+
+- **`Related::withoutSinglePageFooter()`** — no "Records 1–3 of 3" line under a related table while all its records fit on one page; with more pages or "All" the line with pages is shown as usual ([related](docs/related.md#строка-записи-под-таблицей)).
+
+### Changed
+
+- **Opened rows of related tables stay open after a reload** (`Related::expandable()`): after an action in a row (e.g. Sell) or a save the page reloads with the same rows opened; remembered for the browser tab ([related](docs/related.md#раскрывающиеся-строки)).
+- **`HasMany` with `min()` opens an empty list with that many empty blocks** — no need to press Add first ([HasMany](docs/fields/has-many.md)).
+- **A number edited in a list cell (`inlineEditable()`) sits at the right edge of the cell**, under its right-aligned column header.
+- **One Reset button in the list:** with filters applied by a button, the Reset next to the Filters button hides while the filter panel (which has its own Reset) is open.
+
 ## [4.9.2] — 2026-11-09
 
 Changes that remove the need to copy the package templates in a CRM: a list with filters applied by a button, a main button in the row, a record card above the form, and a check that a record may be attached to its parent. Everything new is opt-in: a site that sets none of it works as before.
@@ -664,6 +679,7 @@ The Composer name is `camanru/fastleo`, the namespace is `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.9.3]: https://github.com/Camanru/fastleo/releases/tag/4.9.3
 [4.9.2]: https://github.com/Camanru/fastleo/releases/tag/4.9.2
 [4.9.1]: https://github.com/Camanru/fastleo/releases/tag/4.9.1
 [4.9.0]: https://github.com/Camanru/fastleo/releases/tag/4.9.0

@@ -202,6 +202,15 @@ describe('has many', function (): void {
         expect($article->links()->count())->toBe(1);
     });
 
+    it('opens an empty list with as many empty blocks as the minimum asks', function (): void {
+        useFixtureResources('Blocks');
+        $article = Article::factory()->create();
+        $article->links()->create(['title' => 'Ссылка']);
+
+        $this->get(route('fastleo.resources.create', 'linked-articles'))->assertOk()->assertSee('name="links[new-0][title]"', false);
+        $this->get(route('fastleo.resources.edit', ['linked-articles', $article->id]))->assertOk()->assertDontSee('name="links[new-0][title]"', false);
+    });
+
     it('limits the number of blocks', function (): void {
         $links = array_fill(0, 11, ['title' => 'Ссылка']);
 
