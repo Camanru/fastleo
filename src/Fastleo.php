@@ -30,6 +30,7 @@ use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
+use InvalidArgumentException;
 use LogicException;
 
 /**
@@ -218,27 +219,82 @@ final class Fastleo
     }
 
     /**
-     * Уведомить всех администраторов: значок в колокольчике шапки и сообщение в чаты включённых ботов
-     * раздела «Уведомления» (Telegram, Max).
-     * Строка — заголовок уведомления.
+     * Колокольчик в шапке включён (`fastleo.notifications.bell`, по умолчанию выключен). Выключен — колокольчика нет,
+     * его адреса отвечают 404, а канал `fastleo` ничего не сохраняет. Значение читается мягко (`1`, `'true'` — включён,
+     * `null` из `env()` без переменной — выключен): проверка идёт на каждой странице и в `notifyAdmins()` с форм сайта.
+     */
+    public static function bell(): bool
+    {
+        return filter_var(config('fastleo.notifications.bell', false), FILTER_VALIDATE_BOOL);
+    }
+
+    /**
+     * Как часто колокольчик обновляет число непрочитанных, в миллисекундах (`fastleo.notifications.poll` в секундах,
+     * не чаще раза в 10 секунд и не реже раза в сутки); 0 — не опрашивать (`null` или 0 в конфиге).
+     */
+    public static function bellPoll(): int
+    {
+        $seconds = config('fastleo.notifications.poll', 60);
+
+        // Не реже раза в сутки: таймер браузера считает задержку в int32 мс, и больше ~25 дней опрос пошёл бы без паузы.
+        return is_numeric($seconds) && (float) $seconds >= 1 ? (int) min(max(10, (float) $seconds), 86400) * 1000 : 0;
+    }
+
+    /**
+     * Копия уведомлений `notifyAdmins()` на почту включена (`fastleo.notifications.mail`, по умолчанию выключена).
+     * Значение читается мягко, как в `bell()`: `null` из `env()` без переменной не роняет форму сайта.
+     */
+    public static function mail(): bool
+    {
+        return filter_var(config('fastleo.notifications.mail', false), FILTER_VALIDATE_BOOL);
+    }
+
+    /** Каналы `notifyAdmins()`: колокольчик, почта, боты раздела «Боты уведомлений». */
+    public const array CHANNELS = ['bell', 'mail', 'bots'];
+
+    /**
+     * Уведомить всех администраторов во включённые каналы: колокольчик в шапке (`notifications.bell`), письмо
+     * (`notifications.mail`), чаты ботов раздела «Боты уведомлений» (`notifications.bots`, Telegram и Max).
+     * Строка — заголовок уведомления. `$via` — только эти каналы из `bell`, `mail`, `bots` (выключенный в конфиге
+     * пропускается); null — все включённые. Неизвестное имя канала или пустой список — `InvalidArgumentException`.
      *
      * ```php
      * Fastleo::notifyAdmins('Новая заявка');
      * Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body('Иван')->url(Fastleo::recordUrl($lead, false))->icon('inbox'));
+     * Fastleo::notifyAdmins('Сайт недоступен', via: ['bots']);
      * ```
+     *
+     * @param  list<mixed>|null  $via  имена из `CHANNELS`; остальное (опечатка, не строка) — исключение
      */
-    public static function notifyAdmins(FastleoMessage|string $message): void
+    public static function notifyAdmins(FastleoMessage|string $message, ?array $via = null): void
     {
+        if ($via === []) {
+            throw new InvalidArgumentException(sprintf('Fastleo::notifyAdmins(): пустой список каналов via, допустимы: %s; во все включённые — без via.', implode(', ', self::CHANNELS)));
+        }
+
+        $unknown = array_map(get_debug_type(...), array_filter($via ?? [], fn (mixed $channel): bool => ! is_string($channel)))
+            + array_diff(array_filter($via ?? [], is_string(...)), self::CHANNELS);
+
+        if ($unknown !== []) {
+            throw new InvalidArgumentException(sprintf('Fastleo::notifyAdmins(): неизвестный канал «%s», допустимы: %s.', implode('», «', $unknown), implode(', ', self::CHANNELS)));
+        }
+
+        $via ??= self::CHANNELS;
         $message = is_string($message) ? FastleoMessage::make($message) : $message;
+        $bell = in_array('bell', $via, true) && self::bell();
+        $mail = in_array('mail', $via, true) && self::mail();
+        // Список администраторов нужен только колокольчику и почте: форма заявки без них не делает лишний запрос.
+        $admins = $bell || $mail ? self::admins() : [];
 
-        $admins = self::admins();
-        Notification::send($admins, new MessageNotification($message));
+        if ($bell) {
+            Notification::send($admins, new MessageNotification($message));
+        }
 
-        if (config()->boolean('fastleo.notifications.mail', false)) {
+        if ($mail) {
             self::mailAdmins($admins, $message);
         }
 
-        if (config('fastleo.notifications.bots') === null) {
+        if (! in_array('bots', $via, true) || config('fastleo.notifications.bots') === null) {
             return;
         }
 
@@ -311,10 +367,14 @@ final class Fastleo
     }
 
     /**
-     * Уведомить одного администратора (только колокольчик).
+     * Уведомить одного администратора (только колокольчик; при выключенном колокольчике ничего не делает).
      */
     public static function notify(Authenticatable $user, FastleoMessage|string $message): void
     {
+        if (! self::bell()) {
+            return;
+        }
+
         Notification::send([$user], new MessageNotification(is_string($message) ? FastleoMessage::make($message) : $message));
     }
 

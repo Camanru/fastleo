@@ -906,10 +906,10 @@ Alpine.data('fastleoTabs', ({ keys, tables, active, failed, group }) => ({
 
 /**
  * Колокольчик уведомлений: число непрочитанных в значке, список при открытии, «прочитано» при нажатии,
- * обновление числа раз в минуту, пока вкладка открыта.
+ * обновление числа каждые poll мс, пока вкладка открыта и видна (0 — не опрашивать).
  * readUrl содержит __id__ вместо номера уведомления.
  */
-Alpine.data('fastleoBell', ({ url, readAllUrl, readUrl, unread = 0 }) => ({
+Alpine.data('fastleoBell', ({ url, readAllUrl, readUrl, unread = 0, poll = 0 }) => ({
     open: false,
     loaded: false,
     items: [],
@@ -917,11 +917,13 @@ Alpine.data('fastleoBell', ({ url, readAllUrl, readUrl, unread = 0 }) => ({
     timer: null,
 
     init() {
-        this.timer = setInterval(() => {
-            if (!document.hidden) {
-                this.refreshCount();
-            }
-        }, 60000);
+        if (poll > 0) {
+            this.timer = setInterval(() => {
+                if (!document.hidden) {
+                    this.refreshCount();
+                }
+            }, poll);
+        }
     },
 
     destroy() {

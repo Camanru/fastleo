@@ -43,7 +43,7 @@ it('logs out an admin whose access was revoked', function (): void {
     $response = $this->get(route('fastleo.dashboard'));
 
     $response->assertRedirect(route('fastleo.login'))
-        ->assertSessionHasErrors(['email' => 'У этой учётной записи нет доступа в админку.']);
+        ->assertSessionHasErrors(['email' => 'У этой учётной записи нет доступа.']);
     $this->assertGuest(Fastleo::GUARD);
 });
 

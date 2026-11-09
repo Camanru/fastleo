@@ -154,7 +154,7 @@ function login(array $data): TestResponse
 }
 
 /**
- * Взять ресурсы из папки tests/Fixtures/{папка} вместо демо-ресурсов workbench (встроенные разделы «Администраторы», «Уведомления» и страницы SoftNetica выключены).
+ * Взять ресурсы из папки tests/Fixtures/{папка} вместо демо-ресурсов workbench (встроенные разделы «Администраторы», «Боты уведомлений» и страницы SoftNetica выключены).
  */
 function useFixtureResources(string $folder): void
 {
@@ -421,7 +421,7 @@ function connectSoftNeticaWith(?array $client = null): void
 }
 
 /**
- * Бот раздела «Уведомления» (по умолчанию Telegram с одним чатом, включён).
+ * Бот раздела «Боты уведомлений» (по умолчанию Telegram с одним чатом, включён).
  *
  * @param  array<string, mixed>  $attributes
  */

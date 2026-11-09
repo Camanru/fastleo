@@ -198,6 +198,8 @@ Fastleo размещают тремя способами:
 
 ```php
 'notifications' => [
+    'bell' => false, // колокольчик в шапке; включить: true
+    'poll' => 60,    // секунд; null — без опроса
     'keep_days' => 90,
     'bots' => null, // включить: Fastleo\Notifications\NotificationBotResource::class
     'mail' => false,
@@ -213,9 +215,11 @@ Fastleo размещают тремя способами:
 
 | Ключ | По умолчанию | Что делает |
 |---|---|---|
+| `notifications.bell` | `false` | Колокольчик в шапке; `false` — колокольчика нет и уведомления в него не сохраняются ([подробнее](notifications.md#как-включить-колокольчик)) |
+| `notifications.poll` | `60` | Как часто колокольчик обновляет число непрочитанных, секунд (от 10 секунд до суток); `null` — только при загрузке страницы и открытии колокольчика |
 | `notifications.keep_days` | `90` | Сколько дней хранятся уведомления колокольчика; чистит `fastleo:prune` |
-| `notifications.mail` | `false` | Дублировать `Fastleo::notifyAdmins()` письмом каждому администратору с адресом ([подробнее](notifications.md#копия-на-почту)) |
-| `notifications.bots` | `null` | Раздел «Уведомления»: боты Telegram и Max для чатов администраторов; `null` — раздела нет, включить — `Fastleo\Notifications\NotificationBotResource::class` или свой наследник ([подробнее](notifications.md#боты-telegram-и-max)) |
+| `notifications.mail` | `false` | Отправлять уведомления `Fastleo::notifyAdmins()` письмом каждому администратору с адресом ([подробнее](notifications.md#копия-на-почту)) |
+| `notifications.bots` | `null` | Раздел «Боты уведомлений»: боты Telegram и Max для чатов администраторов; `null` — раздела нет, включить — `Fastleo\Notifications\NotificationBotResource::class` или свой наследник ([подробнее](notifications.md#боты-telegram-и-max)) |
 | `messengers.max.url` | `https://platform-api2.max.ru` | Адрес Bot API Max |
 | `messengers.max.certificate` | `null` | Сертификат для запросов к API Max; `null` — сертификат Минцифры из пакета |
 
@@ -256,6 +260,11 @@ Fastleo размещают тремя способами:
     'name' => null,
     'logo' => null,
     'color' => '#4f46e5',
+    'login' => [
+        'heading' => null,
+        'text' => null,
+        'footer' => null,
+    ],
 ],
 
 'theme' => 'system',
@@ -265,7 +274,10 @@ Fastleo размещают тремя способами:
 
 | Ключ | По умолчанию | Что делает |
 |---|---|---|
-| `brand.name` | `null` | Название в шапке и заголовке вкладки. `null` — `config('app.name')` |
+| `brand.name` | `null` | Название в шапке, над формой входа и в заголовке вкладки. `null` — `config('app.name')`, если и он пуст — адрес сайта из `APP_URL` |
+| `brand.login.heading` | `null` | Заголовок формы входа. `null` — «Вход» |
+| `brand.login.text` | `null` | Строка под заголовком формы входа. `null` — ничего (название и так стоит над формой) |
+| `brand.login.footer` | `null` | Строка внизу страниц без входа (вход, восстановление пароля, второй шаг, страницы ошибок без входа), например `'© ООО «Ромашка»'`. `null` — ничего ([страница входа](theming.md#страница-входа)) |
 | `brand.logo` | `null` | Адрес картинки логотипа, например `'/images/logo.svg'`. `null` — значок и название |
 | `brand.color` | `'#4f46e5'` | Основной цвет кнопок и ссылок в HEX: `#rgb`, `#rrggbb` или `#rrggbbaa`. Другое значение заменяется цветом по умолчанию. Белый текст на этом цвете должен читаться (контраст не меньше 4,5 : 1): подходят индиго `#4f46e5`, изумрудный `#047857`, оранжевый `#c2410c`; яркие `#22c55e` и `#f97316` затемните. Оттенки наведения, фона и фокуса и осветление в тёмной теме считаются из него сами |
 | `theme` | `'system'` | Тема по умолчанию: `'light'`, `'dark'` или `'system'` (как в системе). Администратор переключает тему в шапке, выбор запоминается в браузере |

@@ -172,7 +172,7 @@ $this->post(route('fastleo.resources.action', ['products', 'schedule-products'])
 
 ## Уведомления и настройки сайта
 
-- Уведомления администраторам (`Fastleo::notifyAdmins()`) лежат в таблице `fastleo_notifications`, содержимое — в JSON-колонке `data`: `DB::table('fastleo_notifications')->count()` или `\Fastleo\Notifications\AdminNotification::query()->latest('id')->first()->data['title']`.
+- Уведомления колокольчика (`Fastleo::notifyAdmins()`, `Fastleo::notify()`) лежат в таблице `fastleo_notifications`, если колокольчик включён — в тесте `config(['fastleo.notifications.bell' => true])`; содержимое — в JSON-колонке `data`: `DB::table('fastleo_notifications')->count()` или `\Fastleo\Notifications\AdminNotification::query()->latest('id')->first()->data['title']`.
 - Настройки сайта в сидере и тесте записывает `app(\Fastleo\Support\SettingsStore::class)->save(new SiteSettings, ['phone' => '+7 900 000-00-00'])`.
 
 ## Проверка описания разделов

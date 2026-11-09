@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Workbench\Database\Seeders;
 
+use Fastleo\Fastleo;
+use Fastleo\Notifications\AdminNotification;
+use Fastleo\Notifications\FastleoMessage;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Factories\Sequence;
 use Illuminate\Database\Seeder;
@@ -35,7 +38,7 @@ final class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::factory()->admin()->create([
+        $admin = User::factory()->admin()->create([
             'name' => 'Администратор',
             'email' => 'admin@example.com',
         ]);
@@ -65,6 +68,7 @@ final class DatabaseSeeder extends Seeder
 
         $this->seedImages();
         $this->seedShowcase($suppliers);
+        $this->seedNotifications($admin);
 
         Artisan::call('fastleo:images');
     }
@@ -106,6 +110,34 @@ final class DatabaseSeeder extends Seeder
         ]);
         Task::factory()->done()->count(8)->create(['supplier_id' => fn () => $suppliers->random()->id, 'created_at' => fn () => now()->subDays(random_int(0, 28))]);
         Task::factory()->overdue()->count(3)->create(['supplier_id' => fn () => $suppliers->random()->id, 'is_urgent' => true]);
+    }
+
+    /**
+     * Уведомления администратора за последний месяц для колокольчика и раздела «Уведомления»: 45 штук (две страницы),
+     * свежие — непрочитанные, все уровни, со ссылками на записи и без них.
+     */
+    private function seedNotifications(User $admin): void
+    {
+        $articles = Article::query()->orderBy('id')->limit(10)->get()->all();
+        $products = Product::query()->orderBy('id')->limit(10)->get()->all();
+        $kinds = [
+            fn (int $n): FastleoMessage => FastleoMessage::make('Новая заявка')->body('Клиент '.$n.', +7 900 000-'.str_pad((string) $n, 2, '0', STR_PAD_LEFT).'-00')->icon('inbox')->level('success'),
+            fn (int $n): FastleoMessage => FastleoMessage::make('Статья ждёт проверки')->body($articles[$n % count($articles)]->title)->url(Fastleo::recordUrl($articles[$n % count($articles)], false))->icon('file-text'),
+            fn (int $n): FastleoMessage => FastleoMessage::make('Заканчивается товар')->body($products[$n % count($products)]->title.': осталось '.($n % 5 + 1).' шт.')->url(Fastleo::recordUrl($products[$n % count($products)], false))->icon('package')->level('warning'),
+            fn (int $n): FastleoMessage => FastleoMessage::make('Импорт завершён')->body('Раздел «Товары»: создано '.($n * 3).', обновлено '.$n.', пропущено 0.')->icon('upload')->level('success'),
+            fn (int $n): FastleoMessage => FastleoMessage::make('Публикация не отправлена')->body('Канал «Новости магазина»: бот не администратор канала.')->icon('send')->level('danger'),
+        ];
+
+        foreach (range(1, 45) as $n) {
+            $createdAt = now()->subHours($n * 15 + random_int(0, 10))->subMinutes(random_int(0, 59));
+
+            AdminNotification::query()->create([
+                'user_id' => (string) $admin->id,
+                'data' => $kinds[$n % count($kinds)]($n)->toArray(),
+                'created_at' => $createdAt,
+                'read_at' => $n <= 8 ? null : $createdAt->copy()->addHours(2),
+            ]);
+        }
     }
 
     /**

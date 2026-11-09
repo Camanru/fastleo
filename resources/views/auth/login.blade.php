@@ -8,8 +8,10 @@
 
     <x-fastleo::auth-form x-data x-show="window.top === window" :action="route('fastleo.login.store')">
         <div class="flex flex-col gap-1">
-            <h1 class="text-xl font-[650] tracking-[-0.02em]">{{ __('fastleo::auth.heading') }}</h1>
-            <p class="text-sm text-ink-2">{{ \Fastleo\Support\Branding::name() }} · {{ request()->getHost() }}</p>
+            <h1 class="text-xl font-[650] tracking-[-0.02em]">{{ \Fastleo\Support\Branding::loginHeading() }}</h1>
+            @if (\Fastleo\Support\Branding::loginText() !== null)
+                <p class="text-sm text-ink-2" data-login-text>{{ \Fastleo\Support\Branding::loginText() }}</p>
+            @endif
         </div>
 
         <label class="flex flex-col gap-1.5 text-sm font-medium text-ink-2">

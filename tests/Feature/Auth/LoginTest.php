@@ -14,8 +14,32 @@ it('renders the login form for a guest', function (): void {
     $response = $this->get(route('fastleo.login'));
 
     $response->assertOk()
-        ->assertSee('Вход в админку')
+        ->assertSee('Вход')
         ->assertSee('name="remember"', false);
+});
+
+it('does not mention the package or an admin panel on the login page', function (): void {
+    config(['app.name' => 'Магазин']);
+
+    $this->get(route('fastleo.login'))->assertOk()
+        ->assertSee('<h1 class="text-xl font-[650] tracking-[-0.02em]">Вход</h1>', false)
+        ->assertSee('Магазин')
+        ->assertDontSee('Магазин · localhost')
+        ->assertDontSee('data-login-text', false)
+        ->assertDontSee('data-login-footer', false)
+        ->assertDontSee('Fastleo')
+        ->assertDontSee('админк');
+});
+
+it('shows the login texts from the config', function (): void {
+    config(['fastleo.brand.login' => ['heading' => 'Вход для сотрудников', 'text' => 'Учётную запись выдаёт руководитель', 'footer' => '© ООО «Ромашка»']]);
+
+    $this->get(route('fastleo.login'))->assertOk()
+        ->assertSee('Вход для сотрудников')
+        ->assertSee('Учётную запись выдаёт руководитель')
+        ->assertSee('© ООО «Ромашка»');
+    $this->get(route('fastleo.password.request'))->assertSee('© ООО «Ромашка»');
+
 });
 
 it('logs an admin in and redirects to the dashboard', function (): void {

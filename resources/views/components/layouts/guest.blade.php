@@ -16,7 +16,9 @@
         <div class="w-full">
             {{ $slot }}
         </div>
-        <p class="text-xs text-ink-3">{{ __('fastleo::auth.powered_by') }}</p>
+        @if (\Fastleo\Support\Branding::loginFooter() !== null)
+            <p class="max-w-full text-center text-xs break-words text-ink-3" data-login-footer>{{ \Fastleo\Support\Branding::loginFooter() }}</p>
+        @endif
     </main>
 </body>
 </html>

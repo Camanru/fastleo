@@ -56,6 +56,12 @@ class PublicationResource extends Resource
     }
 
     #[Override]
+    public static function group(): ?string
+    {
+        return static::$group ?? __('fastleo::messengers.group', [], Fastleo::LOCALE);
+    }
+
+    #[Override]
     public static function singular(): string
     {
         return static::$singular ?? __('fastleo::publishing.singular', [], Fastleo::LOCALE);

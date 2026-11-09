@@ -39,7 +39,8 @@ final class WorkbenchServiceProvider extends ServiceProvider
                 'photo' => ['widths' => [480, 1200], 'watermark' => true],
             ],
             'fastleo.images.watermark.path' => 'uploads/watermark.png',
-            // Демо показывает всё: боты уведомлений и публикации выключены у пакета по умолчанию.
+            // Демо показывает всё: колокольчик, боты уведомлений и публикации выключены у пакета по умолчанию.
+            'fastleo.notifications.bell' => true,
             'fastleo.notifications.bots' => NotificationBotResource::class,
             'fastleo.publishing.channels' => ChannelResource::class,
             'fastleo.publishing.publications' => PublicationResource::class,

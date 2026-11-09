@@ -15,7 +15,8 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Заявки»: заявки с формы сайта. Непросмотренные выделены, их число стоит в меню; о новой заявке
- * администраторы узнают из колокольчика (в LeadController). Форма на сайте — ваша: см. StoreLeadRequest.
+ * администраторы узнают через Fastleo::notifyAdmins() (в LeadController) — во включённых каналах: колокольчик,
+ * почта, боты (по умолчанию выключены, см. config/fastleo.php, ключ notifications). Форма на сайте — ваша: см. StoreLeadRequest.
  */
 final class LeadResource extends Resource
 {

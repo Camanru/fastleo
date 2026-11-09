@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Fastleo\Notifications;
 
+use Fastleo\Fastleo;
 use Illuminate\Notifications\Notification;
 
 /**
  * Канал Laravel Notifications `fastleo`: кладёт уведомление в колокольчик администратора.
- * Уведомление должно иметь метод `toFastleo($notifiable): FastleoMessage`.
+ * Уведомление должно иметь метод `toFastleo($notifiable): FastleoMessage`. Колокольчик выключен
+ * (`fastleo.notifications.bell`) — ничего не сохраняется.
  */
 final class FastleoChannel
 {
@@ -17,6 +19,10 @@ final class FastleoChannel
      */
     public function send(object $notifiable, Notification $notification): void
     {
+        if (! Fastleo::bell()) {
+            return;
+        }
+
         $key = method_exists($notifiable, 'getAuthIdentifier') ? $notifiable->getAuthIdentifier() : null;
 
         if (! is_scalar($key) || ! method_exists($notification, 'toFastleo')) {

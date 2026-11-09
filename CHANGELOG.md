@@ -4,6 +4,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The admin interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
+## [4.9.1] — 2026-11-09
+
+### Upgrade notes
+
+- **The notification bell is off by default** (`notifications.bell`, default `false`). A site whose published `config/fastleo.php` has no `bell` key loses the bell after the update: add `'bell' => true` under `notifications` to keep it. While it is off, the bell is not in the header, its addresses answer 404, and nothing is stored for it — `Fastleo::notify()`, the import result, a failed publication and the site's own notifications with the `fastleo` channel are skipped. `Fastleo::notifyAdmins()` still sends mail and bot messages if those are on. A site with the Leads section and every channel off now gets a `fastleo:doctor` warning ([notifications](docs/notifications.md#как-включить-колокольчик)).
+- **The bell's JSON moved to `/fastleo/notifications/feed`** (route `fastleo.notifications.feed`); `/fastleo/notifications` is now the Notifications page. If your site overrides `components/layouts/app.blade.php` (a copy in `resources/views/vendor/fastleo`), copy the template again: the old copy asks the page instead of the JSON (the bell stays empty), shows the bell while it is switched off (its requests answer 404), never refreshes the unread count (the badge disappears once the bell is opened) and has no All notifications link.
+- **Menu:** the notification bots section is renamed from Notifications to **Notification bots**; it moved together with Channels from the System group, and Publications from the top level, to a new **Messengers** group (addresses `notification-bots`, `channels` and `publications` are unchanged). A site that sets `menu.groups` gets Messengers after the listed groups — add `'Мессенджеры'` to the list to place it.
+- **New migration** adds an index `(user_id, created_at)` to `fastleo_notifications`: run `php artisan migrate`.
+- **The login page no longer names the package or calls the panel an admin panel:** the heading is Sign in, the name · site address line inside the form and the Powered by Fastleo line are gone, the access error and the session-expired hint are neutral, and with neither `brand.name` nor `app.name` set the name is the host of `app.url` instead of Fastleo.
+
+### Added
+
+- **`brand.login.heading`, `brand.login.text`, `brand.login.footer`** — the texts of the login page: the heading (default Sign in), the line under it (default none) and a line at the bottom of the guest pages, e.g. a copyright ([theming](docs/theming.md#страница-входа)).
+- **Notifications section** (System → Notifications, `/fastleo/notifications`, the All notifications link at the bottom of the bell): all own notifications for the whole retention period, read ones too, 30 per page, an All / Unread switch, Open (marks read and follows the link), Mark read and Mark all read. Shown while the bell is on ([notifications](docs/notifications.md#колокольчик)).
+- **`notifications.poll`** — how often the bell refreshes the unread count, in seconds (default `60`, from 10 seconds to a day; `null` — no polling, the count refreshes on page load and when the bell is opened).
+- **`Fastleo::notifyAdmins($message, via: ['bell', 'mail', 'bots'])`** — send to some channels only; a channel that is off in the config is skipped, an unknown name, a non-string item or an empty list throws `InvalidArgumentException` ([where to send](docs/notifications.md#куда-отправлять)).
+- **`fastleo:doctor` warnings:** the bell is off while the site has imports or publications (their results reach nobody), and the Leads section exists while the bell, mail and bots are all off.
+
+### Fixed
+
+- **`notifications.mail` is read leniently:** `null` from `env()` without the variable no longer fails the site form that calls `notifyAdmins()`.
+
 ## [4.9.0] — 2026-11-09
 
 Fastleo is now described as a panel for Eloquent models — a site admin panel, a CRM or a back office — and the setup with the whole application at the domain root is documented and checked by `fastleo:doctor`. Menu groups collapse, a multiple `Select` is a set of chips, and the examples in the documentation are neutral. The release also closes the findings of a review of the whole package (regular and adversarial, several rounds): one crash of the PHP worker, holes in the MCP guards, the import, the password reset and the image tools. This is a minor release, not a patch: it adds a required PHP extension and turns several silent mistakes of a site into errors (see "Upgrade notes").
@@ -619,6 +641,7 @@ The Composer name is `camanru/fastleo`, the namespace is `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.9.1]: https://github.com/Camanru/fastleo/releases/tag/4.9.1
 [4.9.0]: https://github.com/Camanru/fastleo/releases/tag/4.9.0
 [4.8.3]: https://github.com/Camanru/fastleo/releases/tag/4.8.3
 [4.8.2]: https://github.com/Camanru/fastleo/releases/tag/4.8.2

@@ -8,7 +8,7 @@ use Fastleo\Resource;
 use Workbench\App\Models\Category;
 
 /**
- * Раздел сайта, занявший адрес встроенного раздела «Уведомления».
+ * Раздел сайта, занявший адрес встроенного раздела «Боты уведомлений».
  */
 final class SiteBotsResource extends Resource
 {

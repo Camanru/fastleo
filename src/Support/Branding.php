@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Fastleo\Support;
 
+use Fastleo\Fastleo;
+
 /**
- * Оформление админки из config('fastleo.brand'), config('fastleo.theme') и config('fastleo.css').
+ * Оформление панели из config('fastleo.brand'), config('fastleo.theme') и config('fastleo.css').
  *
  * Значения проверяются: в шаблон попадает только допустимый цвет и тема.
  */
@@ -18,7 +20,8 @@ final class Branding
     public const array THEMES = ['light', 'dark', 'system'];
 
     /**
-     * Название админки: из конфига, иначе название сайта, иначе «Fastleo».
+     * Название панели: из конфига, иначе название сайта, иначе адрес сайта из `app.url` (имя пакета сайту не навязывается;
+     * адрес из конфига, а не из запроса: подпись в приложении 2FA не зависит от www и чужого заголовка Host).
      *
      * ```php
      * Branding::name(); // 'Мой сайт'
@@ -26,13 +29,46 @@ final class Branding
      */
     public static function name(): string
     {
-        foreach ([config('fastleo.brand.name'), config('app.name')] as $name) {
+        $url = config('app.url');
+
+        foreach ([config('fastleo.brand.name'), config('app.name'), is_string($url) ? parse_url($url, PHP_URL_HOST) : null] as $name) {
             if (is_string($name) && $name !== '') {
                 return $name;
             }
         }
 
-        return 'Fastleo';
+        return request()->getHost();
+    }
+
+    /**
+     * Заголовок формы входа (`brand.login.heading`), по умолчанию «Вход».
+     */
+    public static function loginHeading(): string
+    {
+        $heading = config('fastleo.brand.login.heading');
+
+        return is_string($heading) && $heading !== '' ? $heading : __('fastleo::auth.heading', [], Fastleo::LOCALE);
+    }
+
+    /**
+     * Строка под заголовком формы входа (`brand.login.text`); по умолчанию нет (null) — название и так стоит над формой.
+     */
+    public static function loginText(): ?string
+    {
+        $text = config('fastleo.brand.login.text');
+
+        return is_string($text) && $text !== '' ? $text : null;
+    }
+
+    /**
+     * Строка внизу страниц без входа (`brand.login.footer`: вход, пароль, второй шаг, ошибки без входа), например
+     * «© ООО Ромашка»; по умолчанию нет (null).
+     */
+    public static function loginFooter(): ?string
+    {
+        $footer = config('fastleo.brand.login.footer');
+
+        return is_string($footer) && $footer !== '' ? $footer : null;
     }
 
     /**

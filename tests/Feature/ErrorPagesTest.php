@@ -31,7 +31,8 @@ it('shows a styled page for an address of the admin that no route knows', functi
     $this->get('/fastleo/a/b/c/d/e/f/g')
         ->assertNotFound()
         ->assertSee('Страница не найдена')
-        ->assertSee('В админку')
+        ->assertSee('Войти')
+        ->assertDontSee('админк')
         // Кнопка «Назад» получает адрес готовой строкой JS, а не необработанной директивой Blade.
         ->assertSee('(location.href = '.Js::from(route('fastleo.dashboard'))->toHtml().')', false)
         ->assertDontSee('@js(', false);

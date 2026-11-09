@@ -9,7 +9,7 @@ beforeEach(function (): void {
     $this->actingAs(admin(), Fastleo::GUARD);
     useFixtureResources('Menu');
     // Порядок групп демо-сайта (workbench) здесь не нужен: каждый тест задаёт свой.
-    config(['fastleo.logs.enabled' => false, 'fastleo.menu.groups' => []]);
+    config(['fastleo.logs.enabled' => false, 'fastleo.notifications.bell' => false, 'fastleo.menu.groups' => []]);
 });
 
 it('orders groups as configured and puts links without a group first', function (): void {

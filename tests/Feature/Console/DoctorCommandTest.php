@@ -521,6 +521,31 @@ it('warns about a stale resource cache and accepts a fresh one', function (): vo
     expect(messages('site', 'warning'))->toBe([]);
 });
 
+it('warns that the admin will not hear about imports and failed publications while the bell is off', function (): void {
+    $message = 'Колокольчик выключен: администратор не узнает об окончании импорта';
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain($message);
+
+    config(['fastleo.notifications.bell' => false]);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain($message);
+});
+
+it('warns that nobody hears about new leads while every notification channel is off', function (): void {
+    useFixtureResources('Notifications/Leads');
+    $message = 'Раздел «Заявки» есть, а колокольчик, почта и боты уведомлений выключены';
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain($message);
+
+    config(['fastleo.notifications.bell' => false, 'fastleo.notifications.mail' => false, 'fastleo.notifications.bots' => null]);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain($message);
+
+    config(['fastleo.notifications.mail' => true]);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain($message);
+});
+
 it('warns that the queue hands an import to a second worker while the first still runs it', function (): void {
     $message = 'Очередь выдаёт задачу повторно через 90 с (retry_after), а импорт из файла может идти до 3600 с';
 

@@ -96,10 +96,11 @@ it('does not touch commands and the schedule when the site is served over HTTP',
     expect($before)->toBe(1)->and($scheduled())->toBe(1);
 });
 
-it('ships with notification bots and publishing switched off', function (): void {
+it('ships with the bell, notification bots and publishing switched off', function (): void {
     $defaults = require dirname(__DIR__, 2).'/config/fastleo.php';
 
-    expect($defaults['notifications']['bots'])->toBeNull()
+    expect($defaults['notifications']['bell'])->toBeFalse()
+        ->and($defaults['notifications']['bots'])->toBeNull()
         ->and($defaults['publishing']['channels'])->toBeNull()
         ->and($defaults['publishing']['publications'])->toBeNull();
 });

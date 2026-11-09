@@ -83,7 +83,7 @@ describe('section', function (): void {
     });
 
     it('explains what it is under the title of the list', function (): void {
-        $this->get(route('fastleo.resources.index', 'notification-bots'))->assertOk()->assertSee('Боты Telegram и Max, которые дублируют уведомления колокольчика');
+        $this->get(route('fastleo.resources.index', 'notification-bots'))->assertOk()->assertSee('Боты Telegram и Max, которые отправляют уведомления администраторам');
     });
 
     it('checks the token and the chats only after the messenger is chosen', function (): void {

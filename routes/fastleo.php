@@ -68,6 +68,7 @@ Route::group([
         Route::get('pages/{page}', [PagesController::class, 'show'])->where('page', $slugPattern)->name('pages.show');
         Route::get('search', SearchController::class)->middleware('throttle:60,1')->name('search');
         Route::get('notifications', [NotificationsController::class, 'index'])->name('notifications.index');
+        Route::get('notifications/feed', [NotificationsController::class, 'feed'])->name('notifications.feed');
         Route::post('notifications/read-all', [NotificationsController::class, 'readAll'])->name('notifications.read-all');
         Route::post('notifications/{id}/read', [NotificationsController::class, 'read'])->where('id', '[0-9a-f-]{36}')->name('notifications.read');
         Route::get('logs', [LogsController::class, 'index'])->name('logs.index');

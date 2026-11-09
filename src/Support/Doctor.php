@@ -87,6 +87,7 @@ final class Doctor
         '2026_10_31_000100_create_fastleo_channels_table' => ['fastleo_channels'],
         '2026_10_31_000200_create_fastleo_publications_table' => ['fastleo_publications', 'fastleo_publication_deliveries'],
         '2026_11_01_000000_create_fastleo_dashboard_layouts_table' => ['fastleo_dashboard_layouts'],
+        '2026_11_09_000000_add_user_created_index_to_fastleo_notifications_table' => [],
     ];
 
     /** Миграция колонки `fastleo_admin` в таблице пользователей. */
@@ -170,6 +171,14 @@ final class Doctor
 
         if ($importable) {
             $this->importTimeout();
+        }
+
+        if (! Fastleo::bell() && ($importable || config('fastleo.publishing.publications') !== null)) {
+            $this->add('warning', 'site', 'bell_off', hint: 'bell_off_hint');
+        }
+
+        if ($registry->find('leads') instanceof \Fastleo\Resource && ! Fastleo::bell() && ! Fastleo::mail() && config('fastleo.notifications.bots') === null) {
+            $this->add('warning', 'site', 'leads_unnoticed', hint: 'leads_unnoticed_hint');
         }
 
         foreach (array_keys($settings) as $slug) {

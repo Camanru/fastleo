@@ -17,8 +17,8 @@ use Illuminate\Database\Eloquent\Model;
 use Override;
 
 /**
- * Встроенный раздел «Уведомления»: боты Telegram и Max, через которые `Fastleo::notifyAdmins()` дублирует
- * уведомления колокольчика в чаты администраторов. Токен бота хранится зашифрованным и не выводится.
+ * Встроенный раздел «Боты уведомлений»: боты Telegram и Max, через которые `Fastleo::notifyAdmins()` отправляет
+ * уведомления в чаты администраторов. Токен бота хранится зашифрованным и не выводится.
  *
  * Это служебные чаты админов, не каналы для подписчиков. Включается ключом `fastleo.notifications.bots`:
  * по умолчанию `null` — раздела нет; чтобы включить, укажите класс этого ресурса или ваш наследник. Через MCP недоступен.
@@ -70,7 +70,7 @@ class NotificationBotResource extends Resource
     #[Override]
     public static function group(): ?string
     {
-        return static::$group ?? __('fastleo::users.group', [], Fastleo::LOCALE);
+        return static::$group ?? __('fastleo::messengers.group', [], Fastleo::LOCALE);
     }
 
     /**

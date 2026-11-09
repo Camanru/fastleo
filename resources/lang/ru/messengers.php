@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 return [
+    'group' => 'Мессенджеры',
     'unreachable' => 'нет связи с :messenger',
     'bad_response' => ':messenger прислал непонятный ответ',
     'messenger' => 'Мессенджер',

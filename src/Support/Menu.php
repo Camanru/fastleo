@@ -94,6 +94,18 @@ final class Menu
             ];
         }
 
+        if (Fastleo::bell()) {
+            $entries[] = [
+                'group' => is_string($systemGroup) ? $systemGroup : null,
+                'position' => 850,
+                'label' => __('fastleo::notifications.title', [], Fastleo::LOCALE),
+                'url' => route('fastleo.notifications.index'),
+                'icon' => 'bell',
+                'badge' => null,
+                'active' => request()->routeIs('fastleo.notifications.*'),
+            ];
+        }
+
         if (LogReader::canView()) {
             $entries[] = [
                 'group' => is_string($systemGroup) ? $systemGroup : null,

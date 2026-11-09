@@ -9,6 +9,7 @@ use Fastleo\Notifications\FastleoMessage;
 use Fastleo\Notifications\MessageMailNotification;
 use Fastleo\Notifications\MessageNotification;
 use Fastleo\Notifications\SendAdminMessage;
+use Fastleo\Support\Menu;
 use Illuminate\Foundation\Application;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Bus;
@@ -315,7 +316,7 @@ describe('bell', function (): void {
         AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Новое', 'body' => 'Текст', 'url' => '/fastleo', 'icon' => 'inbox', 'level' => 'warning'], 'created_at' => now()]);
         AdminNotification::query()->create(['user_id' => (string) $boris->id, 'data' => ['title' => 'Чужое'], 'created_at' => now()]);
 
-        $json = $this->getJson(route('fastleo.notifications.index'))->assertOk()->json();
+        $json = $this->getJson(route('fastleo.notifications.feed'))->assertOk()->json();
 
         expect($json['unread'])->toBe(1)
             ->and(array_column($json['items'], 'title'))->toBe(['Новое', 'Старое'])
@@ -326,7 +327,7 @@ describe('bell', function (): void {
     it('answers only the count when asked for it', function (): void {
         Fastleo::notifyAdmins('Раз');
 
-        $this->getJson(route('fastleo.notifications.index', ['count' => 1]))->assertExactJson(['unread' => 1]);
+        $this->getJson(route('fastleo.notifications.feed', ['count' => 1]))->assertExactJson(['unread' => 1]);
     });
 
     it('returns at most twenty notifications', function (): void {
@@ -334,7 +335,7 @@ describe('bell', function (): void {
             AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'N'.$number], 'created_at' => now()->addSeconds($number)]);
         }
 
-        $json = $this->getJson(route('fastleo.notifications.index'))->json();
+        $json = $this->getJson(route('fastleo.notifications.feed'))->json();
 
         expect($json['items'])->toHaveCount(20)->and($json['unread'])->toBe(25);
     });
@@ -342,7 +343,7 @@ describe('bell', function (): void {
     it('never gives out a dangerous link', function (string $url): void {
         AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Плохое', 'url' => $url], 'created_at' => now()]);
 
-        expect($this->getJson(route('fastleo.notifications.index'))->json('items.0.url'))->toBeNull();
+        expect($this->getJson(route('fastleo.notifications.feed'))->json('items.0.url'))->toBeNull();
     })->with(['javascript' => 'javascript:alert(1)', 'protocol-relative' => '//evil.example', 'backslash' => '/\\evil.example', 'tab hides the second slash' => "/\t/evil.example"]);
 
     it('marks one own notification as read', function (): void {
@@ -372,7 +373,7 @@ describe('bell', function (): void {
         $this->postJson(route('fastleo.notifications.read-all'))->assertOk();
 
         expect(AdminNotification::query()->whereNull('read_at')->count())->toBe(0);
-        $this->getJson(route('fastleo.notifications.index', ['count' => 1]))->assertExactJson(['unread' => 0]);
+        $this->getJson(route('fastleo.notifications.feed', ['count' => 1]))->assertExactJson(['unread' => 0]);
     });
 
     it('refuses a malformed notification number', function (): void {
@@ -390,8 +391,255 @@ describe('bell', function (): void {
         $this->app['env'] = 'testing';
         $this->app['auth']->guard(Fastleo::GUARD)->logout();
         $this->flushSession();
-        $this->getJson(route('fastleo.notifications.index'))->assertUnauthorized();
+        $this->getJson(route('fastleo.notifications.feed'))->assertUnauthorized();
         expect($entry->refresh()->read_at)->toBeNull();
+    });
+});
+
+describe('section', function (): void {
+    it('is in the menu and opens from the bell', function (): void {
+        $this->get(route('fastleo.dashboard'))
+            ->assertSee(route('fastleo.notifications.index'), false)
+            ->assertSee('data-bell-all', false);
+    });
+
+    it('lists all own notifications, read ones too, newest first, page by page', function (): void {
+        foreach (range(1, 35) as $number) {
+            AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'N'.$number], 'created_at' => now()->addSeconds($number), 'read_at' => $number % 2 === 0 ? now() : null]);
+        }
+
+        AdminNotification::query()->create(['user_id' => (string) admin()->id, 'data' => ['title' => 'Чужое'], 'created_at' => now()->addHour()]);
+
+        $this->get(route('fastleo.notifications.index'))->assertOk()
+            ->assertSeeInOrder(['N35', 'N34', 'N6'])
+            ->assertDontSee('Чужое')
+            ->assertDontSee('>N5<', false)
+            ->assertSee('data-notifications-older', false)
+            ->assertSee('Непрочитанные (18)');
+
+        $this->get(route('fastleo.notifications.index', ['page' => 2]))->assertOk()->assertSeeInOrder(['N5', 'N1'])->assertSee('data-notifications-newer', false)
+            ->assertDontSee('>N6<', false)->assertDontSee('>N35<', false);
+    });
+
+    it('keeps channels, publications and notification bots together in the Messengers group', function (): void {
+        publishingChannel();
+
+        $messengers = collect(Menu::groups())->firstWhere('label', 'Мессенджеры');
+
+        expect(array_column($messengers['items'], 'label'))->toBe(['Публикации', 'Каналы', 'Боты уведомлений']);
+    });
+
+    it('stands before the error log in the System group of the menu', function (): void {
+        $system = collect(Menu::groups())->firstWhere('label', 'Система');
+        $labels = array_column($system['items'], 'label');
+
+        expect(array_search('Уведомления', $labels, true))->toBeLessThan(array_search('Журнал ошибок', $labels, true));
+    });
+
+    it('returns to the same filter and page after marking read, and to the first page once that one is empty', function (): void {
+        foreach (range(1, 31) as $number) {
+            AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'N'.$number], 'created_at' => now()->addSeconds($number)]);
+        }
+
+        $oldest = AdminNotification::query()->where('data->title', 'N1')->sole();
+
+        $this->get(route('fastleo.notifications.index', ['unread' => 1, 'page' => 2]))
+            ->assertSee('name="unread" value="1"', false)->assertSee('name="page" value="2"', false);
+
+        $this->post(route('fastleo.notifications.read', $oldest->id), ['unread' => '1', 'page' => '2'])
+            ->assertRedirect(route('fastleo.notifications.index', ['unread' => 1, 'page' => 2]));
+        $this->get(route('fastleo.notifications.index', ['unread' => 1, 'page' => 2]))->assertRedirect(route('fastleo.notifications.index', ['unread' => 1]));
+
+        $this->post(route('fastleo.notifications.read', $oldest->id), ['page' => str_repeat('9', 23)])->assertRedirect(route('fastleo.notifications.index'));
+        $this->post(route('fastleo.notifications.read-all'), ['unread' => '1', 'page' => '2'])->assertRedirect(route('fastleo.notifications.index', ['unread' => 1]));
+    });
+
+    it('does not let the form touch a notification of another admin', function (): void {
+        $foreign = AdminNotification::query()->create(['user_id' => (string) admin()->id, 'data' => ['title' => 'Чужое', 'url' => '/fastleo'], 'created_at' => now()]);
+
+        $this->post(route('fastleo.notifications.read', $foreign->id), ['open' => '1'])->assertNotFound();
+
+        expect($foreign->fresh()?->read_at)->toBeNull();
+    });
+
+    it('shows a notification with broken data instead of failing the page', function (): void {
+        AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => ['не строка'], 'level' => 5], 'created_at' => now()]);
+
+        $this->get(route('fastleo.notifications.index'))->assertOk()->assertSee('data-notification="unread"', false);
+    });
+
+    it('shows only unread notifications when asked', function (): void {
+        AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Прочитанное'], 'created_at' => now(), 'read_at' => now()]);
+        AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Новое'], 'created_at' => now()]);
+
+        $this->get(route('fastleo.notifications.index', ['unread' => 1]))->assertOk()->assertSee('Новое')->assertDontSee('Прочитанное');
+
+        AdminNotification::query()->update(['read_at' => now()]);
+
+        $this->get(route('fastleo.notifications.index', ['unread' => 1]))->assertSee('Новых уведомлений нет.')->assertDontSee('data-notifications-read-all', false);
+        $this->get(route('fastleo.notifications.index'))->assertSee('Прочитанное');
+    });
+
+    it('marks a notification read and opens its link, or goes back without one', function (): void {
+        $withLink = AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Заявка', 'url' => '/fastleo/leads/7'], 'created_at' => now()]);
+        $withoutLink = AdminNotification::query()->create(['user_id' => (string) $this->me->id, 'data' => ['title' => 'Без ссылки', 'url' => 'javascript:alert(1)'], 'created_at' => now()]);
+        $back = route('fastleo.notifications.index');
+
+        $this->from($back)->post(route('fastleo.notifications.read', $withLink->id), ['open' => '1'])->assertRedirect('/fastleo/leads/7');
+        $this->from($back)->post(route('fastleo.notifications.read', $withoutLink->id), ['open' => '1'])->assertRedirect($back);
+
+        expect(AdminNotification::query()->whereNull('read_at')->count())->toBe(0);
+        $this->get($back)->assertSee('/fastleo/leads/7')->assertDontSee('javascript:', false);
+    });
+
+    it('marks everything read from the page and says so', function (): void {
+        Fastleo::notifyAdmins('Раз');
+
+        $this->post(route('fastleo.notifications.read-all'))->assertRedirect(route('fastleo.notifications.index'))->assertSessionHas('fastleo.success', 'Все уведомления отмечены прочитанными.');
+
+        expect(AdminNotification::query()->whereNull('read_at')->exists())->toBeFalse();
+    });
+
+    it('is not in the menu and answers 404 while the bell is off', function (): void {
+        config(['fastleo.notifications.bell' => false]);
+
+        $this->get(route('fastleo.dashboard'))->assertDontSee(route('fastleo.notifications.index').'"', false);
+        $this->get(route('fastleo.notifications.index'))->assertNotFound();
+    });
+});
+
+describe('switched off bell', function (): void {
+    beforeEach(function (): void {
+        config(['fastleo.notifications.bell' => false]);
+    });
+
+    it('has no bell in the header and answers 404 at its addresses', function (): void {
+        $this->get(route('fastleo.dashboard'))->assertOk()->assertDontSee('data-bell', false);
+
+        $this->getJson(route('fastleo.notifications.feed'))->assertNotFound();
+        $this->postJson(route('fastleo.notifications.read-all'))->assertNotFound();
+        $this->postJson(route('fastleo.notifications.read', ['id' => '00000000-0000-0000-0000-000000000000']))->assertNotFound();
+    });
+
+    it('does not even run the bell channel', function (): void {
+        NotificationFacade::fake();
+
+        Fastleo::notifyAdmins('Новая заявка');
+        Fastleo::notify($this->me, 'Импорт завершён');
+
+        NotificationFacade::assertNothingSent();
+    });
+
+    it('stores nothing from a notification class of the site with the fastleo channel', function (): void {
+        NotificationFacade::send([$this->me], new class extends Notification
+        {
+            public function via(object $notifiable): array
+            {
+                return ['fastleo'];
+            }
+
+            public function toFastleo(object $notifiable): FastleoMessage
+            {
+                return FastleoMessage::make('Своё уведомление');
+            }
+        });
+
+        expect(AdminNotification::query()->count())->toBe(0);
+    });
+
+    it('stores nothing, but still mails and sends to the bots', function (): void {
+        config(['fastleo.notifications.mail' => true, 'mail.default' => 'array']);
+        Bus::fake([SendAdminMessage::class]);
+        notificationBot(['recipients' => ['12345']]);
+
+        Fastleo::notifyAdmins('Новая заявка');
+        Fastleo::notify($this->me, 'Импорт завершён');
+
+        expect(AdminNotification::query()->count())->toBe(0)
+            ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1);
+        Bus::assertDispatchedTimes(SendAdminMessage::class, 1);
+    });
+});
+
+it('reads the switch leniently, so a value from env() does not break every page', function (mixed $value, bool $enabled): void {
+    config(['fastleo.notifications.bell' => $value]);
+
+    expect(Fastleo::bell())->toBe($enabled);
+    $this->get(route('fastleo.dashboard'))->assertOk();
+})->with([
+    'null from a missing env variable' => [null, false],
+    'one' => [1, true],
+    'string true' => ['true', true],
+    'string false' => ['false', false],
+]);
+
+describe('polling', function (): void {
+    it('refreshes the count as often as the site asks, but not more often than every ten seconds', function (mixed $seconds, int $milliseconds): void {
+        config(['fastleo.notifications.poll' => $seconds]);
+
+        $this->get(route('fastleo.dashboard'))->assertSee('poll: '.$milliseconds.' })', false);
+    })->with([
+        'two minutes' => [120, 120000],
+        'too often' => [5, 10000],
+        'a month, longer than the browser timer holds' => [2592000, 86400000],
+        'a number too big for an integer' => ['1e30', 86400000],
+        'never' => [null, 0],
+        'zero' => [0, 0],
+    ]);
+});
+
+describe('via', function (): void {
+    beforeEach(function (): void {
+        config(['fastleo.notifications.mail' => true, 'mail.default' => 'array']);
+        Bus::fake([SendAdminMessage::class]);
+        notificationBot(['recipients' => ['12345']]);
+    });
+
+    it('sends only to the chosen channels', function (): void {
+        Fastleo::notifyAdmins('Сайт недоступен', via: ['bots']);
+
+        expect(AdminNotification::query()->count())->toBe(0)
+            ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(0);
+        Bus::assertDispatchedTimes(SendAdminMessage::class, 1);
+
+        Fastleo::notifyAdmins('Новая заявка', via: ['bell', 'mail']);
+
+        expect(AdminNotification::query()->count())->toBe(1)
+            ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1);
+        Bus::assertDispatchedTimes(SendAdminMessage::class, 1);
+    });
+
+    it('reads the mail switch leniently, so a value from env() does not break the form of the site', function (): void {
+        config(['fastleo.notifications.mail' => null]);
+        Fastleo::notifyAdmins('Новая заявка');
+
+        config(['fastleo.notifications.mail' => 'true']);
+        Fastleo::notifyAdmins('Ещё заявка');
+
+        expect(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(1);
+    });
+
+    it('skips a chosen channel that the site switched off', function (): void {
+        config(['fastleo.notifications.mail' => false]);
+
+        Fastleo::notifyAdmins('Новая заявка', via: ['mail', 'bell']);
+
+        expect(AdminNotification::query()->count())->toBe(1)
+            ->and(Mail::mailer('array')->getSymfonyTransport()->messages())->toHaveCount(0);
+    });
+
+    it('fails loudly on an unknown channel instead of losing the message', function (): void {
+        expect(fn () => Fastleo::notifyAdmins('Новая заявка', via: ['bell', 'telegram']))
+            ->toThrow(InvalidArgumentException::class, 'неизвестный канал «telegram», допустимы: bell, mail, bots');
+
+        expect(AdminNotification::query()->count())->toBe(0);
+    });
+
+    it('names a channel that is not a string and refuses an empty list', function (): void {
+        expect(fn () => Fastleo::notifyAdmins('Новая заявка', via: ['bell', 0]))
+            ->toThrow(InvalidArgumentException::class, 'неизвестный канал «int», допустимы: bell, mail, bots')
+            ->and(fn () => Fastleo::notifyAdmins('Новая заявка', via: []))
+            ->toThrow(InvalidArgumentException::class, 'пустой список каналов via, допустимы: bell, mail, bots; во все включённые — без via');
     });
 });
 

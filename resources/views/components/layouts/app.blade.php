@@ -211,8 +211,9 @@
                     @endforeach
                 </nav>
 
+                @if (\Fastleo\Fastleo::bell())
                 <div
-                    x-data="fastleoBell({ url: @js(route('fastleo.notifications.index')), readAllUrl: @js(route('fastleo.notifications.read-all')), readUrl: @js(route('fastleo.notifications.read', ['id' => '__id__'])), unread: {{ \Fastleo\Notifications\AdminNotification::unreadCount() }} })"
+                    x-data="fastleoBell({ url: @js(route('fastleo.notifications.feed')), readAllUrl: @js(route('fastleo.notifications.read-all')), readUrl: @js(route('fastleo.notifications.read', ['id' => '__id__'])), unread: {{ \Fastleo\Notifications\AdminNotification::unreadCount() }}, poll: {{ \Fastleo\Fastleo::bellPoll() }} })"
                     class="static lg:relative"
                     data-bell
                     @keydown.escape.window="open = false"
@@ -243,8 +244,10 @@
                             </template>
                             <li x-show="loaded && items.length === 0" class="px-4 py-6 text-center text-sm text-ink-2">{{ __('fastleo::notifications.empty') }}</li>
                         </ul>
+                        <a href="{{ route('fastleo.notifications.index') }}" class="block border-t border-line px-4 py-2.5 text-center text-sm font-medium text-primary-text hover:bg-hover" data-bell-all>{{ __('fastleo::notifications.all') }}</a>
                     </div>
                 </div>
+                @endif
 
                 <div x-data="fastleoTheme" class="flex items-center gap-0.5 rounded-[8px] bg-sunken p-0.5" role="radiogroup" aria-label="{{ __('fastleo::layout.theme') }}">
                     @foreach (['light' => 'sun', 'dark' => 'moon', 'system' => 'monitor'] as $mode => $icon)

@@ -70,7 +70,7 @@ class ChannelResource extends Resource
     #[Override]
     public static function group(): ?string
     {
-        return static::$group ?? __('fastleo::users.group', [], Fastleo::LOCALE);
+        return static::$group ?? __('fastleo::messengers.group', [], Fastleo::LOCALE);
     }
 
     /**

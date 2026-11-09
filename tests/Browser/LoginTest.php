@@ -14,7 +14,7 @@ beforeEach(function (): void {
 it('signs in, switches to the dark theme that survives a reload and signs out', function (): void {
     $page = visit(route('fastleo.login'));
 
-    $page->assertSee('Вход в админку')
+    $page->assertSee('Вход')
         ->fill('email', 'admin@example.com')
         ->fill('password', 'password')
         ->press('Войти')
@@ -27,7 +27,7 @@ it('signs in, switches to the dark theme that survives a reload and signs out', 
         ->assertScript("getComputedStyle(document.body).backgroundColor !== 'rgb(249, 250, 251)'")
         ->click('[data-theme-mode="light"]')
         ->press('Выйти')
-        ->assertSee('Вход в админку')
+        ->assertSee('Вход')
         ->assertNoJavaScriptErrors();
 });
 

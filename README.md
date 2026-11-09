@@ -14,7 +14,7 @@ What's included:
 - **Security**: a separate login with rate limits, two-factor authentication, permissions via model Policies, only declared fields are written, upload protection ([details](docs/security.md)).
 - **Claude**: a skill and Laravel Boost guidelines, the `fastleo:doctor` and `fastleo:inspect` commands, an MCP server — you can ask for a section in a single sentence ([details](docs/claude.md)).
 
-Dark mode and mobile layout work out of the box. The notification bots and publishing are off by default — [how to switch them on](docs/configuration.md).
+Dark mode and mobile layout work out of the box. The notification bell, notification bots and publishing are off by default — [how to switch them on](docs/configuration.md).
 
 Coming from 2.x or 3.0? 4.0 is a new admin panel, not an upgrade of the old one — sections are described again as classes and data formats change; see the [migration guide](docs/upgrade-from-3.md). Moving from another admin panel (MoonShine, a hand-made one)? See [moving to fastleo](docs/migrating.md). What's new — [CHANGELOG](CHANGELOG.md).
 
