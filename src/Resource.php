@@ -145,6 +145,24 @@ abstract class Resource
      */
     protected static ?string $readColumn = null;
 
+    /**
+     * Открытие записи ставит отметку `$readColumn` (по умолчанию да). `false` — отметка меняется только действием
+     * «Просмотрено» / «Не просмотрено» или кодом сайта (`markRead()`): так «прочитано» значит «взяли в работу», а не «кто-то открыл».
+     */
+    protected static bool $readOnOpen = true;
+
+    /**
+     * Фильтры списка применяются сами при выборе значения (по умолчанию да). `false` — только кнопкой «Фильтровать»,
+     * которая стоит в одном ряду с полями: можно спокойно выставить несколько значений и даты, страница не перезагружается.
+     */
+    protected static bool $filtersApplyOnChange = true;
+
+    /**
+     * Панель фильтров в списке свёрнута, пока её не откроют, даже если фильтры применены или заданы по умолчанию
+     * (число применённых — на кнопке «Фильтры»). Открытое или закрытое состояние помнится на время вкладки браузера.
+     */
+    protected static bool $filtersCollapsed = false;
+
     /** Поля, разложенные из fields() (считаются один раз на объект). */
     private ?FormSchema $schema = null;
 
@@ -271,6 +289,30 @@ abstract class Resource
     public static function readColumn(): ?string
     {
         return static::$readColumn;
+    }
+
+    /**
+     * Открытие записи ставит отметку «просмотрено» (`$readOnOpen`).
+     */
+    public static function readOnOpen(): bool
+    {
+        return static::$readOnOpen;
+    }
+
+    /**
+     * Фильтры списка применяются при выборе значения (`$filtersApplyOnChange`); иначе — кнопкой «Фильтровать».
+     */
+    public static function filtersApplyOnChange(): bool
+    {
+        return static::$filtersApplyOnChange;
+    }
+
+    /**
+     * Панель фильтров свёрнута, пока её не откроют (`$filtersCollapsed`).
+     */
+    public static function filtersCollapsed(): bool
+    {
+        return static::$filtersCollapsed;
     }
 
     /**
@@ -744,6 +786,69 @@ abstract class Resource
         }
 
         return $tone;
+    }
+
+    /**
+     * Главная кнопка строки списка: заметная кнопка с подписью рядом со значками записи (остальные действия — в меню «…»).
+     * Подпись может зависеть от записи. Нет действия с таким ключом или оно записи недоступно — кнопки нет.
+     *
+     * ```php
+     * public function primaryRowAction(Model $record): ?array
+     * {
+     *     return $record->manager_id === null
+     *         ? ['key' => (new TakeLead)->key(), 'label' => 'Взять в работу', 'primary' => true]
+     *         : null;
+     * }
+     * ```
+     *
+     * @return array{key: string, label: string, primary?: bool}|null `primary` — залитая кнопка (по умолчанию контурная)
+     */
+    public function primaryRowAction(Model $record): ?array
+    {
+        return null;
+    }
+
+    /**
+     * Карточка записи над вкладками связанных таблиц на странице редактирования: имя Blade-шаблона
+     * (получает `$record` и `$resource`), только для чтения. null — карточки нет.
+     *
+     * ```php
+     * public function summaryView(): ?string
+     * {
+     *     return 'clients.card'; // resources/views/clients/card.blade.php
+     * }
+     * ```
+     */
+    public function summaryView(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Кнопки в шапке страницы редактирования записи рядом с «Удалить», например «Добавить заявку» клиенту
+     * (ссылка на форму дочернего раздела с `?prefill[client_id]=…`).
+     *
+     * ```php
+     * public function addButtons(Model $record): array
+     * {
+     *     return [['label' => 'Добавить заявку', 'url' => route('fastleo.resources.create', ['resource' => 'offers', 'prefill' => ['client_id' => $record->getKey()]])]];
+     * }
+     * ```
+     *
+     * @return list<array{label: string, url: string}>
+     */
+    public function addButtons(Model $record): array
+    {
+        return [];
+    }
+
+    /**
+     * Текст окна подтверждения удаления записи вместо стандартного: например, что вместе с ней пропадут связанные данные.
+     * null — стандартный текст.
+     */
+    public function deleteWarning(Model $record): ?string
+    {
+        return null;
     }
 
     /**

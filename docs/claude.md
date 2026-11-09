@@ -159,6 +159,11 @@ class ProductsAdminTest extends TestCase
 | Просмотр записи: окно (по умолчанию `'modal'`), отдельная страница (`'page'`) или без просмотра, только форма | `'record_view' => 'modal'\|'page'\|false` в `config/fastleo.php`; ссылку на запись в уведомлениях — `Fastleo::recordUrl($запись, false)` | [configuration.md](configuration.md#страница-просмотра-записи) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](related.md#раскрывающиеся-строки) |
 | Статусы цветными метками | `Enum`/`Select` с `->badges()`, у enum — метод `tone()` | [fields/select.md](fields/select.md) |
+| Фильтры списка не применять сами, а кнопкой «Фильтровать»; панель фильтров свёрнута | `protected static bool $filtersApplyOnChange = false;`, `$filtersCollapsed = true;` в ресурсе | [list.md](list.md#фильтры-по-кнопке-и-свёрнутая-панель) |
+| Заметная кнопка главного действия в строке списка («Взять в работу») | `primaryRowAction(Model $record): ?array` в ресурсе — `['key' => …, 'label' => …, 'primary' => true]` | [list.md](list.md#главная-кнопка-строки) |
+| Карточка записи над формой и вкладками; кнопка в шапке («Добавить заявку»); свой текст предупреждения об удалении | `summaryView()`, `addButtons($record)`, `deleteWarning($record)` в ресурсе; у связи — `->withoutAddButton()` | [resources.md](resources.md#страница-записи-карточка-кнопки-предупреждение) |
+| Нельзя привязать запись к чужому или закрытому родителю (запчасть — к чужой заявке) | `BelongsTo::make('offer_id')->mustAllow('update')->hideOnEdit()` | [fields/belongs-to.md](fields/belongs-to.md#привязка-только-к-тому-что-можно-изменять-mustallow) |
+| «Прочитано» = «взяли в работу», а не «кто-то открыл» | `protected static bool $readOnOpen = false;` + `$resource->markRead([$id])` в своём коде | [resources.md](resources.md#отметка-просмотрено) |
 | Подсветить строку списка по состоянию записи (просрочено, выполнено) | `rowTone(Model $record): ?string` в ресурсе — `success`/`warning`/`danger`/`info`/`neutral` | [list.md](list.md#подсветка-строк) |
 | Правка значения прямо в списке | `->inlineEditable()` (текст, число, список, `BelongsTo`); галочка — `->quickToggle()` | [list.md](list.md#правка-в-ячейке) |
 | Столбец прячется, пока у всех записей страницы пуст (второй телефон, комментарий) | `->hideWhenEmpty()` у поля | [list.md](list.md#какие-поля-видны) |
@@ -260,6 +265,7 @@ Doctor работает без вошедшего администратора: 
 | расширение PHP GD не установлено (`image_gd`): любая загруженная картинка отклоняется; GD собрано без WebP или JPEG (`image_gd_formats`): не загрузятся картинки этого формата, а варианты WebP не создадутся | `php-gd` с поддержкой JPEG и WebP (`apt install php8.4-gd`; в Docker — `docker-php-ext-configure gd --with-webp --with-jpeg`) |
 | `Secret` пишет в колонку без шифрующего каста (`secret_cast`): токен лежал бы в базе открытым текстом | `'поле' => 'encrypted'` (или `AsEncrypted…`) в `$casts` модели |
 | `fastleo.record_view` — не `'modal'`, `'page'` и не `false` | одно из трёх значений ([configuration.md](configuration.md#страница-просмотра-записи)) |
+| внешний ключ без индекса в таблице от 1000 строк (`foreign_index`, предупреждение) | `$table->index('колонка')` в миграции: на PostgreSQL и SQLite `constrained()` индекс не создаёт |
 | колонка `$sortColumn`, `$treeColumn` или `$readColumn` не найдена | исправить имя или миграцию |
 | колонка `$readColumn` — не дата со временем или NOT NULL | `$table->timestamp('read_at')->nullable()` |
 | `SetToggle` указывает на поле, которого нет в ресурсе или которое не `Checkbox`/`Toggle` | поправить имя поля |

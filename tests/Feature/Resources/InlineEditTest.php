@@ -78,6 +78,17 @@ describe('the cell', function (): void {
 
         $this->get(route('fastleo.resources.index', 'inline-articles'))->assertOk()->assertSee('<option value="legacy" selected>legacy</option>', false);
     });
+
+    it('names a saved related record that the options of the field leave out, as the list does', function (): void {
+        useFixtureResources('InlineHiddenOption');
+        $this->category->update(['code' => null]);
+        Category::factory()->create(['title' => 'С кодом', 'code' => 'coded']);
+
+        $this->get(route('fastleo.resources.index', 'coded-category-articles'))
+            ->assertOk()
+            ->assertSee('<option value="'.$this->category->id.'" selected>Вентиляция</option>', false)
+            ->assertSee('>С кодом</option>', false);
+    });
 });
 
 describe('the look of a cell', function (): void {

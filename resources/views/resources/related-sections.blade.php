@@ -11,7 +11,7 @@
     @if (\Fastleo\Support\Authorization::allows('view', $resource, $record) && \Fastleo\Support\Authorization::allows('viewAny', $related->child()))
         <section
             x-data="fastleoRelated({ url: @js(route('fastleo.resources.related', [$resource::slug(), $record->getKey(), $related->name, 'return' => ($returnUrl ?? url()->current()).($related->isInTab() ? '#'.$related->tabKey() : ''), 'panel' => ($panel ?? false) ? 1 : null])), error: @js(__('fastleo::resources.related_error')), poll: @js($related->child()::poll()) })"
-            @class(['flex flex-col gap-3', 'mt-6' => ! ($nested ?? false)])
+            @class(['flex flex-col gap-3', 'mt-6' => ! ($nested ?? false) && ! ($panel ?? false)])
             data-related="{{ $related->name }}"
             aria-live="polite"
         >

@@ -151,6 +151,9 @@ describe('field query', function (): void {
         $article = Article::factory()->create();
         $article->topics()->attach([$open->id, $hidden->id]);
 
+        // Скрытая тема не показывается снимаемой меткой: снять её формой нельзя.
+        $this->get(route('fastleo.resources.edit', ['scoped-articles', $article->id]))->assertOk()->assertSee('Открытая')->assertDontSee('Служебная');
+
         $this->put(route('fastleo.resources.update', ['scoped-articles', $article->id]), ['title' => 'Статья', 'topics' => [(string) $other->id]])
             ->assertSessionHasErrors('topics.0');
 

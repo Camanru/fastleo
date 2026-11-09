@@ -89,6 +89,8 @@ return [
     'home_unknown_hint' => 'Укажите адрес существующего раздела или своей страницы в fastleo.home (config/fastleo.php) или верните null.',
     'related_quick_required' => 'Связанная таблица «:relation»: в быстром добавлении нет обязательного поля «:field» раздела :child и у него нет значения по умолчанию — запись не создастся.',
     'related_quick_required_hint' => 'Добавьте поле в quickAdd([...]) или задайте ему default().',
+    'foreign_index' => 'У внешнего ключа :table.:column нет индекса, а в таблице от 1000 строк: выбор записей, связанные таблицы и удаление родителя читают её целиком.',
+    'foreign_index_hint' => 'Добавьте в миграцию $table->index(\':column\') (на MySQL и MariaDB это делает foreignId()->constrained(), на PostgreSQL и SQLite — нет).',
     'related_foreign' => 'Связанная таблица «:relation»: в форме создания раздела :child нет поля «:key» — кнопка «Добавить» не сможет подставить родителя, и новая запись окажется без связи.',
     'related_foreign_hint' => 'Добавьте в fields() раздела :child поле BelongsTo::make(\':key\') (или Select, Number, Hidden с этим именем) и не скрывайте его при создании.',
     'set_toggle_readonly' => 'Действие :action (SetToggle): поле «:field» только для чтения (readonly) — действие будет пропускать все записи.',

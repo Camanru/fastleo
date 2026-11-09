@@ -447,13 +447,14 @@ final class ResourceController
     }
 
     /**
-     * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели).
+     * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели), если раздел не отключил это
+     * свойством `$readOnOpen = false`.
      */
     private function markRead(Resource $resource, Model $record): void
     {
         $column = $resource::readColumn();
 
-        if ($column !== null && $record->getAttribute($column) === null && $resource->markRead([$record->getKey()]) > 0) {
+        if ($column !== null && $resource::readOnOpen() && $record->getAttribute($column) === null && $resource->markRead([$record->getKey()]) > 0) {
             $record->setAttribute($column, $record->freshTimestamp());
             $record->syncOriginalAttribute($column);
         }

@@ -99,6 +99,9 @@ final class Doctor
     /** Типы, у которых значение не может отсутствовать при NOT NULL (пустое значение хранится как `false` или `[]`). */
     private const array NEVER_EMPTY = [Checkbox::class, Gallery::class, KeyValue::class, Seo::class];
 
+    /** С какого числа строк отсутствие индекса у внешнего ключа считается проблемой: на малых таблицах он не нужен. */
+    private const int FOREIGN_INDEX_ROWS = 1000;
+
     /** Касты JSON-значений, которые подходят полям с массивом. */
     private const array ARRAY_CASTS = ['array', 'json', 'json:unicode', 'collection', 'object'];
 
@@ -111,6 +114,13 @@ final class Doctor
      * @var list<string>
      */
     private array $remoteFields = [];
+
+    /**
+     * Внешние ключи (`таблица.колонка`), у которых индекс уже проверен: один ключ встречается в нескольких разделах.
+     *
+     * @var array<string, true>
+     */
+    private array $checkedForeignKeys = [];
 
     /**
      * Таблицы пакета, которых нет (не выполнен `migrate`): о них уже есть одна общая ошибка,
@@ -752,6 +762,7 @@ final class Doctor
 
         $this->setToggles($resource, $scope);
         $this->relatedTables($resource, $scope);
+        $this->foreignIndexes($resource, $model, $fields, $scope);
         $this->queryColumns($resource, $fields, $scope);
         $this->fields($fields, $model, $columns, $scope, ! $resource::isReadonly());
         $this->inputVars($fields, $scope, ! $resource::isReadonly());
@@ -835,6 +846,61 @@ final class Doctor
                 }
             }
         }
+    }
+
+    /**
+     * Внешние ключи раздела (поля `BelongsTo` и связанные таблицы) должны быть первой колонкой какого-нибудь индекса:
+     * без него выбор записей, связанные таблицы и удаление родителя читают всю таблицу. MySQL создаёт такой индекс
+     * для `foreignId()->constrained()` сам, PostgreSQL и SQLite — нет. Проверяются таблицы от 1000 строк.
+     *
+     * @param  list<Field>  $fields
+     */
+    private function foreignIndexes(Resource $resource, Model $model, array $fields, string $scope): void
+    {
+        $keys = [];
+
+        foreach ($fields as $field) {
+            if ($field instanceof BelongsTo) {
+                $keys[] = [$model, $field->name];
+            }
+        }
+
+        foreach ($resource->listRelations() as $related) {
+            $keys[] = [$related->child()->newModel(), $related->foreignKey()];
+        }
+
+        foreach ($keys as [$owner, $column]) {
+            $name = $owner->getTable().'.'.$column;
+
+            if (isset($this->checkedForeignKeys[$name])) {
+                continue;
+            }
+
+            $this->checkedForeignKeys[$name] = true;
+
+            $schema = Schema::connection($owner->getConnectionName());
+
+            if (! $schema->hasColumn($owner->getTable(), $column) || $this->indexedFirst($schema->getIndexes($owner->getTable()), $column)) {
+                continue;
+            }
+
+            // «Есть ли 1000-я строка»: не считает всю таблицу. Недоступная база ломает описание раздела раньше (ошибка `resource`).
+            $big = $owner->newQuery()->withoutGlobalScopes()->toBase()->offset(self::FOREIGN_INDEX_ROWS - 1)->limit(1)->exists();
+
+            if ($big) {
+                $this->add('warning', $scope, 'foreign_index', ['table' => $owner->getTable(), 'column' => $column], 'foreign_index_hint');
+            }
+        }
+    }
+
+    /**
+     * Колонка — первая в каком-либо индексе (в том числе первичном).
+     *
+     * @param  list<array<string, mixed>>  $indexes
+     */
+    private function indexedFirst(array $indexes, string $column): bool
+    {
+        return array_any($indexes, fn (array $index): bool => is_array($index['columns'] ?? null) && ($index['columns'][0] ?? null) === $column);
     }
 
     /**

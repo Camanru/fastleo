@@ -4,12 +4,12 @@
     <div class="flex items-center gap-2">
         <label class="min-w-0 flex-1">
             <span class="sr-only">{{ __('fastleo::resources.filter_number_from') }}</span>
-            <input type="number" step="any" inputmode="decimal" name="filter[{{ $filter->name }}][from]" value="{{ $value['from'] ?? '' }}" form="{{ $form }}" class="fastleo-input" placeholder="{{ __('fastleo::resources.filter_number_from') }}" title="{{ __('fastleo::resources.filter_number_from') }}" x-on:change="$el.form.requestSubmit()">
+            <input type="number" step="any" inputmode="decimal" name="filter[{{ $filter->name }}][from]" value="{{ $value['from'] ?? '' }}" form="{{ $form }}" class="fastleo-input" placeholder="{{ __('fastleo::resources.filter_number_from') }}" title="{{ __('fastleo::resources.filter_number_from') }}" @if ($auto ?? true)x-on:change="$el.form.requestSubmit()"@endif>
         </label>
         <span class="text-ink-3">—</span>
         <label class="min-w-0 flex-1">
             <span class="sr-only">{{ __('fastleo::resources.filter_number_to') }}</span>
-            <input type="number" step="any" inputmode="decimal" name="filter[{{ $filter->name }}][to]" value="{{ $value['to'] ?? '' }}" form="{{ $form }}" class="fastleo-input" placeholder="{{ __('fastleo::resources.filter_number_to') }}" title="{{ __('fastleo::resources.filter_number_to') }}" x-on:change="$el.form.requestSubmit()">
+            <input type="number" step="any" inputmode="decimal" name="filter[{{ $filter->name }}][to]" value="{{ $value['to'] ?? '' }}" form="{{ $form }}" class="fastleo-input" placeholder="{{ __('fastleo::resources.filter_number_to') }}" title="{{ __('fastleo::resources.filter_number_to') }}" @if ($auto ?? true)x-on:change="$el.form.requestSubmit()"@endif>
         </label>
     </div>
 </fieldset>

@@ -1144,3 +1144,59 @@ it('does not warn about routes when the admin at the root has its own domain', f
 
     expect(implode("\n", messages('site', 'warning')))->not->toContain('корне домена');
 });
+
+describe('indexes of foreign keys', function (): void {
+    /**
+     * Вставить в таблицу статей столько строк, сколько нужно.
+     */
+    function insertArticles(int $count): void
+    {
+        // MySQL создаёт индекс для `constrained()` сам, PostgreSQL и SQLite — нет: тесту нужна таблица без индекса.
+        $indexes = array_filter(Schema::getIndexes('articles'), fn (array $index): bool => ($index['columns'][0] ?? null) === 'category_id');
+
+        if ($indexes !== []) {
+            Schema::table('articles', fn (Blueprint $table) => $table->dropForeign(['category_id']));
+            Schema::table('articles', function (Blueprint $table) use ($indexes): void {
+                foreach ($indexes as $index) {
+                    $table->dropIndex($index['name']);
+                }
+            });
+        }
+
+        $now = now()->toDateTimeString();
+
+        foreach (array_chunk(range(1, $count), 250) as $chunk) {
+            DB::table('articles')->insert(array_map(fn (int $i): array => ['title' => 'Статья '.$i, 'created_at' => $now, 'updated_at' => $now], $chunk));
+        }
+    }
+
+    it('warns about a foreign key without an index in a big table, once for the key', function (): void {
+        insertArticles(1000);
+
+        $warnings = array_filter(messages('articles', 'warning'), fn (string $message): bool => str_contains($message, 'нет индекса'));
+
+        expect(implode("\n", $warnings))->toContain('articles.category_id')
+            ->and(array_filter(array_merge(...array_map(fn (string $scope): array => messages($scope, 'warning'), ['articles', 'categories', 'products'])), fn (string $message): bool => str_contains($message, 'articles.category_id')))->toHaveCount(1);
+    });
+
+    it('gives the way out in the hint', function (): void {
+        insertArticles(1000);
+
+        $hints = array_column(array_filter(diagnosed()['problems'], fn (array $problem): bool => str_contains($problem['message'], 'articles.category_id')), 'hint');
+
+        expect($hints[0])->toContain("\$table->index('category_id')");
+    });
+
+    it('is silent when the key has an index', function (): void {
+        insertArticles(1000);
+        Schema::table('articles', fn (Blueprint $table) => $table->index('category_id'));
+
+        expect(implode("\n", messages('articles', 'warning')))->not->toContain('articles.category_id');
+    });
+
+    it('is silent for a small table', function (): void {
+        insertArticles(999);
+
+        expect(implode("\n", messages('articles', 'warning')))->not->toContain('articles.category_id');
+    });
+});

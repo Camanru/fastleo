@@ -1,4 +1,4 @@
-{{-- Фильтр по связи: список с поиском (fastleoCombobox); выбор сразу применяет фильтр. --}}
+{{-- Фильтр по связи: список с поиском (fastleoCombobox); выбор сразу применяет фильтр (если раздел не требует кнопки «Фильтровать»). --}}
 @php
     $remote = $filter->isRemote();
     $combobox = [
@@ -19,7 +19,7 @@
         class="relative"
         @click.outside="close()"
         @keydown.escape="if (open) { $event.preventDefault(); $event.stopPropagation(); close(); }"
-        x-on:input="$event.target.type === 'hidden' && $event.target.form?.requestSubmit()"
+        @if ($auto ?? true)x-on:input="$event.target.type === 'hidden' && $event.target.form?.requestSubmit()"@endif
     >
         <input type="hidden" name="filter[{{ $filter->name }}]" form="{{ $form }}" :value="selected[0]?.value ?? ''">
         <div class="fastleo-input flex min-h-9 cursor-text items-center gap-1.5 py-1.5 focus-within:border-primary focus-within:shadow-[0_0_0_3px_var(--color-ring)]" @click="openList()">

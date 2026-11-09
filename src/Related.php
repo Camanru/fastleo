@@ -59,6 +59,9 @@ final class Related
 
     private bool $aside = false;
 
+    /** Кнопка «Добавить» над таблицей. */
+    private bool $addButton = true;
+
     /** Ключ вкладки, в которую таблица положена в `fields()` (null — таблица из `relations()`, под формой). */
     private ?string $tabKey = null;
 
@@ -229,6 +232,29 @@ final class Related
         $this->aside = $aside;
 
         return $this;
+    }
+
+    /**
+     * Убрать кнопку «Добавить» над таблицей: запись добавляется кнопкой в шапке страницы (`addButtons()` раздела) или не добавляется.
+     * Права на добавление и быстрое добавление (`quickAdd()`) это не меняет.
+     *
+     * ```php
+     * Related::make('offers', OfferResource::class)->withoutAddButton(); // «Добавить заявку» стоит в шапке страницы клиента
+     * ```
+     */
+    public function withoutAddButton(bool $without = true): self
+    {
+        $this->addButton = ! $without;
+
+        return $this;
+    }
+
+    /**
+     * Над таблицей есть кнопка «Добавить».
+     */
+    public function hasAddButton(): bool
+    {
+        return $this->addButton;
     }
 
     /**

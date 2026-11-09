@@ -41,6 +41,7 @@ return [
     'search_placeholder' => 'Найти…',
     'search_reset' => 'Сбросить',
     'filters' => 'Фильтры',
+    'filters_apply' => 'Фильтровать',
     'order_hint' => 'Перетащите строку за ручку или используйте стрелки. Порядок сохраняется сразу.',
     'slug_generate' => 'Сгенерировать из заголовка',
     'tree_add_child_short' => 'Вложенная',

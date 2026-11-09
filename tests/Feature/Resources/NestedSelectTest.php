@@ -302,3 +302,26 @@ describe('choosing a record in a single block', function (): void {
         expect(bundleRows($this->kit))->toBe([[$stored->id, 1]]);
     });
 });
+
+describe('a block choice that must be allowed', function (): void {
+    beforeEach(function (): void {
+        useFixtureResources('NestedMustAllow');
+    });
+
+    it('keeps a block whose saved product may no longer be changed and refuses to add such a product anew', function (): void {
+        $closed = Product::factory()->create(['title' => 'Закрытый']);
+        $kit = Product::factory()->create(['title' => 'Набор']);
+        $row = $kit->bundleItems()->create(['item_id' => $closed->id, 'qty' => 1]);
+
+        $this->put(route('fastleo.resources.update', ['products', $kit->id]), ['title' => 'Набор', 'bundleItems' => [
+            '0' => ['id' => (string) $row->id, 'item_id' => (string) $closed->id],
+        ]])->assertSessionHasNoErrors();
+
+        $this->put(route('fastleo.resources.update', ['products', $kit->id]), ['title' => 'Набор', 'bundleItems' => [
+            '0' => ['id' => (string) $row->id, 'item_id' => (string) $closed->id],
+            '1' => ['item_id' => (string) $closed->id],
+        ]])->assertSessionHasErrors('bundleItems.1.item_id');
+
+        expect(bundleRows($kit))->toBe([[$closed->id, 1]]);
+    });
+});

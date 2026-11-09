@@ -52,11 +52,16 @@
                     {{ __('fastleo::resources.open_on_site') }}
                 </x-fastleo::button>
             @endif
+            @if ($editing && ! $framed)
+                @foreach ($resource->addButtons($record) as $button)
+                    <x-fastleo::button variant="primary" icon="plus" :href="$button['url']">{{ $button['label'] }}</x-fastleo::button>
+                @endforeach
+            @endif
             @if ($canDelete)
                 <x-fastleo::action-form
                     :action="route('fastleo.resources.destroy', [$slug, $record->getKey()])"
                     method="DELETE"
-                    :confirm="__($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')"
+                    :confirm="$resource->deleteWarning($record) ?? __($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')"
                 >
                     <x-fastleo::button type="submit" variant="danger-soft" icon="trash-2">
                         {{ __('fastleo::resources.delete') }}
@@ -70,6 +75,13 @@
 
     @if ($framed)
         <h1 class="mb-3 pr-12 text-lg font-semibold tracking-[-0.01em]">{{ $recordTitle !== '' ? $recordTitle : $title }}</h1>
+    @endif
+
+    @if ($editing && ! $framed && ($summaryView = $resource->summaryView()) !== null)
+        {{-- Карточка записи над формой и вкладками: только чтение (summaryView() раздела). --}}
+        <div class="mb-4">
+            @include($summaryView, ['record' => $record, 'resource' => $resource])
+        </div>
     @endif
 
     @php

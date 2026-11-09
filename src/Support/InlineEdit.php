@@ -73,9 +73,11 @@ final class InlineEdit
             return null;
         }
 
-        // Сохранённое значение, которого нет среди вариантов, остаётся выбранным: ячейка не меняет его молча.
+        // Сохранённое значение, которого нет среди вариантов, остаётся выбранным: ячейка не меняет его молча. Связанная запись
+        // подписана, как в списке (запись вне `query()` поля — например, ответственный, которого уже нет среди вариантов).
         if ($value !== '' && ! in_array($value, array_column($options, 'value'), true)) {
-            $options[] = ['value' => $value, 'label' => $value];
+            $related = $field instanceof BelongsTo ? $record->getRelationValue($field->getRelationName()) : null;
+            $options[] = ['value' => $value, 'label' => $field instanceof BelongsTo && $related instanceof Model ? $field->titleOf($related) : $value];
         }
 
         $tones = [];

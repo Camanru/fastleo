@@ -87,7 +87,16 @@
     <div class="flex flex-col gap-5" x-data="fastleoActions({ ids: @js($pageIds), open: @js(session('fastleo.action')), openIds: @js(array_values(array_filter((array) old('ids', []), 'is_string'))) })">
     @include('fastleo::actions.forms', ['actions' => $formActions])
 
-    <div class="flex flex-col gap-3" x-data="{ filtersOpen: @js($list->filters !== []), filtersApplied: @js($list->filters !== []) }">
+    @php
+        $filtersAuto = $resource::filtersApplyOnChange();
+        $filtersCollapsed = $resource::filtersCollapsed();
+        $filtersStateKey = 'fastleo-filters-'.$slug;
+        // Панель открыта, если фильтры применены; у свёрнутой — как оставили на этой вкладке (sessionStorage может быть недоступен).
+        $filtersOpenInit = $filtersCollapsed
+            ? "(() => { try { return sessionStorage.getItem('".$filtersStateKey."') === '1'; } catch (e) { return false; } })()"
+            : ($list->filters !== [] ? 'true' : 'false');
+    @endphp
+    <div class="flex flex-col gap-3" x-data="{ filtersOpen: {{ $filtersOpenInit }}, filtersApplied: @js($list->filters !== []) }" @if ($filtersCollapsed) x-init="$watch('filtersOpen', (open) => { try { sessionStorage.setItem('{{ $filtersStateKey }}', open ? '1' : '0'); } catch (e) {} })" @endif>
     <div class="flex flex-wrap items-center gap-2">
         @if ($list->hasSearch() || $list->hasFilters())
             <form id="fastleo-list" method="GET" action="{{ route('fastleo.resources.index', $slug) }}" role="search" class="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-[0_1_460px]">
@@ -177,10 +186,19 @@
     </div>
 
     @if ($list->hasFilters())
-        <div id="fastleo-filters" x-show="filtersOpen" x-cloak x-transition.opacity class="fastleo-card grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        {{-- Фильтры применяются сами; у раздела с $filtersApplyOnChange = false — кнопкой «Фильтровать», которая стоит в одном ряду с полями. --}}
+        <div id="fastleo-filters" x-show="filtersOpen" x-cloak x-transition.opacity @class(['fastleo-card p-4', 'grid gap-4 sm:grid-cols-2 lg:grid-cols-4' => $filtersAuto, 'flex flex-wrap items-end gap-4 *:min-w-0 *:flex-[1_1_11rem] [&>fieldset]:flex-[2_1_22rem]' => ! $filtersAuto])>
             @foreach ($resource->listFilters() as $name => $filter)
-                @include($filter->view(), ['filter' => $filter, 'value' => $list->filters[$name] ?? null, 'form' => 'fastleo-list'])
+                @include($filter->view(), ['filter' => $filter, 'value' => $list->filters[$name] ?? null, 'form' => 'fastleo-list', 'auto' => $filtersAuto])
             @endforeach
+            @unless ($filtersAuto)
+                <div class="flex flex-none! items-center gap-2" data-filters-actions>
+                    <x-fastleo::button type="submit" form="fastleo-list" variant="primary" icon="list-filter">{{ __('fastleo::resources.filters_apply') }}</x-fastleo::button>
+                    @if ($list->isChanged())
+                        <x-fastleo::button variant="ghost" :href="route('fastleo.resources.index', array_filter(['resource' => $slug, 'trashed' => $trashed ? 1 : null]))">{{ __('fastleo::resources.search_reset') }}</x-fastleo::button>
+                    @endif
+                </div>
+            @endunless
         </div>
     @endif
     </div>

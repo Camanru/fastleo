@@ -9,10 +9,13 @@ use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\QueriesRelatedRecords;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Fastleo\Resource;
+use Fastleo\Support\Authorization;
 use Fastleo\Support\OptionRule;
+use Fastleo\Support\RecordKey;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo as BelongsToRelation;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use LogicException;
 use Override;
@@ -37,6 +40,9 @@ class BelongsTo extends Field implements SearchesOptions
      * @var BelongsToRelation<Model, Model>|null
      */
     private ?BelongsToRelation $relationInstance = null;
+
+    /** Право на выбранную запись, без которого связь не сохраняется (`mustAllow()`). */
+    private ?string $requiredAbility = null;
 
     /**
      * Метод связи: заданный `relation()` или имя поля без `_id` (`category_id` → `category`).
@@ -156,7 +162,63 @@ class BelongsTo extends Field implements SearchesOptions
         $rules = parent::getRules($record);
         $rules[$this->name] = array_map(fn (mixed $rule): mixed => $rule instanceof OptionRule ? $this->optionRules($record, $keptFor)[1] : $rule, $rules[$this->name]);
 
+        if ($this->requiredAbility !== null) {
+            $rules[$this->name][] = $this->abilityRule($record, $this->requiredAbility, $keptFor);
+        }
+
         return $rules;
+    }
+
+    /**
+     * Связь сохраняется, только если администратору разрешено действие над выбранной записью (по Policy её модели и `can()`
+     * её раздела). Так запись нельзя привязать к чужому или закрытому родителю: запчасть — к чужой заявке, комментарий — к закрытой
+     * теме. Уже сохранённое значение при правке не проверяется (запись остаётся там, где была); чтобы запретить перенос,
+     * добавьте `hideOnEdit()`. Проверка идёт на сервере: список вариантов она не сужает — для этого есть `query()`.
+     *
+     * ```php
+     * BelongsTo::make('offer_id', 'Заявка')->required()->mustAllow('update')->hideOnEdit();
+     * ```
+     *
+     * @param  string  $ability  действие над выбранной записью: `update` (по умолчанию), `view`, `delete`…
+     */
+    public function mustAllow(string $ability = 'update'): static
+    {
+        $this->requiredAbility = $ability;
+
+        return $this;
+    }
+
+    /**
+     * Правило «действие над выбранной записью разрешено». Пустое, сохранённое (в записи или в этом же блоке `HasMany` —
+     * `$keptFor`) и несуществующее значение пропускает: о них говорят правила вариантов.
+     *
+     * @param  (Closure(string, array<array-key, mixed>): list<string>)|null  $keptFor
+     */
+    private function abilityRule(?Model $record, string $ability, ?Closure $keptFor = null): OptionRule
+    {
+        $saved = $this->savedKeys($record);
+
+        return new OptionRule(function (mixed $value, array $data, string $attribute) use ($ability, $saved, $keptFor): bool {
+            $kept = [...$saved, ...($keptFor instanceof Closure ? $keptFor($attribute, $data) : [])];
+
+            if (! is_scalar($value) || $this->isEmptyValue($value) || in_array((string) $value, $kept, true) || RecordKey::strict($this->relatedModel(), (string) $value) === false) {
+                return true;
+            }
+
+            $related = $this->baseOptionsQuery()->whereKey($value)->first();
+
+            if (! $related instanceof Model) {
+                return true;
+            }
+
+            $resource = Fastleo::resources()->forModel($related::class);
+
+            if ($resource instanceof Resource) {
+                return Authorization::allows($ability, $resource, $related);
+            }
+
+            return Gate::getPolicyFor($related) === null || Gate::forUser(Fastleo::guard()->user())->allows($ability, $related);
+        }, 'parent_denied', 'allows:'.$ability);
     }
 
     #[Override]

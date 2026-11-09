@@ -52,7 +52,7 @@
             {{ $link(route('fastleo.resources.edit', [$slug, $record->getKey(), ...$returnQuery]), 'pencil', __('fastleo::resources.edit'), $modalEditUrl ?? null) }}
         @endif
         @if ($childCount === 0 && $allows('delete', $record))
-            {{ $formStart(route('fastleo.resources.destroy', [$slug, $record->getKey()]), 'DELETE', __($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')) }}
+            {{ $formStart(route('fastleo.resources.destroy', [$slug, $record->getKey()]), 'DELETE', $resource->deleteWarning($record) ?? __($resource::usesSoftDeletes() ? 'fastleo::resources.confirm_delete' : 'fastleo::resources.confirm_delete_forever')) }}
                 {{ $submit('trash-2', __('fastleo::resources.delete'), $dangerButton) }}
             </form>
         @elseif ($childCount > 0 && $allows('delete', $record))
@@ -61,6 +61,18 @@
                 <span class="sr-only">{{ __('fastleo::resources.tree_delete_children_first') }}</span>
             </x-fastleo::button>
         @endif
+    @endif
+    @php($primary = $trashed ? null : $resource->primaryRowAction($record))
+    @if ($primary !== null && isset($rowActions[$primary['key']]))
+        {{-- Главная кнопка строки (primaryRowAction() раздела): заметная, с подписью; остальные действия — в меню. --}}
+        <button
+            type="button"
+            x-on:click="run(@js($primary['key']), [@js((string) $record->getKey())], @js($rowActions[$primary['key']]->clientOptions()))"
+            @class([$buttonBase.'ml-1 h-[30px] gap-1.5 rounded-[7px] px-2.5 text-sm', 'bg-primary font-[550] text-white hover:bg-primary-hover' => ($primary['primary'] ?? false), 'border border-line-strong bg-surface font-medium text-ink hover:bg-surface-2' => ! ($primary['primary'] ?? false)])
+        >
+            {{ $icon($rowActions[$primary['key']]->getIcon(), 'shrink-0 size-[15px]') }}
+            {{ $primary['label'] }}
+        </button>
     @endif
     @if ($rowActions !== [])
         @include('fastleo::actions.menu')

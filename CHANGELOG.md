@@ -4,6 +4,29 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The admin interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
+## [4.9.2] — 2026-11-09
+
+Changes that remove the need to copy the package templates in a CRM: a list with filters applied by a button, a main button in the row, a record card above the form, and a check that a record may be attached to its parent. Everything new is opt-in: a site that sets none of it works as before.
+
+### Upgrade notes
+
+- If your site overrides the list, row actions, form or filter templates (copies in `resources/views/vendor/fastleo`), copy them again: the old copies do not know the button mode of filters, the main row button, the record card and the own delete warning.
+
+### Added
+
+- **Filters applied by a button:** `protected static bool $filtersApplyOnChange = false` — a filter no longer submits the list when a value is chosen; the **Filter** button (and **Reset** when something is filtered) stands in the same row as the fields, so several values and dates can be set in peace. All the ready filters honour it ([list](docs/list.md#фильтры-по-кнопке-и-свёрнутая-панель)).
+- **`protected static bool $filtersCollapsed = true`** — the filter panel stays closed until opened, even when filters are applied or set by default; the open or closed state is remembered for the browser tab ([list](docs/list.md#фильтры-по-кнопке-и-свёрнутая-панель)).
+- **`Resource::primaryRowAction(Model $record)`** — a labelled main button in the list row (`['key' => …, 'label' => …, 'primary' => true]`); the rest of the actions stay in the row menu ([list](docs/list.md#главная-кнопка-строки)).
+- **Record page hooks:** `Resource::summaryView()` (a read-only card above the form and the tabs of related tables), `Resource::addButtons($record)` (buttons in the page header, e.g. "Add order" for a client) and `Resource::deleteWarning($record)` (own text of the delete confirmation) ([resources](docs/resources.md#страница-записи-карточка-кнопки-предупреждение)).
+- **`Related::withoutAddButton()`** — no Add button above a related table (the permissions and `quickAdd()` stay); the table inside a form tab no longer has the extra top margin.
+- **`BelongsTo::mustAllow($ability = 'update')`** — the relation is saved only if the administrator may do the ability to the chosen record (its model's Policy and the `can()` of its section): a record cannot be attached to somebody else's or a closed parent. The saved value is not re-checked on edit; add `hideOnEdit()` to forbid moving ([BelongsTo](docs/fields/belongs-to.md#привязка-только-к-тому-что-можно-изменять-mustallow)).
+- **`protected static bool $readOnOpen = false`** — opening a record does not set the `$readColumn` mark; it changes only by the Mark read / Mark unread actions or by `$resource->markRead()` — for a CRM where read means "taken to work", not "somebody opened it" ([resources](docs/resources.md#отметка-просмотрено)).
+- **`fastleo:doctor` warns about a foreign key without an index** (a `BelongsTo` field or a related table) in a table of 1000 rows or more: `constrained()` makes the index on MySQL and MariaDB only, PostgreSQL and SQLite need `->index()`.
+
+### Changed
+
+- **A saved `BelongsTo` link to a record outside the field's options (`query()`) shows the record's title** in the form and in an `inlineEditable()` cell, as the list already did, instead of its key: e.g. a Manager field limited to managers shows the owner's name on an order the owner created. The record still cannot be chosen anew; a record in the trash keeps the key as its label ([BelongsTo](docs/fields/belongs-to.md)).
+
 ## [4.9.1] — 2026-11-09
 
 ### Upgrade notes
@@ -641,6 +664,7 @@ The Composer name is `camanru/fastleo`, the namespace is `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.9.2]: https://github.com/Camanru/fastleo/releases/tag/4.9.2
 [4.9.1]: https://github.com/Camanru/fastleo/releases/tag/4.9.1
 [4.9.0]: https://github.com/Camanru/fastleo/releases/tag/4.9.0
 [4.8.3]: https://github.com/Camanru/fastleo/releases/tag/4.8.3

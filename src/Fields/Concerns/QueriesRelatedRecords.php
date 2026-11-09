@@ -380,9 +380,10 @@ trait QueriesRelatedRecords
 
     /**
      * Подписи выбранных записей (только среди допустимых вариантов). Ключи из `$kept`, которых
-     * среди вариантов нет (сохранённая связь), остаются выбранными: с подписью, если запись видна
-     * без зависимости, иначе с подписью-ключом. В списке нескольких записей скрытая запись (корзина,
-     * `query()`) не показывается — её связь и так не трогается при сохранении.
+     * среди вариантов нет (сохранённая связь), остаются выбранными: с подписью записи (как в списке —
+     * без `query()` и зависимости), а если запись не найдена (корзина) — с подписью-ключом. В списке
+     * нескольких записей скрытая `query()` или корзиной запись не показывается — её связь и так не
+     * трогается при сохранении (видна запись, скрытая только зависимостью).
      *
      * @param  list<string>  $keys
      * @param  list<string>  $kept
@@ -400,7 +401,10 @@ trait QueriesRelatedRecords
             ? collect($this->prefetched)
             : $this->optionsQuery($dependency)->whereKey($keys)->get()->keyBy(fn (Model $record): string => self::key($record));
         $missing = array_values(array_intersect(array_diff($keys, array_map(strval(...), $records->keys()->all())), $kept));
-        $base = $missing === [] ? collect() : $this->baseOptionsQuery()->whereKey($missing)->get()->keyBy(fn (Model $record): string => self::key($record));
+        // Одиночная сохранённая связь подписывается так же, как в списке: запись уже связана, её подпись не новость для администратора.
+        // В списке нескольких записей скрытая `query()` не показывается: её связь сохранение не трогает, и снять её там нельзя.
+        $base = $missing === [] ? collect() : ($this->isMultiple() ? $this->baseOptionsQuery() : $this->relatedModel()->newQuery())
+            ->whereKey($missing)->get()->keyBy(fn (Model $record): string => self::key($record));
 
         $options = [];
 

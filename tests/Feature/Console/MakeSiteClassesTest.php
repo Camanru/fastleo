@@ -72,7 +72,9 @@ it('creates a filter with a view that narrows the list', function (): void {
 
     expect($query->pluck('title')->all())->toBe(['Alpha'])
         ->and(view($filter->view(), ['filter' => $filter, 'value' => 'Alpha', 'form' => 'list-form'])->render())
-        ->toContain('name="filter[title]"', 'form="list-form"', 'value="Alpha"');
+        ->toContain('name="filter[title]"', 'form="list-form"', 'value="Alpha"', 'requestSubmit')
+        ->and(view($filter->view(), ['filter' => $filter, 'value' => 'Alpha', 'form' => 'list-form', 'auto' => false])->render())
+        ->not->toContain('requestSubmit');
 });
 
 it('creates a widget with a view', function (): void {

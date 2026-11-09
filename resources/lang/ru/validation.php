@@ -165,4 +165,5 @@ return [
     'url' => 'Поле «:attribute» должно быть адресом (https://...).',
     'ulid' => 'Поле «:attribute» должно быть ULID.',
     'uuid' => 'Поле «:attribute» должно быть UUID.',
+    'parent_denied' => 'Нет прав на запись, выбранную в поле «:attribute».',
 ];

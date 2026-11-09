@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Tests\Fixtures\Policies\ViewlessCategoryPolicy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Js;
@@ -158,7 +159,7 @@ describe('saving', function (): void {
 
 it('keeps a saved link to a record that is outside the options now', function (): void {
     useFixtureResources('Relations');
-    $hidden = Category::factory()->create(['code' => null]);
+    $hidden = Category::factory()->create(['code' => null, 'title' => 'Скрытая']);
     $article = Article::factory()->create(['category_id' => $hidden->id]);
 
     $this->get(route('fastleo.resources.edit', ['scoped-articles', $article->id]))
@@ -166,7 +167,7 @@ it('keeps a saved link to a record that is outside the options now', function ()
         ->assertSee(Js::from([
             'multiple' => false,
             'options' => [],
-            'selected' => [['value' => (string) $hidden->id, 'label' => (string) $hidden->id]],
+            'selected' => [['value' => (string) $hidden->id, 'label' => 'Скрытая']],
             'url' => null,
             'remote' => false,
             'depends' => null,
@@ -181,6 +182,27 @@ it('keeps a saved link to a record that is outside the options now', function ()
     $other = Category::factory()->create(['code' => null]);
     $this->put(route('fastleo.resources.update', ['scoped-articles', $article->id]), ['title' => 'Статья', 'category_id' => (string) $other->id])
         ->assertSessionHasErrors('category_id');
+});
+
+it('labels a saved link with the key when a global scope of the model hides the related record', function (): void {
+    useFixtureResources('Relations');
+    $gone = Category::factory()->create(['code' => null]);
+    $article = Article::factory()->create(['category_id' => $gone->id]);
+    // Как запись в корзине: глобальный скоуп модели прячет её и от подписи.
+    Category::addGlobalScope('hidden', fn (Builder $query) => $query->whereKeyNot($gone->id));
+    $this->beforeApplicationDestroyed(fn () => Category::clearBootedModels());
+
+    $this->get(route('fastleo.resources.edit', ['scoped-articles', $article->id]))
+        ->assertOk()
+        ->assertSee(Js::from([
+            'multiple' => false,
+            'options' => [],
+            'selected' => [['value' => (string) $gone->id, 'label' => (string) $gone->id]],
+            'url' => null,
+            'remote' => false,
+            'depends' => null,
+            'record' => null,
+        ])->toHtml(), false);
 });
 
 it('shows the related title in the list with one query for all rows', function (): void {

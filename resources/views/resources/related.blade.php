@@ -65,7 +65,7 @@
                 <input type="search" name="q" value="{{ $list->search }}" placeholder="{{ __('fastleo::resources.search_placeholder') }}" class="fastleo-input h-9 pl-9" aria-label="{{ __('fastleo::resources.search') }}">
             </form>
         @endif
-        @if ($canAdd)
+        @if ($canAdd && $related->hasAddButton())
             <x-fastleo::button variant="primary" size="sm" icon="plus" :href="$createUrl" :data-record-modal="$createModalUrl">{{ $related->getAddLabel() }}</x-fastleo::button>
         @endif
     </div>
