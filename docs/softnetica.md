@@ -23,7 +23,7 @@ php artisan fastleo:softnetica-sync
 
 Кнопка «Отключить» стирает токен и сохранённые данные: виджет и раздел исчезают, запросов больше нет.
 
-Кто что видит: виджет, раздел и страница настроек с токеном, «Проверить связь» и «Отключить» — все администраторы (закрыть по ролям можно Gate `manageFastleoSoftNetica`: `Gate::define('manageFastleoSoftNetica', fn (User $user) => $user->is_owner);`) с доступом в админку.
+Кто что видит: виджет, раздел и страница настроек с токеном, «Проверить связь» и «Отключить» — все администраторы (закрыть можно Gate `manageFastleoSoftNetica`: `Gate::define('manageFastleoSoftNetica', fn (User $user) => $user->is_owner);`) с доступом в админку; при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владелец, если Gate не описан.
 
 ## Свои проверки сайта
 

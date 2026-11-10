@@ -264,6 +264,8 @@ it('gives the form a token that is bound to the session of the visitor', functio
     $this->artisan('fastleo:module', ['modules' => ['leads']])->assertSuccessful();
     bootCopiedLeads($this);
     Route::middleware('web')->get('/token', fn (): string => StoreLeadRequest::token());
+    // Время заморожено: иначе при смене секунды между показом токена и проверкой тест случайно падает.
+    $this->freezeTime();
 
     $token = $this->get('/token')->assertOk()->getContent();
 

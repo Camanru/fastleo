@@ -21,6 +21,7 @@ use Fastleo\Tests\Fixtures\McpPersonal\ClosedResource;
 use Fastleo\Tests\Fixtures\McpPersonal\PhoneFieldResource;
 use Fastleo\Tests\Fixtures\McpPersonal\PlainResource;
 use Fastleo\Tests\Fixtures\McpUsers\OpenUserResource;
+use Fastleo\Tests\Fixtures\OwnerOnly\ArticleResource as OwnerOnlyArticleResource;
 use Fastleo\Tests\Fixtures\Policies\HiddenCategoryPolicy;
 use Fastleo\Tests\Fixtures\Policies\RestrictedCategoryPolicy;
 use Illuminate\Database\Eloquent\Model;
@@ -332,6 +333,25 @@ it('does not let an empty set of values past the checks of the update: the Polic
 
     mcp()->tool(UpdateRecord::class, ['resource' => 'articles', 'id' => (string) $locked->id, 'values' => []])
         ->assertHasErrors(['закрыта для правки агентом']);
+});
+
+it('asks the resolver of the owner about the user of the agent and shuts the sections for the owner only to the others', function (): void {
+    useFixtureResources('OwnerOnly');
+    OwnerOnlyArticleResource::$ownerOnly = ['delete'];
+    config(['fastleo.mcp.allow_delete' => true]);
+    Fastleo::resolveOwnerUsing(fn (User $user): bool => $user->email === 'owner@example.com');
+    $manager = admin(['email' => 'manager@example.com']);
+    $owner = admin(['email' => 'owner@example.com']);
+    $article = Article::factory()->create();
+
+    mcp($manager)->tool(DeleteRecord::class, ['resource' => 'articles', 'id' => (string) $article->id])->assertHasErrors(['Нет права «delete»']);
+    expect(Article::query()->count())->toBe(1);
+
+    mcp($owner)->tool(DeleteRecord::class, ['resource' => 'articles', 'id' => (string) $article->id])->assertHasNoErrors();
+    expect(Article::query()->count())->toBe(0);
+
+    Fastleo::resolveOwnerUsing(null);
+    OwnerOnlyArticleResource::$ownerOnly = [];
 });
 
 it('hides the delete tool unless deletion is enabled', function (): void {

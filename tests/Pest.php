@@ -36,6 +36,8 @@ if (! is_dir(__DIR__.'/Browser/Traces')) {
 }
 
 pest()->extend(TestCase::class)->in('Feature', 'Unit', 'Browser');
+// Ожидание действия в браузере: 5 секунд по умолчанию не хватает, когда страница с редактором грузится под нагрузкой набора.
+pest()->browser()->timeout(15_000);
 pest()->extend(TestCase::class)->group('performance')->in('Performance');
 pest()->group('roles')->in('Feature/Roles');
 
@@ -240,7 +242,7 @@ function createTreeNodesTable(): void
  */
 function waitUntil(object $page, string $condition): void
 {
-    $page->script("new Promise((resolve) => { const started = Date.now(); const timer = setInterval(() => { if (({$condition}) || Date.now() - started > 5000) { clearInterval(timer); resolve(true); } }, 50); })");
+    $page->script("new Promise((resolve) => { const started = Date.now(); const timer = setInterval(() => { if (({$condition}) || Date.now() - started > 10000) { clearInterval(timer); resolve(true); } }, 50); })");
 }
 
 /**
@@ -251,8 +253,11 @@ function signInAndVisit(string $url): mixed
     $page = visit(route('fastleo.login'))
         ->fill('email', 'admin@example.com')
         ->fill('password', 'password')
-        ->press('Войти')
-        ->navigate($url);
+        ->press('Войти');
+
+    // Вход завершается редиректом: переход на адрес до него обрывал запрос входа, и тест оказывался на странице входа.
+    waitUntil($page, "location.pathname !== '".parse_url(route('fastleo.login'), PHP_URL_PATH)."'");
+    $page->navigate($url);
 
     // Пока запускается редактор RichText, клики теста могут теряться — ждём его готовности.
     if ($page->script("document.querySelector('[data-rich-text]') !== null") === true) {

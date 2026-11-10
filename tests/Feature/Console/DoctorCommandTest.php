@@ -11,7 +11,9 @@ use Fastleo\Support\Assets;
 use Fastleo\Support\Doctor;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Tests\Fixtures\Fields\StrictRichText;
+use Fastleo\Tests\Fixtures\OwnerOnly\ArticleResource as OwnerOnlyArticleResource;
 use Fastleo\Tests\Fixtures\QuickAdd\CategoryResource as QuickAddCategoryResource;
+use Fastleo\Tests\Fixtures\RecordViewMode\ArticleResource as RecordViewArticleResource;
 use Fastleo\Tests\Fixtures\Registry\TakenBuiltIn\SiteBotsResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\ArticleResource as BrokenArticleResource;
 use Fastleo\Tests\Fixtures\RelatedBroken\CategoryResource as BrokenCategoryResource;
@@ -274,6 +276,74 @@ it('warns about a related table whose child form cannot fill in the parent', fun
     expect(implode("\n", messages('categories', 'warning')))->toContain('нет поля «category_id»');
 
     BrokenCategoryResource::$mode = 'conflict';
+});
+
+it('does not ask for the parent field in a related table that has no add button', function (): void {
+    useFixtureResources('RelatedBroken');
+    BrokenCategoryResource::$mode = 'no-add-button';
+
+    expect(implode("\n", messages('categories', 'warning')))->not->toContain('нет поля «category_id»');
+
+    BrokenCategoryResource::$mode = 'conflict';
+});
+
+it('does not ask for a column behind a field that is counted in PHP', function (): void {
+    useFixtureResources('FromQuery');
+
+    expect(messages('categories', 'error'))->toBe([]);
+});
+
+it('reports a wrong record view mode of a section and accepts the right ones', function (): void {
+    useFixtureResources('RecordViewMode');
+
+    foreach ([null, 'modal', 'page', false] as $mode) {
+        RecordViewArticleResource::$recordView = $mode;
+
+        expect(messages('articles', 'error'))->toBe([]);
+    }
+
+    RecordViewArticleResource::$recordView = 'modall';
+    expect(implode("\n", messages('articles', 'error')))->toContain('$recordView')->toContain('modall');
+
+    RecordViewArticleResource::$recordView = null;
+});
+
+it('reports a section for the owner when the site has no owner, and is quiet once it has', function (): void {
+    useFixtureResources('OwnerOnly');
+    OwnerOnlyArticleResource::$ownerOnly = ['delete'];
+
+    expect(implode("\n", messages('articles', 'error')))->toContain('владельца на сайте нет');
+
+    Fastleo::resolveOwnerUsing(fn (): bool => true);
+    expect(messages('articles', 'error'))->toBe([]);
+
+    Fastleo::resolveOwnerUsing(null);
+    OwnerOnlyArticleResource::$ownerOnly = [];
+    OwnerOnlyArticleResource::$ownerOnlyIndex = true;
+    expect(implode("\n", messages('articles', 'error')))->toContain('владельца на сайте нет');
+
+    OwnerOnlyArticleResource::$ownerOnlyIndex = false;
+    expect(messages('articles', 'error'))->toBe([]);
+});
+
+it('reports a mistyped ability in $ownerOnly, which would close nothing', function (): void {
+    useFixtureResources('OwnerOnly');
+    Fastleo::resolveOwnerUsing(fn (): bool => true);
+    OwnerOnlyArticleResource::$ownerOnly = ['delet', 'export', '*', 'view'];
+
+    expect(implode("\n", messages('articles', 'error')))->toContain('delet')->not->toContain('export');
+
+    OwnerOnlyArticleResource::$ownerOnly = [];
+    Fastleo::resolveOwnerUsing(null);
+});
+
+it('warns that the resolver of the owner does not work while the roles are on', function (): void {
+    Fastleo::resolveOwnerUsing(fn (): bool => true);
+    config(['fastleo.roles.enabled' => true]);
+
+    expect(implode("\n", messages('roles', 'warning')))->toContain('resolveOwnerUsing');
+
+    Fastleo::resolveOwnerUsing(null);
 });
 
 it('reports a related table that is described wrongly', function (): void {

@@ -304,12 +304,12 @@ Alpine.data('fastleoForm', () => ({
 
                 event.preventDefault();
 
-                // Кнопка спрятана (вкладка с таблицей связанных записей): сохранять здесь нечего.
-                if (save !== null && save.offsetParent === null) {
+                // Кнопки нет (запись только читают) или она спрятана (вкладка с таблицей связанных записей): сохранять здесь нечего.
+                if (save === null || save.offsetParent === null) {
                     return;
                 }
 
-                this.$el.requestSubmit(save || undefined);
+                this.$el.requestSubmit(save);
             }
         });
     },
@@ -431,6 +431,35 @@ function canRefresh(region) {
         // Развёрнутая ветка дерева — обычное состояние, а не открытое меню.
         !region.querySelector('[aria-expanded="true"]:not([data-tree-toggle]), [aria-busy="true"], [data-inline] :disabled')
     );
+}
+
+/**
+ * Карточка записи над формой (`[data-record-summary]`, `summaryView()` раздела) после изменения связанных записей в окне:
+ * страница запрашивается заново, подменяется только содержимое карточки. Нет карточки, нет связи или сеанс истёк — ничего не
+ * происходит, форма и вкладки не затрагиваются.
+ */
+async function refreshRecordSummary() {
+    const summary = document.querySelector('[data-record-summary]');
+
+    if (summary === null) {
+        return;
+    }
+
+    try {
+        const response = await fetch(location.href, { headers: { Accept: 'text/html', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+
+        if (!response.ok || response.redirected) {
+            return;
+        }
+
+        const fresh = new DOMParser().parseFromString(await response.text(), 'text/html').querySelector('[data-record-summary]');
+
+        if (fresh !== null && fresh.innerHTML !== summary.innerHTML) {
+            summary.innerHTML = fresh.innerHTML;
+        }
+    } catch {
+        // Нет связи: карточка обновится при следующей загрузке страницы.
+    }
 }
 
 /**
@@ -613,7 +642,12 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
 
         if (modalLink !== null && this.owns(modalLink) && !event.metaKey && !event.ctrlKey && !event.shiftKey && event.button === 0) {
             event.preventDefault();
-            openRecordModal(modalLink.dataset.recordModal).then((saved) => (saved ? this.load(this.url) : null));
+            openRecordModal(modalLink.dataset.recordModal).then((saved) => {
+                if (saved) {
+                    this.load(this.url);
+                    refreshRecordSummary();
+                }
+            });
 
             return;
         }
@@ -1955,7 +1989,12 @@ Alpine.data('fastleoRichText', ({ height, picker, blockFormats, contentCss = [],
                 });
                 editor.addShortcut('meta+s', '', () => {
                     editor.save();
-                    form?.requestSubmit(form.querySelector('[data-save]') || undefined);
+
+                    const save = form?.querySelector('[data-save]');
+
+                    if (save) {
+                        form.requestSubmit(save);
+                    }
                 });
             },
         });

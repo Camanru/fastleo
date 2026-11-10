@@ -77,6 +77,9 @@ final class ResourceInspector
                 'table' => $resource->newModel()->getTable(),
                 'policy' => is_object($policy) ? $policy::class : null,
                 'readonly' => $resource::isReadonly(),
+                'owner_only' => $resource::ownerOnlyGroups(),
+                'owner_only_index' => $resource::ownerOnlyIndexPage(),
+                'record_view' => $resource::recordViewMode(),
                 'soft_deletes' => $resource::usesSoftDeletes(),
                 'sort_column' => $resource::sortColumn(),
                 'tree_column' => $resource::treeColumn(),
@@ -247,6 +250,10 @@ final class ResourceInspector
 
         if ($field->isFromQuery()) {
             $details['from_query'] = true;
+        }
+
+        if ($field->isComputed()) {
+            $details['computed'] = true;
         }
 
         if ($field->isInlineEditable()) {

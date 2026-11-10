@@ -57,7 +57,7 @@ final class SoftNeticaSettings extends Settings
     }
 
     /**
-     * Страница доступна, пока функция включена в конфиге (при ролях — владельцу, если сайт не описал Gate).
+     * Страница доступна, пока функция включена в конфиге (при ролях или резолвере владельца — владельцу, если сайт не описал Gate).
      */
     #[Override]
     public function canAccess(?Authenticatable $user): bool

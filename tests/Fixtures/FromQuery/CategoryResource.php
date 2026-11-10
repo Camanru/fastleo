@@ -8,10 +8,12 @@ use Fastleo\Fields\Number;
 use Fastleo\Fields\Text;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
 use Workbench\App\Models\Category;
 
 /**
- * Рубрики с вычисляемыми столбцами: число статей и сумма просмотров приходят из query(), а один столбец не посчитан.
+ * Рубрики с вычисляемыми столбцами: число статей и сумма просмотров приходят из query(), один столбец не посчитан, а три считаются в PHP по записи (computed()).
  */
 final class CategoryResource extends Resource
 {
@@ -31,6 +33,9 @@ final class CategoryResource extends Resource
             Number::make('articles_count', 'Статей')->fromQuery()->sortable(),
             Number::make('views_total', 'Просмотров')->fromQuery()->sortable()->formatUsing(fn (mixed $value): string => number_format((float) $value, 0, ',', ' ').' пр.'),
             Number::make('not_counted', 'Не посчитано')->fromQuery(),
+            Text::make('summary', 'Сводка')->computed(fn (Model $record): string => 'Рубрика «'.$record->getAttribute('title').'»'),
+            Text::make('markup', 'Разметка')->computed(fn (Model $record): HtmlString => new HtmlString('<b>'.e($record->getAttribute('title')).'</b><br>&amp; ещё')),
+            Text::make('empty_cell', 'Пустая')->computed(fn (): ?string => null),
         ];
     }
 

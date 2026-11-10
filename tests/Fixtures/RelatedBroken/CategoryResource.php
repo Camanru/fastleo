@@ -19,7 +19,7 @@ final class CategoryResource extends Resource
 
     protected static ?string $slug = 'categories';
 
-    /** Вид ошибки: not-has-many, no-method, no-resource, wrong-model, duplicate, conflict, create-only. */
+    /** Вид ошибки: not-has-many, no-method, no-resource, wrong-model, duplicate, conflict, create-only, no-add-button. */
     public static string $mode = 'conflict';
 
     /**
@@ -47,6 +47,7 @@ final class CategoryResource extends Resource
             'no-method' => [Related::make('missing', ArticleResource::class)],
             'no-resource' => [Related::make('articles', Text::class)],
             'wrong-model' => [Related::make('children', ArticleResource::class)],
+            'no-add-button' => [Related::make('articles', ArticleResource::class)->withoutAddButton()],
             'duplicate' => [Related::make('articles', ArticleResource::class), Related::make('articles', ArticleResource::class)],
             default => [Related::make('articles', ArticleResource::class)],
         };

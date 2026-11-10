@@ -78,8 +78,9 @@
     @endif
 
     @if ($editing && ! $framed && ($summaryView = $resource->summaryView()) !== null)
-        {{-- Карточка записи над формой и вкладками: только чтение (summaryView() раздела). --}}
-        <div class="mb-4">
+        {{-- Карточка записи над формой и вкладками: только чтение (summaryView() раздела). data-record-summary — страница
+             подменяет её содержимое после сохранения связанной записи в окне. --}}
+        <div class="mb-4" data-record-summary>
             @include($summaryView, ['record' => $record, 'resource' => $resource])
         </div>
     @endif
@@ -131,6 +132,8 @@
                     @endif
                 </div>
 
+                {{-- Нет ни одного изменяемого поля (запись только читают): строки «Сохранить» нет. --}}
+                @if ($resource->writableFields($editing ? $record : null) !== [])
                 <div x-data="{ visible: true }" x-show="visible" @fastleo-tab.window="if ($event.detail.group === {{ $tabsGroup ?? 'null' }}) visible = ! $event.detail.table" class="sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center gap-2 border-t border-line bg-glass px-4 py-3 backdrop-blur-[18px] backdrop-saturate-[1.8] lg:-mx-8 lg:px-8">
                     <x-fastleo::button type="submit" variant="primary" icon="save" name="_after" value="edit" data-save title="{{ __('fastleo::resources.save_hint') }}">
                         {{ __('fastleo::resources.save') }}
@@ -147,6 +150,7 @@
                     @endunless
                     <span class="ml-auto hidden text-xs text-ink-2 sm:inline" data-mac="{{ __('fastleo::resources.save_hint_mac') }}">{{ __('fastleo::resources.save_hint') }}</span>
                 </div>
+                @endif
                 <input type="hidden" name="_fl_end" value="1">
             </form>
             @if ($editing && ! $framed)

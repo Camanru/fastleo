@@ -97,3 +97,46 @@ describe('description', function (): void {
         expect($field->isFromQuery())->toBeFalse()->and($field->isWritable())->toBeTrue()->and($field->writesAttribute())->toBeTrue();
     });
 });
+
+describe('computed in PHP', function (): void {
+    it('shows the value counted from the record in the list', function (): void {
+        $this->get(route('fastleo.resources.index', 'categories'))
+            ->assertOk()
+            ->assertSee('Рубрика «Загруженная»', false)
+            ->assertSee('<b>Тихая</b>', false);
+    });
+
+    it('puts the plain text of the value into the export', function (): void {
+        $rows = exportedRows($this->get(route('fastleo.resources.export', ['resource' => 'categories', 'format' => 'csv'])), 'csv');
+        $busy = collect($rows)->first(fn (array $row): bool => in_array('Загруженная', $row, true));
+
+        expect($rows[0])->toContain('Сводка', 'Разметка', 'Пустая')
+            ->and($busy)->toContain('Рубрика «Загруженная»')
+            ->and($busy)->toContain('Загруженная & ещё');
+    });
+
+    it('has no input in the form and ignores a posted value', function (): void {
+        $this->get(route('fastleo.resources.edit', ['categories', $this->busy->id]))->assertOk()->assertDontSee('name="summary"', false);
+
+        $this->put(route('fastleo.resources.update', ['categories', $this->busy->id]), ['title' => 'Новое имя', 'summary' => 'взлом'])->assertSessionHasNoErrors();
+
+        expect($this->busy->refresh()->title)->toBe('Новое имя');
+    });
+
+    it('is a display-only field that writes nothing and is searched or sorted by nothing', function (): void {
+        $field = Text::make('x')->computed(fn (): string => 'y');
+
+        expect($field->isComputed())->toBeTrue()
+            ->and($field->writesAttribute())->toBeFalse()
+            ->and($field->isWritable())->toBeFalse()
+            ->and($field->isInForm())->toBeFalse()
+            ->and(Text::make('plain')->isComputed())->toBeFalse();
+    });
+
+    it('refuses to be searched or sorted in either order', function (): void {
+        expect(fn (): Text => Text::make('t')->computed(fn (): string => '')->searchable())->toThrow(LogicException::class, 'считается в PHP')
+            ->and(fn (): Text => Text::make('t')->computed(fn (): string => '')->sortable())->toThrow(LogicException::class, 'считается в PHP')
+            ->and(fn (): Text => Text::make('t')->searchable()->computed(fn (): string => ''))->toThrow(LogicException::class, 'считается в PHP')
+            ->and(fn (): Text => Text::make('t')->sortable()->computed(fn (): string => ''))->toThrow(LogicException::class, 'считается в PHP');
+    });
+});

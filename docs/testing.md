@@ -1,6 +1,6 @@
 # Тесты разделов в сайте
 
-Раздел админки — обычные маршруты Laravel, поэтому его тестируют обычными Feature-тестами сайта: войти администратором, открыть страницу, отправить форму, проверить базу. Своих хелперов у пакета нет — хватает стандартных `actingAs()`, `get()`, `post()`.
+Раздел админки — обычные маршруты Laravel, поэтому его тестируют обычными Feature-тестами сайта: войти администратором, открыть страницу, отправить форму, проверить базу. Хватает стандартных `actingAs()`, `get()`, `post()`; у пакета есть один необязательный помощник — смена вошедшего посреди теста ([ниже](#смена-пользователя-посреди-теста)).
 
 ## Администратор в тесте
 
@@ -23,6 +23,24 @@ $this->actingAs($admin, 'fastleo');
 ```
 
 `actingAs($admin)` без второго аргумента входит на сайт, а не в админку — страницы админки ответят переходом на форму входа.
+
+## Смена пользователя посреди теста
+
+Нужно проверить, что владелец видит страницу, а менеджер получает 403, и оба в одном тесте? Второй `actingAs($user, 'fastleo')` вошедшего не меняет: guard и сессия помнят первого. Подключите трейт к `TestCase` сайта (он сбрасывает guard-ы и сессию и входит заново):
+
+```php
+// tests/TestCase.php
+use Fastleo\Testing\ActsAsFastleoUser;
+
+abstract class TestCase extends BaseTestCase
+{
+    use ActsAsFastleoUser;
+}
+
+// в тесте
+$this->actingAsFastleo($manager)->get(route('fastleo.resources.edit', ['leads', 5]))->assertForbidden();
+$this->actingAsFastleo($owner)->get(route('fastleo.resources.edit', ['leads', 5]))->assertOk();
+```
 
 ## Сброс пароля в тестах
 
@@ -107,7 +125,7 @@ PHPUnit — тот же код методами класса `Tests\TestCase` (�
 | `fastleo.resources.index` | GET | список (`?q=…` — поиск; фильтры и сортировка — как в адресной строке браузера) |
 | `fastleo.resources.create` | GET | форма создания |
 | `fastleo.resources.store` | POST | создать |
-| `fastleo.resources.show` | GET | просмотр (если не выключен `record_view`: тогда 404) |
+| `fastleo.resources.show` | GET | просмотр (если не выключен `record_view` или `$recordView` раздела: тогда 404) |
 | `fastleo.resources.edit` | GET | форма изменения |
 | `fastleo.resources.update` | PUT | сохранить |
 | `fastleo.resources.destroy` | DELETE | удалить (в корзину при `SoftDeletes`) |

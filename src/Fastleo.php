@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo;
 
 use Closure;
+use Fastleo\Auth\RoleMatrix;
 use Fastleo\Auth\UserLookup;
 use Fastleo\Health\HealthChecks;
 use Fastleo\Health\HealthResult;
@@ -32,6 +33,8 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Route;
 use InvalidArgumentException;
 use LogicException;
+use Throwable;
+use WeakMap;
 
 /**
  * Общие точки входа пакета.
@@ -147,6 +150,21 @@ final class Fastleo
     private static ?Closure $bellResolver = null;
 
     /**
+     * Как узнать, что пользователь — владелец (`resolveOwnerUsing()`); `null` — не задано.
+     *
+     * @var (Closure(Authenticatable): bool)|null
+     */
+    private static ?Closure $ownerResolver = null;
+
+    /**
+     * Ответы резолвера владельца на время запроса: по объекту пользователя, а не по его ключу, чтобы долгий процесс
+     * (очередь, MCP) не помнил старый ответ после смены прав.
+     *
+     * @var WeakMap<Authenticatable, bool>|null
+     */
+    private static ?WeakMap $ownerCache = null;
+
+    /**
      * Абсолютный адрес страницы админки для писем: от `APP_URL` (или от `fastleo.domain`), а не от заголовка Host
      * запроса, — иначе подменённый Host попал бы в ссылку сброса пароля.
      *
@@ -226,6 +244,77 @@ final class Fastleo
     }
 
     /**
+     * Сказать панели, кто здесь владелец, без ролей `spatie/laravel-permission`: остальным закрываются файлы, журнал ошибок,
+     * очистка кеша, SoftNetica, настройки, свои страницы, раздел пользователей и разделы с `$ownerOnly`. Вызывается в
+     * `AppServiceProvider::boot()`. При включённых ролях владельца определяет роль, резолвер не действует.
+     *
+     * Ответ считается только по `=== true`; исключение внутри замыкания — в лог и «не владелец».
+     *
+     * ```php
+     * Fastleo::resolveOwnerUsing(fn (User $user) => $user->is_owner);
+     * ```
+     *
+     * @param  (Closure(Authenticatable): bool)|null  $resolver  null возвращает прежнее поведение (владельца нет)
+     */
+    public static function resolveOwnerUsing(?Closure $resolver): void
+    {
+        self::$ownerResolver = $resolver;
+        self::$ownerCache = null;
+    }
+
+    /**
+     * Свой способ определить владельца задан (`resolveOwnerUsing()`).
+     *
+     * ```php
+     * Fastleo::hasOwnerResolver(); // true после resolveOwnerUsing(fn ($user) => …)
+     * ```
+     */
+    public static function hasOwnerResolver(): bool
+    {
+        return self::$ownerResolver instanceof Closure;
+    }
+
+    /**
+     * Пользователь — владелец: роль-владелец при включённых ролях, иначе ответ `resolveOwnerUsing()`; нет ни того ни другого —
+     * нет. Без аргумента — вошедший в панель; без пользователя (консоль, очередь без входа) — нет. Сайту: проверка в Policy
+     * и в коде вместо своего `$user->is_owner`.
+     *
+     * ```php
+     * if (Fastleo::isOwner()) { … }
+     * Fastleo::isOwner($manager);
+     * ```
+     */
+    public static function isOwner(?Authenticatable $user = null): bool
+    {
+        $user ??= self::guard()->user();
+
+        if (! $user instanceof Authenticatable) {
+            return false;
+        }
+
+        if (RoleMatrix::enabled()) {
+            return RoleMatrix::hasOwnerRole($user);
+        }
+
+        if (! self::$ownerResolver instanceof Closure) {
+            return false;
+        }
+
+        $cache = self::$ownerCache ??= new WeakMap();
+
+        if (! $cache->offsetExists($user)) {
+            try {
+                $cache->offsetSet($user, (self::$ownerResolver)($user) === true);
+            } catch (Throwable $e) {
+                report($e);
+                $cache->offsetSet($user, false);
+            }
+        }
+
+        return $cache->offsetGet($user);
+    }
+
+    /**
      * Показывать колокольчик (и раздел «Уведомления») только некоторым администраторам, например владельцу: у остальных нет
      * колокольчика, их адреса отвечают 404, а уведомления им не сохраняются. Вызывается в `AppServiceProvider::boot()`;
      * включённый в конфиге колокольчик остаётся главным выключателем.
@@ -251,7 +340,7 @@ final class Fastleo
             return false;
         }
 
-        return ! self::$bellResolver instanceof Closure || ($user instanceof Authenticatable && (bool) (self::$bellResolver)($user));
+        return ! self::$bellResolver instanceof Closure || ($user instanceof Authenticatable && (self::$bellResolver)($user) === true);
     }
 
     /**
@@ -366,22 +455,6 @@ final class Fastleo
                 rescue(fn () => Notification::route('mail', $email)->notify(new MessageMailNotification($message)));
             }
         }
-    }
-
-    /**
-     * У записи есть страница просмотра (`fastleo.record_view` не `false`; по умолчанию просмотр открывается в окне).
-     */
-    public static function recordView(): bool
-    {
-        return config('fastleo.record_view', 'modal') !== false;
-    }
-
-    /**
-     * Просмотр записи открывается в окне поверх страницы (`fastleo.record_view` = `'modal'`, по умолчанию), а не переходом на страницу.
-     */
-    public static function recordViewInModal(): bool
-    {
-        return config('fastleo.record_view', 'modal') === 'modal';
     }
 
     /**

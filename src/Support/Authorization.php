@@ -37,7 +37,7 @@ final class Authorization
             return false;
         }
 
-        if (! RoleMatrix::allows($ability, $resource::slug())) {
+        if (self::deniedToNonOwner($ability, $resource) || ! RoleMatrix::allows($ability, $resource::slug())) {
             return false;
         }
 
@@ -84,7 +84,7 @@ final class Authorization
      */
     public static function allowsOwnOr(string $ability, string $fallback, Resource $resource, ?Model $record = null): bool
     {
-        if (! RoleMatrix::allows($ability, $resource::slug()) || ! $resource->can($ability, $record)) {
+        if (self::deniedToNonOwner($ability, $resource) || ! RoleMatrix::allows($ability, $resource::slug()) || ! $resource->can($ability, $record)) {
             return false;
         }
 
@@ -95,5 +95,64 @@ final class Authorization
         }
 
         return self::allows($fallback, $resource, $record);
+    }
+
+    /**
+     * Способность закрыта разделом для всех, кроме владельца (`$ownerOnly`, `$ownerOnlyIndex`).
+     *
+     * В `$ownerOnly` — группы (`view`, `create`, `update`, `delete`: по `RoleMatrix::GROUPS`, неизвестная способность Action
+     * считается изменением), точные способности (`export`, `import`, `forceDelete`) или `'*'` — раздел целиком. Владельца
+     * нет вовсе (ни ролей, ни `Fastleo::resolveOwnerUsing()`) — закрыто всем, а `fastleo:doctor` говорит об этом ошибкой.
+     * Общий список (`$ownerOnlyIndex`) закрывается только на странице списка этого раздела, а не в связанных таблицах.
+     *
+     * ```php
+     * Authorization::deniedToNonOwner('delete', $resource);
+     * ```
+     */
+    public static function deniedToNonOwner(string $ability, Resource $resource): bool
+    {
+        $closed = $resource::ownerOnlyGroups();
+        $indexOnly = $ability === 'viewAny' && $resource::ownerOnlyIndexPage() && self::isIndexSurfaceOf($resource);
+
+        if ($closed === [] && ! $indexOnly) {
+            return false;
+        }
+
+        if (Fastleo::isOwner()) {
+            return false;
+        }
+
+        $group = RoleMatrix::GROUPS[$ability] ?? 'update';
+
+        return $indexOnly || in_array('*', $closed, true) || in_array($ability, $closed, true) || in_array($group, $closed, true);
+    }
+
+    /**
+     * Запрос идёт не из связанной таблицы на карточке и не из меню этого раздела: сам общий список, его выгрузка, импорт и
+     * фильтры, а также всё вне разделов-ресурсов (поиск Ctrl+K, дашборд, консоль, MCP, очередь). Закрыто по умолчанию:
+     * открыты только маршруты разделов-ресурсов, кроме перечисленных страниц самого раздела.
+     */
+    private static function isIndexSurfaceOf(Resource $resource): bool
+    {
+        $request = request();
+
+        if (! $request->routeIs('fastleo.resources.*')) {
+            return true;
+        }
+
+        return $request->route('resource') === $resource::slug()
+            && $request->routeIs('fastleo.resources.index', 'fastleo.resources.export', 'fastleo.resources.import', 'fastleo.resources.imports.*', 'fastleo.resources.filter-options');
+    }
+
+    /**
+     * Раздел можно показать ссылкой (меню, главная, поиск): право `viewAny` есть и общий список не закрыт `$ownerOnlyIndex`.
+     *
+     * ```php
+     * Authorization::allowsIndexLink($resource);
+     * ```
+     */
+    public static function allowsIndexLink(Resource $resource): bool
+    {
+        return (! $resource::ownerOnlyIndexPage() || Fastleo::isOwner()) && self::allows('viewAny', $resource);
     }
 }

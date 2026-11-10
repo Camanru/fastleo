@@ -299,3 +299,28 @@ it('counts a user hidden by a global scope of the model as holding the address',
 
     expect($validator->fails())->toBeTrue();
 });
+
+describe('the words of the section', function (): void {
+    it('are the texts of the package until the site names them itself', function (): void {
+        $access = collect(new UserResource()->fields())->first(fn ($field): bool => $field->name === 'fastleo_admin');
+
+        expect(UserResource::label())->toBe('Администраторы')
+            ->and(UserResource::singular())->toBe('Администратор')
+            ->and($access->getLabel())->toBe('Доступ в админку');
+    });
+
+    it('are taken from the config: the section, one person and the access toggle', function (): void {
+        config(['fastleo.users.label' => 'Сотрудники', 'fastleo.users.singular' => 'Сотрудник', 'fastleo.users.access' => 'Доступ в CRM']);
+        $access = collect(new UserResource()->fields())->first(fn ($field): bool => $field->name === 'fastleo_admin');
+
+        expect(UserResource::label())->toBe('Сотрудники')
+            ->and(UserResource::singular())->toBe('Сотрудник')
+            ->and($access->getLabel())->toBe('Доступ в CRM');
+    });
+
+    it('fall back to the texts of the package when the config holds an empty or a wrong value', function (mixed $value): void {
+        config(['fastleo.users.label' => $value]);
+
+        expect(UserResource::label())->toBe('Администраторы');
+    })->with(['empty string' => '', 'number' => 5, 'null' => null]);
+});

@@ -91,7 +91,7 @@ final class InlineController
     }
 
     /**
-     * Вычисляемые столбцы (`fromQuery()`) записи после правки: значение берётся из `query()` ресурса заново.
+     * Вычисляемые столбцы (`fromQuery()` — из `query()` ресурса, `computed()` — из записи) после правки: значение берётся заново.
      *
      * @return array<string, string>
      */
@@ -105,7 +105,7 @@ final class InlineController
         }
 
         foreach ($resource->listFields() as $field) {
-            if ($field->isFromQuery()) {
+            if ($field->isFromQuery() || $field->isComputed()) {
                 $cells[$field->name] = view('fastleo::resources.cell', ['resource' => $resource, 'record' => $record, 'field' => $field, 'inList' => true])->render();
             }
         }

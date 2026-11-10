@@ -30,7 +30,7 @@ final class Menu
         foreach (Fastleo::resources()->all() as $slug => $class) {
             $resource = Fastleo::resources()->find($slug);
 
-            if (! $resource instanceof Resource || ! $resource::inMenu() || ! Authorization::allows('viewAny', $resource)) {
+            if (! $resource instanceof Resource || ! $resource::inMenu() || ! Authorization::allowsIndexLink($resource)) {
                 continue;
             }
 

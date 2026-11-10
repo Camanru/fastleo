@@ -12,4 +12,9 @@ parameters:
         - workbench/database
     excludePaths:
         - workbench/database/migrations/2026_11_04_200000_create_permission_tables.php
+    ignoreErrors:
+        # Трейт для тестов сайта: в самом пакете его никто не подключает (тесты пакета не анализируются).
+        -
+            identifier: trait.unused
+            path: src/Testing/ActsAsFastleoUser.php
     tmpDir: .phpstan.cache

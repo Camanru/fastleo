@@ -95,6 +95,9 @@ abstract class Field
     /** Значение приходит из `query()` ресурса (`withCount`, `withSum`, подзапрос), в базу не пишется. */
     protected bool $fromQuery = false;
 
+    /** Значение считается в PHP по записи (`computed()`): колонки в таблице нет. */
+    protected ?Closure $computed = null;
+
     /** Значение правится прямо в ячейке списка. */
     protected bool $inlineEditable = false;
 
@@ -661,6 +664,10 @@ abstract class Field
      */
     public function sortable(bool $sortable = true): static
     {
+        if ($sortable && $this->computed instanceof Closure) {
+            throw new LogicException(__('fastleo::exceptions.computed_search_sort', ['field' => $this->name], Fastleo::LOCALE));
+        }
+
         $this->sortable = $sortable;
 
         return $this;
@@ -677,6 +684,10 @@ abstract class Field
     {
         if ($searchable && $this->fromQuery) {
             throw new LogicException(__('fastleo::exceptions.from_query_searchable', ['field' => $this->name], Fastleo::LOCALE));
+        }
+
+        if ($searchable && $this->computed instanceof Closure) {
+            throw new LogicException(__('fastleo::exceptions.computed_search_sort', ['field' => $this->name], Fastleo::LOCALE));
         }
 
         $this->searchable = $searchable;
@@ -715,6 +726,48 @@ abstract class Field
         $this->fromQuery = $fromQuery;
 
         return $this->onlyInList($fromQuery);
+    }
+
+    /**
+     * Столбец списка, значение которого считается в PHP по записи: «Контакт» из телефона, имени и сайта, «Клиент и заявка»
+     * ссылками. Колонки в таблице нет, поэтому поле только для списка и выгрузки, не пишется, не ищется и не сортируется
+     * (для сортировки и числа из SQL — `fromQuery()`). Замыкание получает запись и возвращает текст, число или `HtmlString`
+     * (в выгрузке и MCP теги убираются).
+     *
+     * ```php
+     * Text::make('contact', 'Контакт')->computed(fn (Lead $lead) => $lead->phone.' · '.$lead->name);
+     * ```
+     *
+     * @param  Closure(Model): (string|int|float|Htmlable|null)  $value
+     *
+     * @throws LogicException поле уже `searchable()` или `sortable()`
+     */
+    public function computed(Closure $value): static
+    {
+        if ($this->searchable || $this->sortable) {
+            throw new LogicException(__('fastleo::exceptions.computed_search_sort', ['field' => $this->name], Fastleo::LOCALE));
+        }
+
+        $this->computed = $value;
+        $this->formatUsing = function (mixed $stored, Model $record) use ($value): string|Htmlable|null {
+            $shown = $value($record);
+
+            return is_int($shown) || is_float($shown) ? (string) $shown : $shown;
+        };
+
+        return $this->readonly()->onlyInList();
+    }
+
+    /**
+     * Значение поля считается в PHP по записи (`computed()`).
+     *
+     * ```php
+     * Text::make('contact')->computed(fn ($lead) => $lead->phone)->isComputed(); // true
+     * ```
+     */
+    public function isComputed(): bool
+    {
+        return $this->computed instanceof Closure;
     }
 
     /**
@@ -1132,6 +1185,12 @@ abstract class Field
      */
     public function exportValue(Model $record): string|int|float|null
     {
+        if ($this->computed instanceof Closure) {
+            $value = ($this->computed)($record);
+
+            return self::exportScalar($value instanceof Htmlable ? trim(html_entity_decode(strip_tags((string) preg_replace('#<br\s*/?>#i', ' ', $value->toHtml())))) : $value);
+        }
+
         return self::exportScalar($this->hydrate($record));
     }
 
@@ -1535,7 +1594,7 @@ abstract class Field
      */
     public function writesAttribute(): bool
     {
-        return ! $this->fromQuery;
+        return ! $this->fromQuery && ! $this->computed instanceof Closure;
     }
 
     /**

@@ -41,7 +41,7 @@ final class ClosingSettings extends Settings
     }
 
     /**
-     * Страница доступна, пока функция включена в конфиге; при включённых ролях — только владельцу.
+     * Страница доступна, пока функция включена в конфиге; при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владельцу.
      */
     #[Override]
     public function canAccess(?Authenticatable $user): bool

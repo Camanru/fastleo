@@ -26,8 +26,8 @@
 @endphp
 <div class="flex items-center justify-end gap-0.5">
     @if ($trashed)
-        @if (\Fastleo\Fastleo::recordView() && $allows('view', $record))
-            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), \Fastleo\Fastleo::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
+        @if ($resource::hasRecordView() && $allows('view', $record))
+            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), $resource::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
         @endif
         @if ($allows('restore', $record))
             <x-fastleo::action-form :action="route('fastleo.resources.restore', [$slug, $record->getKey()])">
@@ -40,8 +40,8 @@
             </form>
         @endif
     @else
-        @if (\Fastleo\Fastleo::recordView() && $allows('view', $record))
-            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), \Fastleo\Fastleo::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
+        @if ($resource::hasRecordView() && $allows('view', $record))
+            {{ $link(route('fastleo.resources.show', [$slug, $record->getKey(), ...$returnQuery]), 'eye', __('fastleo::resources.show'), $resource::recordViewInModal() ? route('fastleo.resources.show', [$slug, $record->getKey(), 'frame' => 1]) : null, 'data-record-view') }}
         @endif
         @if (($tree ?? null) && $allows('create'))
             <x-fastleo::button variant="ghost" size="sm" icon="plus" class="text-primary-text opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100 max-md:opacity-100" :href="route('fastleo.resources.create', ['resource' => $slug, 'parent' => $record->getKey()])" title="{{ __('fastleo::resources.tree_add_child') }}">

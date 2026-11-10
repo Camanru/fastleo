@@ -35,7 +35,7 @@ final class Home
         $resource = $registry->find($slug);
 
         if ($resource instanceof Resource) {
-            return Authorization::allows('viewAny', $resource) ? route('fastleo.resources.index', $slug) : route('fastleo.dashboard');
+            return Authorization::allowsIndexLink($resource) ? route('fastleo.resources.index', $slug) : route('fastleo.dashboard');
         }
 
         $page = $registry->findPage($slug);

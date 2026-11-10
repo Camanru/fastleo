@@ -705,11 +705,34 @@ class MorphTo extends Field implements SearchesOptions
      */
     public function linkUrl(Model $record): ?string
     {
+        $target = $this->linkTarget($record);
+
+        return $target === null ? null : $target[0]->viewUrl($target[1]);
+    }
+
+    /**
+     * Адрес той же записи для окна просмотра (`frame=1`) или null: раздел показывает записи не в окне либо ссылки нет.
+     */
+    public function linkModalUrl(Model $record): ?string
+    {
+        $target = $this->linkTarget($record);
+        $url = $target === null ? null : $target[0]->viewUrl($target[1]);
+
+        return $target === null ? null : $target[0]->viewModalUrl($url);
+    }
+
+    /**
+     * Раздел и запись, на которые указывает связь, или null.
+     *
+     * @return array{0: Resource, 1: Model}|null
+     */
+    private function linkTarget(Model $record): ?array
+    {
         $stored = $this->stored($record);
         $slug = $stored === null ? null : $this->slugOf($stored[0]);
         $target = $stored === null || $slug === null || ! isset($this->offered()[$slug]) ? null : $this->recordOf($slug, $stored[1]);
 
-        return $target instanceof Model ? $this->resolved()[$slug]['resource']->viewUrl($target) : null;
+        return $target instanceof Model ? [$this->resolved()[$slug]['resource'], $target] : null;
     }
 
     /**

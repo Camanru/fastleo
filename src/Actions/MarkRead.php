@@ -69,7 +69,7 @@ final class MarkRead extends Action
         $slug = $this->resource()::slug();
 
         foreach ($records as $record) {
-            foreach (Fastleo::recordView() ? ['fastleo.resources.show', 'fastleo.resources.edit'] : ['fastleo.resources.edit'] as $route) {
+            foreach ($this->resource()::hasRecordView() ? ['fastleo.resources.show', 'fastleo.resources.edit'] : ['fastleo.resources.edit'] as $route) {
                 if (parse_url($previous, PHP_URL_PATH) === route($route, [$slug, $record->getKey()], false)) {
                     parse_str((string) parse_url($previous, PHP_URL_QUERY), $query);
 

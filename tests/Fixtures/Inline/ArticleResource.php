@@ -11,11 +11,12 @@ use Fastleo\Fields\Select;
 use Fastleo\Fields\Text;
 use Fastleo\Resource;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 
 /**
- * Статьи, у которых цена, просмотры, статус и категория правятся прямо в ячейке; заголовок и автор — нет; «Вдвое» считается в запросе.
+ * Статьи, у которых цена, просмотры, статус и категория правятся прямо в ячейке; заголовок и автор — нет; «Вдвое» считается в запросе, «Подпись» — в PHP по записи.
  */
 final class ArticleResource extends Resource
 {
@@ -38,6 +39,7 @@ final class ArticleResource extends Resource
             Text::make('author_email', 'Автор')->readonly()->inlineEditable(),
             Number::make('rating', 'Рейтинг')->integer()->min(0)->hideOnEdit()->inlineEditable(),
             Number::make('views_double', 'Вдвое')->fromQuery(),
+            Text::make('views_label', 'Подпись')->computed(fn (Model $record): string => 'Просмотров: '.$record->getAttribute('views')),
         ];
     }
 

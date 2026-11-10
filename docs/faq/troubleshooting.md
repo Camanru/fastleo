@@ -58,6 +58,16 @@ php artisan storage:link
 
 Подробнее — [кеш списка разделов](../resources.md#кеш-списка-разделов), [права доступа](../authorization.md#с-policy).
 
+### Что делать, если раздел закрыт всем, включая меня?
+
+У раздела задан `$ownerOnly` или `$ownerOnlyIndex`, а панель не знает, кто владелец. Это видно в `fastleo:doctor` (`owner_only_without_owner`). Скажите панели, кто владелец, или включите роли.
+
+```php
+Fastleo::resolveOwnerUsing(fn (User $user) => $user->is_owner === true);
+```
+
+Подробнее — [владелец и `$ownerOnly`](../authorization.md#владелец-и-owneronly).
+
 ### Что делать, если адрес раздела отвечает 404?
 
 Посмотрите настоящий адрес раздела: он берётся из имени модели во множественном числе (`Product` → `products`, `News` → `news`).

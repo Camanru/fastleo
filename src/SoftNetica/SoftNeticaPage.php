@@ -70,7 +70,7 @@ final class SoftNeticaPage extends Page
     }
 
     /**
-     * Доступ — всем администраторам (при ролях — только владельцу), пока функция включена в конфиге; закрыть по ролям можно Gate `manageFastleoSoftNetica`.
+     * Доступ — всем администраторам (при ролях или `Fastleo::resolveOwnerUsing()` — только владельцу), пока функция включена в конфиге; закрыть по ролям можно Gate `manageFastleoSoftNetica`.
      */
     #[Override]
     public function canAccess(?Authenticatable $user): bool

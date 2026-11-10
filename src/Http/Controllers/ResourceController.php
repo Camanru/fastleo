@@ -100,14 +100,14 @@ final class ResourceController
      */
     public function show(Request $request, string $resource, string $id): View
     {
-        abort_unless(Fastleo::recordView(), 404);
-
         $resource = $this->resource($resource);
+        abort_unless($resource::hasRecordView(), 404);
+
         $record = $this->record($resource, $id, $resource::usesSoftDeletes());
         Authorization::authorize('view', $resource, $record);
         $this->markRead($resource, $record);
 
-        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request), 'framed' => $this->framed($request)]);
+        return view('fastleo::resources.show', ['resource' => $resource, 'record' => $record, 'returnUrl' => ReturnUrl::from($request), 'framed' => $resource::recordViewInModal() && $this->framed($request)]);
     }
 
     /**

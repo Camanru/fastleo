@@ -60,6 +60,20 @@ HTML из `formatUsing()` выводится только через `HtmlString
 
 Подробнее — [Общие методы полей](../fields/README.md#общие-методы).
 
+### Как показать в одном столбце телефон и имя?
+
+Столбец, который считается в PHP по записи, — `computed()`: колонки в таблице ему не нужно, писать, искать и сортировать по нему нельзя (для поиска оставьте настоящее скрытое поле `phone` с `searchable()`).
+
+```php
+use Fastleo\Fields\Text;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\HtmlString;
+
+Text::make('contact', 'Контакт')->computed(fn (Model $lead) => new HtmlString(e($lead->phone).'<br><small>'.e($lead->name).'</small>')),
+```
+
+Значение попадает и в экспорт (теги убираются). Если значение даёт SQL в `query()`, используйте `fromQuery()`. Подробнее — [вычисляемые столбцы](../list.md#столбец-который-считается-в-php-по-записи).
+
 ### Как показать в столбце число заказов или сумму продаж?
 
 Посчитайте значение в `query()` ресурса (`withCount`, `withSum`, подзапрос) и опишите поле с тем же именем и `fromQuery()`.

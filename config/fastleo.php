@@ -55,11 +55,16 @@ return [
     |
     | users.resource — встроенный раздел «Администраторы» (Fastleo\Resources\UserResource):
     | оставьте как есть, укажите свой класс-наследник или null, чтобы раздела не было.
+    | users.label, users.singular, users.access — как раздел и его галочка называются у вас («Сотрудники»,
+    | «Сотрудник», «Доступ в CRM»); null — тексты пакета.
     |
     */
 
     'users' => [
         'resource' => UserResource::class,
+        'label' => null,
+        'singular' => null,
+        'access' => null,
     ],
 
     /*

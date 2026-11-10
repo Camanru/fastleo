@@ -6,6 +6,7 @@ namespace Fastleo\Auth;
 
 use Fastleo\Fastleo;
 use Fastleo\Resource;
+use Fastleo\Support\Authorization;
 use Fastleo\Support\UserModel;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -96,22 +97,21 @@ final class RoleMatrix
     }
 
     /**
-     * Вошедший администратор — владелец. Роли выключены — нет.
+     * Вошедший администратор — владелец: роль-владелец при включённых ролях, иначе ответ `Fastleo::resolveOwnerUsing()`.
+     * Ни ролей, ни резолвера — нет.
      */
     public static function isOwner(): bool
     {
-        $user = self::enabled() ? self::roleUser() : null;
-
-        return $user !== null && self::hasOwnerRole($user);
+        return Fastleo::isOwner();
     }
 
     /**
-     * Для страниц и действий вне разделов-ресурсов (настройки, файлы, журнал ошибок…): роли выключены — разрешено,
-     * включены — только владельцу.
+     * Для страниц и действий вне разделов-ресурсов (настройки, файлы, журнал ошибок…): ни ролей, ни резолвера владельца
+     * нет — разрешено всем; есть роли или резолвер — только владельцу.
      */
     public static function allowsOwnerOnly(): bool
     {
-        return ! self::enabled() || self::isOwner();
+        return (! self::enabled() && ! Fastleo::hasOwnerResolver()) || self::isOwner();
     }
 
     /**
@@ -138,21 +138,27 @@ final class RoleMatrix
      */
     public static function allowsRelated(Model $related): bool
     {
-        if (! self::enabled()) {
-            return true;
-        }
-
         // У модели может быть несколько разделов («Статьи» и «Новости»): подписи записей открыты, если администратору
         // открыт хотя бы один — иначе закрытый первый по алфавиту закрыл бы связь, которую второй раздел разрешает.
         $resources = Fastleo::resources()->allForModel($related::class);
 
-        return $resources === [] || array_any($resources, fn (Resource $resource): bool => self::allows('viewAny', $resource::slug()) && $resource->can('viewAny', null));
+        if ($resources === []) {
+            return true;
+        }
+
+        // Раздел только для владельца (`$ownerOnly`) подписей не отдаёт ни без ролей, ни с ними.
+        $open = array_filter($resources, fn (Resource $resource): bool => ! Authorization::deniedToNonOwner('viewAny', $resource));
+
+        if (! self::enabled()) {
+            return $open !== [];
+        }
+
+        return array_any($open, fn (Resource $resource): bool => self::allows('viewAny', $resource::slug()) && $resource->can('viewAny', null));
     }
 
     /**
      * Связь на раздел, который администратору не открыт (`allowsRelated()`), нужно закрыть: не встраивать в страницу
-     * варианты выбора и не принимать новые значения. Без вошедшего администратора (консоль, `inspect`) и при выключенных
-     * ролях — нет.
+     * варианты выбора и не принимать новые значения. Без вошедшего администратора (консоль, `inspect`) — нет.
      *
      * ```php
      * RoleMatrix::closesRelated($field->relatedModel());
@@ -160,12 +166,12 @@ final class RoleMatrix
      */
     public static function closesRelated(Model $related): bool
     {
-        return self::enabled() && Fastleo::guard()->user() !== null && ! self::allowsRelated($related);
+        return Fastleo::guard()->user() !== null && ! self::allowsRelated($related);
     }
 
     /**
      * Решение Gate сайта (`viewFastleoLogs`, `clearFastleoCache`, `manageFastleoFiles`, `manageFastleoSoftNetica`),
-     * а если Gate не описан — владелец при включённых ролях и любой администратор при выключенных.
+     * а если Gate не описан — владелец (роль или `Fastleo::resolveOwnerUsing()`), а без ролей и резолвера — любой администратор.
      *
      * ```php
      * RoleMatrix::gate('clearFastleoCache');
@@ -214,7 +220,7 @@ final class RoleMatrix
     /**
      * Роль-владелец именно guard `fastleo`: одноимённая роль сайта (`web`) владельцем не делает.
      */
-    private static function hasOwnerRole(object $user): bool
+    public static function hasOwnerRole(object $user): bool
     {
         return method_exists($user, 'hasRole') && $user->hasRole(self::ownerRole(), Fastleo::GUARD) === true;
     }

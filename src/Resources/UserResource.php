@@ -16,6 +16,7 @@ use Fastleo\Resources\Users\UserGuard;
 use Fastleo\Resources\Users\UserRoles;
 use Fastleo\Support\OperationCancelled;
 use Fastleo\Support\UserModel;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
@@ -25,7 +26,7 @@ use Override;
  * Встроенный раздел «Администраторы»: пользователи сайта с доступом в админку.
  *
  * Работает на модели пользователей guard fastleo. Показывает только администраторов (`fastleo_admin`);
- * нельзя удалить себя и последнего администратора, снять доступ у себя и у последнего. При включённых ролях
+ * нельзя удалить себя и последнего администратора, снять доступ у себя и у последнего. При включённых ролях или заданном `Fastleo::resolveOwnerUsing()`
  * раздел открыт только владельцу, в форме появляется поле «Роли» и нельзя оставить сайт без владельца. Свой пароль
  * меняется в профиле. Включается ключом `fastleo.users.resource`: класс этого ресурса (по умолчанию),
  * ваш наследник или `null`, чтобы раздела не было.
@@ -74,7 +75,7 @@ class UserResource extends Resource
     #[Override]
     public static function label(): string
     {
-        return static::$label ?? __('fastleo::users.label', [], Fastleo::LOCALE);
+        return static::$label ?? self::word('label');
     }
 
     #[Override]
@@ -86,7 +87,17 @@ class UserResource extends Resource
     #[Override]
     public static function singular(): string
     {
-        return static::$singular ?? __('fastleo::users.singular', [], Fastleo::LOCALE);
+        return static::$singular ?? self::word('singular');
+    }
+
+    /**
+     * Слово раздела: из `fastleo.users.label|singular|access`, а если там пусто — из текстов пакета.
+     */
+    private static function word(string $key): string
+    {
+        $custom = config("fastleo.users.{$key}");
+
+        return is_string($custom) && $custom !== '' ? $custom : __("fastleo::users.{$key}", [], Fastleo::LOCALE);
     }
 
     #[Override]
@@ -107,7 +118,11 @@ class UserResource extends Resource
             Password::make('password', __('fastleo::users.password'))->required()->confirmed()
                 ->help(__('fastleo::users.password_help'))
                 ->hidden(fn (?Model $record): bool => $record instanceof Model && UserGuard::isCurrentUser($record)),
-            AdminAccess::make('fastleo_admin', __('fastleo::users.access'))->default(true),
+            AdminAccess::make('fastleo_admin', self::word('access'))->default(true),
+            // Без ролей, но с `resolveOwnerUsing()` кто владелец, видно в списке: иначе владельцев путают с остальными.
+            ...(! RoleMatrix::enabled() && Fastleo::hasOwnerResolver() ? [Text::make('owner', __('fastleo::users.owner'))->computed(
+                fn (Model $record): string => $record instanceof Authenticatable && Fastleo::isOwner($record) ? __('fastleo::users.owner_yes', [], Fastleo::LOCALE) : '—',
+            )] : []),
             ...(RoleMatrix::enabled() ? [UserRoles::make('roles', __('fastleo::users.roles'))->multiple()->help(__('fastleo::users.roles_help'))] : []),
         ];
     }
@@ -145,7 +160,7 @@ class UserResource extends Resource
     }
 
     /**
-     * При включённых ролях раздел — только владельцу (иначе право на «Администраторов» отдаёт чужие пароли и роли).
+     * При включённых ролях или заданном `Fastleo::resolveOwnerUsing()` раздел — только владельцу (иначе право на «Администраторов» отдаёт чужие пароли и роли).
      * Себя и последнего администратора удалить нельзя.
      */
     #[Override]

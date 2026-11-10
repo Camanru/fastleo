@@ -103,7 +103,8 @@ describe('the look of a cell', function (): void {
         $response = $this->patchJson(inlineUrl($this->article, 'views'), ['value' => '25'])->assertOk();
 
         expect($response->json('cells.views_double'))->toContain('50')
-            ->and($response->json('cells'))->toHaveKey('views_double');
+            ->and($response->json('cells'))->toHaveKey('views_double')
+            ->and($response->json('cells.views_label'))->toContain('Просмотров: 25');
     });
 
     it('marks the cells so that the page can find them', function (): void {

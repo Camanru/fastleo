@@ -256,18 +256,37 @@ class BelongsTo extends Field implements SearchesOptions
      */
     public function linkUrl(Model $record): ?string
     {
+        return $this->linkTarget($record)[1] ?? null;
+    }
+
+    /**
+     * Адрес той же записи для окна просмотра (`frame=1`) или null: раздел показывает записи не в окне либо ссылки нет.
+     */
+    public function linkModalUrl(Model $record): ?string
+    {
+        $target = $this->linkTarget($record);
+
+        return $target === null ? null : $target[0]->viewModalUrl($target[1]);
+    }
+
+    /**
+     * Раздел связанной записи и адрес страницы (первый раздел модели, который администратору открыт: разделов может быть несколько).
+     *
+     * @return array{0: Resource, 1: string}|null
+     */
+    private function linkTarget(Model $record): ?array
+    {
         $related = $record->getRelationValue($this->getRelationName());
 
         if (! $related instanceof Model) {
             return null;
         }
 
-        // Ссылка ведёт в первый раздел модели, который администратору открыт (разделов может быть несколько).
         foreach (Fastleo::resources()->allForModel($related::class) as $resource) {
             $url = $resource->viewUrl($related);
 
             if ($url !== null) {
-                return $url;
+                return [$resource, $url];
             }
         }
 

@@ -120,7 +120,7 @@ final class Table extends Widget
                 return [
                     'cells' => array_map(fn (Field $field): string|\Illuminate\Contracts\Support\Htmlable|null => $field->listDisplay($record), $fields),
                     'url' => $url,
-                    'modalUrl' => Resource::viewModalUrl($url),
+                    'modalUrl' => $resource->viewModalUrl($url),
                 ];
             })->all(),
             'allUrl' => route('fastleo.resources.index', $resource::slug()),

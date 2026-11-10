@@ -13,6 +13,7 @@ use Fastleo\Support\ContainsExpression;
 use Fastleo\Support\OptionRule;
 use Fastleo\Support\RecordKey;
 use Fastleo\Support\Tree;
+use Illuminate\Contracts\Auth\Factory as AuthFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -193,13 +194,22 @@ trait QueriesRelatedRecords
     }
 
     /**
-     * Поле только для чтения; при ролях — и когда связанный раздел администратору не открыт: выбрать запись из закрытой
+     * Связанный раздел вошедшему пользователю не открыт (ролями или `$ownerOnly`). Без пользователя (консоль, `inspect`,
+     * `doctor`) — нет, и модель связи при этом не строится: сломанная связь не должна падать здесь.
+     */
+    private function closedForUser(): bool
+    {
+        return resolve(AuthFactory::class)->guard(Fastleo::GUARD)->user() !== null && RoleMatrix::closesRelated($this->relatedModel());
+    }
+
+    /**
+     * Поле только для чтения; и когда связанный раздел пользователю не открыт (ролями или `$ownerOnly`): выбрать запись из закрытой
      * таблицы нельзя, а привязанные раньше остаются как есть.
      */
     #[Override]
     public function isReadonly(): bool
     {
-        return parent::isReadonly() || (RoleMatrix::enabled() && RoleMatrix::closesRelated($this->relatedModel()));
+        return parent::isReadonly() || $this->closedForUser();
     }
 
     /**
@@ -209,11 +219,11 @@ trait QueriesRelatedRecords
     public function getHelp(): ?string
     {
         $help = parent::getHelp();
-        $related = RoleMatrix::enabled() ? $this->relatedModel() : null;
-
-        if (! $related instanceof Model || ! RoleMatrix::closesRelated($related)) {
+        if (! $this->closedForUser()) {
             return $help;
         }
+
+        $related = $this->relatedModel();
 
         $resource = Fastleo::resources()->forModel($related::class);
         $notice = __('fastleo::roles.related_closed', ['section' => $resource instanceof Resource ? $resource::label() : $related::class], Fastleo::LOCALE);
@@ -227,7 +237,7 @@ trait QueriesRelatedRecords
     #[Override]
     public function isWritable(): bool
     {
-        return parent::isWritable() && (! RoleMatrix::enabled() || ! RoleMatrix::closesRelated($this->relatedModel()));
+        return parent::isWritable() && ! $this->closedForUser();
     }
 
     /**

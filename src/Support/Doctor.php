@@ -219,6 +219,10 @@ final class Doctor
         $rolesTable = $this->permissionTable('roles');
         $enabled = RoleMatrix::enabled();
 
+        if ($enabled && Fastleo::hasOwnerResolver()) {
+            $this->add('warning', 'roles', 'owner_resolver_ignored', [], 'owner_resolver_ignored_hint');
+        }
+
         if (! $enabled) {
             if ($rolesTable !== null && DB::table($rolesTable)->where('guard_name', Fastleo::GUARD)->exists()) {
                 $this->add('warning', 'roles', 'roles_disabled_with_roles', [], 'roles_disabled_with_roles_hint');
@@ -760,6 +764,26 @@ final class Doctor
             $this->add('error', $scope, 'read_column_type', ['column' => $readColumn], 'read_column_type_hint');
         }
 
+        // Раздел для владельца, а владельца нет: закрыт всем, включая настоящего владельца.
+        if (($resource::ownerOnlyGroups() !== [] || $resource::ownerOnlyIndexPage()) && ! RoleMatrix::enabled() && ! Fastleo::hasOwnerResolver()) {
+            $this->add('error', $scope, 'owner_only_without_owner', hint: 'owner_only_without_owner_hint');
+        }
+
+        // Опечатка в $ownerOnly («delet», «edit») не совпадает ни с чем, и раздел остаётся открытым менеджерам.
+        $knownAbilities = ['*', ...array_keys(RoleMatrix::GROUPS), ...array_values(RoleMatrix::GROUPS), ...array_map(fn (Action $action): string => $action->getAbility(), $resource->actions())];
+        $unknownOwnerOnly = array_values(array_diff($resource::ownerOnlyGroups(), $knownAbilities));
+
+        if ($unknownOwnerOnly !== []) {
+            $this->add('error', $scope, 'owner_only_unknown', ['value' => implode(', ', $unknownOwnerOnly)], 'owner_only_unknown_hint');
+        }
+
+        // Опечатка в $recordView раздела молча работала бы как страница просмотра.
+        $recordView = $resource::recordViewSetting();
+
+        if (! in_array($recordView, [null, 'modal', 'page', false], true)) {
+            $this->add('error', $scope, 'resource_record_view_unknown', ['value' => var_export($recordView, true)], 'resource_record_view_unknown_hint');
+        }
+
         $this->setToggles($resource, $scope);
         $this->relatedTables($resource, $scope);
         $this->foreignIndexes($resource, $model, $fields, $scope);
@@ -825,6 +849,7 @@ final class Doctor
 
     /**
      * Связанные таблицы: форма дочернего раздела должна иметь поле внешнего ключа, иначе «Добавить» не сможет подставить родителя.
+     * Без кнопки «Добавить» (`withoutAddButton()`) подставлять некому, поэтому поле не требуется.
      */
     private function relatedTables(Resource $resource, string $scope): void
     {
@@ -832,7 +857,7 @@ final class Doctor
             $child = $related->child();
             $key = $related->foreignKey();
 
-            if (! in_array($key, array_map(fn (Field $field): string => $field->name, $child->writableFields(null)), true)) {
+            if ($related->hasAddButton() && ! in_array($key, array_map(fn (Field $field): string => $field->name, $child->writableFields(null)), true)) {
                 $this->add('warning', $scope, 'related_foreign', ['relation' => $related->name, 'child' => $child::slug(), 'key' => $key], 'related_foreign_hint');
             }
 

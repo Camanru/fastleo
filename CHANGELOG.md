@@ -4,7 +4,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The admin interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
-## [Unreleased]
+## [4.9.5] — 2026-11-10
+
+### Added
+
+- **`Fastleo::resolveOwnerUsing()`, `Fastleo::isOwner()` and `Resource::$ownerOnly` / `$ownerOnlyIndex`** — an owner/others split without roles and `spatie/laravel-permission`. The site says who the owner is; files, the error log, cache clearing, SoftNetica, settings, custom pages and the users section are then for the owner only, and a section can close groups of abilities (`view`, `create`, `update`, `delete`), exact abilities (`export`, `import`, `forceDelete`) or itself entirely (`'*'`) to everybody else. The check stands above Policies and `can()`; no owner at all closes such a section to everybody and `fastleo:doctor` reports it. With roles on, the role decides and the resolver is ignored ([authorization](docs/authorization.md#владелец-и-owneronly)).
+- **`Resource::$recordView`** — the record page mode per section (`'modal'`, `'page'`, `false`; `null` follows `fastleo.record_view`), so a section that is read but not edited (messages for a manager) shows a card even when the site has no record pages; `fastleo:doctor` checks the value (and reports a mistyped ability in `$ownerOnly` or a resolver that roles make useless), `fastleo:inspect` shows `record_view`, `owner_only`, `owner_only_index` and `computed`. `Resource::viewModalUrl()` is now an instance method ([resources](docs/resources.md#просмотр-записи-в-разделе)).
+- **`Field::computed()`** — a list column counted in PHP from the record (phone + name, links): display, export (tags stripped) and MCP, no column in the table, no writing; `sortable()` or `searchable()` on it throws a `LogicException` ([list](docs/list.md#столбец-который-считается-в-php-по-записи)).
+- **`fastleo.users.label|singular|access`** — names of the users section, a person and the access toggle ([configuration](docs/configuration.md)); the built-in users section also shows an "Owner" column when `resolveOwnerUsing()` is set.
+- **`Fastleo\Testing\ActsAsFastleoUser`** — `actingAsFastleo($user)` signs a user in and drops the previous one, for tests that switch between an owner and a manager ([testing](docs/testing.md#смена-пользователя-посреди-теста)).
+
+### Changed
+
+- **A form with no field the admin may change has no Save buttons**, and Ctrl+S in it sends nothing.
+- **The card above the form (`summaryView()`) refreshes after a related record is saved in a window** (`Related::editIn('modal')`).
+- **`fastleo:doctor` no longer asks for the parent field in a related table that has no Add button** (`withoutAddButton()`).
+- **`Fastleo::showBellTo()` shows the bell only for a strict `true`** from the closure; a `1` from an uncast column used to count and no longer does (cast it to `bool`).
+- **`$ownerOnlyIndex` closes everything that returns the whole list**: the list page, export, import, filters, Ctrl+K search, the menu item and MCP; tables of the section on other records' pages stay open.
+- **A relation field (`BelongsTo`, `MorphTo`) to a section closed by `$ownerOnly` is read-only and gives no option titles** even when roles are off; the link in a list opens the card by the related section's own record page mode.
+- **A failing owner resolver is reported once per user** instead of on every check.
+- **Removed `Fastleo::recordView()` and `Fastleo::recordViewInModal()`**, which nothing called: use `Resource::hasRecordView()` and `Resource::recordViewInModal()` (per section).
 
 ## [4.9.4] — 2026-11-10
 
@@ -685,6 +704,7 @@ The Composer name is `camanru/fastleo`, the namespace is `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.9.5]: https://github.com/Camanru/fastleo/releases/tag/4.9.5
 [4.9.4]: https://github.com/Camanru/fastleo/releases/tag/4.9.4
 [4.9.3]: https://github.com/Camanru/fastleo/releases/tag/4.9.3
 [4.9.2]: https://github.com/Camanru/fastleo/releases/tag/4.9.2

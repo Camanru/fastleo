@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Filters\SelectFilter;
+use Fastleo\Tests\Fixtures\OwnerOnly\ArticleResource as OwnerOnlyArticleResource;
 use Fastleo\Tests\Fixtures\Related\ArticleResource as RelatedArticleResource;
 use Illuminate\Support\Facades\Artisan;
 use Workbench\App\Fastleo\ArticleResource;
@@ -145,6 +146,27 @@ it('marks the columns that come from the query of the resource', function (): vo
 
     expect($fields['articles_count'])->toMatchArray(['from_query' => true, 'writes_attribute' => false, 'in_form' => false, 'in_list' => true, 'sortable' => true])
         ->and($fields['title'])->not->toHaveKey('from_query');
+});
+
+it('marks the columns that are counted in PHP from the record', function (): void {
+    useFixtureResources('FromQuery');
+
+    $fields = collect(inspected('categories')['fields'])->keyBy('name');
+
+    expect($fields['summary'])->toMatchArray(['computed' => true, 'writes_attribute' => false, 'in_form' => false, 'in_list' => true, 'sortable' => false])
+        ->and($fields['summary'])->not->toHaveKey('from_query')
+        ->and($fields['title'])->not->toHaveKey('computed');
+});
+
+it('tells what a section closes to the others and how it shows a record', function (): void {
+    useFixtureResources('OwnerOnly');
+    OwnerOnlyArticleResource::$ownerOnly = ['delete', 'export'];
+    OwnerOnlyArticleResource::$ownerOnlyIndex = true;
+
+    expect(inspected('articles'))->toMatchArray(['owner_only' => ['delete', 'export'], 'owner_only_index' => true, 'record_view' => 'modal']);
+
+    OwnerOnlyArticleResource::$ownerOnly = [];
+    OwnerOnlyArticleResource::$ownerOnlyIndex = false;
 });
 
 it('lists the related tables of a section', function (): void {

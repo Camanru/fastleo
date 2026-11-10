@@ -504,6 +504,116 @@ abstract class Resource
     }
 
     /**
+     * Что в разделе закрыто для всех, кроме владельца (`Fastleo::resolveOwnerUsing()` или роль-владелец): группы
+     * `view`, `create`, `update`, `delete` (у `update` ещё порядок и восстановление, у `delete` — удаление из корзины), точные
+     * способности `export`, `import`, `forceDelete` или `'*'` — раздел целиком (нет меню, адреса отвечают 403).
+     *
+     * ```php
+     * protected static array $ownerOnly = ['create', 'update', 'delete', 'export'];   // менеджер сообщение только читает
+     * ```
+     *
+     * @var list<string>
+     */
+    protected static array $ownerOnly = [];
+
+    /**
+     * Общий список этого раздела (адрес `/{раздел}`) — только владельцу; таблицы на карточках других записей и правка остаются
+     * открытыми. Нужен вспомогательным разделам без пункта меню (запчасти, варианты): общий список собрал бы всю базу.
+     *
+     * ```php
+     * protected static bool $ownerOnlyIndex = true;
+     * ```
+     */
+    protected static bool $ownerOnlyIndex = false;
+
+    /**
+     * Режим страницы просмотра этого раздела: `'modal'` (в окне), `'page'` (отдельная страница) или `false` (просмотра нет);
+     * `null` — как в конфиге (`fastleo.record_view`, по умолчанию `'modal'`). Нужен разделу, у которого запись читают, но не
+     * правят (сообщения для менеджера), или который открывается иначе, чем остальные.
+     *
+     * ```php
+     * protected static string|false|null $recordView = 'modal';
+     * ```
+     */
+    protected static string|false|null $recordView = null;
+
+    /**
+     * Закрытое для всех, кроме владельца (`$ownerOnly`).
+     *
+     * ```php
+     * LeadResource::ownerOnlyGroups(); // ['create', 'update', 'delete', 'export']
+     * ```
+     *
+     * @return list<string>
+     */
+    public static function ownerOnlyGroups(): array
+    {
+        return static::$ownerOnly;
+    }
+
+    /**
+     * Общий список раздела — только владельцу (`$ownerOnlyIndex`).
+     *
+     * ```php
+     * VariantResource::ownerOnlyIndexPage(); // true
+     * ```
+     */
+    public static function ownerOnlyIndexPage(): bool
+    {
+        return static::$ownerOnlyIndex;
+    }
+
+    /**
+     * Что задано в `$recordView` раздела (`null` — не задано, действует конфиг).
+     *
+     * ```php
+     * LeadResource::recordViewSetting(); // 'modal'
+     * ```
+     */
+    public static function recordViewSetting(): string|false|null
+    {
+        return static::$recordView;
+    }
+
+    /**
+     * Режим просмотра записи этого раздела с учётом конфига: `'modal'`, `'page'` или `false`.
+     *
+     * ```php
+     * LeadResource::recordViewMode(); // 'modal'
+     * ```
+     */
+    public static function recordViewMode(): string|false
+    {
+        $mode = static::$recordView ?? config('fastleo.record_view', 'modal');
+
+        return $mode === false ? false : ($mode === 'modal' ? 'modal' : 'page');
+    }
+
+    /**
+     * У записей раздела есть страница просмотра.
+     *
+     * ```php
+     * if (LeadResource::hasRecordView()) { … }
+     * ```
+     */
+    public static function hasRecordView(): bool
+    {
+        return static::recordViewMode() !== false;
+    }
+
+    /**
+     * Просмотр записи раздела открывается в окне поверх страницы.
+     *
+     * ```php
+     * LeadResource::recordViewInModal(); // true при 'modal'
+     * ```
+     */
+    public static function recordViewInModal(): bool
+    {
+        return static::recordViewMode() === 'modal';
+    }
+
+    /**
      * Адрес записи для списков и поиска: форма правки, если запись можно менять (и она не в корзине), иначе страница
      * просмотра (если она включена: `fastleo.record_view`, и можно `view`), иначе null.
      *
@@ -528,7 +638,7 @@ abstract class Resource
             return route('fastleo.resources.edit', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute);
         }
 
-        return Fastleo::recordView() && $can('view', $record)
+        return static::hasRecordView() && $can('view', $record)
             ? route('fastleo.resources.show', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute)
             : null;
     }
@@ -541,7 +651,7 @@ abstract class Resource
      */
     public function viewUrl(Model $record, array $query = [], bool $absolute = true): ?string
     {
-        if (Fastleo::recordView()) {
+        if (static::hasRecordView()) {
             return $this->showUrl($record, $query, $absolute);
         }
 
@@ -562,20 +672,21 @@ abstract class Resource
      */
     public function recordAddress(Model $record, bool $absolute = true): string
     {
-        return route(Fastleo::recordView() ? 'fastleo.resources.show' : 'fastleo.resources.edit', [static::slug(), $record->getKey()], $absolute);
+        return route(static::hasRecordView() ? 'fastleo.resources.show' : 'fastleo.resources.edit', [static::slug(), $record->getKey()], $absolute);
     }
 
     /**
-     * Адрес для окна (страница без меню в iframe) по адресу страницы просмотра из `viewUrl()`: null, если окно не
-     * включено (`fastleo.record_view` не `'modal'`) или страницы нет. Права уже учтены в `viewUrl()`, Policy второй раз не зовётся.
+     * Адрес для окна (страница без меню в iframe) по адресу страницы просмотра из `viewUrl()`: null, если у раздела окно не
+     * включено (`$recordView` или `fastleo.record_view` не `'modal'`) или страницы нет. Права уже учтены в `viewUrl()`,
+     * Policy второй раз не зовётся.
      *
      * ```php
-     * Resource::viewModalUrl($resource->viewUrl($article));   // http://site.test/fastleo/articles/5?frame=1
+     * $resource->viewModalUrl($resource->viewUrl($article));   // http://site.test/fastleo/articles/5?frame=1
      * ```
      */
-    public static function viewModalUrl(?string $viewUrl): ?string
+    public function viewModalUrl(?string $viewUrl): ?string
     {
-        return Fastleo::recordViewInModal() && $viewUrl !== null ? (string) Uri::of($viewUrl)->withQuery(['frame' => 1]) : null;
+        return static::recordViewInModal() && $viewUrl !== null ? (string) Uri::of($viewUrl)->withQuery(['frame' => 1]) : null;
     }
 
     /**
@@ -585,7 +696,7 @@ abstract class Resource
      */
     private function showUrl(Model $record, array $query, bool $absolute): ?string
     {
-        return Fastleo::recordView() && Authorization::allows('view', $this, $record)
+        return static::hasRecordView() && Authorization::allows('view', $this, $record)
             ? route('fastleo.resources.show', [static::slug(), $record->getKey(), ...$this->cleanQuery($query)], $absolute)
             : null;
     }

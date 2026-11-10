@@ -21,7 +21,7 @@
     @elseif ($display === null || $display === '')
         <span class="text-ink-3">—</span>
     @elseif ($link !== null)
-        <a href="{{ $link }}" class="hover:text-primary-text hover:underline" data-related-link{!! ($modalLink = \Fastleo\Resource::viewModalUrl($link)) ? ' data-record-view="'.e($modalLink).'"' : '' !!}>{{ $display }}</a>
+        <a href="{{ $link }}" class="hover:text-primary-text hover:underline" data-related-link{!! ($modalLink = $field->linkModalUrl($record)) ? ' data-record-view="'.e($modalLink).'"' : '' !!}>{{ $display }}</a>
     @else
         {{ $display }}
     @endif

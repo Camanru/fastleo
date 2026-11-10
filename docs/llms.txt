@@ -137,6 +137,7 @@ class ProductsAdminTest extends TestCase
 | Вложенные записи блоками в форме (ссылки статьи, цены вариантов товара, до десятков штук) | поле `HasMany` во вкладке; для сотен записей — таблица `Related` | [fields/has-many.md](fields/has-many.md) |
 | Ссылка на запись одного из нескольких разделов (заметка на статью или товар) | `MorphTo::make('subject')->types([ArticleResource::class, ProductResource::class])`, колонки `nullableMorphs('subject')` | [fields/morph-to.md](fields/morph-to.md) |
 | Товар в комплекте, количество у связи «многие ко многим», выбор записи другого раздела в каждой строке | отдельная таблица с `id` и моделью; `HasMany` с `BelongsTo` внутри блока | [fields/has-many.md](fields/has-many.md#выбор-записи-в-блоке) |
+| Раздел, где запись читают, но не правят (сообщения менеджеру): карточка есть, формы нет | `$recordView = 'modal'` у раздела + закрыть правку (`can()`); поля все `readonly()` — форма без «Сохранить» | [resources.md](resources.md#просмотр-записи-в-разделе) |
 | Просмотр записи: окно (по умолчанию `'modal'`), отдельная страница (`'page'`) или без просмотра, только форма | `'record_view' => 'modal'\|'page'\|false` в `config/fastleo.php`; ссылку на запись в уведомлениях — `Fastleo::recordUrl($запись, false)` | [configuration.md](configuration.md#страница-просмотра-записи) |
 | Вложенные записи в карточке на нескольких уровнях (заказ → позиции → предложения) | `Related::make(…)->expandable()` и `relations()` у дочерних разделов | [related.md](related.md#раскрывающиеся-строки) |
 | Убрать строку «Записи 1–3 из 3» под небольшой связанной таблицей | `Related::make(…)->withoutSinglePageFooter()` — пока все записи на одной странице | [related.md](related.md#строка-записи-под-таблицей) |
@@ -151,6 +152,7 @@ class ProductsAdminTest extends TestCase
 | Столбец прячется, пока у всех записей страницы пуст (второй телефон, комментарий) | `->hideWhenEmpty()` у поля | [list.md](list.md#какие-поля-видны) |
 | Обложка миниатюрой рядом с названием, без отдельного столбца | `Image::make(...)->inTitle()` | [fields/image.md](fields/image.md) |
 | Столбец из подсчёта, суммы, подзапроса | `->fromQuery()` + `query(Builder $query)` ресурса | [list.md](list.md#вычисляемые-столбцы) |
+| Столбец из нескольких полей записи или ссылок (телефон + имя, «Клиент и заявка»), без колонки в таблице | `->computed(fn ($record) => …)`; сортировка и поиск не поддерживаются | [list.md](list.md#столбец-который-считается-в-php-по-записи) |
 | Отчёт с плитками по шесть в ряд | `protected static int $columns = 6;` в странице-отчёте, `columnSpan(1–6)` у виджетов | [reports.md](reports.md#шесть-плиток-в-ряд) |
 | Фильтр списка, в том числе по умолчанию («менеджер — я») | `filters()`, `->default(fn () => …)` | [list.md](list.md) |
 | Список обновляется сам (входящие) | `protected static ?int $poll = 10;` | [list.md](list.md#автообновление-списка) |
@@ -161,6 +163,7 @@ class ProductsAdminTest extends TestCase
 | Статистика: период, график, таблица с итогами | страница `Page` с `filters()` и `widgets()`: `Period`, `Choice`, `Stat`, `Chart`, `Rows` | [reports.md](reports.md) |
 | Плитки и числа на главной | `Dashboard` и виджеты | [dashboard.md](dashboard.md) |
 | «Только свои записи», права по ролям | Policy модели + `query()` ресурса | [authorization.md](authorization.md), [recipes.md](recipes.md) |
+| Владелец и менеджеры без ролей: настройки, файлы, журнал — только владельцу; в разделе удаление/правка/выгрузка — только владельцу | `Fastleo::resolveOwnerUsing(fn ($user) => $user->is_owner)` в `AppServiceProvider::boot()` + `$ownerOnly = ['update', 'delete', 'export']` (`'*'` — раздел целиком, `$ownerOnlyIndex` — только общий список); в Policy и коде — `Fastleo::isOwner()` | [authorization.md](authorization.md#владелец-и-owneronly) |
 | Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](recipes.md) |
 | Готовый раздел «Страницы», «Новости», «Заявки» или «Контакты» в админке (без вёрстки сайта) | `php artisan fastleo:module pages` (или `news`, `leads`, `contacts`) | [modules.md](modules.md) |
 | Выгрузка и загрузка CSV | `$exportable`, `$importable` | [import-export.md](import-export.md) |
