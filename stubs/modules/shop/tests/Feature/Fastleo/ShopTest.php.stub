@@ -1,0 +1,115 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Enums\ShopOrderStatus;
+use {{ namespace }}\Exceptions\OutOfStockException;
+use {{ namespace }}\Models\ShopOrder;
+use {{ namespace }}\Models\ShopProduct;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+const CUSTOMER = ['name' => 'Иван', 'phone' => '+7 900 000-00-00'];
+
+it('takes the prices and titles from the database, not from the request', function (): void {
+    $kettle = ShopProduct::factory()->create(['title' => 'Чайник', 'price' => '1500.50', 'sku' => 'K-1']);
+    $mug = ShopProduct::factory()->create(['title' => 'Кружка', 'price' => '99.99']);
+
+    $order = ShopOrder::place(CUSTOMER, [$kettle->id => 2, $mug->id => 3]);
+
+    expect($order->total)->toBe('3300.97')
+        ->and($order->status)->toBe(ShopOrderStatus::New)
+        ->and($order->items)->toHaveCount(2)
+        ->and($order->items->firstWhere('product_id', $kettle->id)->only(['title', 'sku', 'price', 'quantity']))->toBe(['title' => 'Чайник', 'sku' => 'K-1', 'price' => '1500.50', 'quantity' => 2]);
+
+    // Цену товара изменили — заказ хранит прежнюю.
+    $kettle->update(['price' => '1.00']);
+
+    expect($order->fresh()->items->firstWhere('product_id', $kettle->id)->price)->toBe('1500.50');
+});
+
+it('writes the stock off and refuses an order for more than there is', function (): void {
+    $product = ShopProduct::factory()->create(['stock' => 3, 'title' => 'Лампа']);
+
+    ShopOrder::place(CUSTOMER, [$product->id => 2]);
+
+    expect($product->fresh()->stock)->toBe(1)
+        ->and(fn () => ShopOrder::place(CUSTOMER, [$product->id => 2]))->toThrow(OutOfStockException::class, '«Лампа»: в наличии 1 шт.')
+        ->and($product->fresh()->stock)->toBe(1)
+        ->and(ShopOrder::query()->count())->toBe(1);
+});
+
+it('leaves the stock alone for a product that does not keep it and rolls back the whole order on a failure', function (): void {
+    $free = ShopProduct::factory()->create(['stock' => null]);
+    $scarce = ShopProduct::factory()->create(['stock' => 1]);
+
+    expect(fn () => ShopOrder::place(CUSTOMER, [$free->id => 5, $scarce->id => 2]))->toThrow(OutOfStockException::class)
+        ->and(ShopOrder::query()->count())->toBe(0)
+        ->and($free->fresh()->stock)->toBeNull()
+        ->and($scarce->fresh()->stock)->toBe(1);
+});
+
+it('refuses a wrong order', function (array $customer, array $items): void {
+    ShopProduct::factory()->create(['id' => 1]);
+    ShopProduct::factory()->create(['id' => 2, 'is_published' => false]);
+
+    expect(fn () => ShopOrder::place($customer, $items))->toThrow(InvalidArgumentException::class)
+        ->and(ShopOrder::query()->count())->toBe(0);
+})->with([
+    'empty cart' => [CUSTOMER, []],
+    'zero quantity' => [CUSTOMER, [1 => 0]],
+    'negative quantity' => [CUSTOMER, [1 => -1]],
+    'fractional quantity' => [CUSTOMER, [1 => '1.5']],
+    'unknown product' => [CUSTOMER, [999 => 1]],
+    'hidden product' => [CUSTOMER, [2 => 1]],
+    'no phone' => [['name' => 'Иван', 'phone' => ' '], [1 => 1]],
+]);
+
+it('returns the stock once when an order is cancelled and does not let it out of that status', function (): void {
+    $product = ShopProduct::factory()->create(['stock' => 5]);
+    $order = ShopOrder::place(CUSTOMER, [$product->id => 2]);
+
+    expect($order->changeStatus(ShopOrderStatus::InWork))->toBeTrue()
+        ->and($order->changeStatus(ShopOrderStatus::InWork))->toBeFalse()
+        ->and($product->fresh()->stock)->toBe(3)
+        ->and($order->changeStatus(ShopOrderStatus::Cancelled))->toBeTrue()
+        ->and($product->fresh()->stock)->toBe(5)
+        ->and($order->changeStatus(ShopOrderStatus::Cancelled))->toBeFalse()
+        ->and($order->changeStatus(ShopOrderStatus::New))->toBeFalse()
+        ->and($product->fresh()->stock)->toBe(5)
+        ->and($order->fresh()->status)->toBe(ShopOrderStatus::Cancelled);
+});
+
+it('sets the payment date itself', function (): void {
+    $order = ShopOrder::factory()->create();
+
+    expect($order->paid_at)->toBeNull();
+
+    $order->update(['is_paid' => true]);
+    expect($order->fresh()->paid_at)->not->toBeNull();
+
+    $order->update(['is_paid' => false]);
+    expect($order->fresh()->paid_at)->toBeNull();
+});
+
+it('lets an administrator work with the shop sections but not create an order by hand', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+    $product = ShopProduct::factory()->create(['stock' => 4]);
+    $order = ShopOrder::place(CUSTOMER, [$product->id => 1]);
+
+    foreach (['shop-categories', 'shop-products', 'shop-orders'] as $slug) {
+        $this->get(route('fastleo.resources.index', $slug))->assertOk();
+    }
+
+    $this->get(route('fastleo.resources.edit', ['shop-orders', $order->id]))->assertOk()->assertSee('Заметка менеджера');
+    $this->get(route('fastleo.resources.create', 'shop-orders'))->assertForbidden();
+
+    $this->post(route('fastleo.resources.action', ['shop-orders', 'change-shop-order-status']), ['ids' => [$order->id], 'data' => ['status' => 'cancelled']])->assertSessionHas('fastleo.success');
+
+    expect($order->fresh()->status)->toBe(ShopOrderStatus::Cancelled)
+        ->and($product->fresh()->stock)->toBe(4);
+});

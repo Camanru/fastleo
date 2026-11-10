@@ -22,7 +22,7 @@ beforeEach(function (): void {
 });
 
 /**
- * «Отправить» с временем в часовом поясе админки.
+ * «Отправить» с временем в часовом поясе панели.
  */
 function sendAt(Publication $publication, string $at): TestResponse
 {

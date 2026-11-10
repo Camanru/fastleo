@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Database\Factories\Fastleo\ShopCategoryFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+/**
+ * Категория каталога: дерево (`parent_id`). Вывод на сайте — ваш.
+ *
+ * ```php
+ * ShopCategory::query()->published()->whereNull('parent_id')->get();
+ * ```
+ *
+ * @property int $id
+ * @property int|null $parent_id
+ * @property int $sort
+ * @property string $title
+ * @property string $slug
+ * @property bool $is_published
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ */
+#[UseFactory(ShopCategoryFactory::class)]
+class ShopCategory extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['parent_id', 'sort', 'title', 'slug', 'is_published', 'seo'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+            'seo' => 'array',
+        ];
+    }
+
+    /**
+     * Родительская категория.
+     *
+     * @return BelongsTo<ShopCategory, $this>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /**
+     * Вложенные категории.
+     *
+     * @return HasMany<ShopCategory, $this>
+     */
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
+    }
+
+    /**
+     * Товары категории.
+     *
+     * @return HasMany<ShopProduct, $this>
+     */
+    public function products(): HasMany
+    {
+        return $this->hasMany(ShopProduct::class, 'category_id');
+    }
+
+    /**
+     * Только опубликованные категории в порядке, заданном в панели.
+     *
+     * @param  Builder<ShopCategory>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderBy('id');
+    }
+}

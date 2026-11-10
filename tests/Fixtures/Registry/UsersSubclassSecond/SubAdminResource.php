@@ -7,6 +7,6 @@ namespace Fastleo\Tests\Fixtures\Registry\UsersSubclassSecond;
 use Fastleo\Resources\UserResource;
 
 /**
- * Наследник встроенного раздела «Администраторы» идёт вторым: поиск наследника ведётся по классу, который проверяется сейчас.
+ * Наследник встроенного раздела «Пользователи» идёт вторым: поиск наследника ведётся по классу, который проверяется сейчас.
  */
 final class SubAdminResource extends UserResource {}

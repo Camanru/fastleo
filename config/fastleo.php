@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Fastleo\Leads\LeadApiKeyResource;
 use Fastleo\Resources\RoleResource;
 use Fastleo\Resources\UserResource;
 
@@ -9,18 +10,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Адрес админки
+    | Настройки из .env
     |--------------------------------------------------------------------------
     |
-    | path — префикс адресов (https://site.ru/fastleo), domain — отдельный
-    | домен (admin.site.ru) или null, чтобы админка жила на домене сайта.
-    | middleware — группы, через которые проходят все страницы админки.
+    | Простые значения (вкл/выкл, числа, строки) можно задать в .env, не меняя
+    | этот файл. Имя переменной — FASTLEO_ и путь ключа заглавными буквами через
+    | «_»: path → FASTLEO_PATH, auth.two_factor_required →
+    | FASTLEO_AUTH_TWO_FACTOR_REQUIRED. Вкл/выкл — true или false, null — «не задано».
+    | Классы разделов, списки и папка ресурсов задаются только здесь. После правки .env на
+    | боевом сайте выполните php artisan config:cache.
     |
     */
 
-    'path' => 'fastleo',
+    /*
+    |--------------------------------------------------------------------------
+    | Адрес панели
+    |--------------------------------------------------------------------------
+    |
+    | path — префикс адресов (https://site.ru/fastleo), domain — отдельный
+    | домен (admin.site.ru) или null, чтобы панель жила на домене сайта.
+    | middleware — группы, через которые проходят все страницы панели.
+    |
+    */
 
-    'domain' => null,
+    'path' => env('FASTLEO_PATH', 'fastleo'),
+
+    'domain' => env('FASTLEO_DOMAIN'),
 
     'middleware' => ['web'],
 
@@ -33,48 +48,52 @@ return [
     | работает guard fastleo. Модель провайдера реализует Fastleo\Auth\FastleoUser.
     | remember_days — сколько дней держится вход с галочкой «Запомнить меня».
     | reset_minutes — сколько минут действует ссылка из письма «Забыли пароль?».
-    | two_factor_required — требовать двухфакторную защиту от всех администраторов.
-    | new_login_mail — писать администратору о входе с нового устройства.
+    | two_factor_required — требовать двухфакторную защиту от всех пользователей.
+    | new_login_mail — писать пользователю о входе с нового устройства.
     | logins_keep_days — сколько дней хранится история входов в профиле.
     |
     */
 
     'auth' => [
-        'provider' => 'users',
-        'remember_days' => 30,
-        'reset_minutes' => 60,
-        'two_factor_required' => false,
-        'new_login_mail' => true,
-        'logins_keep_days' => 90,
+        'provider' => env('FASTLEO_AUTH_PROVIDER', 'users'),
+        'remember_days' => (int) env('FASTLEO_AUTH_REMEMBER_DAYS', 30),
+        'reset_minutes' => (int) env('FASTLEO_AUTH_RESET_MINUTES', 60),
+        'two_factor_required' => (bool) env('FASTLEO_AUTH_TWO_FACTOR_REQUIRED', false),
+        'new_login_mail' => (bool) env('FASTLEO_AUTH_NEW_LOGIN_MAIL', true),
+        'logins_keep_days' => (int) env('FASTLEO_AUTH_LOGINS_KEEP_DAYS', 90),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Администраторы
+    | Пользователи
     |--------------------------------------------------------------------------
     |
-    | users.resource — встроенный раздел «Администраторы» (Fastleo\Resources\UserResource):
+    | users.resource — встроенный раздел «Пользователи» (Fastleo\Resources\UserResource):
     | оставьте как есть, укажите свой класс-наследник или null, чтобы раздела не было.
     | users.label, users.singular, users.access — как раздел и его галочка называются у вас («Сотрудники»,
     | «Сотрудник», «Доступ в CRM»); null — тексты пакета.
+    | users.impersonate — «Войти как»: владелец входит под другим пользователем, чтобы проверить его права, и возвращается
+    | кнопкой «Вернуться». По умолчанию false. Работает, только когда сайт знает владельца (роли или
+    | Fastleo::resolveOwnerUsing()); входить можно под пользователем, который сам не владелец.
     |
     */
 
     'users' => [
         'resource' => UserResource::class,
-        'label' => null,
-        'singular' => null,
-        'access' => null,
+        'label' => env('FASTLEO_USERS_LABEL'),
+        'singular' => env('FASTLEO_USERS_SINGULAR'),
+        'access' => env('FASTLEO_USERS_ACCESS'),
+        'impersonate' => (bool) env('FASTLEO_USERS_IMPERSONATE', false),
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Роли администраторов
+    | Роли пользователей
     |--------------------------------------------------------------------------
     |
     | roles.enabled — права по разделам через spatie/laravel-permission (docs/roles.md): действие разрешено,
-    | только если разрешают роли администратора, метод ресурса can() и Policy модели. Выключено — как раньше.
-    | roles.owner — роль-владелец (guard fastleo): проходит все проверки, одна управляет «Администраторами»,
+    | только если разрешают роли пользователя, метод ресурса can() и Policy модели. Выключено — как раньше.
+    | roles.owner — роль-владелец (guard fastleo): проходит все проверки, одна управляет «Пользователями»,
     | настройками, файлами и журналом ошибок. Выдать её: php artisan fastleo:roles --owner=email.
     | roles.resource — раздел «Роли» с матрицей прав (Fastleo\Resources\RoleResource): оставьте как есть,
     | укажите свой класс-наследник или null, чтобы раздела не было (роли тогда заводятся сидером).
@@ -83,8 +102,8 @@ return [
 
     'roles' => [
         'resource' => RoleResource::class,
-        'enabled' => false,
-        'owner' => 'fastleo-owner',
+        'enabled' => (bool) env('FASTLEO_ROLES_ENABLED', false),
+        'owner' => env('FASTLEO_ROLES_OWNER', 'fastleo-owner'),
     ],
 
     /*
@@ -93,12 +112,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | logs.enabled — страница «Журнал ошибок» (storage/logs/*.log). Закрыть её для части
-    | администраторов можно Gate viewFastleoLogs.
+    | пользователей можно Gate viewFastleoLogs.
     |
     */
 
     'logs' => [
-        'enabled' => true,
+        'enabled' => (bool) env('FASTLEO_LOGS_ENABLED', true),
     ],
 
     /*
@@ -106,24 +125,45 @@ return [
     | Уведомления
     |--------------------------------------------------------------------------
     |
-    | bell — колокольчик в шапке админки. По умолчанию false — колокольчика нет и в него ничего не сохраняется
+    | bell — колокольчик в шапке панели. По умолчанию false — колокольчика нет и в него ничего не сохраняется
     | (notify(), notifyAdmins(), итог импорта, сбой публикации, свои классы с каналом fastleo); включить — true.
     | poll — как часто колокольчик обновляет число непрочитанных, секунд (от 10 секунд до суток);
     | null — не опрашивать: число обновляется при загрузке страницы и открытии колокольчика.
     | keep_days — сколько дней хранятся уведомления в колокольчике (чистит fastleo:prune).
     | bots — раздел «Боты уведомлений» (группа меню «Мессенджеры»): боты Telegram и Max, через которые Fastleo::notifyAdmins()
-    | отправляет уведомления в чаты администраторов. По умолчанию null — раздела нет; включить —
+    | отправляет уведомления в чаты пользователей. По умолчанию null — раздела нет; включить —
     | Fastleo\Notifications\NotificationBotResource::class (или свой наследник).
-    | mail — отправлять уведомления notifyAdmins() письмом каждому администратору с адресом (через очередь сайта, если она есть).
+    | mail — отправлять уведомления notifyAdmins() письмом каждому пользователю с адресом (через очередь сайта, если она есть).
     |
     */
 
     'notifications' => [
-        'bell' => false,
-        'poll' => 60,
-        'keep_days' => 90,
+        'bell' => (bool) env('FASTLEO_NOTIFICATIONS_BELL', false),
+        'poll' => (int) env('FASTLEO_NOTIFICATIONS_POLL', 60),
+        'keep_days' => (int) env('FASTLEO_NOTIFICATIONS_KEEP_DAYS', 90),
         'bots' => null,
-        'mail' => false,
+        'mail' => (bool) env('FASTLEO_NOTIFICATIONS_MAIL', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Заявки
+    |--------------------------------------------------------------------------
+    |
+    | Встроенный раздел «Заявки»: форма на сайте и приём заявок с других сайтов по API с ключами. По умолчанию выключено.
+    | resource — класс раздела: Fastleo\Leads\LeadResource::class (или ваш наследник); null — заявок нет совсем.
+    | keys — раздел «Доступы для сайтов» и приём по API (POST api_path); работает, только когда включён resource; null — без API.
+    | form — принимать заявки с формы сайта (POST path); форма — <x-fastleo::lead-form />.
+    | path, api_path — адреса приёма: форма и API.
+    |
+    */
+
+    'leads' => [
+        'resource' => null,
+        'keys' => LeadApiKeyResource::class,
+        'form' => (bool) env('FASTLEO_LEADS_FORM', true),
+        'path' => env('FASTLEO_LEADS_PATH') ?: 'leads',
+        'api_path' => env('FASTLEO_LEADS_API_PATH') ?: 'api/leads',
     ],
 
     /*
@@ -157,8 +197,8 @@ return [
 
     'messengers' => [
         'max' => [
-            'url' => 'https://platform-api2.max.ru',
-            'certificate' => null,
+            'url' => env('FASTLEO_MESSENGERS_MAX_URL', 'https://platform-api2.max.ru'),
+            'certificate' => env('FASTLEO_MESSENGERS_MAX_CERTIFICATE'),
         ],
     ],
 
@@ -168,7 +208,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Доступно клиентам SoftNetica: токен выдаёт администратор SoftNetica, вводится
-    | на странице «SoftNetica» в настройках админки. Без токена пакет не делает
+    | на странице «SoftNetica» в настройках панели. Без токена пакет не делает
     | ни одного запроса. enabled = false — убрать функцию целиком (страницу настроек,
     | виджет, раздел, синхронизацию).
     | url — адрес панели SoftNetica (только https; http допустим лишь при APP_ENV=local).
@@ -177,8 +217,8 @@ return [
     */
 
     'softnetica' => [
-        'enabled' => true,
-        'url' => 'https://panel.softnetica.com',
+        'enabled' => (bool) env('FASTLEO_SOFTNETICA_ENABLED', true),
+        'url' => env('FASTLEO_SOFTNETICA_URL', 'https://panel.softnetica.com'),
         'cabinet_hosts' => ['my.softnetica.com'],
     ],
 
@@ -187,15 +227,15 @@ return [
     | Закрытие сайта
     |--------------------------------------------------------------------------
     |
-    | enabled — показать в админке страницу «Закрытие сайта» (Настройки). Пока на ней стоит
+    | enabled — показать в панели страницу «Закрытие сайта» (Настройки). Пока на ней стоит
     | галочка, посетители групп маршрутов web и api получают страницу «Сайт временно не работает»
-    | с кодом 503, а вошедшие администраторы и сама админка работают как обычно.
+    | с кодом 503, а вошедшие пользователи и сама панель работают как обычно.
     | Маршруты вне групп web и api не закрываются. Включение подхватывается при старте приложения (после config:cache — пересоберите кеш).
     |
     */
 
     'closing' => [
-        'enabled' => false,
+        'enabled' => (bool) env('FASTLEO_CLOSING_ENABLED', false),
     ],
 
     /*
@@ -206,12 +246,12 @@ return [
     | enabled — отдавать /robots.txt (по умолчанию выключено: маршрут не занимает адрес, пока он не нужен;
     | а файл public/robots.txt веб-сервер отдаёт раньше Laravel — удалите его).
     | lines — строки файла; если включена карта сайта, внизу добавляется «Sitemap: …».
-    | Адрес админки сюда не пишут: он закрыт от индексации заголовком X-Robots-Tag.
+    | Адрес панели сюда не пишут: он закрыт от индексации заголовком X-Robots-Tag.
     |
     */
 
     'robots' => [
-        'enabled' => false,
+        'enabled' => (bool) env('FASTLEO_ROBOTS_ENABLED', false),
         'lines' => ['User-agent: *', 'Disallow:'],
     ],
 
@@ -231,9 +271,9 @@ return [
     */
 
     'sitemap' => [
-        'enabled' => false,
-        'cache_minutes' => 60,
-        'per_file' => 50000,
+        'enabled' => (bool) env('FASTLEO_SITEMAP_ENABLED', false),
+        'cache_minutes' => (int) env('FASTLEO_SITEMAP_CACHE_MINUTES', 60),
+        'per_file' => (int) env('FASTLEO_SITEMAP_PER_FILE', 50000),
         'urls' => [],
     ],
 
@@ -254,17 +294,17 @@ return [
     */
 
     'brand' => [
-        'name' => null,
-        'logo' => null,
-        'color' => '#4f46e5',
+        'name' => env('FASTLEO_BRAND_NAME'),
+        'logo' => env('FASTLEO_BRAND_LOGO'),
+        'color' => env('FASTLEO_BRAND_COLOR', '#4f46e5'),
         'login' => [
-            'heading' => null,
-            'text' => null,
-            'footer' => null,
+            'heading' => env('FASTLEO_BRAND_LOGIN_HEADING'),
+            'text' => env('FASTLEO_BRAND_LOGIN_TEXT'),
+            'footer' => env('FASTLEO_BRAND_LOGIN_FOOTER'),
         ],
     ],
 
-    'theme' => 'system',
+    'theme' => env('FASTLEO_THEME', 'system'),
 
     'css' => [],
 
@@ -301,8 +341,8 @@ return [
     'menu' => [
         'groups' => [],
         'links' => [],
-        'dashboard' => true,
-        'collapsed' => null,
+        'dashboard' => (bool) env('FASTLEO_MENU_DASHBOARD', true),
+        'collapsed' => env('FASTLEO_MENU_COLLAPSED'),
     ],
 
     /*
@@ -310,12 +350,12 @@ return [
     | Стартовая страница
     |--------------------------------------------------------------------------
     |
-    | Адрес раздела или своей страницы ('leads'): сюда ведут вход в админку и
+    | Адрес раздела или своей страницы ('leads'): сюда ведут вход в панель и
     | логотип. null — дашборд.
     |
     */
 
-    'home' => null,
+    'home' => env('FASTLEO_HOME'),
 
     /*
     |--------------------------------------------------------------------------
@@ -332,7 +372,7 @@ return [
     |
     */
 
-    'record_view' => 'modal',
+    'record_view' => env('FASTLEO_RECORD_VIEW', 'modal'),
 
     /*
     |--------------------------------------------------------------------------
@@ -348,9 +388,9 @@ return [
     */
 
     'list' => [
-        'per_page' => 25,
+        'per_page' => (int) env('FASTLEO_LIST_PER_PAGE', 25),
         'per_page_options' => [25, 50, 100],
-        'max_all' => 1000,
+        'max_all' => (int) env('FASTLEO_LIST_MAX_ALL', 1000),
     ],
 
     /*
@@ -377,7 +417,7 @@ return [
     |
     */
 
-    'xlsx' => false,
+    'xlsx' => (bool) env('FASTLEO_XLSX', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -396,12 +436,12 @@ return [
     */
 
     'import' => [
-        'disk' => 'local',
-        'max_size' => 10240,
-        'max_rows' => 50000,
-        'max_unpacked' => 200,
-        'max_read_seconds' => 600,
-        'keep_days' => 30,
+        'disk' => env('FASTLEO_IMPORT_DISK', 'local'),
+        'max_size' => (int) env('FASTLEO_IMPORT_MAX_SIZE', 10240),
+        'max_rows' => (int) env('FASTLEO_IMPORT_MAX_ROWS', 50000),
+        'max_unpacked' => (int) env('FASTLEO_IMPORT_MAX_UNPACKED', 200),
+        'max_read_seconds' => (int) env('FASTLEO_IMPORT_MAX_READ_SECONDS', 600),
+        'keep_days' => (int) env('FASTLEO_IMPORT_KEEP_DAYS', 30),
     ],
 
     /*
@@ -415,7 +455,7 @@ return [
     */
 
     'relations' => [
-        'preload' => 100,
+        'preload' => (int) env('FASTLEO_RELATIONS_PRELOAD', 100),
     ],
 
     /*
@@ -425,7 +465,7 @@ return [
     |
     | disk — диск Laravel Storage с публичными адресами (public, s3, r2).
     | root — папка на диске, в которой работает файловый менеджер; выше неё
-    | админка не видит и не пишет. extensions — какие файлы можно загружать
+    | панель не видит и не пишет. extensions — какие файлы можно загружать
     | (php, html, svg, js и другие исполняемые форматы запрещены всегда, даже
     | если их вписать). images — какие из них картинки: они проверяются,
     | поворачиваются по EXIF, очищаются от метаданных. max_size — наибольший
@@ -438,16 +478,16 @@ return [
     */
 
     'files' => [
-        'disk' => 'public',
-        'root' => 'uploads',
+        'disk' => env('FASTLEO_FILES_DISK', 'public'),
+        'root' => env('FASTLEO_FILES_ROOT', 'uploads'),
         'extensions' => [
             'png', 'jpg', 'jpeg', 'gif', 'webp',
             'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'odt', 'ods', 'rtf', 'txt', 'csv',
             'mp3', 'mp4', 'webm', 'zip',
         ],
         'images' => ['png', 'jpg', 'jpeg', 'gif', 'webp'],
-        'max_size' => null,
-        'max_pixels' => 32_000_000,
+        'max_size' => (int) env('FASTLEO_FILES_MAX_SIZE', 0) ?: null,
+        'max_pixels' => (int) env('FASTLEO_FILES_MAX_PIXELS', 32_000_000),
         'hidden' => [],
     ],
 
@@ -475,24 +515,24 @@ return [
     */
 
     'images' => [
-        'max_width' => 2560,
-        'quality' => 90,
+        'max_width' => (int) env('FASTLEO_IMAGES_MAX_WIDTH', 2560),
+        'quality' => (int) env('FASTLEO_IMAGES_QUALITY', 90),
         'presets' => [
             // 'card' => ['widths' => [400, 800], 'ratio' => '4:3', 'watermark' => false],
             // 'hero' => ['widths' => [800, 1200, 1600], 'ratio' => null, 'watermark' => true],
         ],
-        'variant_quality' => 80,
+        'variant_quality' => (int) env('FASTLEO_IMAGES_VARIANT_QUALITY', 80),
         'watermark' => [
-            'path' => null,
-            'position' => 'bottom-right',
-            'opacity' => 50,
-            'size' => 20,
+            'path' => env('FASTLEO_IMAGES_WATERMARK_PATH'),
+            'position' => env('FASTLEO_IMAGES_WATERMARK_POSITION', 'bottom-right'),
+            'opacity' => (int) env('FASTLEO_IMAGES_WATERMARK_OPACITY', 50),
+            'size' => (int) env('FASTLEO_IMAGES_WATERMARK_SIZE', 20),
         ],
     ],
 
     /*
     |--------------------------------------------------------------------------
-    | Часовой пояс админки
+    | Часовой пояс панели
     |--------------------------------------------------------------------------
     |
     | В нём показываются и вводятся дата и время (DateTime). null — пояс
@@ -500,7 +540,7 @@ return [
     |
     */
 
-    'timezone' => null,
+    'timezone' => env('FASTLEO_TIMEZONE'),
 
     /*
     |--------------------------------------------------------------------------
@@ -508,7 +548,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | php artisan fastleo:mcp --user=admin@site.ru даёт ИИ-агенту читать и
-    | править записи разделов от имени этого администратора (с его правами).
+    | править записи разделов от имени этого пользователя (с его правами).
     |
     | allow_delete — разрешить агенту удалять записи (инструмент delete-record
     | и встроенные действия удаления) и запускать действия с подтверждением
@@ -518,7 +558,7 @@ return [
     */
 
     'mcp' => [
-        'allow_delete' => false,
+        'allow_delete' => (bool) env('FASTLEO_MCP_ALLOW_DELETE', false),
     ],
 
     /*
@@ -550,9 +590,9 @@ return [
         'tags' => [],
         'attributes' => [],
         'iframe_hosts' => [],
-        'styles' => false,
+        'styles' => (bool) env('FASTLEO_RICH_TEXT_STYLES', false),
         'content_css' => [],
-        'content_style' => null,
+        'content_style' => env('FASTLEO_RICH_TEXT_CONTENT_STYLE'),
     ],
 
 ];

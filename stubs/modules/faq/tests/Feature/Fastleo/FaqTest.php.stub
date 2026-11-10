@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Models\FaqItem;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published questions in the order set in the panel', function (): void {
+    FaqItem::factory()->create(['question' => 'Второй?', 'sort' => 2]);
+    FaqItem::factory()->create(['question' => 'Первый?', 'sort' => 1]);
+    FaqItem::factory()->create(['question' => 'Скрытый?', 'is_published' => false]);
+
+    expect(FaqItem::query()->published()->pluck('question')->all())->toBe(['Первый?', 'Второй?']);
+});
+
+it('lets an administrator add a question', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'faq'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'faq'), ['question' => 'Как заказать?', 'answer' => '<p>Позвоните.</p>', 'is_published' => '1'])->assertRedirect();
+
+    expect(FaqItem::query()->where('question', 'Как заказать?')->exists())->toBeTrue();
+});

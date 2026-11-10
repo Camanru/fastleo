@@ -21,19 +21,19 @@ it('tells the developer on every page that the assets are not published when deb
 
     $this->get(route('fastleo.login'))
         ->assertOk()
-        ->assertSee('Ассеты админки не опубликованы')
+        ->assertSee('Ассеты панели не опубликованы')
         ->assertSee('php artisan vendor:publish --tag=fastleo-assets --force');
 });
 
 it('stays silent in production even without published assets', function (): void {
     config(['app.debug' => false]);
 
-    $this->get(route('fastleo.login'))->assertOk()->assertDontSee('Ассеты админки не опубликованы');
+    $this->get(route('fastleo.login'))->assertOk()->assertDontSee('Ассеты панели не опубликованы');
 });
 
 it('stays silent when the assets are published', function (): void {
     config(['app.debug' => true]);
     File::copyDirectory(Assets::distPath(), $this->public.'/vendor/fastleo');
 
-    $this->get(route('fastleo.login'))->assertOk()->assertDontSee('Ассеты админки не опубликованы');
+    $this->get(route('fastleo.login'))->assertOk()->assertDontSee('Ассеты панели не опубликованы');
 });

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Опасное действие с подтверждением в админке.
+ * Опасное действие с подтверждением в панели.
  */
 final class WipeTitles extends Action
 {

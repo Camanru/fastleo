@@ -29,7 +29,7 @@ final class Feedback extends Model
      * Фабрика модели.
      */
     /**
-     * Касты: время просмотра в админке.
+     * Касты: время просмотра в панели.
      *
      * @return array<string, string>
      */

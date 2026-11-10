@@ -19,7 +19,7 @@ use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\Validator;
 
 /**
- * Профиль администратора: имя, email, пароль, устройства и «выйти на других устройствах».
+ * Профиль пользователя: имя, email, пароль, устройства и «выйти на других устройствах».
  *
  * Изменения, требующие подтверждения, проверяют текущий пароль; запросы с паролем ограничены
  * лимитом `fastleo-profile` (перебор пароля при краже сессии).
@@ -129,7 +129,7 @@ final readonly class ProfileController
     }
 
     /**
-     * Вошедший администратор как Eloquent-модель (админка работает только с такими, см. `UserModel`).
+     * Вошедший пользователь как Eloquent-модель (панель работает только с такими, см. `UserModel`).
      */
     private function user(): Model&Authenticatable
     {

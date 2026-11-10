@@ -7,11 +7,11 @@ namespace Fastleo\Auth;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Доступ в админку по булевой колонке fastleo_admin таблицы пользователей.
+ * Доступ в панель по булевой колонке fastleo_admin таблицы пользователей.
  *
  * Колонку добавляет миграция пакета, флаг ставит `php artisan fastleo:user`.
  * Не добавляйте fastleo_admin в $fillable модели: иначе форма регистрации
- * сайта сможет выдать права администратора.
+ * сайта сможет дать доступ в панель.
  *
  * ```php
  * class User extends Authenticatable implements FastleoUser
@@ -35,7 +35,7 @@ trait HasFastleoAccess
     }
 
     /**
-     * Пользователь — администратор fastleo, если в колонке fastleo_admin истина.
+     * Пользователь может входить в панель, если в колонке fastleo_admin истина.
      *
      * ```php
      * $user->canAccessFastleo(); // true для fastleo_admin = 1

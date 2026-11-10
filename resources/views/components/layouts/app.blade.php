@@ -1,5 +1,5 @@
 @props(['title' => null, 'description' => null, 'count' => null, 'heading' => null, 'back' => null, 'crumbs' => null])
-{{-- Страницы админки после входа: боковое меню, шапка, заголовок страницы, содержимое.
+{{-- Страницы панели после входа: боковое меню, шапка, заголовок страницы, содержимое.
      title — название страницы (вкладка браузера, крошки), heading — заголовок на странице, если он другой (название записи); description и count — пояснение и счётчик рядом с ним; back — ['url' => …, 'label' => …], ссылка «назад» над заголовком;
      crumbs — хлебные крошки [['label' => …, 'url' => …|null], …] (по умолчанию группа меню и title); слоты actions — кнопки справа на одной линии с заголовком (или x-teleport="#fastleo-page-actions" из содержимого страницы), badge — бейдж под заголовком, рядом с пояснением. --}}
 @php
@@ -20,6 +20,8 @@
 
     $user = auth()->user();
     $userName = (string) $user?->getAttribute('name');
+    $impersonating = \Fastleo\Auth\Impersonation::active();
+    $profileTag = $impersonating ? 'div' : 'a';
     $initials = \Illuminate\Support\Str::of($userName)->explode(' ')->filter()->take(2)->map(fn ($word) => \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($word, 0, 1)))->implode('');
     $iconButton = 'flex size-8 items-center justify-center rounded-[8px] text-ink-2 transition-colors hover:bg-hover hover:text-ink';
 @endphp
@@ -116,13 +118,13 @@
                     <span class="lg:collapsed:sr-only">{{ __('fastleo::layout.sidebar_collapse') }}</span>
                 </button>
                 <div class="flex items-center gap-1 lg:collapsed:flex-col">
-                    <a href="{{ route('fastleo.profile.show') }}" class="flex min-w-0 flex-1 items-center gap-2 rounded-[9px] py-1 pr-2 pl-1 transition-colors hover:bg-hover lg:collapsed:flex-none lg:collapsed:p-0" title="{{ __('fastleo::profile.menu') }}" data-profile-link>
+                    <{{ $profileTag }} @unless ($impersonating) href="{{ route('fastleo.profile.show') }}" title="{{ __('fastleo::profile.menu') }}" @endunless class="flex min-w-0 flex-1 items-center gap-2 rounded-[9px] py-1 pr-2 pl-1 transition-colors lg:collapsed:flex-none lg:collapsed:p-0 {{ $impersonating ? '' : 'hover:bg-hover' }}" data-profile-link>
                         <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[11px] font-semibold text-primary-text">{{ $initials ?: '?' }}</span>
                         <span class="flex min-w-0 flex-col lg:collapsed:sr-only">
                             <span class="truncate text-sm font-medium">{{ $userName }}</span>
                             <span class="truncate text-xs text-ink-2">{{ $user?->getAttribute('email') }}</span>
                         </span>
-                    </a>
+                    </{{ $profileTag }}>
                     <form method="POST" action="{{ route('fastleo.logout') }}">
                         @csrf
                         <button type="submit" class="{{ $iconButton }}" title="{{ __('fastleo::auth.logout') }}">
@@ -266,13 +268,25 @@
                         </button>
                     @endforeach
                 </div>
-            <a href="{{ route('fastleo.profile.show') }}" class="hidden items-center gap-2 rounded-[9px] py-1 pr-2.5 pl-1 transition-colors hover:bg-hover lg:flex" title="{{ __('fastleo::profile.menu') }}">
+            <{{ $profileTag }} @unless ($impersonating) href="{{ route('fastleo.profile.show') }}" title="{{ __('fastleo::profile.menu') }}" @endunless class="hidden items-center gap-2 rounded-[9px] py-1 pr-2.5 pl-1 transition-colors lg:flex {{ $impersonating ? '' : 'hover:bg-hover' }}">
                     <span class="flex size-7 items-center justify-center rounded-full bg-primary-soft text-[11px] font-semibold text-primary-text">{{ $initials ?: '?' }}</span>
                     <span class="max-w-32 truncate text-sm font-medium">{{ \Illuminate\Support\Str::of($userName)->explode(' ')->first() }}</span>
-                </a>
+                </{{ $profileTag }}>
             </header>
 
             <main class="flex min-w-0 flex-1 flex-col gap-5 px-4 pt-4 pb-6 lg:px-8 lg:pt-7 lg:pb-8">
+                @if ($impersonating)
+                    <div class="flex flex-wrap items-center justify-between gap-2 rounded-[10px] border border-warning bg-warning-soft px-3.5 py-2.5 text-sm font-medium text-warning" data-impersonating>
+                        <span class="inline-flex items-center gap-2">
+                            <x-fastleo::icon name="log-in" class="size-4" />
+                            {{ __('fastleo::users.impersonating', ['name' => $userName]) }}
+                        </span>
+                        <form method="POST" action="{{ route('fastleo.impersonate.leave') }}">
+                            @csrf
+                            <button type="submit" class="rounded-[7px] border border-warning px-2.5 py-1 text-sm font-medium hover:bg-surface" data-impersonate-leave>{{ __('fastleo::users.impersonate_leave') }}</button>
+                        </form>
+                    </div>
+                @endif
                 @if (\Fastleo\Closing\SiteClosing::closed())
                     <a href="{{ route('fastleo.settings.edit', 'closing') }}" class="flex flex-wrap items-center gap-2 rounded-[10px] border border-warning bg-warning-soft px-3.5 py-2.5 text-sm font-medium text-warning" data-site-closed>
                         <x-fastleo::icon name="power" class="size-4" />

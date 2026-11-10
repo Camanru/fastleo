@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Database\Factories\Fastleo\ReviewFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Отзыв клиента. Вывод на сайте — ваш: `Review::query()->published()->get()`.
+ *
+ * @property int $id
+ * @property string $author
+ * @property string|null $company
+ * @property int $rating
+ * @property string $body
+ * @property string|null $photo
+ * @property \Illuminate\Support\Carbon|null $reviewed_at
+ * @property bool $is_published
+ * @property int $sort
+ */
+#[UseFactory(ReviewFactory::class)]
+class Review extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['author', 'company', 'rating', 'body', 'photo', 'reviewed_at', 'is_published', 'sort'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'rating' => 'integer',
+            'reviewed_at' => 'date',
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованные отзывы в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<Review>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

@@ -18,7 +18,7 @@ use Override;
 /**
  * Новая запись раздела.
  */
-#[Description('Создать запись. values — значения полей по именам из describe-resource; проверка и запись те же, что в форме админки. Ошибки проверки вернутся по полям.')]
+#[Description('Создать запись. values — значения полей по именам из describe-resource; проверка и запись те же, что в форме панели. Ошибки проверки вернутся по полям.')]
 #[IsDestructive(false)]
 final class CreateRecord extends ResourceTool
 {

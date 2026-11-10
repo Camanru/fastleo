@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Индекс для раздела «Уведомления» и колокольчика: уведомления одного администратора, новые сверху.
+ * Индекс для раздела «Уведомления» и колокольчика: уведомления одного пользователя, новые сверху.
  */
 return new class extends Migration
 {

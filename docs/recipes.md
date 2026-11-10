@@ -38,7 +38,7 @@ Tel::make('phone', 'Телефон')->required()
     ->duplicateOf(fn (string $phone) => Client::query()->where('phone', $phone)->first()),
 ```
 
-  Под полем появится «Такое значение уже есть. Открыть: Иванов Иван» — ссылка, если у администратора есть право открыть эту запись.
+  Под полем появится «Такое значение уже есть. Открыть: Иванов Иван» — ссылка, если у пользователя есть право открыть эту запись.
 - **Дубль: открыть существующего клиента.** Из входящей заявки кнопка ведёт к клиенту с таким номером, а если его нет — к форме нового клиента:
 
 ```bash
@@ -76,7 +76,7 @@ php artisan fastleo:make-policy Offer             # app/Policies/OfferPolicy.php
 ```
 
 ```php
-// app/Policies/OfferPolicy.php: менеджер видит все заявки, но менять и удалять может только свои (и админ — любые)
+// app/Policies/OfferPolicy.php: менеджер видит все заявки, но менять и удалять может только свои (и пользователь — любые)
 final class OfferPolicy
 {
     public function viewAny(User $user): bool { return true; }
@@ -173,28 +173,11 @@ public static function badge(): ?int
 'menu' => ['groups' => ['Работа', 'Заявки', 'Клиенты', 'Справочники']],
 ```
 
-Метод вызывается на каждой странице админки: условие должно опираться на индекс (`manager_id`, `due_at`).
+Метод вызывается на каждой странице панели: условие должно опираться на индекс (`manager_id`, `due_at`).
 
 ## Заявки с сайта и из телефонии
 
-Приём — обычный маршрут сайта с токеном; админка только показывает результат и сообщает о новой заявке.
-
-```php
-// routes/api.php (файл появляется после `php artisan install:api`)
-Route::post('leads', function (Request $request) {
-    $token = (string) config('services.leads.token');
-    abort_if($token === '' || ! hash_equals($token, (string) $request->bearerToken()), 401);
-
-    $data = $request->validate(['phone' => ['required', 'string', 'max:30'], 'text' => ['nullable', 'string', 'max:2000']]);
-    $lead = Lead::create($data);
-
-    Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)->url(Fastleo::recordUrl($lead, false))->level('success'));
-
-    return response()->json(['id' => $lead->id], 201);
-})->middleware('throttle:60,1');
-```
-
-`hash_equals` сравнивает токены за постоянное время; токен хранится в `.env` (`config/services.php`), а не в коде. Проверка `$token === ''` обязательна: с пустым `LEADS_TOKEN=` запрос без заголовка иначе прошёл бы. Уведомление приходит в колокольчик (если он [включён](notifications.md#как-включить-колокольчик)) и, если включены [боты](notifications.md), в Telegram.
+Заявки с формы сайта и с других сайтов по API принимают встроенные [заявки](leads.md): форма `<x-fastleo::lead-form />` (`POST /leads`) и приём по ключам (`POST /api/leads`), уведомление о новой заявке — во включённых [каналах](notifications.md).
 
 Пропущенные звонки, которые отдаёт телефония по запросу, забирает команда по расписанию:
 
@@ -210,7 +193,7 @@ Schedule::command('leads:import-missed-calls')->everyTenMinutes()->withoutOverla
 $calls = Http::withToken((string) fastleo_setting('telephony.token'))->timeout(10)->retry(2, 500)->get(config('services.telephony.url').'/lost-calls', ['minutes' => 10])->throw()->json();
 ```
 
-Токен сервиса удобно хранить в [настройках](settings.md) полем `Secret`: администратор меняет его в админке, в исходном коде страницы токена нет. Не записывайте токены в код и не коммитьте. Планировщику нужен cron `* * * * * php artisan schedule:run` ([installation.md](installation.md)).
+Токен сервиса удобно хранить в [настройках](settings.md) полем `Secret`: пользователь меняет его в панели, в исходном коде страницы токена нет. Не записывайте токены в код и не коммитьте. Планировщику нужен cron `* * * * * php artisan schedule:run` ([installation.md](installation.md)).
 
 ## Файлы заявки
 
@@ -323,7 +306,7 @@ Hash::extend('legacy', fn () => new LegacyHasher(config('hashing.bcrypt')));
 
 **Старые хеши переносите в базу напрямую** — `DB::table('users')->insert([... 'password' => $oldHash])` или `update()`, а не через модель. Модель пользователя Laravel с кастом `'password' => 'hashed'` не узнаёт md5 как хеш и захеширует его ещё раз: после этого ни старый, ни новый пароль не подойдут.
 
-После того как все администраторы и пользователи вошли хотя бы раз, уберите `LegacyHasher`: старые хеши md5 слабы, и держать их дольше нужного незачем ([migrating.md](migrating.md#1-администраторы)). Тот, кто не вошёл, сбросит пароль письмом.
+После того как все пользователи и пользователи вошли хотя бы раз, уберите `LegacyHasher`: старые хеши md5 слабы, и держать их дольше нужного незачем ([migrating.md](migrating.md#1-администраторы)). Тот, кто не вошёл, сбросит пароль письмом.
 
 ## Координаты
 

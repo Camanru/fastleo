@@ -179,7 +179,7 @@ class BelongsToMany extends Field implements SearchesOptions
         $linked = $this->strings($relation->newPivotQuery()->pluck($relation->getRelatedPivotKeyName())->all());
         $visible = $linked === [] ? [] : $this->strings($this->baseOptionsQuery()->whereKey($linked)->pluck($this->relatedModel()->getKeyName())->all());
 
-        // Связь, добавленную другим администратором за время правки формы, устаревшая форма не отвязывает: убираются только
+        // Связь, добавленную другим пользователем за время правки формы, устаревшая форма не отвязывает: убираются только
         // те связи, что были в ней при открытии (`seenKeys()`); без этих данных (MCP, импорт) список заменяется целиком.
         $seen = $this->seenKeys();
         $unseen = $seen === null ? [] : array_diff($linked, $seen);

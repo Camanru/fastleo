@@ -5,10 +5,13 @@ declare(strict_types=1);
 use Fastleo\Closing\ClosingSettings;
 use Fastleo\Fastleo;
 use Fastleo\Files\ImageSupport;
+use Fastleo\Leads\LeadApiKeyResource;
+use Fastleo\Leads\LeadResource;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\SoftNetica\SoftNeticaSettings;
 use Fastleo\Support\Assets;
 use Fastleo\Support\Doctor;
+use Fastleo\Support\ResourceRegistry;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Tests\Fixtures\Fields\StrictRichText;
 use Fastleo\Tests\Fixtures\OwnerOnly\ArticleResource as OwnerOnlyArticleResource;
@@ -38,7 +41,7 @@ beforeEach(function (): void {
     File::copyDirectory(Assets::distPath(), $this->sandbox.'/public/vendor/fastleo');
     $this->app->usePublicPath($this->sandbox.'/public');
     $this->app->useBootstrapPath($this->sandbox.'/bootstrap');
-    config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 4000]);
+    config(['queue.default' => 'database', 'queue.connections.database.retry_after' => 4000, 'app.url' => 'https://site.example']);
 });
 
 afterEach(function (): void {
@@ -326,6 +329,32 @@ it('reports a section for the owner when the site has no owner, and is quiet onc
     expect(messages('articles', 'error'))->toBe([]);
 });
 
+it('reports "sign in as" when the site does not name an owner, and is quiet once it does', function (): void {
+    config(['fastleo.users.impersonate' => true]);
+
+    expect(implode("\n", messages('site', 'error')))->toContain('«Войти как» включён');
+
+    Fastleo::resolveOwnerUsing(fn (): bool => true);
+    expect(implode("\n", messages('site', 'error')))->not->toContain('«Войти как»');
+
+    Fastleo::resolveOwnerUsing(null);
+    config(['fastleo.users.impersonate' => false]);
+    expect(implode("\n", messages('site', 'error')))->not->toContain('«Войти как»');
+});
+
+it('reports "sign in as" with no action to start it when the section of users is off', function (): void {
+    config(['fastleo.users.impersonate' => true]);
+    Fastleo::resolveOwnerUsing(fn (): bool => true);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('нет действия «Войти как»');
+
+    config(['fastleo.users.resource' => null]);
+    app()->forgetInstance(ResourceRegistry::class);
+    expect(implode("\n", messages('site', 'warning')))->toContain('нет действия «Войти как»');
+
+    Fastleo::resolveOwnerUsing(null);
+});
+
 it('reports a mistyped ability in $ownerOnly, which would close nothing', function (): void {
     useFixtureResources('OwnerOnly');
     Fastleo::resolveOwnerUsing(fn (): bool => true);
@@ -508,7 +537,7 @@ describe('password reset table', function (): void {
         expect(diagnosed()['problems'])->toContain([
             'level' => 'error',
             'scope' => 'site',
-            'message' => 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.',
+            'message' => 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в панели упадёт с ошибкой.',
             'hint' => 'Создайте таблицу миграцией сайта (колонки email, token, created_at) — пример в docs/auth.md.',
         ]);
     });
@@ -521,12 +550,12 @@ describe('password reset table', function (): void {
         });
         config(['auth.passwords.fastleo.table' => 'admin_password_resets', 'auth.passwords.users.table' => 'password_resets']);
 
-        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.')['hint'];
+        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в панели упадёт с ошибкой.')['hint'];
 
         expect($hint)->toContain('не переименовывайте')->toContain("'table' => 'password_resets'");
 
         config(['auth.passwords.users.table' => 'password_reset_tokens']);
-        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в админке упадёт с ошибкой.')['hint'];
+        $hint = (string) collect(diagnosed()['problems'])->firstWhere('message', 'Нет таблицы admin_password_resets для ссылок сброса пароля (брокер auth.passwords.fastleo): «Забыли пароль?» в панели упадёт с ошибкой.')['hint'];
 
         expect($hint)->toContain("Schema::rename('password_resets', 'admin_password_resets')");
     })->skip(fn (): bool => in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true), 'CREATE TABLE в MySQL неявно закрывает транзакцию теста');
@@ -571,8 +600,8 @@ it('reports unpublished and outdated assets', function (): void {
     File::delete($this->sandbox.'/public/vendor/fastleo/fastleo.css');
     file_put_contents($this->sandbox.'/public/vendor/fastleo/fastleo.js', 'old');
 
-    expect(implode("\n", messages('site', 'error')))->toContain('Ассеты админки не опубликованы')->toContain('fastleo.css')
-        ->and(implode("\n", messages('site', 'warning')))->toContain('Ассеты админки устарели')->toContain('fastleo.js');
+    expect(implode("\n", messages('site', 'error')))->toContain('Ассеты панели не опубликованы')->toContain('fastleo.css')
+        ->and(implode("\n", messages('site', 'warning')))->toContain('Ассеты панели устарели')->toContain('fastleo.js');
 });
 
 it('warns when the storage link is missing', function (): void {
@@ -592,7 +621,7 @@ it('warns about a stale resource cache and accepts a fresh one', function (): vo
 });
 
 it('warns that the admin will not hear about imports and failed publications while the bell is off', function (): void {
-    $message = 'Колокольчик выключен: администратор не узнает об окончании импорта';
+    $message = 'Колокольчик выключен: пользователь не узнает об окончании импорта';
 
     expect(implode("\n", messages('site', 'warning')))->not->toContain($message);
 
@@ -614,6 +643,21 @@ it('warns that nobody hears about new leads while every notification channel is 
     config(['fastleo.notifications.mail' => true]);
 
     expect(implode("\n", messages('site', 'warning')))->not->toContain($message);
+});
+
+it('reports a cache that keeps nothing while leads are taken by API', function (): void {
+    $message = 'Кеш сайта ничего не хранит (драйвер null)';
+    config(['cache.stores.none' => ['driver' => 'null'], 'cache.default' => 'none', 'fastleo.leads.keys' => null]);
+
+    expect(implode("\n", messages('site', 'error')))->not->toContain($message);
+
+    config(['fastleo.leads.resource' => LeadResource::class, 'fastleo.leads.keys' => LeadApiKeyResource::class]);
+
+    expect(implode("\n", messages('site', 'error')))->toContain($message);
+
+    config(['cache.default' => 'array']);
+
+    expect(implode("\n", messages('site', 'error')))->not->toContain($message);
 });
 
 it('warns that the queue hands an import to a second worker while the first still runs it', function (): void {
@@ -1174,7 +1218,7 @@ describe('the MorphTo field', function (): void {
 });
 
 /**
- * Админка на корне домена: маршруты пакета загружаются раньше маршрутов сайта, как в провайдере.
+ * Панель на корне домена: маршруты пакета загружаются раньше маршрутов сайта, как в провайдере.
  *
  * @param  array<string, string>  $siteRoutes  адрес → ответ
  */
@@ -1206,7 +1250,7 @@ it('warns that the admin at the site root takes the addresses of site pages', fu
 it('reports as an error that a site route at the root replaces a route of the admin', function (): void {
     rootWithSiteRoutes(['/' => 'welcome', '/login' => 'site login']);
 
-    expect(implode("\n", messages('site', 'error')))->toContain('заменяют маршруты админки на корне домена: /login, / — админка не откроется');
+    expect(implode("\n", messages('site', 'error')))->toContain('заменяют маршруты панели на корне домена: /login, / — панель не откроется');
 });
 
 it('does not warn about routes when the admin at the root has its own domain', function (): void {
@@ -1270,3 +1314,15 @@ describe('indexes of foreign keys', function (): void {
         expect(implode("\n", messages('articles', 'warning')))->not->toContain('articles.category_id');
     });
 });
+
+it('warns when APP_URL points to localhost: file addresses and thumbnails are built from it', function (string $url): void {
+    config(['app.url' => $url]);
+
+    expect(implode("\n", messages('site', 'warning')))->toContain('APP_URL указывает на localhost ('.$url.')');
+})->with(['http://localhost:8000', 'http://localhost', 'http://127.0.0.1:8000', 'http://[::1]:8000']);
+
+it('does not complain about APP_URL of a real site', function (?string $url): void {
+    config(['app.url' => $url]);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('APP_URL');
+})->with(['https://site.example', 'http://site.test', 'https://localhost.example.com', '', null]);

@@ -14,7 +14,7 @@ use Override;
 /**
  * Дата и время. Колонка `dateTime`/`timestamp`, в модели — каст `'datetime'` (необязательно).
  *
- * Показывается и вводится в часовом поясе админки (`fastleo.timezone`), а в базу пишется
+ * Показывается и вводится в часовом поясе панели (`fastleo.timezone`), а в базу пишется
  * в поясе сайта (`app.timezone`) — как и всё остальное в Laravel.
  *
  * ```php
@@ -24,7 +24,7 @@ use Override;
 class DateTime extends Date
 {
     /**
-     * Дата и время для `<input type="datetime-local">` в поясе админки.
+     * Дата и время для `<input type="datetime-local">` в поясе панели.
      */
     #[Override]
     public function hydrate(Model $record): ?string
@@ -33,7 +33,7 @@ class DateTime extends Date
     }
 
     /**
-     * `ГГГГ-ММ-ДД ЧЧ:ММ` в поясе админки.
+     * `ГГГГ-ММ-ДД ЧЧ:ММ` в поясе панели.
      */
     #[Override]
     public function exportValue(Model $record): ?string
@@ -42,7 +42,7 @@ class DateTime extends Date
     }
 
     /**
-     * Ячейка-дата Excel, `ГГГГ-ММ-ДД ЧЧ:ММ[:СС]` или `ДД.ММ.ГГГГ ЧЧ:ММ` (пояс админки) → значение формы.
+     * Ячейка-дата Excel, `ГГГГ-ММ-ДД ЧЧ:ММ[:СС]` или `ДД.ММ.ГГГГ ЧЧ:ММ` (пояс панели) → значение формы.
      */
     #[Override]
     public function importValue(mixed $cell): ?string
@@ -62,7 +62,7 @@ class DateTime extends Date
     }
 
     /**
-     * Введённое в поясе админки → строка `Y-m-d H:i:s` в поясе сайта; пустое — null.
+     * Введённое в поясе панели → строка `Y-m-d H:i:s` в поясе сайта; пустое — null.
      */
     #[Override]
     public function dehydrate(mixed $value): ?string
@@ -93,7 +93,7 @@ class DateTime extends Date
     }
 
     /**
-     * Дата и время по умолчанию (`now()`, Carbon) → значение поля в поясе админки.
+     * Дата и время по умолчанию (`now()`, Carbon) → значение поля в поясе панели.
      */
     #[Override]
     protected function formatDefault(mixed $value): mixed
@@ -129,7 +129,7 @@ class DateTime extends Date
     }
 
     /**
-     * Значение атрибута (в поясе сайта) → Carbon в поясе админки.
+     * Значение атрибута (в поясе сайта) → Carbon в поясе панели.
      */
     private function inAdminTimezone(mixed $value): ?Carbon
     {

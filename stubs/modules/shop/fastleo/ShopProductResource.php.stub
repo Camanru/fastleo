@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\ShopProduct;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\KeyValue;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Товары»: цена, остаток (необязательный), фото, характеристики и описание. Порядок на сайте — перетаскиванием.
+ * Показ на сайте — ваши маршруты и шаблоны: `ShopProduct::query()->published()->inStock()->paginate(24)`.
+ */
+final class ShopProductResource extends Resource
+{
+    protected static string $model = ShopProduct::class;
+
+    protected static ?string $slug = 'shop-products';
+
+    protected static ?string $label = 'Товары';
+
+    protected static ?string $singular = 'Товар';
+
+    protected static string $icon = 'package';
+
+    protected static ?string $group = 'Магазин';
+
+    protected static int $position = 20;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля товара.
+     */
+    public function fields(): array
+    {
+        return [
+            Image::make('cover', 'Фото')->directory('shop')->inTitle(),
+            Text::make('title', 'Название')->required()->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('title'),
+            BelongsTo::make('category_id', 'Категория')->relation('category')->hideInList(),
+            Text::make('sku', 'Артикул')->maxLength(100)->searchable(),
+            Number::make('price', 'Цена, ₽')->required()->min(0)->max(9999999999.99)->step(0.01)->sortable()
+                ->formatUsing(fn ($value) => $value === null ? null : number_format((float) $value, 2, ',', ' ').' ₽'),
+            Number::make('stock', 'Остаток')->integer()->min(0)->max(2147483647)->sortable()
+                ->help('Пусто — остаток не учитывается (услуга, товар под заказ). Иначе заказ списывает его сам.'),
+            Gallery::make('photos', 'Фотографии')->directory('shop')->max(20)->hideInList(),
+            RichText::make('description', 'Описание'),
+            KeyValue::make('specs', 'Характеристики')->keyLabel('Параметр')->valueLabel('Значение')->max(50),
+            Toggle::make('is_published', 'Показывать')->default(true)->quickToggle(),
+            Seo::make('seo')->directory('shop'),
+        ];
+    }
+}

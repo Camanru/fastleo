@@ -1,5 +1,5 @@
 {{-- HasMany / HasOne: вложенные записи в форме родителя. После ошибки проверки блоки берутся только из old():
-     если админ удалил все блоки, они не возвращаются из базы. --}}
+     если пользователь удалил все блоки, они не возвращаются из базы. --}}
 @php
     $children = $value instanceof \Illuminate\Support\Collection ? $value : collect();
     $old = old($path);
@@ -69,7 +69,7 @@
         >
             @if ($writable)
                 <input type="hidden" name="{{ $name }}" value="">
-                {{-- Ключи строк при открытии формы: удаляются только они, строку другого администратора устаревшая форма не стирает. --}}
+                {{-- Ключи строк при открытии формы: удаляются только они, строку другого пользователя устаревшая форма не стирает. --}}
                 <input type="hidden" name="{{ $field->seenInputName() }}" value="{{ $field->seenInputValue($children->map(fn ($child) => (string) $child->getKey())->implode(',')) }}">
             @endif
             <div x-ref="list" class="flex flex-col gap-3">

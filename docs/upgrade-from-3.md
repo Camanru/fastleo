@@ -76,7 +76,7 @@
 | колонка `users.fastleo_admin` (`boolean`, может быть `NULL`), вход при `fastleo_admin = 1` | та же по смыслу колонка `fastleo_admin` (`boolean`, по умолчанию `false`, с индексом) — её создаёт миграция пакета, старую колонку нужно переименовать до неё ([шаг 5](#5-миграции-и-перенос-администраторов)) |
 | вход по сессии fastleo (2.x) или middleware `fastleo.auth` (3.0) | guard `fastleo` и метод `canAccessFastleo()` модели пользователя: интерфейс `Fastleo\Auth\FastleoUser` и трейт `Fastleo\Auth\HasFastleoAccess` ([установка](installation.md#2-модель-пользователя)) |
 | `php artisan fastleo:user --admin` | `php artisan fastleo:user admin@site.ru` |
-| раздел «Пользователи» (`/fastleo/users`) — все пользователи сайта | раздел «Администраторы» (`/fastleo/users`) — только пользователи с `fastleo_admin = true` ([подробнее](auth.md#администраторы)) |
+| раздел «Пользователи» (`/fastleo/users`) — все пользователи сайта | раздел «Пользователи» (`/fastleo/users`; до 4.10.0 назывался «Администраторы») — только те, у кого `fastleo_admin = true` ([подробнее](auth.md#пользователи)) |
 | `remember_days` (если было в 3.0) | `auth.remember_days` в `config/fastleo.php` |
 
 ### Конфиг `config/fastleo.php`
@@ -574,7 +574,7 @@ final class ArticleResource extends Resource
 - **Строка `Модель:ключ:подпись`** в `data` не поддерживается — связь `BelongsTo` или замыкание в `options()`.
 - **Множественный выбор строкой через запятую** не поддерживается — `BelongsToMany` или JSON-массив.
 - **Переопределение шаблонов** через `resources/views/vendor/fastleo` старых шаблонов не повторить — оформление меняется через `css` в конфиге, ячейки списка — `listView()`, свои поля — [custom.md](fields/custom.md).
-- **Раздел «Администраторы»** показывает только администраторов, а не всех пользователей сайта.
+- **Раздел «Пользователи»** (до 4.10.0 — «Администраторы») показывает только тех, кто входит в панель, а не всех пользователей сайта.
 - **По 25 записей на странице** вместо 15 (`list.per_page` или `$perPage`).
 - **Модель без раздела по прямому адресу** (`$fastleo = false`, `/fastleo/app/Row`) больше не открывается.
 - **Новое, чего не было:** права через Policies моделей, корзина для `SoftDeletes`, фильтры и действия, 2FA и история входов, восстановление пароля, поиск по Ctrl+K, уведомления и боты Telegram и Max для администраторов, публикации в каналы, SEO-поля и `sitemap.xml`, MCP-сервер для Claude. Обзор — в [README](../README.md).

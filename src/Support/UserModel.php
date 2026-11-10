@@ -32,7 +32,7 @@ final class UserModel
     }
 
     /**
-     * Модель подходит для админки: Eloquent и реализует FastleoUser.
+     * Модель подходит для панели: Eloquent и реализует FastleoUser.
      *
      * @return class-string<Model&FastleoUser>|null
      */

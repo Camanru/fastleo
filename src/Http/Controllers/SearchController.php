@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
 /**
  * Глобальный поиск (Ctrl+K): пункты меню по названию и записи разделов по полям `searchable()`.
  *
- * Раздел участвует, если администратору доступно `viewAny` и раздел не выключил `$globallySearchable`;
+ * Раздел участвует, если пользователю доступно `viewAny` и раздел не выключил `$globallySearchable`;
  * каждая найденная запись проходит Policy `view`. До 5 записей на раздел.
  */
 final class SearchController

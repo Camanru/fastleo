@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories\Fastleo;
+
+use {{ namespace }}\Models\News;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+
+/**
+ * Фабрика новостей.
+ *
+ * @extends Factory<News>
+ */
+class NewsFactory extends Factory
+{
+    protected $model = News::class;
+
+    /**
+     * Опубликованная новость с анонсом и текстом.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $title = fake()->unique()->sentence(4);
+
+        return [
+            'title' => $title,
+            'slug' => Str::slug($title),
+            'excerpt' => fake()->sentence(12),
+            'body' => '<p>'.fake()->paragraph().'</p>',
+            'published_at' => fake()->dateTimeBetween('-1 year'),
+            'is_published' => true,
+        ];
+    }
+}

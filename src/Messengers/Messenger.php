@@ -19,7 +19,7 @@ enum Messenger: string
     case Max = 'max';
 
     /**
-     * Название для админки.
+     * Название для панели.
      */
     public function label(): string
     {

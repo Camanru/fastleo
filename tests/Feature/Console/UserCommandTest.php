@@ -18,7 +18,7 @@ it('creates an admin from options', function (): void {
         '--name' => 'Иван',
         '--password' => 'secret-password',
         '--no-interaction' => true,
-    ])->expectsOutputToContain('Администратор admin@example.com создан.')->assertSuccessful();
+    ])->expectsOutputToContain('Пользователь admin@example.com создан.')->assertSuccessful();
 
     $user = User::query()->sole();
     expect($user->email)->toBe('admin@example.com')
@@ -29,7 +29,7 @@ it('creates an admin from options', function (): void {
 
 it('asks for the email, name and password when they are not given', function (): void {
     $this->artisan('fastleo:user')
-        ->expectsQuestion('Email администратора', 'admin@example.com')
+        ->expectsQuestion('Email пользователя', 'admin@example.com')
         ->expectsQuestion('Имя', 'Иван')
         ->expectsQuestion('Пароль', 'secret-password')
         ->assertSuccessful();
@@ -43,7 +43,7 @@ it('grants access to an existing user and keeps the password when none is entere
 
     $this->artisan('fastleo:user', ['email' => 'user@example.com'])
         ->expectsQuestion('Новый пароль (пусто — оставить прежний)', '')
-        ->expectsOutputToContain('Пользователю user@example.com выдан доступ в админку.')
+        ->expectsOutputToContain('Пользователю user@example.com выдан доступ в панель.')
         ->assertSuccessful();
 
     $user->refresh();
@@ -86,7 +86,7 @@ it('rejects invalid input without creating a user', function (array $arguments, 
 })->with([
     'bad email' => [['email' => 'not-an-email', '--password' => 'secret-password'], 'Укажите правильный email.'],
     'short password' => [['email' => 'admin@example.com', '--password' => 'short'], 'не меньше 8'],
-    'no password for a new user' => [['email' => 'admin@example.com'], 'Пароль нового администратора обязателен.'],
+    'no password for a new user' => [['email' => 'admin@example.com'], 'Пароль нового пользователя обязателен.'],
 ]);
 
 it('fails when the user model does not implement FastleoUser', function (): void {

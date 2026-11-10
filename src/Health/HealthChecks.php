@@ -24,7 +24,7 @@ final class HealthChecks
     /** Имена встроенных проверок: свои проверки не могут их занимать. */
     public const array RESERVED = [
         'debug', 'maintenance', 'cache', 'queue', 'scheduler', 'mail', 'storage_link', 'writable', 'disk',
-        'post_max_size', 'opcache', 'database_ping', 'failed_jobs',
+        'post_max_size', 'opcache', 'proxy', 'database_ping', 'failed_jobs',
     ];
 
     /** Допустимое имя проверки. */
@@ -75,7 +75,8 @@ final class HealthChecks
 
         foreach (ServerReport::sections() as $section) {
             foreach ($section['rows'] as $row) {
-                if ($row['status'] === null) {
+                // `app_url` зависит от адреса в браузере того, кто открыл панель, а не от сервера: в отчёт не идёт.
+                if ($row['status'] === null || $row['key'] === 'app_url') {
                     continue;
                 }
 
@@ -88,7 +89,7 @@ final class HealthChecks
 
     /**
      * Только свои проверки сайта: выполняются сразу, сбой замыкания не роняет остальные. Для отчёта в SoftNetica
-     * тексты очищаются от адресов, почты, путей и ключей (`HealthText`); для виджета в самой админке (`$mask = false`)
+     * тексты очищаются от адресов, почты, путей и ключей (`HealthText`); для виджета в самой панели (`$mask = false`)
      * остаются как есть — там адрес сайта и есть смысл проверки.
      *
      * @return list<Check>

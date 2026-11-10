@@ -27,7 +27,7 @@ final class CacheCleaner
     private const int SIZE_SECONDS = 60;
 
     /**
-     * Админу можно очищать кеш: Gate `clearFastleoCache`, если сайт его описал, иначе любому админу (при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владельцу).
+     * Пользователю можно очищать кеш: Gate `clearFastleoCache`, если сайт его описал, иначе любому пользователю (при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владельцу).
      *
      * ```php
      * Gate::define('clearFastleoCache', fn (User $user) => $user->is_owner);

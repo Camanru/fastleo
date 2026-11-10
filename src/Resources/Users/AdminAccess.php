@@ -14,11 +14,11 @@ use Illuminate\Validation\ValidationException;
 use Override;
 
 /**
- * Галочка «Доступ в админку» (колонка `fastleo_admin`).
+ * Галочка «Доступ в панель» (колонка `fastleo_admin`).
  *
  * Колонки нет в `$fillable` модели намеренно (доступ нельзя выдать массовым присваиванием), поэтому поле пишет её
- * через `forceFill` и не требует `$fillable`. Нельзя снять доступ у себя и у последнего администратора
- * и создать администратора без доступа.
+ * через `forceFill` и не требует `$fillable`. Нельзя снять доступ у себя и у последнего пользователя
+ * и создать пользователя без доступа.
  */
 final class AdminAccess extends Toggle
 {
@@ -60,7 +60,7 @@ final class AdminAccess extends Toggle
             return;
         }
 
-        // Без ролей: два администратора, снимающие доступ друг у друга одновременно, оба прошли бы проверку правила.
+        // Без ролей: два пользователя, снимающие доступ друг у друга одновременно, оба прошли бы проверку правила.
         // Здесь, внутри транзакции записи, с блокировкой одна из записей откатится.
         if (! RoleMatrix::enabled()) {
             if (! $record->newQuery()->where('fastleo_admin', true)->lockForUpdate()->exists()) {
@@ -79,7 +79,7 @@ final class AdminAccess extends Toggle
     }
 
     /**
-     * Правила галочки и запрет снять доступ у себя и у последнего администратора.
+     * Правила галочки и запрет снять доступ у себя и у последнего пользователя.
      *
      * @return array<string, list<mixed>>
      */
@@ -89,7 +89,7 @@ final class AdminAccess extends Toggle
         $rules = parent::getRules($record);
 
         if (! $record instanceof Model || ! $record->exists) {
-            // Раздел показывает только администраторов: без доступа новая запись сразу пропала бы из списка.
+            // Раздел показывает только пользователей: без доступа новая запись сразу пропала бы из списка.
             $rules[$this->name][] = function (string $attribute, mixed $value, Closure $fail): void {
                 if (! filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
                     $fail(__('fastleo::users.access_required_for_new', [], Fastleo::LOCALE));

@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Database\Factories\Fastleo\NewsFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Новость сайта. Вывод на сайте — ваш: `News::query()->published()->paginate(10)`.
+ *
+ * @property int $id
+ * @property string $title
+ * @property string $slug
+ * @property string|null $cover
+ * @property string|null $excerpt
+ * @property string|null $body
+ * @property \Illuminate\Support\Carbon|null $published_at
+ * @property bool $is_published
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ */
+#[UseFactory(NewsFactory::class)]
+class News extends Model
+{
+    use HasFactory;
+
+    protected $table = 'news';
+
+    protected $fillable = ['title', 'slug', 'cover', 'excerpt', 'body', 'published_at', 'is_published', 'seo'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'published_at' => 'datetime',
+            'is_published' => 'boolean',
+            'seo' => 'array',
+        ];
+    }
+
+    /**
+     * Только опубликованные новости, свежие сверху. Дата публикации в будущем откладывает показ до этой даты.
+     *
+     * @param  Builder<News>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)
+            ->where(fn (Builder $when) => $when->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->orderByRaw('coalesce(published_at, created_at) desc')->orderByDesc('id');
+    }
+}

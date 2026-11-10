@@ -15,7 +15,7 @@ use Workbench\App\Models\Article;
 use Workbench\App\Models\User;
 
 /**
- * Дашборд тестов: числа, график, таблица, упавший виджет и виджет только для «главного» админа.
+ * Дашборд тестов: числа, график, таблица, упавший виджет и виджет только для «главного» пользователя.
  */
 final class Dashboard extends BaseDashboard
 {

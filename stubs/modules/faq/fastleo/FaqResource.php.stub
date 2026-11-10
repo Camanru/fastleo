@@ -1,0 +1,45 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\FaqItem;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Вопросы и ответы»: вопрос, ответ, необязательная группа. Порядок на сайте — перетаскиванием в списке.
+ * Показ на сайте — ваши маршруты и шаблоны: `FaqItem::query()->published()->get()->groupBy('category')`.
+ */
+final class FaqResource extends Resource
+{
+    protected static string $model = FaqItem::class;
+
+    protected static ?string $slug = 'faq';
+
+    protected static ?string $label = 'Вопросы и ответы';
+
+    protected static ?string $singular = 'Вопрос';
+
+    protected static string $icon = 'circle-help';
+
+    protected static int $position = 40;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля вопроса.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('question', 'Вопрос')->required()->maxLength(255)->searchable()->sortable(),
+            RichText::make('answer', 'Ответ')->required(),
+            Text::make('category', 'Группа')->maxLength(100)->help('Необязательно: вопросы с одинаковой группой можно показать вместе («Оплата», «Доставка»).')->sortable(),
+            Toggle::make('is_published', 'Опубликован')->default(true)->quickToggle(),
+        ];
+    }
+}

@@ -25,7 +25,7 @@ final class MediaSampleResource extends Resource
 
     protected static ?string $singular = 'Пример файлов и медиа';
 
-    protected static ?string $description = 'Файлы выбираются в файловом менеджере админки. У каждого поля в подсказке — какую возможность оно показывает.';
+    protected static ?string $description = 'Файлы выбираются в файловом менеджере панели. У каждого поля в подсказке — какую возможность оно показывает.';
 
     protected static string $icon = 'image';
 

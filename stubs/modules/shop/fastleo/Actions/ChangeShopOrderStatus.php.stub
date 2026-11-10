@@ -1,0 +1,57 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Actions;
+
+use {{ namespace }}\Enums\ShopOrderStatus;
+use {{ namespace }}\Models\ShopOrder;
+use Fastleo\Actions\Action;
+use Fastleo\Actions\ActionResult;
+use Fastleo\Fields\Select;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * «Сменить статус»: для одного заказа и для выбранных. Статус меняется только здесь (в форме заказа он только для чтения):
+ * отмена возвращает остаток товаров на склад, а из «Отменён» заказ не выходит.
+ */
+final class ChangeShopOrderStatus extends Action
+{
+    protected ?string $label = 'Сменить статус';
+
+    protected string $icon = 'refresh-cw';
+
+    /**
+     * Куда перевести заказ.
+     */
+    public function fields(): array
+    {
+        return [
+            Select::make('status', 'Новый статус')->options(ShopOrderStatus::class)->required(),
+        ];
+    }
+
+    /**
+     * Скрыть кнопку у отменённого заказа: из этого статуса он не выходит.
+     */
+    public function visibleFor(Model $record): bool
+    {
+        return $record instanceof ShopOrder && $record->status !== ShopOrderStatus::Cancelled;
+    }
+
+    public function handle(Collection $records, array $data): ActionResult
+    {
+        $status = ShopOrderStatus::from((string) $data['status']);
+        $changed = 0;
+        $skipped = 0;
+
+        foreach ($records as $order) {
+            $order instanceof ShopOrder && $order->changeStatus($status) ? $changed++ : $skipped++;
+        }
+
+        return $changed > 0
+            ? ActionResult::success("Статус изменён: {$changed}".($skipped > 0 ? ". Пропущено (уже такой статус или заказ отменён): {$skipped}" : ''))
+            : ActionResult::error('Статус не изменён: заказы уже в этом статусе или отменены.');
+    }
+}

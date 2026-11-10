@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Override;
 
 /**
- * Своя страница админки «{{ label }}»: пункт в меню и адрес /fastleo/pages/…
+ * Своя страница панели «{{ label }}»: пункт в меню и адрес /fastleo/pages/…
  */
 final class {{ class }} extends Page
 {

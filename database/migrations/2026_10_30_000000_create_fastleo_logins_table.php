@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Входы в админку: с какого устройства и адреса, когда впервые и в последний раз.
+ * Входы в панель: с какого устройства и адреса, когда впервые и в последний раз.
  * По ним профиль показывает «где вы вошли», а вход с нового устройства — письмо.
  */
 return new class extends Migration

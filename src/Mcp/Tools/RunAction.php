@@ -64,7 +64,7 @@ final class RunAction extends ResourceTool
             throw new ToolFailed(__('fastleo::mcp.delete_disabled'));
         }
 
-        // Действие с подтверждением в админке (`$danger = true`) агенту без окна подтверждения доступно только вместе с удалением.
+        // Действие с подтверждением в панели (`$danger = true`) агенту без окна подтверждения доступно только вместе с удалением.
         if ($action->isDanger() && ! config()->boolean('fastleo.mcp.allow_delete')) {
             throw new ToolFailed(__('fastleo::mcp.action_danger'));
         }

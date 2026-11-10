@@ -31,7 +31,7 @@ beforeEach(function (): void {
  */
 function botForm(array $overrides = []): array
 {
-    return ['name' => 'Админы', 'messenger' => 'telegram', 'token' => TELEGRAM_TOKEN, 'recipients' => ['12345', '-100200300'], 'enabled' => '1', ...$overrides];
+    return ['name' => 'Пользователи', 'messenger' => 'telegram', 'token' => TELEGRAM_TOKEN, 'recipients' => ['12345', '-100200300'], 'enabled' => '1', ...$overrides];
 }
 
 describe('section', function (): void {
@@ -83,7 +83,7 @@ describe('section', function (): void {
     });
 
     it('explains what it is under the title of the list', function (): void {
-        $this->get(route('fastleo.resources.index', 'notification-bots'))->assertOk()->assertSee('Боты Telegram и Max, которые отправляют уведомления администраторам');
+        $this->get(route('fastleo.resources.index', 'notification-bots'))->assertOk()->assertSee('Боты Telegram и Max, которые отправляют уведомления пользователям');
     });
 
     it('checks the token and the chats only after the messenger is chosen', function (): void {

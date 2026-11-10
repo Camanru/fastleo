@@ -7,7 +7,7 @@ namespace Fastleo\Tests\Fixtures\Policies;
 use Workbench\App\Models\User;
 
 /**
- * Товары: список закрыт (раздел для администратора недоступен).
+ * Товары: список закрыт (раздел для пользователя недоступен).
  */
 final class NoListProductPolicy
 {

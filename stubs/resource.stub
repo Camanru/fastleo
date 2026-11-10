@@ -7,7 +7,7 @@ namespace {{ namespace }};
 {{ imports }}
 
 /**
- * Раздел админки «{{ label }}».
+ * Раздел панели «{{ label }}».
  */
 final class {{ class }} extends Resource
 {

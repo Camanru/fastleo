@@ -1,4 +1,4 @@
-{{-- Общий <head> админки: тема и свёрнутость меню до загрузки стилей (без мигания), стили пакета и сайта, основной цвет. --}}
+{{-- Общий <head> панели: тема и свёрнутость меню до загрузки стилей (без мигания), стили пакета и сайта, основной цвет. --}}
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">

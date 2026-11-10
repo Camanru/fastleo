@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
 /**
- * Маршруты админки (все, что называются `fastleo.*`).
+ * Маршруты панели (все, что называются `fastleo.*`).
  *
  * @return list<LaravelRoute>
  */

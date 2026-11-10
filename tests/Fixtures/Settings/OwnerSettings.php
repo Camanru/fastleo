@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Override;
 
 /**
- * Настройки только для администратора owner@example.com.
+ * Настройки только для пользователя owner@example.com.
  */
 final class OwnerSettings extends Settings
 {

@@ -10,6 +10,7 @@ use Fastleo\Http\Controllers\ExpandController;
 use Fastleo\Http\Controllers\ExportController;
 use Fastleo\Http\Controllers\FilesController;
 use Fastleo\Http\Controllers\FilterOptionsController;
+use Fastleo\Http\Controllers\ImpersonationController;
 use Fastleo\Http\Controllers\ImportsController;
 use Fastleo\Http\Controllers\InlineController;
 use Fastleo\Http\Controllers\LogsController;
@@ -54,6 +55,7 @@ Route::group([
 
     Route::middleware(Fastleo::adminMiddleware())->group(function (): void {
         Route::post('logout', [AuthController::class, 'destroy'])->name('logout');
+        Route::post('impersonate/leave', [ImpersonationController::class, 'leave'])->name('impersonate.leave');
         Route::get('/', DashboardController::class)->name('dashboard');
         Route::post('clear-cache', [DashboardController::class, 'clearCache'])->name('dashboard.clear-cache');
         Route::put('dashboard/layout', [DashboardController::class, 'saveLayout'])->name('dashboard.layout.save');
@@ -97,7 +99,7 @@ Route::group([
             Route::delete('/', 'destroy')->name('destroy');
         });
 
-        // Разделы-ресурсы: {resource} — адрес раздела (кроме занятых админкой), {id} — ключ записи (формат проверяет контроллер).
+        // Разделы-ресурсы: {resource} — адрес раздела (кроме занятых панелью), {id} — ключ записи (формат проверяет контроллер).
         $reserved = implode('|', ResourceRegistry::RESERVED_SLUGS);
 
         Route::controller(ResourceController::class)

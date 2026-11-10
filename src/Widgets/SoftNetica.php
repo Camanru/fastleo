@@ -27,7 +27,7 @@ use Override;
 final class SoftNetica extends Widget
 {
     /**
-     * Виден администратору, если сайт подключён к SoftNetica и Gate `manageFastleoSoftNetica` разрешает ему раздел.
+     * Виден пользователю, если сайт подключён к SoftNetica и Gate `manageFastleoSoftNetica` разрешает ему раздел.
      */
     #[Override]
     public function isVisible(): bool

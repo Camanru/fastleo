@@ -1,0 +1,52 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\ShopCategory;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Категории» магазина: дерево с ручным порядком (перетаскиванием). Показ на сайте — ваши маршруты и шаблоны:
+ * `ShopCategory::query()->published()->whereNull('parent_id')->get()`.
+ */
+final class ShopCategoryResource extends Resource
+{
+    protected static string $model = ShopCategory::class;
+
+    protected static ?string $slug = 'shop-categories';
+
+    protected static ?string $label = 'Категории';
+
+    protected static ?string $singular = 'Категория';
+
+    protected static string $icon = 'folder-tree';
+
+    protected static ?string $group = 'Магазин';
+
+    protected static int $position = 30;
+
+    protected static ?string $treeColumn = 'parent_id';
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля категории.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required()->maxLength(150)->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('title'),
+            BelongsTo::make('parent_id', 'Родитель')->hideInList(),
+            Toggle::make('is_published', 'Показывать')->default(true)->quickToggle(),
+            Seo::make('seo')->directory('shop'),
+        ];
+    }
+}

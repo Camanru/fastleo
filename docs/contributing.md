@@ -20,7 +20,7 @@ npx playwright install chromium   # для браузерных тестов
 
 Ветка `master` содержит выпущенные версии: каждая версия — один коммит с тегом. Ошибки и предложения присылайте через issues; pull request тоже пригодится, но его не вливают напрямую — автор переносит правку в рабочую ветку, и она выходит в следующей версии.
 
-## Демо-админка
+## Демо-панель
 
 ```bash
 composer serve
@@ -34,7 +34,7 @@ composer serve
   - группа «Витрина: поля» — «Текст и числа» (строки, числа, `Range`, контакты, `Password`, `Secret`, `Code`, `Slug`, `Hidden`, вычисляемый столбец и своё поле `Fields/PromoCode` со своим шаблоном в `workbench/resources/views/fastleo/fields`), «Выбор и даты» (`Select` одиночный, `multiple()`, `badges()`, `dependsOn()`, `emptyValue()`, `Enum` на целочисленном enum, `Radio`, `Checkbox`, `Toggle` с `quickToggle()`, `Tags`, даты, `visibleWhen()`), «Файлы и медиа» (`Image` с `crop()`, вариантами и `alt()`, `Gallery`, `File`, `Video`), «Разметка и JSON» (`translatable()`, `RichText`, `Markdown`, `Repeater` с вложенным `Repeater`, `KeyValue`, `Blocks`, `Seo`); раскладка — вкладки, сетки, секции (с описанием, сворачиваемые, свёрнутые), боковая панель;
   - группа «Витрина: список и действия» — «Задачи»: фильтры всех видов (в том числе `using()`, `default()` и свой тип `Filters/ContainsText`), число записей на странице, порядок по умолчанию, своя подпись кнопки создания, экспорт и импорт, правка в ячейке, цвет строки, число просроченных в меню (`badge()`), свои действия в `Fastleo/Actions` (с вопросом, с мини-формой, опасное со своим правом Policy, скачивание файла) и `SetToggle`; права — `Policies/TaskPolicy`, время выполнения ставит `Observers/TaskObserver`;
   - группа «Витрина: отчёты» — «Отчёт по задачам» (`TaskReportPage`: фильтры `Period` и `Choice`, плитки, графики, `Rows` с итогом, `Table`);
-- роли ([roles.md](roles.md)), модули ([modules.md](modules.md)) и закрытие сайта ([site-closing.md](site-closing.md)) в демо не включены: они меняют поведение всей админки и всех тестов, которые идут на демо-сайте;
+- роли ([roles.md](roles.md)), модули ([modules.md](modules.md)) и закрытие сайта ([site-closing.md](site-closing.md)) в демо не включены: они меняют поведение всей панели и всех тестов, которые идут на демо-сайте;
 - `workbench/app/Providers/WorkbenchServiceProvider.php` — папка ресурсов демо, регистрация Policy и observers;
 - `workbench/database/migrations/`, `factories/`, `seeders/DatabaseSeeder.php` — таблицы и демо-данные;
 - `testbench.yaml` — настройки демо-сайта (провайдеры, миграции, сидер, переменные окружения).

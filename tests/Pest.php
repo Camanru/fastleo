@@ -55,7 +55,7 @@ expect()->extend('toBeStoredJson', function (array $expected): object {
 });
 
 /**
- * Администратор fastleo с паролем «password».
+ * Пользователь fastleo с паролем «password».
  *
  * @param  array<string, mixed>  $attributes
  */
@@ -78,7 +78,7 @@ function useRoles(): void
 }
 
 /**
- * Администратор с ролью spatie (тесты ролей): строка в `users`, но модель с трейтом `HasRoles`.
+ * Пользователь с ролью spatie (тесты ролей): строка в `users`, но модель с трейтом `HasRoles`.
  *
  * @param  array<string, mixed>  $attributes
  */
@@ -132,7 +132,7 @@ function confirmTwoFactor(TwoFactor $twoFactor, User $admin, string $secret): ?a
 }
 
 /**
- * Включённая двухфакторная защита у администратора (последний принятый код — шаг назад).
+ * Включённая двухфакторная защита у пользователя (последний принятый код — шаг назад).
  *
  * @return array{secret: string, codes: list<string>}
  */
@@ -156,7 +156,7 @@ function login(array $data): TestResponse
 }
 
 /**
- * Взять ресурсы из папки tests/Fixtures/{папка} вместо демо-ресурсов workbench (встроенные разделы «Администраторы», «Боты уведомлений» и страницы SoftNetica выключены).
+ * Взять ресурсы из папки tests/Fixtures/{папка} вместо демо-ресурсов workbench (встроенные разделы «Пользователи», «Боты уведомлений», «Заявки» и страницы SoftNetica выключены).
  */
 function useFixtureResources(string $folder): void
 {
@@ -167,6 +167,7 @@ function useFixtureResources(string $folder): void
         'fastleo.notifications.bots' => null,
         'fastleo.publishing.channels' => null,
         'fastleo.publishing.publications' => null,
+        'fastleo.leads.resource' => null,
         'fastleo.softnetica.enabled' => false,
     ]);
     Fastleo::resources()->flush();
@@ -246,7 +247,7 @@ function waitUntil(object $page, string $condition): void
 }
 
 /**
- * Войти в админку и открыть адрес (на форме с RichText — дождаться редактора).
+ * Войти в панель и открыть адрес (на форме с RichText — дождаться редактора).
  */
 function signInAndVisit(string $url): mixed
 {

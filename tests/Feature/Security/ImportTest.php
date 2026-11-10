@@ -16,7 +16,7 @@ use Workbench\App\Models\Category;
 beforeEach(function (): void {
     useFixtureResources('Imports');
     Storage::fake('local');
-    // xlsx в админке отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
+    // xlsx в панели отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
     config(['fastleo.xlsx' => true]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });

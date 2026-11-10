@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Transport\StdioTransport;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Запускает MCP-сервер админки для Claude: агент читает и правит записи разделов от имени администратора
+ * Запускает MCP-сервер панели для Claude: агент читает и правит записи разделов от имени пользователя
  * `--user` с его правами (Policy). Сервер общается по stdio и ждёт сообщений
  * клиента — запускать вручную в терминале не нужно, команду прописывают в `.mcp.json` сайта.
  *
@@ -28,12 +28,12 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * ```
  */
 #[AsCommand(name: 'fastleo:mcp')]
-#[Description('MCP-сервер админки для Claude (запускается клиентом, см. .mcp.json)')]
-#[Signature('fastleo:mcp {--user= : email администратора, от имени которого работает агент} {--allow-delete : разрешить агенту удалять записи}')]
+#[Description('MCP-сервер панели для Claude (запускается клиентом, см. .mcp.json)')]
+#[Signature('fastleo:mcp {--user= : email пользователя, от имени которого работает агент} {--allow-delete : разрешить агенту удалять записи}')]
 final class McpCommand extends Command
 {
     /**
-     * Проверить администратора и запустить сервер.
+     * Проверить пользователя и запустить сервер.
      */
     public function handle(): int
     {

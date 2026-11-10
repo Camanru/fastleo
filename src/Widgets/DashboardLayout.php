@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Attributes\Unguarded;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Раскладка дашборда одного администратора: порядок, размер и скрытие виджетов по их ключам.
+ * Раскладка дашборда одного пользователя: порядок, размер и скрытие виджетов по их ключам.
  *
  * @property int $id
  * @property string $user_id

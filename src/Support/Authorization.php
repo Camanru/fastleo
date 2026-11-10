@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * Права администратора на действия в разделе — через Policy модели сайта.
+ * Права пользователя на действия в разделе — через Policy модели сайта.
  *
  * Нет Policy у модели — разрешено всё. Есть Policy — решает её метод (`viewAny`, `view`, `create`,
  * `update`, `delete`, `restore`, `forceDelete`); метода нет — запрещено, как везде в Laravel.
@@ -29,7 +29,7 @@ final class Authorization
     public const array WRITE_ABILITIES = ['create', 'update', 'delete', 'restore', 'forceDelete'];
 
     /**
-     * Разрешено ли действие текущему администратору.
+     * Разрешено ли действие текущему пользователю.
      */
     public static function allows(string $ability, Resource $resource, ?Model $record = null): bool
     {

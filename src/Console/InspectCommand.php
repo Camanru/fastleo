@@ -14,7 +14,7 @@ use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Показывает, как сайт настроил админку: разделы, поля, правила проверки, связи, фильтры, действия, права.
+ * Показывает, как сайт настроил панель: разделы, поля, правила проверки, связи, фильтры, действия, права.
  * С `--json` отдаёт те же данные машине — Claude читает по ним текущее состояние сайта.
  *
  * ```bash
@@ -24,7 +24,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * ```
  */
 #[AsCommand(name: 'fastleo:inspect')]
-#[Description('Показать разделы, поля и права админки (--json — для Claude)')]
+#[Description('Показать разделы, поля и права панели (--json — для Claude)')]
 #[Signature('fastleo:inspect {resource? : адрес раздела, например articles} {--json : вывести JSON}')]
 final class InspectCommand extends Command
 {

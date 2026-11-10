@@ -8,6 +8,7 @@ use Fastleo\Auth\RoleMatrix;
 use Fastleo\Closing\ClosingSettings;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Fastleo;
+use Fastleo\Leads\Leads;
 use Fastleo\Page;
 use Fastleo\Resource;
 use Fastleo\Resources\UserResource;
@@ -39,15 +40,15 @@ final class ResourceRegistry
     public const array RUNTIME = [...self::SOFTNETICA, ClosingSettings::class];
 
     /** Ключи конфига со встроенными разделами (класс ресурса или `null` — раздела нет). */
-    public const array BUILT_IN = ['fastleo.notifications.bots', 'fastleo.publishing.channels', 'fastleo.publishing.publications'];
+    public const array BUILT_IN = ['fastleo.notifications.bots', 'fastleo.publishing.channels', 'fastleo.publishing.publications', 'fastleo.leads.resource', 'fastleo.leads.keys'];
 
     /**
-     * Адреса, которые админка занимает сама, и `up` — проверка работы сайта Laravel (иначе при админке на корне
+     * Адреса, которые панель занимает сама, и `up` — проверка работы сайта Laravel (иначе при панели на корне
      * домена её адрес достался бы разделам). Их нельзя брать ресурсу.
      */
     public const array RESERVED_SLUGS = [
         'login', 'logout', 'dashboard', 'files', 'search', 'settings', 'pages', 'logs', 'notifications',
-        'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica', 'up',
+        'profile', 'two-factor', 'forgot-password', 'reset-password', 'sitemap', 'markdown', 'clear-cache', 'softnetica', 'up', 'impersonate',
     ];
 
     /**
@@ -225,7 +226,12 @@ final class ResourceRegistry
         $classes = [];
 
         foreach (self::BUILT_IN as $key) {
-            $class = config($key);
+            // «Доступы для сайтов» — часть заявок: сами по себе, без раздела «Заявки», не нужны.
+            if ($key === 'fastleo.leads.keys' && ! Leads::enabled()) {
+                continue;
+            }
+
+            $class = $key === 'fastleo.leads.keys' ? Leads::keysClass() : config($key);
 
             if (is_string($class) && class_exists($class) && is_subclass_of($class, Resource::class)) {
                 $classes[] = $class;
@@ -317,7 +323,7 @@ final class ResourceRegistry
     }
 
     /**
-     * Добавить раздел администраторов из `fastleo.users.resource` (если он включён, подходит модель
+     * Добавить раздел пользователей из `fastleo.users.resource` (если он включён, подходит модель
      * пользователей и сайт не описал тот же класс сам).
      *
      * @param  list<class-string<Resource|Settings|Page>>  $classes
@@ -404,7 +410,7 @@ final class ResourceRegistry
             }
 
             if (isset($resources[$slug])) {
-                // Наследник встроенного «Администраторы» подключается настройкой, а не новым адресом.
+                // Наследник встроенного «Пользователи» подключается настройкой, а не новым адресом.
                 $custom = array_find([$class, $resources[$slug]], fn (string $candidate): bool => is_subclass_of($candidate, UserResource::class));
 
                 throw new LogicException($this->message($custom === null ? 'resource_slug_duplicate' : 'resource_slug_users', ['class' => $class, 'other' => $resources[$slug], 'slug' => $slug, 'custom' => $custom.'::class']));
@@ -474,7 +480,7 @@ final class ResourceRegistry
 
     /**
      * Все зарегистрированные разделы модели в порядке регистрации (у одной модели их может быть несколько:
-     * «Статьи» и «Новости»; встроенные «Администраторы» идут последними).
+     * «Статьи» и «Новости»; встроенные «Пользователи» идут последними).
      *
      * ```php
      * Fastleo::resources()->allForModel(Article::class);   // [ArticleResource, NewsResource]

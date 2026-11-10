@@ -28,7 +28,7 @@ final class ArticleResource extends Resource
     /** Как описан внешний ключ рубрики: normal, readonly или absent (поля нет в форме). */
     public static string $foreignMode = 'normal';
 
-    /** Почта администратора, от которого скрыто поле «Просмотры»; null — скрыто ни от кого. */
+    /** Почта пользователя, от которого скрыто поле «Просмотры»; null — скрыто ни от кого. */
     public static ?string $hideViewsFrom = null;
 
     /**

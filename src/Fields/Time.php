@@ -60,7 +60,7 @@ class Time extends Field
     }
 
     /**
-     * Время по умолчанию (`now()`, Carbon) → `ЧЧ:ММ` в поясе админки.
+     * Время по умолчанию (`now()`, Carbon) → `ЧЧ:ММ` в поясе панели.
      */
     #[Override]
     protected function formatDefault(mixed $value): mixed

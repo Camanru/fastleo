@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 use Override;
 
 /**
- * Записи раздела постранично: поиск, фильтры, сортировка — как в списке админки.
+ * Записи раздела постранично: поиск, фильтры, сортировка — как в списке панели.
  */
 #[Description('Записи раздела постранично. Поиск q идёт по полям searchable, filters — по фильтрам раздела (имена из describe-resource), sort — по полям sortable.')]
 #[IsReadOnly]
@@ -41,7 +41,7 @@ final class ListRecords extends ResourceTool
             'sort' => $schema->string()->description('Поле сортировки (sortable).'),
             'direction' => $schema->string()->description('asc или desc.'),
             'page' => $schema->integer()->description('Номер страницы, с 1.'),
-            'per_page' => $schema->integer()->description('Записей на странице, до '.self::MAX_PER_PAGE.' (по умолчанию — как в админке).'),
+            'per_page' => $schema->integer()->description('Записей на странице, до '.self::MAX_PER_PAGE.' (по умолчанию — как в панели).'),
         ];
     }
 

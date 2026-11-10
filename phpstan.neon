@@ -17,4 +17,7 @@ parameters:
         -
             identifier: trait.unused
             path: src/Testing/ActsAsFastleoUser.php
+    # Конфиг пакета лежит в config/ корня пакета, а не в config_path() каркаса Testbench: env() там допустим.
+    configDirectories:
+        - config
     tmpDir: .phpstan.cache

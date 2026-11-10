@@ -102,7 +102,7 @@ final readonly class TwoFactorController
     }
 
     /**
-     * Вошедший администратор.
+     * Вошедший пользователь.
      */
     private function user(): Authenticatable
     {

@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Пункты меню сайта: дерево, место (шапка или подвал), адрес, порядок.
+     */
+    public function up(): void
+    {
+        Schema::create('menu_items', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('parent_id')->nullable()->constrained('menu_items')->cascadeOnDelete();
+            $table->unsignedInteger('sort')->default(0);
+            $table->string('location', 20)->default('header')->index();
+            $table->string('title', 150);
+            $table->string('url', 500);
+            $table->boolean('new_tab')->default(false);
+            $table->boolean('is_published')->default(true);
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Удалить таблицу пунктов меню.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('menu_items');
+    }
+};

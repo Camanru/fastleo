@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\PortfolioItem;
+use Fastleo\Fields\Date;
+use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Портфолио»: работа с обложкой, галереей, описанием и категорией. Порядок на сайте — перетаскиванием в списке.
+ * Показ на сайте — ваши маршруты и шаблоны: `PortfolioItem::query()->published()->paginate(12)`.
+ */
+final class PortfolioResource extends Resource
+{
+    protected static string $model = PortfolioItem::class;
+
+    protected static ?string $slug = 'portfolio';
+
+    protected static ?string $label = 'Портфолио';
+
+    protected static ?string $singular = 'Работа';
+
+    protected static string $icon = 'briefcase';
+
+    protected static int $position = 25;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля работы.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required()->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('title'),
+            Text::make('category', 'Категория')->maxLength(100)->help('Необязательно: по ней можно отбирать работы на сайте («Интерьеры», «Сайты»).')->sortable(),
+            Text::make('client', 'Заказчик')->maxLength(150)->hideInList(),
+            Date::make('completed_at', 'Дата завершения')->hideInList(),
+            Image::make('cover', 'Обложка')->directory('portfolio')->hideInList(),
+            Gallery::make('photos', 'Фотографии')->directory('portfolio')->max(30)->hideInList(),
+            Textarea::make('excerpt', 'Кратко')->rows(3)->hideInList(),
+            RichText::make('body', 'Описание'),
+            Toggle::make('is_published', 'Опубликована')->default(true)->quickToggle(),
+            Seo::make('seo')->directory('portfolio'),
+        ];
+    }
+}

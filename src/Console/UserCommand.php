@@ -24,7 +24,7 @@ use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
 
 /**
- * Создаёт администратора или выдаёт доступ в админку существующему пользователю.
+ * Создаёт пользователя или выдаёт доступ в панель существующему пользователю.
  *
  * ```bash
  * php artisan fastleo:user admin@site.ru            # спросит имя и пароль
@@ -33,15 +33,15 @@ use function Laravel\Prompts\text;
  * ```
  */
 #[AsCommand(name: 'fastleo:user')]
-#[Description('Создать администратора fastleo или выдать доступ существующему пользователю')]
+#[Description('Создать пользователя fastleo или выдать доступ существующему пользователю')]
 #[Signature('fastleo:user
-        {email? : Email администратора}
+        {email? : Email пользователя}
         {--name= : Имя (для нового пользователя)}
         {--password= : Пароль (лучше ввести по запросу — так он не попадёт в историю команд)}
         {--reset-two-factor : Отключить двухфакторную защиту пользователя (потерян телефон и резервные коды)}')]
 final class UserCommand extends Command
 {
-    /** Минимальная длина пароля администратора. */
+    /** Минимальная длина пароля пользователя. */
     public const int PASSWORD_MIN = 8;
 
     /**
@@ -81,7 +81,7 @@ final class UserCommand extends Command
         $user = $matches->first();
         $isNew = $user === null;
 
-        // Сброс 2FA — только для существующего пользователя: опечатка в email не должна создавать администратора.
+        // Сброс 2FA — только для существующего пользователя: опечатка в email не должна создавать пользователя.
         if ($isNew && $this->option('reset-two-factor') === true) {
             $this->components->error(__('fastleo::console.user_not_found', ['email' => $email]));
 

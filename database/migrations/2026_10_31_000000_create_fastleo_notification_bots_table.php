@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Боты уведомлений администраторам (раздел «Уведомления»): мессенджер, токен (зашифрован), чаты получателей.
+ * Боты уведомлений пользователям (раздел «Уведомления»): мессенджер, токен (зашифрован), чаты получателей.
  */
 return new class extends Migration
 {

@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\File;
 use Throwable;
 
 /**
- * Задача импорта файла в раздел: от имени загрузившего админа (его права по Policy),
+ * Задача импорта файла в раздел: от имени загрузившего пользователя (его права по Policy),
  * с отчётом в `fastleo_imports`. Без очереди (`sync`) выполняется сразу.
  *
  * ```php
@@ -60,7 +60,7 @@ final class ImportRecords implements ShouldQueue
         $guard = Fastleo::guard();
         // Задача на воркере живёт дольше одного импорта: вошедшим от имени загрузившего остаёмся только на время работы.
         $previous = $guard->hasUser() ? $guard->user() : null;
-        // Воркер не проходит middleware админки: без этого `auth()` и `__()` в observers и правилах сайта видели бы
+        // Воркер не проходит middleware панели: без этого `auth()` и `__()` в observers и правилах сайта видели бы
         // другой guard (auth()->id() = null) и язык сайта, а не тот же guard и язык, что у формы.
         $previousDriver = Auth::getDefaultDriver();
         $previousLocale = app()->getLocale();
@@ -73,7 +73,7 @@ final class ImportRecords implements ShouldQueue
                 throw new ImportFailed(__('fastleo::imports.unavailable', locale: Fastleo::LOCALE));
             }
 
-            // Формат, который админка не принимает (xlsx при `fastleo.xlsx` = false), не читается и у задания, поставленного в очередь раньше.
+            // Формат, который панель не принимает (xlsx при `fastleo.xlsx` = false), не читается и у задания, поставленного в очередь раньше.
             $stream = in_array($extension, SpreadsheetFormats::all(), true) ? $disk->readStream($import->path) : null;
 
             if (! is_resource($stream) || $local === false) {
@@ -123,7 +123,7 @@ final class ImportRecords implements ShouldQueue
 
     /**
      * Воркер прервал задачу (время, память, остановка процесса): импорт не остаётся «выполняющимся» навсегда,
-     * файл удаляется, администратор получает уведомление.
+     * файл удаляется, пользователь получает уведомление.
      */
     public function failed(?Throwable $exception = null): void
     {
@@ -168,7 +168,7 @@ final class ImportRecords implements ShouldQueue
     }
 
     /**
-     * Сообщить загрузившему администратору в колокольчик, чем закончился импорт (с ссылкой на отчёт).
+     * Сообщить загрузившему пользователю в колокольчик, чем закончился импорт (с ссылкой на отчёт).
      */
     private function notifyUploader(Import $import): void
     {

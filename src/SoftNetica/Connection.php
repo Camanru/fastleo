@@ -28,8 +28,8 @@ final class Connection
     }
 
     /**
-     * Администратору можно открывать страницу SoftNetica: функция включена и Gate `manageFastleoSoftNetica`, если сайт его описал,
-     * иначе любому администратору (при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владельцу).
+     * Пользователю можно открывать страницу SoftNetica: функция включена и Gate `manageFastleoSoftNetica`, если сайт его описал,
+     * иначе любому пользователю (при включённых ролях или `Fastleo::resolveOwnerUsing()` — только владельцу).
      *
      * ```php
      * Gate::define('manageFastleoSoftNetica', fn (User $user) => $user->is_owner);

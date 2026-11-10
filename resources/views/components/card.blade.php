@@ -1,6 +1,6 @@
 @props(['title' => null, 'description' => null])
 {{-- Карточка содержимого: <x-fastleo::card title="Заголовок" description="Пояснение">…</x-fastleo::card>.
-     Слот action — действие в правом верхнем углу: <x-slot:action>…</x-slot:action>. Для виджетов и своих страниц админки. --}}
+     Слот action — действие в правом верхнем углу: <x-slot:action>…</x-slot:action>. Для виджетов и своих страниц панели. --}}
 <section {{ $attributes->class(['fastleo-card flex min-w-0 flex-col gap-3 p-4 sm:p-5']) }}>
     @if ($title || isset($action))
         <div class="flex items-start justify-between gap-3">

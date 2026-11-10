@@ -14,7 +14,7 @@ function galleryCell(Gallery $field, Article $article): string
 }
 
 it('shows the first thumbnails of a gallery in the list and the total when there are more', function (): void {
-    // Подпись берётся на языке запроса админки: вне запроса язык приложения задаём сами.
+    // Подпись берётся на языке запроса панели: вне запроса язык приложения задаём сами.
     app()->setLocale('ru');
     $few = new Article(['gallery' => ['uploads/a.jpg', 'uploads/b.jpg']]);
     $many = new Article(['gallery' => ['uploads/a.jpg', 'uploads/b.jpg', 'uploads/c.jpg', 'uploads/d.jpg', 'uploads/e.jpg']]);

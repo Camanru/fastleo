@@ -22,7 +22,7 @@ Fastleo — пакет Laravel 13 для работы с моделями Eloque
 - Файлы и картинки хранятся путём относительно диска (`uploads/products/kettle.jpg`), галерея — JSON-массивом (нужен каст `array`).
 - Пароли и секреты не показывают полями (кроме `Password`, который хеширует значение).
 - «Галочка» (да/нет) — `Toggle`; `Checkbox` нужен, когда флажок стоит в строке с текстом.
-- Для тестов имена маршрутов: `fastleo.resources.index`, `.create`, `.store`, `.show`, `.edit`, `.update`, `.destroy` (адрес раздела — первым параметром, ключ записи — вторым: `route('fastleo.resources.edit', ['products', $id])`). Вход в тесте — `actingAs($admin, 'fastleo')`, администратор — пользователь с `fastleo_admin = true`.
+- Для тестов имена маршрутов: `fastleo.resources.index`, `.create`, `.store`, `.show`, `.edit`, `.update`, `.destroy` (адрес раздела — первым параметром, ключ записи — вторым: `route('fastleo.resources.edit', ['products', $id])`). Вход в тесте — `actingAs($admin, 'fastleo')`, пользователь с `fastleo_admin = true`.
 - Внешние ключи: миграция таблицы, на которую ссылаются (рубрики), должна выполняться раньше (метка времени меньше), чем миграция таблицы со ссылкой (новости).
 - После каждой правки — `fastleo:doctor`; перед сдачей работы — тест раздела.
 

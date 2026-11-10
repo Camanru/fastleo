@@ -2,7 +2,7 @@
 @php
     $selected = (string) fastleo_old($path, $value);
     $radioOptions = $field->getOptions();
-    // Сохранённое значение вне вариантов остаётся выбранным, пока админ не выберет другое.
+    // Сохранённое значение вне вариантов остаётся выбранным, пока пользователь не выберет другое.
     foreach ($field->savedValues($record) as $savedValue) {
         if (! array_key_exists($savedValue, $radioOptions)) {
             $radioOptions[$savedValue] = $savedValue;

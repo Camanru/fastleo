@@ -7,7 +7,7 @@ namespace Fastleo\Tests\Fixtures\Policies;
 use Workbench\App\Models\User;
 
 /**
- * Policy сайта для модели пользователей: админ меняет только себя.
+ * Policy сайта для модели пользователей: пользователь меняет только себя.
  */
 final class SelfOnlyUserPolicy
 {

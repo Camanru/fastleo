@@ -34,6 +34,7 @@ use Fastleo\Console\UserCommand;
 use Fastleo\Health\HealthChecks;
 use Fastleo\Http\ErrorPage;
 use Fastleo\Http\Middleware\SecurityHeaders;
+use Fastleo\Leads\Leads;
 use Fastleo\Notifications\FastleoChannel;
 use Fastleo\Publishing\Channel;
 use Fastleo\SoftNetica\Connection;
@@ -120,6 +121,14 @@ final class FastleoServiceProvider extends ServiceProvider
             $this->loadRoutesFrom($this->packagePath('routes/robots.php'));
         }
 
+        if (Leads::formEnabled()) {
+            $this->loadRoutesFrom($this->packagePath('routes/leads.php'));
+        }
+
+        if (Leads::apiEnabled()) {
+            $this->loadRoutesFrom($this->packagePath('routes/leads-api.php'));
+        }
+
         if (SiteClosing::enabled()) {
             SiteClosing::register();
         }
@@ -144,7 +153,7 @@ final class FastleoServiceProvider extends ServiceProvider
                 Sitemap::touched($payload[0]);
             }
         });
-        // Страницы ошибок 403, 404, 419 и 429 внутри админки: в оформлении админки, а не голая страница Laravel.
+        // Страницы ошибок 403, 404, 419 и 429 внутри панели: в оформлении панели, а не голая страница Laravel.
         $this->app->make(ExceptionHandler::class)->renderable(fn (HttpExceptionInterface $exception, Request $request): ?Response => ErrorPage::render($exception, $request));
 
         Notification::extend('fastleo', fn (): FastleoChannel => new FastleoChannel());
@@ -210,7 +219,7 @@ final class FastleoServiceProvider extends ServiceProvider
     }
 
     /**
-     * Лимиты запросов: восстановление пароля (по IP и по адресу) и профиль (по администратору — перебор текущего пароля).
+     * Лимиты запросов: восстановление пароля (по IP и по адресу) и профиль (по пользователю — перебор текущего пароля).
      */
     private function limitRequests(): void
     {
@@ -227,7 +236,7 @@ final class FastleoServiceProvider extends ServiceProvider
         // не защищает, а мешает владельцу: десять запросов ссылки на его адрес закрыли бы ему и ввод нового пароля.
         RateLimiter::for('fastleo-password-reset', fn (Request $request): Limit => Limit::perMinute(5)->by('fastleo-password-reset-ip:'.$request->ip()));
 
-        // Лимиты по администратору (а не по IP): перебор текущего пароля в профиле и проверки связи с внешними сервисами.
+        // Лимиты по пользователю (а не по IP): перебор текущего пароля в профиле и проверки связи с внешними сервисами.
         $adminKey = function (Request $request): string {
             $user = $request->user(Fastleo::GUARD);
 
@@ -235,7 +244,7 @@ final class FastleoServiceProvider extends ServiceProvider
         };
 
         RateLimiter::for('fastleo-profile', fn (Request $request): Limit => Limit::perMinute(5)->by('fastleo-profile:'.$adminKey($request)));
-        // Выгрузка и загрузка таблиц: тяжёлые запросы (потоковый экспорт, разбор файла), по администратору.
+        // Выгрузка и загрузка таблиц: тяжёлые запросы (потоковый экспорт, разбор файла), по пользователю.
         RateLimiter::for('fastleo-transfer', fn (Request $request): Limit => Limit::perMinute(10)->by('fastleo-transfer:'.$adminKey($request)));
         RateLimiter::for('fastleo-integrations', fn (Request $request): Limit => Limit::perMinute(10)->by('fastleo-integrations:'.$adminKey($request)));
     }

@@ -26,7 +26,7 @@ use LogicException;
  */
 final class RichTextSettings
 {
-    /** Приставки атрибутов, которые исполняют код: директивы Alpine админки, htmx, Vue, Angular. */
+    /** Приставки атрибутов, которые исполняют код: директивы Alpine панели, htmx, Vue, Angular. */
     private const array FRAMEWORK_PREFIXES = ['x-', 'hx-', 'data-hx-', 'v-', 'ng-'];
 
     /**

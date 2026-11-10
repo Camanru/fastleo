@@ -14,7 +14,7 @@ beforeEach(function (): void {
 });
 
 /**
- * Данные формы администратора.
+ * Данные формы пользователя.
  *
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>

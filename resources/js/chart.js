@@ -8,14 +8,14 @@ import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
 /**
- * Значение CSS-переменной темы админки или запасное.
+ * Значение CSS-переменной темы панели или запасное.
  */
 function cssVar(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
 /**
- * Цвет акцента с прозрачностью: color-mix понимают все браузеры, которые поддерживает админка.
+ * Цвет акцента с прозрачностью: color-mix понимают все браузеры, которые поддерживает панель.
  */
 function mix(color, percent) {
     return `color-mix(in srgb, ${color} ${percent}%, transparent)`;

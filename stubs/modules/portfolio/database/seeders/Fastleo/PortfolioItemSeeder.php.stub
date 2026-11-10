@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders\Fastleo;
+
+use {{ namespace }}\Models\PortfolioItem;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры работ портфолио (php artisan db:seed --class=PortfolioItemSeeder).
+ */
+class PortfolioItemSeeder extends Seeder
+{
+    /**
+     * Создать три работы, если таких адресов ещё нет.
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Первая работа', 2 => 'Вторая работа', 3 => 'Третья работа'] as $number => $title) {
+            PortfolioItem::query()->firstOrCreate(['slug' => 'work-'.$number], [
+                'title' => $title,
+                'category' => 'Примеры',
+                'excerpt' => 'Коротко о проекте.',
+                'body' => '<p>Свои работы добавьте в панели: раздел «Портфолио».</p>',
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

@@ -15,9 +15,9 @@ use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 use Override;
 
 /**
- * Разделы админки, доступные администратору.
+ * Разделы панели, доступные пользователю.
  */
-#[Description('Список разделов админки, к которым есть доступ: адрес (resource), название, модель, только ли для чтения, можно ли создавать записи.')]
+#[Description('Список разделов панели, к которым есть доступ: адрес (resource), название, модель, только ли для чтения, можно ли создавать записи.')]
 #[IsReadOnly]
 final class ListResources extends ResourceTool
 {

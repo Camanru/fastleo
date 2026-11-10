@@ -14,7 +14,7 @@ enum ArticleStatus: string
     case Published = 'published';
 
     /**
-     * Подпись для админки.
+     * Подпись для панели.
      */
     public function label(): string
     {

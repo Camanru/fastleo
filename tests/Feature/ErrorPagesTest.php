@@ -100,7 +100,7 @@ it('does not take the same path on another domain for the admin', function (): v
 });
 
 /**
- * Админка на корне домена сайта: маршруты пакета загружаются первыми, маршруты сайта — после них.
+ * Панель на корне домена сайта: маршруты пакета загружаются первыми, маршруты сайта — после них.
  */
 function adminAtSiteRoot(?string $domain = null): void
 {

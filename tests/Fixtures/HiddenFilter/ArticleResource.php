@@ -14,7 +14,7 @@ use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 
 /**
- * Статьи с фильтрами по статусу и рубрике; рубрика скрыта от администратора, статус виден.
+ * Статьи с фильтрами по статусу и рубрике; рубрика скрыта от пользователя, статус виден.
  */
 final class ArticleResource extends Resource
 {
@@ -22,7 +22,7 @@ final class ArticleResource extends Resource
 
     protected static ?string $slug = 'articles';
 
-    /** Сколько раз спрашивали, скрыта ли рубрика: описание ресурса без администратора не должно вызывать замыкание. */
+    /** Сколько раз спрашивали, скрыта ли рубрика: описание ресурса без пользователя не должно вызывать замыкание. */
     public static int $hiddenAsked = 0;
 
     /**

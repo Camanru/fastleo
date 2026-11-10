@@ -13,7 +13,7 @@ use ReflectionClass;
 use Symfony\Component\Process\Process;
 
 /**
- * Подключает модель пользователя сайта к админке: добавляет в её файл интерфейс
+ * Подключает модель пользователя сайта к панели: добавляет в её файл интерфейс
  * FastleoUser и трейт HasFastleoAccess (так делают установщики Breeze и Filament Shield).
  *
  * Файл меняется, только если модель устроена обычно (как `app/Models/User.php` нового

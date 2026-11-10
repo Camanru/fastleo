@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Leads\LeadApiKeyResource;
+use Fastleo\Leads\LeadResource;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\Publishing\ChannelResource;
 use Fastleo\Publishing\PublicationResource;
@@ -34,7 +36,7 @@ it('returns the same resource object for repeated lookups', function (): void {
 });
 
 it('finds nothing when the folder does not exist', function (): void {
-    config(['fastleo.resources.path' => '/nonexistent/fastleo', 'fastleo.users.resource' => null, 'fastleo.notifications.bots' => null, 'fastleo.publishing.channels' => null, 'fastleo.publishing.publications' => null]);
+    config(['fastleo.resources.path' => '/nonexistent/fastleo', 'fastleo.users.resource' => null, 'fastleo.notifications.bots' => null, 'fastleo.publishing.channels' => null, 'fastleo.publishing.publications' => null, 'fastleo.leads.resource' => null]);
     Fastleo::resources()->flush();
 
     expect(Fastleo::resources()->all())->toBe([]);
@@ -159,9 +161,9 @@ describe('cache', function (): void {
     it('reads the resource list from the cache file when it exists', function (): void {
         File::put(Fastleo::resources()->cachePath(), '<?php return '.var_export([GuardedCategoryResource::class], true).';');
 
-        expect(Fastleo::resources()->all())->toBe(['guarded-categories' => GuardedCategoryResource::class, 'notification-bots' => NotificationBotResource::class, 'channels' => ChannelResource::class, 'publications' => PublicationResource::class]);
+        expect(Fastleo::resources()->all())->toBe(['guarded-categories' => GuardedCategoryResource::class, 'notification-bots' => NotificationBotResource::class, 'channels' => ChannelResource::class, 'publications' => PublicationResource::class, 'leads' => LeadResource::class, 'lead-api-keys' => LeadApiKeyResource::class]);
 
-        config(['fastleo.notifications.bots' => null, 'fastleo.publishing.channels' => null, 'fastleo.publishing.publications' => null]);
+        config(['fastleo.notifications.bots' => null, 'fastleo.publishing.channels' => null, 'fastleo.publishing.publications' => null, 'fastleo.leads.resource' => null]);
         Fastleo::resources()->flush();
         expect(Fastleo::resources()->all())->toBe(['guarded-categories' => GuardedCategoryResource::class]);
     });

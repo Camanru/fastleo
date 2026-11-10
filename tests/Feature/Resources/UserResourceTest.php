@@ -22,7 +22,7 @@ beforeEach(function (): void {
 });
 
 /**
- * Данные формы администратора.
+ * Данные формы пользователя.
  *
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
@@ -36,7 +36,7 @@ it('adds the admins section to the menu and lists only admins', function (): voi
     User::factory()->create(['name' => 'Покупатель']);
     admin(['name' => 'Борис']);
 
-    $this->get(route('fastleo.dashboard'))->assertSee('Администраторы')->assertSee(route('fastleo.resources.index', 'users'), false);
+    $this->get(route('fastleo.dashboard'))->assertSee('Пользователи')->assertSee(route('fastleo.resources.index', 'users'), false);
     $this->get(route('fastleo.resources.index', 'users'))
         ->assertOk()
         ->assertSee('Анна')
@@ -116,7 +116,7 @@ it('cannot take the access away from yourself', function (): void {
 
 it('does not create an admin without access because he would vanish from the list', function (): void {
     $this->post(route('fastleo.resources.store', 'users'), adminForm(['fastleo_admin' => '0']))
-        ->assertSessionHasErrors(['fastleo_admin' => 'Нового администратора создают с доступом: без него он не появится в списке.']);
+        ->assertSessionHasErrors(['fastleo_admin' => 'Нового пользователя создают с доступом: без него он не появится в списке.']);
 
     expect(User::query()->count())->toBe(1);
 });
@@ -163,7 +163,7 @@ it('deletes another admin but never the last one', function (): void {
     $this->delete(route('fastleo.resources.destroy', ['users', $boris->id]))->assertRedirect();
     expect(User::query()->whereKey($boris->id)->exists())->toBeFalse();
 
-    // Единственный администратор: убрать некому, кроме него самого.
+    // Единственный пользователь: убрать некому, кроме него самого.
     $this->delete(route('fastleo.resources.destroy', ['users', $this->me->id]))->assertForbidden();
 });
 
@@ -273,8 +273,8 @@ describe('resetting two-factor protection', function (): void {
 it('describes the resource with the user model of the guard', function (): void {
     expect(UserResource::model())->toBe(User::class)
         ->and(UserResource::hasModel())->toBeTrue()
-        ->and(UserResource::label())->toBe('Администраторы')
-        ->and(UserResource::singular())->toBe('Администратор');
+        ->and(UserResource::label())->toBe('Пользователи')
+        ->and(UserResource::singular())->toBe('Пользователь');
 });
 
 it('honours a site policy of the user model on top of its own rules', function (): void {
@@ -304,9 +304,9 @@ describe('the words of the section', function (): void {
     it('are the texts of the package until the site names them itself', function (): void {
         $access = collect(new UserResource()->fields())->first(fn ($field): bool => $field->name === 'fastleo_admin');
 
-        expect(UserResource::label())->toBe('Администраторы')
-            ->and(UserResource::singular())->toBe('Администратор')
-            ->and($access->getLabel())->toBe('Доступ в админку');
+        expect(UserResource::label())->toBe('Пользователи')
+            ->and(UserResource::singular())->toBe('Пользователь')
+            ->and($access->getLabel())->toBe('Доступ в панель');
     });
 
     it('are taken from the config: the section, one person and the access toggle', function (): void {
@@ -321,6 +321,6 @@ describe('the words of the section', function (): void {
     it('fall back to the texts of the package when the config holds an empty or a wrong value', function (mixed $value): void {
         config(['fastleo.users.label' => $value]);
 
-        expect(UserResource::label())->toBe('Администраторы');
+        expect(UserResource::label())->toBe('Пользователи');
     })->with(['empty string' => '', 'number' => 5, 'null' => null]);
 });

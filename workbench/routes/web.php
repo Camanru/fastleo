@@ -11,7 +11,7 @@ use Workbench\App\Models\Page;
 Route::get('/site-pages/{slug}', fn (string $slug): Factory|\Illuminate\Contracts\View\View => view('page', ['page' => Page::query()->where('slug', $slug)->firstOrFail()]))
     ->name('site-pages.show');
 
-// Демо-страница сайта: контакты берутся из настроек админки.
+// Демо-страница сайта: контакты берутся из настроек панели.
 Route::view('/contacts', 'contacts')->name('contacts');
 
 // Демо-страница статьи: мета-теги из поля Seo выводит <x-fastleo::seo>.

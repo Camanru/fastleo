@@ -25,7 +25,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * ```
  */
 #[AsCommand(name: 'fastleo:doctor')]
-#[Description('Проверить сайт и разделы админки на ошибки описания (--json — для Claude)')]
+#[Description('Проверить сайт и разделы панели на ошибки описания (--json — для Claude)')]
 #[Signature('fastleo:doctor {--json : вывести JSON} {--sanitize-diff : показать записи, которые изменит чистка HTML полей RichText}')]
 final class DoctorCommand extends Command
 {

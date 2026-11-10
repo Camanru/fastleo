@@ -6,6 +6,7 @@ namespace Fastleo\Http\Controllers;
 
 use Fastleo\Auth\FailedLogins;
 use Fastleo\Auth\FastleoUser;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Auth\LoginRedirect;
 use Fastleo\Auth\LoginThrottle;
 use Fastleo\Auth\TwoFactor;
@@ -18,7 +19,7 @@ use Illuminate\Http\Request;
  * Второй шаг входа: код из приложения-аутентификатора или резервный код.
  *
  * Состояние «пароль верен, ждём код» лежит в сессии (новый идентификатор после первого шага)
- * и живёт 10 минут. Пока код не введён, администратор не вошёл. Попытки считаются отдельно
+ * и живёт 10 минут. Пока код не введён, пользователь не вошёл. Попытки считаются отдельно
  * от попыток пароля (ключ `2fa:{id}`), счётчики не сбрасываются первым шагом.
  */
 final class TwoFactorChallengeController
@@ -76,6 +77,7 @@ final class TwoFactorChallengeController
         $throttle->clear($account, $ip);
         $throttle->clear('id:'.$pending['id'], $ip);
         $request->session()->forget(self::SESSION_KEY);
+        Impersonation::forget();
         Fastleo::guard()->login($user, $pending['remember']);
         $request->session()->regenerate();
 

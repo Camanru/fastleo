@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Выбранный период отчёта: границы включительно, в часовом поясе админки (`fastleo.timezone`). Любая граница может
+ * Выбранный период отчёта: границы включительно, в часовом поясе панели (`fastleo.timezone`). Любая граница может
  * отсутствовать — период открыт.
  *
  * ```php

@@ -109,7 +109,7 @@
             @if ($listing['folders'] === [] && $listing['files'] === [])
                 <p class="fastleo-card px-4 py-10 text-center text-sm text-ink-2">{{ __('fastleo::files.empty') }}</p>
             @else
-                <ul class="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+                <ul class="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
                     @foreach ($listing['folders'] as $entry)
                         <li x-show="matches(@js($entry['name']))" class="fastleo-card group relative flex flex-col overflow-hidden" data-entry="{{ $entry['path'] }}" data-name="{{ $entry['name'] }}">
                             <a href="{{ $folderUrl($entry['path']) }}" @click="go($event)" class="flex flex-1 flex-col text-left hover:bg-hover">
@@ -159,6 +159,12 @@
                                 </span>
                             @endif
                             <span class="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-md:opacity-100">
+                                @if ($file['image'])
+                                    <button type="button" class="rounded-[7px] bg-surface/90 p-1.5 text-ink-2 shadow-card hover:text-ink" title="{{ __('fastleo::files.view') }}" @click.stop="view(@js(['url' => $file['url'], 'name' => $file['name']]))" data-files-view>
+                                        <span class="sr-only">{{ __('fastleo::files.view') }}</span>
+                                        <x-fastleo::icon name="eye" class="size-4" />
+                                    </button>
+                                @endif
                                 <button type="button" class="rounded-[7px] bg-surface/90 p-1.5 text-ink-2 shadow-card hover:text-ink" title="{{ __('fastleo::files.copy_link') }}" @click.stop="copy(@js($file['url']))">
                                     <span class="sr-only">{{ __('fastleo::files.copy_link') }}</span>
                                     <x-fastleo::icon name="copy" class="size-4" />
@@ -182,6 +188,21 @@
                 </x-fastleo::button>
             </div>
         @endif
+
+        <dialog x-ref="viewer" @click="if ($event.target === $refs.viewer) $refs.viewer.close()" @close="viewer = null" aria-label="{{ __('fastleo::files.view') }}" class="m-auto max-h-[92vh] max-w-[min(94vw,1100px)] overflow-hidden rounded-dialog border border-line bg-surface p-0 text-ink shadow-pop backdrop:bg-[rgb(10_12_16/.55)] backdrop:backdrop-blur-[3px]" data-files-viewer>
+            <template x-if="viewer">
+                <figure class="flex flex-col">
+                    <img :src="viewer.url" :alt="viewer.name" class="max-h-[80vh] max-w-full self-center object-contain">
+                    <figcaption class="flex items-center justify-between gap-4 border-t border-line px-4 py-2.5 text-sm">
+                        <span class="truncate font-medium" x-text="viewer.name"></span>
+                        <button type="button" class="shrink-0 rounded-[7px] p-1.5 text-ink-2 hover:bg-hover hover:text-ink" @click="$refs.viewer.close()" data-files-viewer-close>
+                            <span class="sr-only">{{ __('fastleo::files.close') }}</span>
+                            <x-fastleo::icon name="x" class="size-4" />
+                        </button>
+                    </figcaption>
+                </figure>
+            </template>
+        </dialog>
 
         <div x-cloak x-show="dragging" class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-card border-2 border-dashed border-primary bg-primary-soft text-sm font-medium text-primary-text">
             {{ __('fastleo::files.drop') }}

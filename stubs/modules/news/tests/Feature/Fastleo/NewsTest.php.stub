@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Models\News;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published news whose date has come in the published scope', function (): void {
+    News::factory()->create(['slug' => 'open']);
+    News::factory()->create(['slug' => 'draft', 'is_published' => false]);
+    News::factory()->create(['slug' => 'soon', 'published_at' => now()->addDay()]);
+    News::factory()->create(['slug' => 'undated', 'published_at' => null]);
+
+    expect(News::query()->published()->pluck('slug')->sort()->values()->all())->toBe(['open', 'undated']);
+});
+
+it('lets an administrator add news', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'news'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'news'), ['title' => 'Новость', 'slug' => 'novost', 'is_published' => '1'])->assertRedirect();
+
+    expect(News::query()->where('slug', 'novost')->exists())->toBeTrue();
+});

@@ -16,7 +16,7 @@ beforeEach(function (): void {
 
 it('refuses to start without a known admin', function (?string $email): void {
     $this->artisan('fastleo:mcp', array_filter(['--user' => $email]))
-        ->expectsOutputToContain('не найден или не имеет доступа в админку')
+        ->expectsOutputToContain('не найден или не имеет доступа в панель')
         ->assertFailed();
 
     expect(Fastleo::guard()->user())->toBeNull();

@@ -13,7 +13,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Письмо администратору: в его учётную запись вошли с нового устройства.
+ * Письмо пользователю: в его учётную запись вошли с нового устройства.
  */
 final class NewLoginNotification extends Notification implements ShouldQueue
 {

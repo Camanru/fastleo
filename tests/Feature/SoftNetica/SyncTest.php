@@ -372,7 +372,7 @@ describe('the answer of the panel', function (): void {
     it('does not bring the data back after the token was erased while the request was on the way', function (): void {
         connectSoftNetica();
         Http::fake(function () {
-            // Пока идёт запрос, администратор нажал «Отключить».
+            // Пока идёт запрос, пользователь нажал «Отключить».
             resolve(SettingsStore::class)->save(Fastleo::resources()->findSettings('softnetica'), ['token' => '']);
 
             return acceptedResponse();

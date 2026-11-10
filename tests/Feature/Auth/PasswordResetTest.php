@@ -41,7 +41,7 @@ it('sends a reset link to an admin', function (): void {
     admin(['email' => 'anna@example.com']);
 
     $this->post(route('fastleo.password.email'), ['email' => ' Anna@Example.com '])
-        ->assertSessionHas('status', 'Если такой администратор есть, мы отправили ему письмо со ссылкой для нового пароля.');
+        ->assertSessionHas('status', 'Если такой пользователь есть, мы отправили ему письмо со ссылкой для нового пароля.');
 
     Notification::assertSentOnDemand(ResetPasswordNotification::class, function ($notification, $channels, $notifiable): bool {
         $mail = $notification->toMail($notifiable);
@@ -228,7 +228,7 @@ it('limits the attempts to enter a new password per ip', function (): void {
 });
 
 /**
- * Все запросы сброса пароля, при которых ответ не должен выдавать, есть ли такой администратор.
+ * Все запросы сброса пароля, при которых ответ не должен выдавать, есть ли такой пользователь.
  *
  * @return array<string, array{string, array<string, string>}>
  */

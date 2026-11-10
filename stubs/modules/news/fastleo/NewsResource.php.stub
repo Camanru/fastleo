@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ appNamespace }}\Models\News;
+use {{ namespace }}\Models\News;
 use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\RichText;
@@ -28,8 +28,6 @@ final class NewsResource extends Resource
     protected static ?string $singular = 'Новость';
 
     protected static string $icon = 'newspaper';
-
-    protected static ?string $group = 'Содержимое';
 
     protected static int $position = 20;
 

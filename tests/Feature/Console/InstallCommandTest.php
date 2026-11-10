@@ -165,7 +165,7 @@ it('connects a plain user model of the site to the admin panel', function (): vo
     fakeChildArtisan();
 
     $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
-        ->expectsOutputToContain('Модель '.$model['class'].' подключена к админке')
+        ->expectsOutputToContain('Модель '.$model['class'].' подключена к панели')
         ->assertSuccessful();
 
     expect(File::get($model['file']))
@@ -217,7 +217,7 @@ it('creates the administrator and runs the check in a separate process in the ru
         ->assertSuccessful();
 
     expect($child->calls)->toBe([
-        ['fastleo:user', ['email' => 'own@example.com', '--name' => 'Администратор', '--password' => 'secret-pass-1'], false],
+        ['fastleo:user', ['email' => 'own@example.com', '--password' => 'secret-pass-1'], false],
         ['fastleo:doctor', [], false],
     ]);
 });
@@ -244,7 +244,7 @@ it('does not touch a user model file it cannot write and asks to connect it by h
     chmod($model['file'], 0o444);
 
     $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
-        ->expectsOutputToContain('не подключена к админке')
+        ->expectsOutputToContain('не подключена к панели')
         ->assertFailed();
 
     chmod($model['file'], 0o644);
@@ -260,7 +260,7 @@ it('does not connect a user model whose own file does not compile', function ():
     File::put($model['file'], $broken);
 
     $this->artisan('fastleo:install', ['--skill-path' => $this->sandbox.'/skill', '--no-interaction' => true])
-        ->expectsOutputToContain('не подключена к админке')
+        ->expectsOutputToContain('не подключена к панели')
         ->assertFailed();
 
     expect(File::get($model['file']))->toBe($broken);

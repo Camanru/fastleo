@@ -6,12 +6,13 @@ namespace Fastleo\Http\Middleware;
 
 use Closure;
 use Fastleo\Auth\FastleoUser;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Fastleo;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Проверяет `canAccessFastleo()` на каждом запросе: у администратора могли снять права после входа.
+ * Проверяет `canAccessFastleo()` на каждом запросе: у пользователя могли снять права после входа.
  */
 final class EnsureCanAccessFastleo
 {
@@ -28,7 +29,7 @@ final class EnsureCanAccessFastleo
             return $next($request);
         }
 
-        Fastleo::guard()->logout();
+        Impersonation::signOut();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 

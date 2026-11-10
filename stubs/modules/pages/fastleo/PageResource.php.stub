@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ appNamespace }}\Models\Page;
+use {{ namespace }}\Models\Page;
 use Fastleo\Fields\Block;
 use Fastleo\Fields\Blocks;
 use Fastleo\Fields\BelongsTo;
@@ -25,7 +25,7 @@ final class PageResource extends Resource
 {
     protected static string $model = Page::class;
 
-    /** Адрес pages занят самой админкой. */
+    /** Адрес pages занят самой панелью. */
     protected static ?string $slug = 'site-pages';
 
     protected static ?string $label = 'Страницы';
@@ -33,8 +33,6 @@ final class PageResource extends Resource
     protected static ?string $singular = 'Страница';
 
     protected static string $icon = 'file-text';
-
-    protected static ?string $group = 'Содержимое';
 
     protected static int $position = 10;
 

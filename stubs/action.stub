@@ -20,7 +20,7 @@ final class {{ class }} extends Action
     protected string $icon = 'zap';
 
     /**
-     * Выполнить действие над записями, на которые у администратора есть право (`$ability`).
+     * Выполнить действие над записями, на которые у пользователя есть право (`$ability`).
      *
      * @param  Collection<int, Model>  $records
      * @param  array<string, mixed>  $data  значения мини-формы из `fields()`

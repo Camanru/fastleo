@@ -65,7 +65,7 @@ final class DeleteRecord extends ResourceTool
 
         try {
             DB::connection($record->getConnectionName())->transaction(function () use ($resource, $record): void {
-                // Запрет сайта (заказы, последний владелец) действует и для агента, как для кнопки в админке.
+                // Запрет сайта (заказы, последний владелец) действует и для агента, как для кнопки в панели.
                 $resource->beforeDelete($record);
 
                 if ($record->delete() === false) {

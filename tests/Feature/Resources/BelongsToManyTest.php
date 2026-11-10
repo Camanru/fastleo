@@ -59,7 +59,7 @@ it('does not unlink a topic that another administrator linked after the form was
     $article = Article::factory()->create();
     $article->topics()->attach([$first->id, $second->id]);
     $seen = $first->id.','.$second->id;
-    // Пока форма была открыта, другой администратор связал третью тему.
+    // Пока форма была открыта, другой пользователь связал третью тему.
     $article->topics()->attach($third->id);
 
     // Форма (устаревшая) сохраняет только первую: вторую убрали сами, третьей в ней не было.

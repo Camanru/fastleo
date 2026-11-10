@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\Page;
+use App\FastleoPages\Models\Page;
 use Fastleo\Fastleo;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Model;
@@ -37,9 +37,9 @@ function bootCopiedPages(object $test): void
 
     // Классы объявляются один раз на процесс: каждый тест копирует модуль в свою папку.
     $classes = [
-        'app/Models/Page.php' => 'App\\Models\\Page',
+        'app/Fastleo/Models/Page.php' => 'App\\FastleoPages\\Models\\Page',
         'app/Fastleo/PageResource.php' => 'App\\FastleoPages\\PageResource',
-        'database/factories/PageFactory.php' => 'Database\\Factories\\PageFactory',
+        'database/factories/Fastleo/PageFactory.php' => 'Database\\Factories\\Fastleo\\PageFactory',
     ];
 
     foreach ($classes as $file => $class) {
@@ -48,20 +48,18 @@ function bootCopiedPages(object $test): void
         }
     }
 
-    // Как на обычном сайте: фабрика ищется в Database\Factories (демо-сайт подменяет правило своим).
-    Factory::guessFactoryNamesUsing(fn (string $model): string => 'Database\\Factories\\'.class_basename($model).'Factory');
 }
 
 it('copies the pages module as an admin section only: no routes, controllers or templates', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['pages']])
-        ->expectsOutputToContain('app/Models/Page.php')
+        ->expectsOutputToContain('app/Fastleo/Models/Page.php')
         ->assertSuccessful();
 
-    expect($this->sandbox.'/app/Models/Page.php')->toBeFile()
+    expect($this->sandbox.'/app/Fastleo/Models/Page.php')->toBeFile()
         ->and($this->sandbox.'/app/Fastleo/PageResource.php')->toBeFile()
-        ->and(File::get($this->sandbox.'/app/Models/Page.php'))->toContain('namespace App\Models;')
+        ->and(File::get($this->sandbox.'/app/Fastleo/Models/Page.php'))->toContain('namespace App\FastleoPages\Models;')
         ->and(glob($this->sandbox.'/database/migrations/*_create_pages_table.php'))->toHaveCount(1)
-        ->and($this->sandbox.'/database/seeders/PageSeeder.php')->toBeFile()
+        ->and($this->sandbox.'/database/seeders/Fastleo/PageSeeder.php')->toBeFile()
         ->and($this->sandbox.'/app/Http')->not->toBeDirectory()
         ->and($this->sandbox.'/routes/site')->not->toBeDirectory()
         ->and($this->sandbox.'/resources')->not->toBeDirectory()
@@ -73,7 +71,7 @@ it('copies the site tests only when the site uses Pest', function (): void {
         ->expectsOutputToContain('на сайте нет Pest')
         ->assertSuccessful();
 
-    expect($this->sandbox.'/tests/Feature/Site/PagesTest.php')->not->toBeFile();
+    expect($this->sandbox.'/tests/Feature/Fastleo/PagesTest.php')->not->toBeFile();
 
     File::deleteDirectory($this->sandbox.'/app');
     File::deleteDirectory($this->sandbox.'/database');
@@ -84,7 +82,7 @@ it('copies the site tests only when the site uses Pest', function (): void {
         ->expectsOutputToContain('pest --init')
         ->assertSuccessful();
 
-    expect($this->sandbox.'/tests/Feature/Site/PagesTest.php')->not->toBeFile();
+    expect($this->sandbox.'/tests/Feature/Fastleo/PagesTest.php')->not->toBeFile();
 
     File::deleteDirectory($this->sandbox.'/app');
     File::deleteDirectory($this->sandbox.'/database');
@@ -93,7 +91,7 @@ it('copies the site tests only when the site uses Pest', function (): void {
 
     $this->artisan('fastleo:module', ['modules' => ['pages']])->assertSuccessful();
 
-    expect($this->sandbox.'/tests/Feature/Site/PagesTest.php')->toBeFile();
+    expect($this->sandbox.'/tests/Feature/Fastleo/PagesTest.php')->toBeFile();
 });
 
 it('refuses to install over an existing pages table', function (): void {
@@ -105,7 +103,7 @@ it('refuses to install over an existing pages table', function (): void {
         ->expectsOutputToContain('таблица pages уже есть')
         ->assertFailed();
 
-    expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile();
+    expect($this->sandbox.'/app/Fastleo/Models/Page.php')->not->toBeFile();
 });
 
 it('reminds to refresh the cache of the sections when the site keeps one', function (): void {
@@ -139,7 +137,7 @@ it('refuses to install over a migration of the site that was not run yet and cre
         ->expectsOutputToContain('database/migrations/2024_01_01_000000_create_pages_table.php уже есть')
         ->assertFailed();
 
-    expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile()
+    expect($this->sandbox.'/app/Fastleo/Models/Page.php')->not->toBeFile()
         ->and(File::glob($this->sandbox.'/database/migrations/*'))->toHaveCount(1);
 });
 

@@ -92,7 +92,7 @@ final class ImportsController
     }
 
     /**
-     * Импорт этого раздела, загруженный вошедшим администратором.
+     * Импорт этого раздела, загруженный вошедшим пользователем.
      */
     private function own(Resource $resource, string $import): Import
     {

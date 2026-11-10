@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Уведомление администратору в колокольчике.
+ * Уведомление пользователю в колокольчике.
  *
  * @property string $id
  * @property string $user_id
@@ -29,7 +29,7 @@ final class AdminNotification extends Model
     use HasUuids;
 
     /**
-     * Сколько непрочитанных уведомлений у вошедшего администратора.
+     * Сколько непрочитанных уведомлений у вошедшего пользователя.
      */
     public static function unreadCount(): int
     {

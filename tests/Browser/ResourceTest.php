@@ -15,7 +15,7 @@ it('creates a record and saves changes with Ctrl+S', function (): void {
     $page = signInAndVisit(route('fastleo.resources.create', 'categories'));
 
     $page->fill('title', 'Новости')
-        ->pressAndWaitFor('Сохранить') // Ctrl+S ловит скрипт админки: нажатие до его запуска на новой странице теряется
+        ->pressAndWaitFor('Сохранить') // Ctrl+S ловит скрипт панели: нажатие до его запуска на новой странице теряется
         ->assertSee('Сохранено.')
         ->fill('title', 'Статьи')
         ->keys('#field-title', 'Control+s')

@@ -14,7 +14,7 @@ enum Priority: int
     case High = 3;
 
     /**
-     * Подпись для админки.
+     * Подпись для панели.
      */
     public function label(): string
     {

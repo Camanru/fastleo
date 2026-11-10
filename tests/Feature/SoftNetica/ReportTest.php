@@ -31,13 +31,24 @@ function collectedChecks(): array
 
 describe('built-in checks', function (): void {
     it('uses only reserved names for the rows of the server report', function (): void {
+        request()->headers->set('X-Forwarded-For', '203.0.113.7');
+
         foreach (ServerReport::sections() as $section) {
             foreach ($section['rows'] as $row) {
-                if ($row['status'] !== null) {
+                if ($row['status'] !== null && $row['key'] !== 'app_url') {
                     expect(HealthChecks::RESERVED)->toContain($row['key']);
                 }
             }
         }
+
+        expect(collectedChecks())->toHaveKey('proxy');
+    });
+
+    it('does not report the APP_URL row: it depends on the address in the browser of whoever opened the panel', function (): void {
+        config(['app.url' => 'https://other.example']);
+
+        expect(array_column(array_merge(...array_column(ServerReport::sections(), 'rows')), 'key'))->toContain('app_url')
+            ->and(collectedChecks())->not->toHaveKey('app_url');
     });
 
     it('maps the server report to checks with ok, warning and failed statuses', function (): void {

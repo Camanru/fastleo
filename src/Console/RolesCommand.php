@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Роль-владелец для ролей администраторов (`fastleo.roles.enabled`): создаёт её и по `--owner` выдаёт администратору.
+ * Роль-владелец для ролей пользователей (`fastleo.roles.enabled`): создаёт её и по `--owner` выдаёт пользователю.
  * Повторный запуск без `--owner` никого не повышает; с `--owner` — путь восстановления, если владельцев не осталось.
  * С `--presets` создаёт ещё и готовые роли по разделам сайта (существующие не трогает).
  *
@@ -29,12 +29,12 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * ```
  */
 #[AsCommand(name: 'fastleo:roles')]
-#[Description('Создать роль-владелец fastleo и выдать её администратору (--owner=email)')]
-#[Signature('fastleo:roles {--owner= : Email администратора, которому выдать роль владельца} {--presets : Создать готовые роли «Администратор», «Редактор», «Наблюдатель»}')]
+#[Description('Создать роль-владелец fastleo и выдать её пользователю (--owner=email)')]
+#[Signature('fastleo:roles {--owner= : Email пользователя, которому выдать роль владельца} {--presets : Создать готовые роли «Администратор», «Редактор», «Наблюдатель»}')]
 final class RolesCommand extends Command
 {
     /**
-     * Создать роль-владелец; выдать её администратору из `--owner`.
+     * Создать роль-владелец; выдать её пользователю из `--owner`.
      */
     public function handle(): int
     {
@@ -85,7 +85,7 @@ final class RolesCommand extends Command
     }
 
     /**
-     * Выдать роль-владелец администратору.
+     * Выдать роль-владелец пользователю.
      */
     private function grant(Model $owner, string $email): int
     {

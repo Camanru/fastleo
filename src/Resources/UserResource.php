@@ -11,6 +11,7 @@ use Fastleo\Fields\Text;
 use Fastleo\Resource;
 use Fastleo\Resources\Users\AdminAccess;
 use Fastleo\Resources\Users\AdminEmail;
+use Fastleo\Resources\Users\ImpersonateUser;
 use Fastleo\Resources\Users\ResetTwoFactor;
 use Fastleo\Resources\Users\UserGuard;
 use Fastleo\Resources\Users\UserRoles;
@@ -23,10 +24,10 @@ use LogicException;
 use Override;
 
 /**
- * Встроенный раздел «Администраторы»: пользователи сайта с доступом в админку.
+ * Встроенный раздел «Пользователи»: пользователи сайта с доступом в панель.
  *
- * Работает на модели пользователей guard fastleo. Показывает только администраторов (`fastleo_admin`);
- * нельзя удалить себя и последнего администратора, снять доступ у себя и у последнего. При включённых ролях или заданном `Fastleo::resolveOwnerUsing()`
+ * Работает на модели пользователей guard fastleo. Показывает только пользователей (`fastleo_admin`);
+ * нельзя удалить себя и последнего пользователя, снять доступ у себя и у последнего. При включённых ролях или заданном `Fastleo::resolveOwnerUsing()`
  * раздел открыт только владельцу, в форме появляется поле «Роли» и нельзя оставить сайт без владельца. Свой пароль
  * меняется в профиле. Включается ключом `fastleo.users.resource`: класс этого ресурса (по умолчанию),
  * ваш наследник или `null`, чтобы раздела не было.
@@ -44,7 +45,7 @@ class UserResource extends Resource
 {
     protected static ?string $slug = 'users';
 
-    /** Администраторы — почта, пароли и доступы: ИИ-агенту раздел не виден. */
+    /** Пользователи — почта, пароли и доступы: ИИ-агенту раздел не виден. */
     protected static bool $mcp = false;
 
     protected static string $icon = 'shield-check';
@@ -58,7 +59,7 @@ class UserResource extends Resource
      *
      * @return class-string<Model>
      *
-     * @throws LogicException модель не подходит для админки
+     * @throws LogicException модель не подходит для панели
      */
     #[Override]
     public static function model(): string
@@ -107,7 +108,7 @@ class UserResource extends Resource
     }
 
     /**
-     * Имя, email, пароль и доступ в админку.
+     * Имя, email, пароль и доступ в панель.
      */
     #[Override]
     public function fields(): array
@@ -128,7 +129,7 @@ class UserResource extends Resource
     }
 
     /**
-     * Только администраторы.
+     * Только пользователи.
      *
      * @param  Builder<Model>  $query
      * @return Builder<Model>
@@ -142,7 +143,7 @@ class UserResource extends Resource
     #[Override]
     public function actions(): array
     {
-        return [new ResetTwoFactor()];
+        return [new ImpersonateUser(), new ResetTwoFactor()];
     }
 
     /**
@@ -160,8 +161,8 @@ class UserResource extends Resource
     }
 
     /**
-     * При включённых ролях или заданном `Fastleo::resolveOwnerUsing()` раздел — только владельцу (иначе право на «Администраторов» отдаёт чужие пароли и роли).
-     * Себя и последнего администратора удалить нельзя.
+     * При включённых ролях или заданном `Fastleo::resolveOwnerUsing()` раздел — только владельцу (иначе право на «Пользователей» отдаёт чужие пароли и роли).
+     * Себя и последнего пользователя удалить нельзя.
      */
     #[Override]
     public function can(string $ability, ?Model $record): bool

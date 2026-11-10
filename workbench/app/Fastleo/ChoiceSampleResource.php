@@ -91,7 +91,7 @@ final class ChoiceSampleResource extends Resource
             Aside::make([
                 Toggle::make('is_active', 'Активно')->default(true)->sortable()->quickToggle()->help('Toggle: quickToggle() — переключатель прямо в списке'),
                 Date::make('available_on', 'Доступно с')->sortable()->help('Date'),
-                DateTime::make('starts_at', 'Начало акции')->hideInList()->help('DateTime: в часовом поясе админки'),
+                DateTime::make('starts_at', 'Начало акции')->hideInList()->help('DateTime: в часовом поясе панели'),
                 Time::make('opens_at', 'Открытие')->hideInList()->help('Time'),
             ]),
         ];

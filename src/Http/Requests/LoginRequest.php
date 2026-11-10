@@ -8,7 +8,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
 
 /**
- * Форма входа в админку.
+ * Форма входа в панель.
  */
 final class LoginRequest extends FormRequest
 {

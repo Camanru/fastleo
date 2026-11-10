@@ -14,6 +14,7 @@ use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -36,6 +37,15 @@ function reportRow(string $title): array
     }
 
     throw new RuntimeException('Нет строки '.$title);
+}
+
+/**
+ * Открыть панель с другого адреса (`null` — запрос без Host, как в консоли); `url()` запоминает корень, поэтому сбрасываем.
+ */
+function openedFrom(?string $host): void
+{
+    $host === null ? request()->headers->remove('host') : request()->headers->set('host', $host);
+    url()->setRequest(request());
 }
 
 describe('report', function (): void {
@@ -85,6 +95,72 @@ describe('report', function (): void {
 
         request()->headers->set('X-Forwarded-For', '127.0.0.1');
         expect(fn (): array => reportRow('Адрес посетителя'))->toThrow(RuntimeException::class, 'Нет строки Адрес посетителя');
+    });
+
+    it('shows an error when the panel is opened from an address other than APP_URL', function (string $configured, string $actual, string $shown): void {
+        config(['app.url' => $configured]);
+        openedFrom($actual);
+
+        $row = reportRow('Адрес сайта (APP_URL)');
+
+        expect($row['status'])->toBe('danger')
+            ->and($row['value'])->toBe($shown)
+            ->and($row['hint'])->toContain('APP_URL='.$shown)->toContain($actual === 'localhost' ? 'http://localhost,' : $actual)->toContain('php artisan config:clear');
+    })->with([
+        'other host' => ['http://localhost:8000', 'site.test', 'http://localhost:8000'],
+        'other port' => ['http://localhost:8000', 'localhost', 'http://localhost:8000'],
+    ]);
+
+    it('only warns when the panel is opened with www and APP_URL is without it: files still open', function (): void {
+        config(['app.url' => 'http://site.example']);
+        openedFrom('www.site.example');
+
+        $row = reportRow('Адрес сайта (APP_URL)');
+
+        expect($row['status'])->toBe('warning')
+            ->and($row['hint'])->toContain('http://www.site.example')->toContain('переадресацию')->not->toContain('не откроются');
+    });
+
+    it('says nothing about APP_URL when the address matches, differs only in case or default port, or the request is not from a browser', function (): void {
+        config(['app.url' => 'http://Localhost:8000/panel']);
+        openedFrom('localhost:8000');
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        config(['app.url' => 'http://SITE.example:80']);
+        openedFrom('site.example');
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        config(['app.url' => 'not a url']);
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        // APP_URL=null в .env.
+        config(['app.url' => null]);
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        config(['app.url' => 'https://site.example:443']);
+        openedFrom(null);
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+    });
+
+    it('says nothing about APP_URL when the panel has its own domain or the scheme is forced to https', function (): void {
+        config(['app.url' => 'https://site.example', 'fastleo.domain' => 'admin.site.example']);
+        openedFrom('admin.site.example');
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        config(['fastleo.domain' => null]);
+        openedFrom('site.example');
+        URL::forceScheme('https');
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+    });
+
+    it('blames the untrusted proxy, not APP_URL, when only the scheme differs behind it', function (): void {
+        config(['app.url' => 'https://site.example']);
+        openedFrom('site.example');
+        request()->headers->set('X-Forwarded-Proto', 'https');
+        expect(fn (): array => reportRow('Адрес сайта (APP_URL)'))->toThrow(RuntimeException::class);
+
+        openedFrom('other.example');
+        expect(reportRow('Адрес сайта (APP_URL)')['status'])->toBe('danger');
     });
 
     it('asks for cached config and a real mailer only on production', function (): void {

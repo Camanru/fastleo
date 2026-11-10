@@ -1,4 +1,4 @@
-{{-- Профиль администратора: данные, пароль, двухфакторная защита, устройства. $user, $devices, $currentDevice, $twoFactor*, $recoveryLeft. --}}
+{{-- Профиль пользователя: данные, пароль, двухфакторная защита, устройства. $user, $devices, $currentDevice, $twoFactor*, $recoveryLeft. --}}
 @php($input = 'fastleo-input')
 @php($card = 'fastleo-card flex flex-col gap-4 p-5')
 <x-fastleo::layouts.app :title="__('fastleo::profile.title')" :description="__('fastleo::profile.description')">

@@ -164,7 +164,7 @@ class RichText extends Field
     }
 
     /**
-     * На просмотре — оформленный текст (чистится ещё раз: в базе мог оказаться HTML не из админки).
+     * На просмотре — оформленный текст (чистится ещё раз: в базе мог оказаться HTML не из панели).
      */
     #[Override]
     protected function format(mixed $value): string|Htmlable|null

@@ -7,7 +7,7 @@ namespace Fastleo\Files;
 use RuntimeException;
 
 /**
- * Файл или папку нельзя сохранить; текст сообщения показывается админу.
+ * Файл или папку нельзя сохранить; текст сообщения показывается пользователю.
  */
 final class FileRejected extends RuntimeException
 {

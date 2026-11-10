@@ -34,7 +34,7 @@
             'placeholder' => $field->getPlaceholder() ?? __('fastleo::resources.combobox_placeholder'),
         ])
         @if ($field instanceof \Fastleo\Fields\BelongsToMany)
-            {{-- Связи при открытии формы: отвязываются только они, связь другого администратора устаревшая форма не стирает. --}}
+            {{-- Связи при открытии формы: отвязываются только они, связь другого пользователя устаревшая форма не стирает. --}}
             <input type="hidden" name="{{ $field->seenInputName() }}" value="{{ $field->seenInputValue(implode(',', $field->savedKeys($record))) }}">
         @endif
     @endif

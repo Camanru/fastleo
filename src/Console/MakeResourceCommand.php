@@ -31,7 +31,7 @@ use function Laravel\Prompts\text;
  * ```
  */
 #[AsCommand(name: 'fastleo:make-resource')]
-#[Description('Создать раздел админки (ресурс) для модели; --generate — поля по колонкам таблицы')]
+#[Description('Создать раздел панели (ресурс) для модели; --generate — поля по колонкам таблицы')]
 #[Signature('fastleo:make-resource
         {name? : Имя раздела латиницей: Product → ProductResource}
         {--model= : Класс модели (по умолчанию App\Models\{name})}
@@ -60,7 +60,7 @@ final class MakeResourceCommand extends Command
     /** JSON-колонки для поисковиков по имени (`seo`, `page_seo`; нужен каст `array`) — поле Seo. */
     private const array SEO_NAMES = ['seo'];
 
-    /** Колонки, которые форма не показывает: пароль, токены, флаг доступа в админку, 2FA. */
+    /** Колонки, которые форма не показывает: пароль, токены, флаг доступа в панель, 2FA. */
     private const array SKIPPED_COLUMNS = ['remember_token', 'password', 'fastleo_admin', 'two_factor_secret', 'two_factor_recovery_codes', 'two_factor_confirmed_at'];
 
     /**
@@ -114,7 +114,7 @@ final class MakeResourceCommand extends Command
         $fields = [];
         $this->properties = [];
 
-        // Адрес по имени модели (`Page` → pages) бывает занят самой админкой: ресурс без своего адреса сломал бы все её страницы.
+        // Адрес по имени модели (`Page` → pages) бывает занят самой панелью: ресурс без своего адреса сломал бы все её страницы.
         $slug = Str::kebab(Str::pluralStudly(class_basename($model)));
 
         if (in_array($slug, ResourceRegistry::RESERVED_SLUGS, true)) {

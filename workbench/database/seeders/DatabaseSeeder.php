@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Workbench\Database\Seeders;
 
 use Fastleo\Fastleo;
+use Fastleo\Leads\Lead;
+use Fastleo\Leads\LeadApiKey;
+use Fastleo\Leads\LeadStatus;
 use Fastleo\Notifications\AdminNotification;
 use Fastleo\Notifications\FastleoMessage;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
@@ -29,7 +32,7 @@ use Workbench\App\Models\Topic;
 use Workbench\App\Models\User;
 
 /**
- * Данные демо-сайта: администратор admin@example.com / password, примеры записей и витрина возможностей.
+ * Данные демо-сайта: пользователь admin@example.com / password, примеры записей и витрина возможностей.
  */
 final class DatabaseSeeder extends Seeder
 {
@@ -39,9 +42,14 @@ final class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $admin = User::factory()->admin()->create([
-            'name' => 'Администратор',
+            'name' => 'Владелец',
             'email' => 'admin@example.com',
         ]);
+
+        // Заявки: с формы сайта и с другого сайта по API (ключ — в разделе «Доступы для сайтов»).
+        LeadApiKey::query()->create(['name' => 'Лендинг про шины', 'site' => 'https://shiny.example']);
+        Lead::query()->create(['name' => 'Иван', 'phone' => '+7 900 123-45-67', 'message' => 'Нужны зимние шины R16', 'source' => '/prices', 'status' => LeadStatus::New]);
+        Lead::query()->create(['name' => 'Мария', 'phone' => '+7 900 765-43-21', 'message' => 'Перезвоните, пожалуйста', 'source' => 'https://shiny.example/zimnie', 'site' => 'Лендинг про шины', 'form' => 'Обратный звонок', 'status' => LeadStatus::InWork, 'read_at' => now()]);
 
         // Дерево категорий: 6 разделов по 3 подраздела, у первых подразделов — ещё по 2.
         $categories = Category::factory()->count(6)->sequence(fn (Sequence $sequence): array => ['sort' => $sequence->index + 1])->create();
@@ -113,7 +121,7 @@ final class DatabaseSeeder extends Seeder
     }
 
     /**
-     * Уведомления администратора за последний месяц для колокольчика и раздела «Уведомления»: 45 штук (две страницы),
+     * Уведомления пользователя за последний месяц для колокольчика и раздела «Уведомления»: 45 штук (две страницы),
      * свежие — непрочитанные, все уровни, со ссылками на записи и без них.
      */
     private function seedNotifications(User $admin): void

@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Уведомления администраторам (колокольчик в шапке): заголовок, текст, ссылка, прочитано ли.
+ * Уведомления пользователям (колокольчик в шапке): заголовок, текст, ссылка, прочитано ли.
  */
 return new class extends Migration
 {

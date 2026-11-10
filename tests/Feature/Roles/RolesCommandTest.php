@@ -28,7 +28,7 @@ it('creates the owner role and hands it to the named administrator', function ()
     $admin = roleAdmin(null, ['email' => 'boss@example.com']);
 
     $this->artisan('fastleo:roles', ['--owner' => ' Boss@Example.com '])
-        ->expectsOutputToContain('Администратору boss@example.com выдана роль fastleo-owner.')
+        ->expectsOutputToContain('Пользователю boss@example.com выдана роль fastleo-owner.')
         ->assertSuccessful();
 
     expect($admin->fresh()->hasRole('fastleo-owner', Fastleo::GUARD))->toBeTrue()
@@ -38,7 +38,7 @@ it('creates the owner role and hands it to the named administrator', function ()
 it('does not promote anybody on a rerun without --owner', function (): void {
     $admin = roleAdmin(null, ['email' => 'plain@example.com']);
 
-    $this->artisan('fastleo:roles')->expectsOutputToContain('Ни одного владельца с доступом в админку нет.')->assertSuccessful();
+    $this->artisan('fastleo:roles')->expectsOutputToContain('Ни одного владельца с доступом в панель нет.')->assertSuccessful();
     $this->artisan('fastleo:roles')->assertSuccessful();
 
     expect($admin->fresh()->roles)->toBeEmpty()
@@ -55,7 +55,7 @@ it('refuses somebody who cannot sign in to the admin', function (): void {
     User::factory()->create(['email' => 'visitor@example.com']);
 
     $this->artisan('fastleo:roles', ['--owner' => 'visitor@example.com'])
-        ->expectsOutputToContain('Администратор visitor@example.com не найден')
+        ->expectsOutputToContain('Пользователь visitor@example.com не найден')
         ->assertFailed();
     $this->artisan('fastleo:roles', ['--owner' => 'nobody@example.com'])->assertFailed();
 });
@@ -115,8 +115,8 @@ it('warns about teams mode, no owner, admins without roles and direct permission
     $problems = implode("\n", roleProblems());
 
     expect($problems)->toContain('режим teams')
-        ->and($problems)->toContain('Нет ни одного администратора с ролью fastleo-owner')
-        ->and($problems)->toContain('Администраторов без ролей guard fastleo: 1')
+        ->and($problems)->toContain('Нет ни одного пользователя с ролью fastleo-owner')
+        ->and($problems)->toContain('Пользователей без ролей guard fastleo: 1')
         ->and($problems)->toContain('права выданы напрямую')
         ->and($problems)->toContain('У разделов нет прав');
 });

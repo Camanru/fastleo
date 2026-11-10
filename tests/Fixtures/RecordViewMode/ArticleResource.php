@@ -23,7 +23,7 @@ final class ArticleResource extends Resource
     /** Все поля только для чтения: запись читают, но не правят. */
     public static bool $readOnlyFields = false;
 
-    /** Администратору разрешено менять записи. */
+    /** Пользователю разрешено менять записи. */
     public static bool $canUpdate = true;
 
     /**

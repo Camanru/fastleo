@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Enums;
+
+/**
+ * Статус заказа. «Отменён» — конечный: заказ из него не выходит (остаток уже возвращён на склад).
+ */
+enum ShopOrderStatus: string
+{
+    case New = 'new';
+    case InWork = 'in_work';
+    case Shipped = 'shipped';
+    case Completed = 'completed';
+    case Cancelled = 'cancelled';
+
+    /**
+     * Подпись в панели.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::New => 'Новый',
+            self::InWork => 'В работе',
+            self::Shipped => 'Отправлен',
+            self::Completed => 'Выполнен',
+            self::Cancelled => 'Отменён',
+        };
+    }
+
+    /**
+     * Цвет метки в списке.
+     */
+    public function tone(): string
+    {
+        return match ($this) {
+            self::New => 'warning',
+            self::InWork, self::Shipped => 'info',
+            self::Completed => 'success',
+            self::Cancelled => 'neutral',
+        };
+    }
+}

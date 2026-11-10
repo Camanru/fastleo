@@ -11,14 +11,14 @@ use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Создать свою главную страницу админки (класс Dashboard)
+ * Создать свою главную страницу панели (класс Dashboard)
  *
  * ```bash
  * php artisan fastleo:make-dashboard
  * ```
  */
 #[AsCommand(name: 'fastleo:make-dashboard')]
-#[Description('Создать свою главную страницу админки (класс Dashboard с набором виджетов)')]
+#[Description('Создать свою главную страницу панели (класс Dashboard с набором виджетов)')]
 #[Signature('fastleo:make-dashboard {--force : перезаписать существующий файл}')]
 final class MakeDashboardCommand extends Command
 {

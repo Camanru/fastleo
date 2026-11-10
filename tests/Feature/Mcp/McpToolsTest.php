@@ -41,7 +41,7 @@ use Workbench\App\Models\Remark;
 use Workbench\App\Models\User;
 
 /**
- * Сервер MCP от имени администратора.
+ * Сервер MCP от имени пользователя.
  */
 function mcp(?User $user = null): PendingTestResponse
 {
@@ -49,7 +49,7 @@ function mcp(?User $user = null): PendingTestResponse
 }
 
 /**
- * Сайт открыл раздел «Администраторы» агенту.
+ * Сайт открыл раздел «Пользователи» агенту.
  */
 function openAdminsToAgent(): void
 {
@@ -254,7 +254,7 @@ it('stops serving an admin whose access was taken away after the server started'
     $session->tool(ListResources::class)->assertHasNoErrors();
     User::query()->whereKey($admin->id)->update(['fastleo_admin' => false]);
 
-    $session->tool(ListResources::class)->assertHasErrors(['без администратора']);
+    $session->tool(ListResources::class)->assertHasErrors(['без пользователя']);
 });
 
 it('checks a dependent field again when only the field it depends on is sent', function (): void {
@@ -506,8 +506,8 @@ it('does not run actions meant for the trash', function (): void {
 it('refuses every tool when no admin is signed in', function (): void {
     $plain = User::factory()->create();
 
-    mcp($plain)->tool(ListResources::class)->assertHasErrors(['без администратора']);
-    mcp($plain)->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'x', 'status' => 'draft']])->assertHasErrors(['без администратора']);
+    mcp($plain)->tool(ListResources::class)->assertHasErrors(['без пользователя']);
+    mcp($plain)->tool(CreateRecord::class, ['resource' => 'articles', 'values' => ['title' => 'x', 'status' => 'draft']])->assertHasErrors(['без пользователя']);
 
     expect(Article::query()->count())->toBe(0);
 });

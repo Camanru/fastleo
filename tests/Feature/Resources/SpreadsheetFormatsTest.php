@@ -15,7 +15,7 @@ use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\XLSX\Writer;
 use Workbench\App\Models\Article;
 
-// Здесь настройка `fastleo.xlsx` остаётся по умолчанию (`false`): Excel в админке недоступен.
+// Здесь настройка `fastleo.xlsx` остаётся по умолчанию (`false`): Excel в панели недоступен.
 
 beforeEach(function (): void {
     useFixtureResources('Imports');

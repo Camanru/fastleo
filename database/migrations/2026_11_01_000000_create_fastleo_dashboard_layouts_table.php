@@ -7,7 +7,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Раскладка дашборда администратора: порядок, размер и скрытие виджетов (по одной записи на администратора).
+ * Раскладка дашборда пользователя: порядок, размер и скрытие виджетов (по одной записи на пользователя).
  */
 return new class extends Migration
 {

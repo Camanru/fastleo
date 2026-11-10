@@ -1,0 +1,230 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use {{ namespace }}\Enums\ShopOrderStatus;
+use {{ namespace }}\Exceptions\OutOfStockException;
+use Fastleo\Fastleo;
+use Fastleo\Notifications\FastleoMessage;
+use Database\Factories\Fastleo\ShopOrderFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
+use Throwable;
+
+/**
+ * Заказ интернет-магазина: снимок покупателя, позиции (`items`) и сумма. Создавайте заказ только через `ShopOrder::place()`:
+ * цены и названия берутся из базы, а не из запроса покупателя, всё в одной транзакции вместе со списанием остатка.
+ *
+ * ```php
+ * // контроллер вашего сайта, после проверки формы
+ * $order = ShopOrder::place(
+ *     ['name' => $data['name'], 'phone' => $data['phone'], 'address' => $data['address'] ?? null],
+ *     [12 => 2, 15 => 1], // id товара => количество (из корзины сайта)
+ * );
+ * ```
+ *
+ * @property int $id
+ * @property ShopOrderStatus $status
+ * @property string $customer_name
+ * @property string $customer_phone
+ * @property string|null $customer_email
+ * @property string|null $address
+ * @property string|null $delivery
+ * @property string|null $comment
+ * @property string $total
+ * @property bool $is_paid
+ * @property \Illuminate\Support\Carbon|null $paid_at
+ * @property string|null $note
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ShopOrderItem> $items
+ */
+#[UseFactory(ShopOrderFactory::class)]
+class ShopOrder extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['status', 'customer_name', 'customer_phone', 'customer_email', 'address', 'delivery', 'comment', 'total', 'is_paid', 'paid_at', 'note'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => ShopOrderStatus::class,
+            'total' => 'decimal:2',
+            'is_paid' => 'boolean',
+            'paid_at' => 'datetime',
+        ];
+    }
+
+    /**
+     * Дата оплаты ставится сама: при отметке «Оплачен» — сейчас, при снятии отметки — пусто.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $order): void {
+            if ($order->is_paid && $order->paid_at === null) {
+                $order->paid_at = now();
+            } elseif (! $order->is_paid) {
+                $order->paid_at = null;
+            }
+        });
+    }
+
+    /**
+     * Позиции заказа.
+     *
+     * @return HasMany<ShopOrderItem, $this>
+     */
+    public function items(): HasMany
+    {
+        return $this->hasMany(ShopOrderItem::class, 'order_id');
+    }
+
+    /**
+     * Создать заказ из корзины. В одной транзакции: цены и названия берутся из базы, остаток (если он ведётся) списывается
+     * атомарно, пишутся позиции-снимки и сумма; после этого администраторам уходит уведомление (в текст — только номер и сумма).
+     *
+     * @param  array{name: string, phone: string, email?: ?string, address?: ?string, delivery?: ?string, comment?: ?string}  $customer
+     * @param  array<int|string, int|string>  $items  id товара => количество (не меньше 1)
+     *
+     * @throws OutOfStockException товара нет в нужном количестве
+     * @throws InvalidArgumentException пустая корзина, неверное количество, товар не найден или не опубликован, нет имени или телефона
+     */
+    public static function place(array $customer, array $items): self
+    {
+        $name = trim($customer['name']);
+        $phone = trim($customer['phone']);
+
+        if ($name === '' || $phone === '') {
+            throw new InvalidArgumentException('Для заказа нужны имя и телефон покупателя.');
+        }
+
+        $quantities = [];
+
+        foreach ($items as $productId => $quantity) {
+            if (filter_var($quantity, FILTER_VALIDATE_INT) === false || (int) $quantity < 1) {
+                throw new InvalidArgumentException('Количество товара должно быть целым числом не меньше 1.');
+            }
+
+            $quantities[(int) $productId] = (int) $quantity;
+        }
+
+        if ($quantities === []) {
+            throw new InvalidArgumentException('В заказе нет товаров.');
+        }
+
+        // Строки товаров блокируются по порядку id: два заказа с теми же товарами в другом порядке не попадут во взаимную блокировку.
+        ksort($quantities);
+
+        $order = DB::transaction(function () use ($customer, $name, $phone, $quantities): self {
+            $products = ShopProduct::query()->whereKey(array_keys($quantities))->where('is_published', true)->get()->keyBy('id');
+            $totalCents = 0;
+            $lines = [];
+
+            foreach ($quantities as $productId => $quantity) {
+                $product = $products->get($productId);
+
+                if (! $product instanceof ShopProduct) {
+                    throw new InvalidArgumentException("Товар {$productId} недоступен для заказа.");
+                }
+
+                // Условное списание атомарно: два заказа одновременно не уведут остаток в минус.
+                if ($product->stock !== null && ShopProduct::query()->whereKey($productId)->where('stock', '>=', $quantity)->decrement('stock', $quantity) === 0) {
+                    throw OutOfStockException::for($product->title, (int) ShopProduct::query()->whereKey($productId)->value('stock'));
+                }
+
+                $priceCents = self::cents($product->price);
+                $totalCents += $priceCents * $quantity;
+                $lines[] = ['product_id' => $productId, 'title' => $product->title, 'sku' => $product->sku, 'price' => self::money($priceCents), 'quantity' => $quantity, 'stock_taken' => $product->stock !== null];
+            }
+
+            $order = self::query()->create([
+                'status' => ShopOrderStatus::New,
+                'customer_name' => mb_substr($name, 0, 150),
+                'customer_phone' => mb_substr($phone, 0, 50),
+                'customer_email' => isset($customer['email']) ? mb_substr(trim($customer['email']), 0, 255) ?: null : null,
+                'address' => $customer['address'] ?? null,
+                'delivery' => isset($customer['delivery']) ? mb_substr($customer['delivery'], 0, 150) : null,
+                'comment' => $customer['comment'] ?? null,
+                'total' => self::money($totalCents),
+            ]);
+
+            $order->items()->createMany($lines);
+
+            return $order->load('items');
+        });
+
+        self::notify($order);
+
+        return $order;
+    }
+
+    /**
+     * Сменить статус. «Отменён» — конечный: из него заказ не выходит, а при отмене списанный при заказе остаток возвращается (один раз).
+     * Возвращает `false`, если статус не изменился.
+     */
+    public function changeStatus(ShopOrderStatus $to): bool
+    {
+        return DB::transaction(function () use ($to): bool {
+            $current = self::query()->lockForUpdate()->find($this->getKey(), ['id', 'status'])?->status;
+
+            if ($current === ShopOrderStatus::Cancelled || $current === $to) {
+                return false;
+            }
+
+            if ($to === ShopOrderStatus::Cancelled) {
+                foreach ($this->items()->whereNotNull('product_id')->where('stock_taken', true)->get() as $item) {
+                    ShopProduct::query()->whereKey($item->product_id)->whereNotNull('stock')->increment('stock', $item->quantity);
+                }
+            }
+
+            // Статус в этом объекте мог устареть: берём его из базы, иначе save() может не увидеть изменения и ничего не записать.
+            $this->setAttribute('status', $current);
+            $this->syncOriginalAttribute('status');
+            $this->forceFill(['status' => $to])->save();
+
+            return true;
+        });
+    }
+
+    /**
+     * Сообщить администраторам о новом заказе (номер и сумма). Сбой канала не мешает заказу.
+     */
+    private static function notify(self $order): void
+    {
+        try {
+            Fastleo::notifyAdmins(
+                FastleoMessage::make('Новый заказ №'.$order->id)
+                    ->body($order->total.' ₽')
+                    ->url(Fastleo::recordUrl($order, false))
+                    ->icon('shopping-bag')
+                    ->level('success'),
+            );
+        } catch (Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * Сумма в копейках: цена хранится строкой с копейками, считаем в целых числах.
+     */
+    private static function cents(string $amount): int
+    {
+        return (int) round((float) $amount * 100);
+    }
+
+    /**
+     * Копейки в строку с двумя знаками (`150000` → `'1500.00'`).
+     */
+    private static function money(int $cents): string
+    {
+        return number_format($cents / 100, 2, '.', '');
+    }
+}

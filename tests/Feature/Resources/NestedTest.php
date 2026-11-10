@@ -49,7 +49,7 @@ describe('has many', function (): void {
         $article = Article::factory()->create(['title' => 'Было']);
         $first = $article->links()->create(['title' => 'Первая', 'sort' => 1]);
         $second = $article->links()->create(['title' => 'Вторая', 'sort' => 2]);
-        // Форма открыта, когда в ней были первая и вторая; затем другой администратор добавил третью.
+        // Форма открыта, когда в ней были первая и вторая; затем другой пользователь добавил третью.
         $seen = $first->id.','.$second->id;
         $third = $article->links()->create(['title' => 'Добавлена другим', 'sort' => 3]);
 

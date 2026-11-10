@@ -7,7 +7,7 @@ use Illuminate\Support\Arr;
 
 if (! function_exists('fastleo_setting')) {
     /**
-     * Значение настройки сайта, заданной в админке: `страница.поле`.
+     * Значение настройки сайта, заданной в панели: `страница.поле`.
      *
      * ```php
      * fastleo_setting('contacts.phone');                       // '+7 900 000-00-00'

@@ -120,10 +120,71 @@ final class ServerReport
             self::row('storage_link', self::flag($linked), $linked ? 'ok' : 'warning', $linked ? null : self::text('storage_link_hint')),
             self::row('writable', self::flag($writable), $writable ? 'ok' : 'danger', $writable ? null : self::text('writable_hint')),
             self::row('disk', $disk['value'], $disk['status'], $disk['hint']),
+            ...self::appUrl(),
             ...self::proxy(),
             self::databasePing(),
             ...self::failedJobs(),
         ];
+    }
+
+    /**
+     * Адрес, с которого открыта панель, не совпадает с `APP_URL`: адреса файлов (`/storage/...`) и миниатюры в панели, ссылки в письмах
+     * и уведомлениях строятся от `APP_URL` и не откроются. Видно только на запросе из браузера (в консоли заголовка `Host` нет),
+     * поэтому строка появляется лишь при расхождении (только `www.` — предупреждение). Адрес запроса берётся через `url('/')`: он учитывает `URL::forceScheme()`
+     * и доверенные прокси. Не проверяется, когда у панели свой домен (`fastleo.domain`: сайт и файлы живут на `APP_URL`)
+     * и когда отличается только схема за прокси, которому Laravel не доверяет (об этом строка «Прокси»).
+     *
+     * @return list<Row>
+     */
+    private static function appUrl(): array
+    {
+        $request = request();
+        $domain = config('fastleo.domain');
+
+        if (! $request->headers->has('host') || (is_string($domain) && $domain !== '')) {
+            return [];
+        }
+
+        $configured = self::origin(is_string($url = config('app.url')) ? $url : '');
+        $actual = self::origin(url('/'));
+
+        if ($configured === null || $actual === null || $configured === $actual) {
+            return [];
+        }
+
+        if ($request->headers->has('X-Forwarded-Proto') && self::withoutScheme($configured) === self::withoutScheme($actual)) {
+            return [];
+        }
+
+        // Тот же сайт с `www.` или без: файлы и ссылки от APP_URL открываются, это не ошибка, а два адреса одного сайта.
+        $onlyWww = str_replace('://www.', '://', $configured) === str_replace('://www.', '://', $actual);
+
+        return [self::row('app_url', $configured, $onlyWww ? 'warning' : 'danger', strtr(self::text($onlyWww ? 'app_url_www_hint' : 'app_url_hint'), [':actual' => $actual, ':configured' => $configured]))];
+    }
+
+    /**
+     * Адрес без схемы: `https://site.ru` → `site.ru`.
+     */
+    private static function withoutScheme(string $origin): string
+    {
+        return substr($origin, (int) strpos($origin, '://') + 3);
+    }
+
+    /**
+     * Адрес без пути в виде `схема://хост[:порт]` (обычные порты 80 и 443 не пишутся); `null` — адрес не разобрать.
+     */
+    private static function origin(string $url): ?string
+    {
+        $parts = parse_url($url);
+
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower($parts['scheme']);
+        $port = $parts['port'] ?? null;
+
+        return $scheme.'://'.strtolower($parts['host']).($port === null || $port === ($scheme === 'https' ? 443 : 80) ? '' : ':'.$port);
     }
 
     /**

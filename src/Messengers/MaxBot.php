@@ -82,7 +82,7 @@ final class MaxBot extends Bot
 
     /**
      * `GET /me` (токен), `GET /chats/{id}` (чат активен, название) и `GET /chats/{id}/members/me`: в канале бот —
-     * администратор с правами `write`, `edit`, `delete` (или их старыми названиями).
+     * пользователь с правами `write`, `edit`, `delete` (или их старыми названиями).
      */
     #[Override]
     public function checkChannel(string $chatId): array

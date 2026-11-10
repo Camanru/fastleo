@@ -35,7 +35,7 @@ final class UserLookup
     }
 
     /**
-     * Пользователь с доступом в админку или null.
+     * Пользователь с доступом в панель или null.
      */
     public static function adminByEmail(string $email): ?FastleoUser
     {

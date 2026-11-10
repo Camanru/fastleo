@@ -11,7 +11,7 @@ use Workbench\App\Enums\ArticleStatus;
 use Workbench\App\Models\Article;
 
 /**
- * Демо-страница админки: сколько статей в каждом статусе.
+ * Демо-страница панели: сколько статей в каждом статусе.
  */
 final class ReportPage extends Page
 {

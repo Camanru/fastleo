@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\News;
+use App\FastleoNews\Models\News;
 use Fastleo\Fastleo;
 use Fastleo\Installer\DashboardPatcher;
 use Fastleo\Support\UserModelPatcher;
@@ -36,10 +36,10 @@ function bootCopiedNews(object $test): void
 
     // Классы объявляются один раз на процесс: каждый тест копирует модуль в свою папку.
     $classes = [
-        'app/Models/News.php' => 'App\\Models\\News',
+        'app/Fastleo/Models/News.php' => 'App\\FastleoNews\\Models\\News',
         'app/Fastleo/NewsResource.php' => 'App\\FastleoNews\\NewsResource',
         'app/Fastleo/Dashboard.php' => 'App\\FastleoNews\\Dashboard',
-        'database/factories/NewsFactory.php' => 'Database\\Factories\\NewsFactory',
+        'database/factories/Fastleo/NewsFactory.php' => 'Database\\Factories\\Fastleo\\NewsFactory',
     ];
 
     foreach ($classes as $file => $class) {
@@ -48,12 +48,11 @@ function bootCopiedNews(object $test): void
         }
     }
 
-    Factory::guessFactoryNamesUsing(fn (string $model): string => 'Database\\Factories\\'.class_basename($model).'Factory');
 }
 
 it('copies the news module and puts its widget on the dashboard', function (): void {
     $this->artisan('fastleo:module', ['modules' => ['news']])
-        ->expectsOutputToContain('app/Models/News.php')
+        ->expectsOutputToContain('app/Fastleo/Models/News.php')
         ->expectsOutputToContain('виджеты модулей добавлены')
         ->assertSuccessful();
 
@@ -75,7 +74,7 @@ it('lists the dashboard file among the created ones only when the installation h
 
     File::deleteDirectory($this->sandbox.'/database');
     Schema::dropIfExists('news');
-    File::delete($this->sandbox.'/app/Models/News.php');
+    File::delete($this->sandbox.'/app/Fastleo/Models/News.php');
     File::delete($this->sandbox.'/app/Fastleo/NewsResource.php');
 
     Artisan::call('fastleo:module', ['modules' => ['news']]);

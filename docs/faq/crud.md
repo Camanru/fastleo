@@ -1,6 +1,6 @@
 # FAQ: Разделы и поля (CRUD)
 
-Как создать раздел админки, подобрать поля, настроить форму, связи и сохранение. Все вопросы — [список](README.md).
+Как создать раздел панели, подобрать поля, настроить форму, связи и сохранение. Все вопросы — [список](README.md).
 
 ## Новый раздел
 
@@ -100,7 +100,7 @@ php artisan fastleo:make-resource Product --model="App\Models\Catalog\Product"  
 protected static ?string $slug = 'staff';   // /fastleo/staff
 ```
 
-Адреса самой админки (`login`, `files`, `settings`, `pages`, `search` и другие) занимать нельзя. Текущий адрес раздела покажет `php artisan fastleo:inspect`.
+Адреса самой панели (`login`, `files`, `settings`, `pages`, `search` и другие) занимать нельзя. Текущий адрес раздела покажет `php artisan fastleo:inspect`.
 
 Подробнее — [Свойства ресурса](../resources.md#свойства).
 
@@ -119,7 +119,7 @@ protected static ?string $group = 'Каталог';                // групп
 protected static int $position = 10;                        // порядок в группе
 ```
 
-Порядок групп меню и прочее про меню — [FAQ: интерфейс админки](admin-ui.md).
+Порядок групп меню и прочее про меню — [FAQ: интерфейс панели](admin-ui.md).
 
 Подробнее — [Свойства ресурса](../resources.md#свойства).
 
@@ -246,7 +246,7 @@ Textarea::make('note', 'Заметка')->emptyValue(''),
 
 Подробнее — [Пустое значение](../fields/README.md#пустое-значение).
 
-### Как скрыть поле при создании, при правке или для части администраторов?
+### Как скрыть поле при создании, при правке или для части пользователей?
 
 Используйте `hideOnCreate()`, `hideOnEdit()` или `hidden()` с замыканием. Скрытое поле не проверяется и не записывается.
 
@@ -832,7 +832,7 @@ class Product extends Model
 
 ### Как выполнить свой код при сохранении записи?
 
-Повесьте observer на модель. Админка пишет через Eloquent по одной записи, поэтому observer срабатывает в форме, импорте, действиях и правке в ячейке.
+Повесьте observer на модель. Панель пишет через Eloquent по одной записи, поэтому observer срабатывает в форме, импорте, действиях и правке в ячейке.
 
 ```bash
 php artisan make:observer ProductObserver --model=Product   # app/Observers/ProductObserver.php
@@ -849,7 +849,7 @@ final class ProductObserver
 {
     public function saving(Product $product): bool
     {
-        // false отменяет сохранение — админка покажет «Сайт отменил сохранение»
+        // false отменяет сохранение — панель покажет «Сайт отменил сохранение»
         return ! ($product->is_active && $product->price === null);
     }
 

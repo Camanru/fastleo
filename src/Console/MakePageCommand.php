@@ -11,7 +11,7 @@ use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Создать свою страницу админки: класс и шаблон или, с `--report`, отчёт из фильтров и виджетов без шаблона.
+ * Создать свою страницу панели: класс и шаблон или, с `--report`, отчёт из фильтров и виджетов без шаблона.
  *
  * ```bash
  * php artisan fastleo:make-page Instructions
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Attribute\AsCommand;
  * ```
  */
 #[AsCommand(name: 'fastleo:make-page')]
-#[Description('Создать свою страницу админки (класс и шаблон; --report — отчёт из фильтров и виджетов)')]
+#[Description('Создать свою страницу панели (класс и шаблон; --report — отчёт из фильтров и виджетов)')]
 #[Signature('fastleo:make-page {name? : имя класса, например Report} {--report : отчёт: фильтры и виджеты, без своего шаблона} {--force : перезаписать существующие файлы}')]
 final class MakePageCommand extends Command
 {

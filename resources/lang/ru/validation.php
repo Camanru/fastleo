@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * Русские тексты правил валидации Laravel для форм админки.
+ * Русские тексты правил валидации Laravel для форм панели.
  *
  * Подмешиваются только там, где у сайта нет своей строки в lang/ru/validation.php:
  * тексты сайта главнее (Fastleo\Support\ValidationMessages).

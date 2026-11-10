@@ -1,9 +1,0 @@
-<?php
-
-declare(strict_types=1);
-
-use {{ appNamespace }}\Http\Controllers\LeadController;
-use Illuminate\Support\Facades\Route;
-
-// Не больше 5 заявок за 10 минут с одного адреса; свой ключ `leads`, чтобы лимит не делили с другими маршрутами сайта.
-Route::post('/leads', [LeadController::class, 'store'])->middleware('throttle:5,10,leads')->name('site.leads.store');

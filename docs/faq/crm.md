@@ -2,7 +2,7 @@
 
 Клиенты, заявки, воронка, задачи, комментарии, уведомления и отчёты по менеджерам — готовые решения с кодом. Все вопросы — [список](README.md).
 
-В примерах модели `Client`, `ClientPhone`, `Lead`, `Task`, `Order`; менеджеры — администраторы админки (модель `App\Models\User`, связь `Lead::manager()`). Подставьте свои имена.
+В примерах модели `Client`, `ClientPhone`, `Lead`, `Task`, `Order`; менеджеры — пользователи панели (модель `App\Models\User`, связь `Lead::manager()`). Подставьте свои имена.
 
 ## Клиенты
 
@@ -261,40 +261,16 @@ Number::make('revenue', 'Покупок, ₽')->fromQuery()->sortable()
 
 ### Как принимать заявки с формы сайта в раздел «Заявки»?
 
-Сделайте маршрут сайта с токеном: он создаёт запись и сообщает администраторам. Раздел `LeadResource` покажет её сам.
+Включите встроенные [заявки](../leads.md): раздел «Заявки», форма на сайте `<x-fastleo::lead-form />` (`POST /leads`) и приём с других сайтов по API (`POST /api/leads`, ключи — «Настройки → Доступы для сайтов»). О каждой заявке пользователи панели получают уведомление.
 
 ```php
-// routes/api.php (после `php artisan install:api`)
-use App\Models\Lead;
-use Fastleo\Fastleo;
-use Fastleo\Notifications\FastleoMessage;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
-
-Route::post('leads', function (Request $request) {
-    $token = (string) config('services.leads.token');
-    abort_if($token === '' || ! hash_equals($token, (string) $request->bearerToken()), 401);
-
-    $data = $request->validate([
-        'name' => ['nullable', 'string', 'max:100'],
-        'phone' => ['required', 'string', 'max:30'],
-        'text' => ['nullable', 'string', 'max:2000'],
-    ]);
-    $lead = Lead::create($data + ['source' => 'site']);
-
-    Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body($lead->phone)
-        ->url(Fastleo::recordUrl($lead, false))->icon('inbox')->level('success'));
-
-    return response()->json(['id' => $lead->id], 201);
-})->middleware('throttle:60,1');
+// config/fastleo.php
+'leads' => [
+    'resource' => Fastleo\Leads\LeadResource::class,
+],
 ```
 
-```php
-// config/services.php
-'leads' => ['token' => env('LEADS_TOKEN')],
-```
-
-Если форма стоит на этом же сайте, вызывайте `Lead::create()` прямо из её контроллера — токен не нужен. Подробнее — [рецепт](../recipes.md#заявки-с-сайта-и-из-телефонии), [API и вебхуки](integrations.md).
+Подробнее — [заявки](../leads.md).
 
 ### Как забирать пропущенные звонки из телефонии?
 
@@ -419,7 +395,7 @@ Enum::make('status', 'Статус')->enum(LeadStatus::class)->required()->badge
 
 ### Как назначить заявке менеджера?
 
-Добавьте в заявку колонку `manager_id`, связь `manager()` и поле `BelongsTo` с вариантами только из администраторов.
+Добавьте в заявку колонку `manager_id`, связь `manager()` и поле `BelongsTo` с вариантами только из пользователей.
 
 ```bash
 php artisan make:migration add_manager_id_to_leads_table
@@ -448,7 +424,7 @@ BelongsTo::make('manager_id', 'Менеджер')
 
 ### Как открывать «только мои заявки» по умолчанию?
 
-Задайте фильтру менеджера значение по умолчанию — текущего администратора. Фильтру нужно поле `BelongsTo` с тем же именем.
+Задайте фильтру менеджера значение по умолчанию — текущего пользователя. Фильтру нужно поле `BelongsTo` с тем же именем.
 
 ```php
 // app/Fastleo/LeadResource.php
@@ -549,7 +525,7 @@ public function query(Builder $query): Builder
 
 Обновление не сбивает выбранные записи и набранный текст. Подробнее — [автообновление списка](../list.md#автообновление-списка).
 
-### Как открывать заявки сразу после входа в админку?
+### Как открывать заявки сразу после входа в панель?
 
 Укажите адрес раздела в `home`; пункт «Дашборд» можно убрать.
 
@@ -610,7 +586,7 @@ public static function badge(): ?int
 }
 ```
 
-Метод вызывается на каждой странице админки — нужны индексы на `manager_id`, `due_at`. Подробнее — [badge()](../resources.md#badge), [рецепт](../recipes.md#счётчики-в-меню-и-порядок-групп).
+Метод вызывается на каждой странице панели — нужны индексы на `manager_id`, `due_at`. Подробнее — [badge()](../resources.md#badge), [рецепт](../recipes.md#счётчики-в-меню-и-порядок-групп).
 
 ### Как выделять непросмотренные заявки и считать в меню только их?
 
@@ -927,7 +903,7 @@ Observer срабатывает при назначении из формы, и�
 
 ### Как отправить менеджеру личное сообщение в Telegram?
 
-Боты раздела «Боты уведомлений» пишут в общие чаты администраторов. Чтобы написать конкретному менеджеру, храните его `telegram_chat_id` и отправляйте сообщение своей задачей очереди.
+Боты раздела «Боты уведомлений» пишут в общие чаты пользователей. Чтобы написать конкретному менеджеру, храните его `telegram_chat_id` и отправляйте сообщение своей задачей очереди.
 
 ```bash
 php artisan make:migration add_telegram_chat_id_to_users_table
@@ -939,7 +915,7 @@ php artisan make:job SendTelegramMessage        # app/Jobs/SendTelegramMessage.p
 // database/migrations/…_add_telegram_chat_id_to_users_table.php
 $table->string('telegram_chat_id', 32)->nullable();
 
-// app/Fastleo/TelegramSettings.php — токен бота задаётся в админке
+// app/Fastleo/TelegramSettings.php — токен бота задаётся в панели
 namespace App\Fastleo;
 
 use Fastleo\Fields\Text;
@@ -1002,7 +978,7 @@ if ($lead->manager->telegram_chat_id) {
 
 ### Как сообщить о новой заявке в рабочий чат Telegram?
 
-Вызовите `Fastleo::notifyAdmins()`, включите раздел ботов (`notifications.bots`, [как](../notifications.md#как-включить-ботов)) и подключите бота в разделе **Мессенджеры → Боты уведомлений**. Сообщение уйдёт в колокольчик всем администраторам (если он [включён](../notifications.md#как-включить-колокольчик)) и в чаты бота.
+Вызовите `Fastleo::notifyAdmins()`, включите раздел ботов (`notifications.bots`, [как](../notifications.md#как-включить-ботов)) и подключите бота в разделе **Мессенджеры → Боты уведомлений**. Сообщение уйдёт в колокольчик всем пользователям (если он [включён](../notifications.md#как-включить-колокольчик)) и в чаты бота.
 
 ```php
 use Fastleo\Fastleo;
@@ -1016,7 +992,7 @@ Fastleo::notifyAdmins(FastleoMessage::make('Новая заявка')->body("{$l
 
 1. Создайте бота у @BotFather и скопируйте токен.
 2. Добавьте бота в рабочую группу и напишите в ней любое сообщение.
-3. В админке: **Боты уведомлений → Создать**, вставьте токен, нажмите «Найти чаты бота», выберите группу и сохраните.
+3. В панели: **Боты уведомлений → Создать**, вставьте токен, нажмите «Найти чаты бота», выберите группу и сохраните.
 4. Нажмите действие «Отправить тест».
 
 Подробнее — [боты Telegram и Max](../notifications.md#боты-telegram-и-max).

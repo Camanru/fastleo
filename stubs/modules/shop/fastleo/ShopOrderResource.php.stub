@@ -1,0 +1,123 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Enums\ShopOrderStatus;
+use {{ namespace }}\Actions\ChangeShopOrderStatus;
+use {{ namespace }}\Models\ShopOrder;
+use Fastleo\Fields\DateTime;
+use Fastleo\Fields\Email;
+use Fastleo\Fields\Enum;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Tel;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Filters\SelectFilter;
+use Fastleo\Related;
+use Fastleo\Resource;
+use Illuminate\Database\Eloquent\Model;
+use Override;
+
+/**
+ * Раздел «Заказы»: покупатель, сумма, статус и позиции. Заказы создаёт код сайта через `ShopOrder::place()`; менеджер меняет
+ * статус (действие «Сменить статус»), «Оплачен», контакты и заметку. Позиции и сумма — снимок на момент заказа, не правятся.
+ */
+final class ShopOrderResource extends Resource
+{
+    protected static string $model = ShopOrder::class;
+
+    protected static ?string $slug = 'shop-orders';
+
+    protected static ?string $label = 'Заказы';
+
+    protected static ?string $singular = 'Заказ';
+
+    protected static string $icon = 'shopping-bag';
+
+    protected static ?string $group = 'Магазин';
+
+    protected static int $position = 10;
+
+    protected static ?array $defaultOrder = ['id', 'desc'];
+
+    /** Новые заказы появляются в списке сами. */
+    protected static ?int $poll = 30;
+
+    /** Число новых заказов у пункта меню. */
+    #[Override]
+    public static function badge(): ?int
+    {
+        return ShopOrder::query()->where('status', ShopOrderStatus::New)->count() ?: null;
+    }
+
+    /**
+     * Название заказа в заголовке и поиске: номер и покупатель.
+     */
+    #[Override]
+    public function title(Model $record): string
+    {
+        return 'Заказ №'.$record->getKey().' — '.$record->getAttribute('customer_name');
+    }
+
+    /**
+     * Заказ создаёт только код сайта; удалить можно только отменённый (остаток уже возвращён).
+     */
+    #[Override]
+    public function can(string $ability, ?Model $record): bool
+    {
+        return match ($ability) {
+            'create' => false,
+            'delete' => ! $record instanceof ShopOrder || $record->status === ShopOrderStatus::Cancelled,
+            default => true,
+        };
+    }
+
+    /**
+     * Поля заказа.
+     */
+    public function fields(): array
+    {
+        return [
+            DateTime::make('created_at', 'Создан')->onlyInList()->readonly()->sortable(),
+            Enum::make('status', 'Статус')->enum(ShopOrderStatus::class)->badges()->readonly()->sortable(),
+            Text::make('customer_name', 'Покупатель')->required()->maxLength(150)->searchable(),
+            Tel::make('customer_phone', 'Телефон')->required()->searchable(),
+            Email::make('customer_email', 'Почта')->hideInList(),
+            Number::make('total', 'Сумма')->readonly()->sortable()
+                ->formatUsing(fn ($value) => $value === null ? null : number_format((float) $value, 2, ',', ' ').' ₽'),
+            Toggle::make('is_paid', 'Оплачен')->quickToggle(),
+            DateTime::make('paid_at', 'Дата оплаты')->readonly()->hideInList(),
+            Text::make('delivery', 'Доставка')->readonly()->hideInList(),
+            Textarea::make('address', 'Адрес доставки')->rows(2)->hideInList(),
+            Textarea::make('comment', 'Комментарий покупателя')->rows(2)->readonly()->hideInList(),
+            Textarea::make('note', 'Заметка менеджера')->rows(3)->hideInList()->help('Видна только в панели.'),
+        ];
+    }
+
+    /**
+     * Фильтр по статусу.
+     */
+    public function filters(): array
+    {
+        return [SelectFilter::make('status', 'Статус')->options(ShopOrderStatus::class)];
+    }
+
+    /**
+     * Действие «Сменить статус» (в том числе для выбранных заказов).
+     */
+    public function actions(): array
+    {
+        return [new ChangeShopOrderStatus];
+    }
+
+    /**
+     * Позиции заказа под формой.
+     */
+    public function relations(): array
+    {
+        return [Related::make('items', ShopOrderItemResource::class)->label('Позиции')->withoutAddButton()->withoutSinglePageFooter()];
+    }
+}

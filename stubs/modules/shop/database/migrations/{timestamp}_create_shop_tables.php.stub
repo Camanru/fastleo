@@ -1,0 +1,86 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Интернет-магазин: категории (дерево), товары, заказы и позиции заказов (снимки цен и названий).
+     */
+    public function up(): void
+    {
+        Schema::create('shop_categories', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('parent_id')->nullable()->constrained('shop_categories')->nullOnDelete();
+            $table->unsignedInteger('sort')->default(0);
+            $table->string('title', 150);
+            $table->string('slug')->unique();
+            $table->boolean('is_published')->default(true);
+            $table->json('seo')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('shop_products', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('category_id')->nullable()->constrained('shop_categories')->nullOnDelete();
+            $table->unsignedInteger('sort')->default(0);
+            $table->string('title');
+            $table->string('slug')->unique();
+            $table->string('sku', 100)->nullable()->index();
+            $table->decimal('price', 12, 2);
+            // null — остаток не учитывается (услуга, товар под заказ).
+            $table->unsignedInteger('stock')->nullable();
+            $table->string('cover')->nullable();
+            $table->json('photos')->nullable();
+            $table->longText('description')->nullable();
+            $table->json('specs')->nullable();
+            $table->boolean('is_published')->default(true);
+            $table->json('seo')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('shop_orders', function (Blueprint $table): void {
+            $table->id();
+            $table->string('status', 20)->default('new')->index();
+            $table->string('customer_name', 150);
+            $table->string('customer_phone', 50);
+            $table->string('customer_email')->nullable();
+            $table->text('address')->nullable();
+            $table->string('delivery', 150)->nullable();
+            $table->text('comment')->nullable();
+            $table->decimal('total', 12, 2)->default(0);
+            $table->boolean('is_paid')->default(false);
+            $table->timestamp('paid_at')->nullable();
+            $table->text('note')->nullable();
+            $table->timestamps();
+        });
+
+        Schema::create('shop_order_items', function (Blueprint $table): void {
+            $table->id();
+            $table->foreignId('order_id')->constrained('shop_orders')->cascadeOnDelete();
+            // Товар могут удалить: позиция живёт своим снимком (название, артикул, цена).
+            $table->foreignId('product_id')->nullable()->constrained('shop_products')->nullOnDelete();
+            $table->string('title');
+            $table->string('sku', 100)->nullable();
+            $table->decimal('price', 12, 2);
+            $table->unsignedInteger('quantity');
+            // Остаток списан при заказе: при отмене вернётся только он (учёт могли включить позже).
+            $table->boolean('stock_taken')->default(false);
+        });
+    }
+
+    /**
+     * Удалить таблицы магазина.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('shop_order_items');
+        Schema::dropIfExists('shop_orders');
+        Schema::dropIfExists('shop_products');
+        Schema::dropIfExists('shop_categories');
+    }
+};

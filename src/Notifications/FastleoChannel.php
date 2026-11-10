@@ -8,7 +8,7 @@ use Fastleo\Fastleo;
 use Illuminate\Notifications\Notification;
 
 /**
- * Канал Laravel Notifications `fastleo`: кладёт уведомление в колокольчик администратора.
+ * Канал Laravel Notifications `fastleo`: кладёт уведомление в колокольчик пользователя.
  * Уведомление должно иметь метод `toFastleo($notifiable): FastleoMessage`. Колокольчик выключен
  * (`fastleo.notifications.bell`) — ничего не сохраняется.
  */

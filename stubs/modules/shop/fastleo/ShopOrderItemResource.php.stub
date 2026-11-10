@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\ShopOrderItem;
+use Fastleo\Fields\BelongsTo;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Text;
+use Fastleo\Resource;
+use Override;
+
+/**
+ * Позиции заказа: таблица под формой заказа, только просмотр. Названия и цены — снимок на момент заказа.
+ */
+final class ShopOrderItemResource extends Resource
+{
+    protected static string $model = ShopOrderItem::class;
+
+    protected static ?string $slug = 'shop-order-items';
+
+    protected static ?string $label = 'Позиции заказа';
+
+    protected static ?string $singular = 'Позиция';
+
+    protected static string $icon = 'receipt';
+
+    protected static bool $readonly = true;
+
+    /** Отдельного пункта меню нет: позиции видны в заказе. */
+    #[Override]
+    public static function inMenu(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Поля позиции.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Товар'),
+            Text::make('sku', 'Артикул'),
+            Number::make('price', 'Цена')->formatUsing(fn ($value) => $value === null ? null : number_format((float) $value, 2, ',', ' ').' ₽'),
+            Number::make('quantity', 'Кол-во')->integer(),
+            BelongsTo::make('order_id', 'Заказ')->relation('order')->hideInList(),
+        ];
+    }
+}

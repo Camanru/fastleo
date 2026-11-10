@@ -33,7 +33,7 @@ enum SyncResult: string
     case BadUrl = 'bad_url';
 
     /**
-     * Подпись для администратора.
+     * Подпись для пользователя.
      */
     public function label(): string
     {

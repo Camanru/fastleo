@@ -90,7 +90,7 @@ final class ModuleCommand extends Command
         }
 
         if ($this->option('without-hints') !== true && array_any($modules, fn (Module $module): bool => $module->tables !== [])) {
-            $this->components->warn(__('fastleo::console.module_migrate'));
+            $this->nextSteps($modules);
         }
 
         if ($installer->testsSkipped) {
@@ -98,5 +98,24 @@ final class ModuleCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Подсказка, что делать после копирования: миграции и, по желанию, сидеры с примерами данных.
+     *
+     * @param  list<Module>  $modules
+     */
+    private function nextSteps(array $modules): void
+    {
+        $this->components->info(__('fastleo::console.module_next'));
+        $this->line('  '.__('fastleo::console.module_next_migrate'));
+
+        $seeders = array_values(array_unique(array_merge(...array_map(fn (Module $module): array => $module->seeders, $modules))));
+
+        if ($seeders !== []) {
+            $this->line('  '.__('fastleo::console.module_next_seed', ['commands' => implode('; ', array_map(fn (string $seeder): string => "php artisan db:seed --class='{$seeder}'", $seeders))]));
+        }
+
+        $this->newLine();
     }
 }

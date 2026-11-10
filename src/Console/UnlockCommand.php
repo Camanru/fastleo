@@ -15,15 +15,15 @@ use Illuminate\Support\Str;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
- * Снимает блокировку входа администратора после слишком большого числа неверных паролей или кодов 2FA за час.
+ * Снимает блокировку входа пользователя после слишком большого числа неверных паролей или кодов 2FA за час.
  *
  * ```bash
  * php artisan fastleo:unlock admin@site.ru
  * ```
  */
 #[AsCommand(name: 'fastleo:unlock')]
-#[Description('Снять блокировку входа администратора fastleo (слишком много неверных паролей)')]
-#[Signature('fastleo:unlock {email : Email администратора}')]
+#[Description('Снять блокировку входа пользователя fastleo (слишком много неверных паролей)')]
+#[Signature('fastleo:unlock {email : Email пользователя}')]
 final class UnlockCommand extends Command
 {
     /**

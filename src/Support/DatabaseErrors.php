@@ -50,7 +50,7 @@ final class DatabaseErrors
     }
 
     /**
-     * Текст ошибки драйвера без SQL и значений запроса: в `getMessage()` лежат введённые администратором значения,
+     * Текст ошибки драйвера без SQL и значений запроса: в `getMessage()` лежат введённые пользователем значения,
      * слово «foreign key» в поле формы не должно менять причину ошибки.
      */
     private static function driverMessage(QueryException $exception): string

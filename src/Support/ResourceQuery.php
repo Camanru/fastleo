@@ -87,7 +87,7 @@ final class ResourceQuery
         $defaults = [];
 
         foreach ($resource->listFilters() as $name => $filter) {
-            // Ключ есть в адресе (даже пустой — «Все») — решает администратор; нет — умолчание фильтра.
+            // Ключ есть в адресе (даже пустой — «Все») — решает пользователь; нет — умолчание фильтра.
             $given = is_array($input) && array_key_exists($name, $input);
             $default = $withDefaults ? $filter->value($filter->defaultInput()) : null;
             $value = $given ? $filter->value($input[$name]) : $default;

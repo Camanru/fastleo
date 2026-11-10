@@ -99,7 +99,7 @@ final readonly class ClientData
     }
 
     /**
-     * Свежая ли последняя ночь: сегодняшняя или вчерашняя по часовому поясу админки.
+     * Свежая ли последняя ночь: сегодняшняя или вчерашняя по часовому поясу панели.
      */
     public function lastNightIsFresh(): bool
     {
@@ -161,7 +161,7 @@ final readonly class ClientData
     }
 
     /**
-     * Дата для вывода: «31.01.2026» (для даты со временем — в часовом поясе админки) или «нет данных».
+     * Дата для вывода: «31.01.2026» (для даты со временем — в часовом поясе панели) или «нет данных».
      */
     public static function show(?CarbonImmutable $date, bool $time = false): string
     {
@@ -232,7 +232,7 @@ final readonly class ClientData
     }
 
     /**
-     * Дата или момент из строки ISO 8601: только дата — как есть, со временем — в часовом поясе админки.
+     * Дата или момент из строки ISO 8601: только дата — как есть, со временем — в часовом поясе панели.
      */
     private static function date(mixed $value): ?CarbonImmutable
     {

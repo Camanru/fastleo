@@ -308,3 +308,19 @@ it('edits a rich text in the editor and inserts a picture from the file window',
         ->toContain('Текст статьи')
         ->toContain('<img src="/storage/uploads/articles/photo.jpg"');
 });
+
+it('opens a picture in a window by the eye on its tile and closes the window', function (): void {
+    $this->disk->put('uploads/foto-tovara.jpg', UploadedFile::fake()->image('a.jpg', 800, 600)->getContent());
+    $this->disk->put('uploads/price.txt', 'x');
+
+    $page = signInAndVisit(route('fastleo.files.index'));
+
+    $page->assertMissing('[data-entry="uploads/price.txt"] [data-files-view]')
+        ->assertNotPresent('[data-files-viewer][open]')
+        ->click('[data-entry="uploads/foto-tovara.jpg"] [data-files-view]')
+        ->assertPresent('[data-files-viewer][open] img')
+        ->assertSeeIn('[data-files-viewer]', 'foto-tovara.jpg')
+        ->click('[data-files-viewer-close]')
+        ->assertNotPresent('[data-files-viewer][open]')
+        ->assertNoJavaScriptErrors();
+});

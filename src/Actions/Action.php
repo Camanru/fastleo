@@ -82,7 +82,7 @@ abstract class Action
     /** Кнопка в полосе выбранных записей списка. */
     protected bool $bulk = true;
 
-    /** Действие можно запустить через MCP-сервер (`run-action`); `false` — только человеком в админке. */
+    /** Действие можно запустить через MCP-сервер (`run-action`); `false` — только человеком в панели. */
     protected bool $mcp = true;
 
     /** Ресурс, к которому привязано действие. */
@@ -92,7 +92,7 @@ abstract class Action
     private ?FormSchema $schema = null;
 
     /**
-     * Выполнить действие над записями, на которые у админа есть право.
+     * Выполнить действие над записями, на которые у пользователя есть право.
      *
      * @param  Collection<int, Model>  $records
      * @param  array<string, mixed>  $data  значения мини-формы (`fields()`), уже проверенные
@@ -220,7 +220,7 @@ abstract class Action
     }
 
     /**
-     * Админ может выполнить действие над записью (способность `$ability` по Policy модели).
+     * Пользователь может выполнить действие над записью (способность `$ability` по Policy модели).
      */
     public function allows(Model $record): bool
     {

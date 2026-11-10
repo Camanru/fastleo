@@ -192,7 +192,7 @@ Alpine.data('fastleoDensity', () => ({
 const SIDEBAR_KEY = 'fastleo-sidebar';
 
 /**
- * Каркас админки: выезжающее меню на телефоне и свёрнутое (полоса 64 px) на широком экране.
+ * Каркас панели: выезжающее меню на телефоне и свёрнутое (полоса 64 px) на широком экране.
  * Выбор хранится в localStorage; без выбора меню свёрнуто на экранах уже 1280 px (начальное состояние
  * ставит скрипт в <head>, чтобы страница не дёргалась).
  */
@@ -673,7 +673,7 @@ Alpine.data('fastleoRelated', ({ url, error, poll = null }) => ({
 
     /**
      * Снова раскрыть строки, которые были раскрыты до перезагрузки страницы (например, после действия «Продать»):
-     * администратор остаётся там, где работал. Вложенные таблицы раскрывают свои строки сами, когда загрузятся.
+     * пользователь остаётся там, где работал. Вложенные таблицы раскрывают свои строки сами, когда загрузятся.
      */
     restoreExpanded() {
         const saved = expandedRows();
@@ -1299,7 +1299,7 @@ function csrfToken() {
 }
 
 /**
- * Запрос к админке с CSRF и ответом JSON. Ошибка → исключение с полями status и data.
+ * Запрос к панели с CSRF и ответом JSON. Ошибка → исключение с полями status и data.
  */
 async function requestJson(url, method, body) {
     const response = await fetch(url, {
@@ -2017,6 +2017,7 @@ Alpine.data('fastleoFiles', () => ({
     errors: [],
     expired: false,
     notice: '',
+    viewer: null,
 
     init() {
         this.messages = JSON.parse(this.$root.dataset.messages);
@@ -2068,6 +2069,12 @@ Alpine.data('fastleoFiles', () => ({
         }
 
         this.send([file]);
+    },
+
+    /** Показать картинку в окне поверх страницы (значок глаза на плитке). */
+    view(file) {
+        this.viewer = file;
+        this.$refs.viewer.showModal();
     },
 
     chooseSelected() {

@@ -156,7 +156,7 @@ final readonly class SettingsController
     }
 
     /**
-     * Поля, которые админ видит и может менять.
+     * Поля, которые пользователь видит и может менять.
      *
      * @return list<Field>
      */

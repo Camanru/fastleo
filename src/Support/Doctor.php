@@ -7,6 +7,7 @@ namespace Fastleo\Support;
 use BackedEnum;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\SetToggle;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Auth\RoleMatrix;
 use Fastleo\Console\DropActivityCommand;
 use Fastleo\Fastleo;
@@ -34,16 +35,19 @@ use Fastleo\Fields\Text;
 use Fastleo\Fields\Textarea;
 use Fastleo\Files\ImageSupport;
 use Fastleo\Imports\ImportRecords;
+use Fastleo\Leads\Leads;
 use Fastleo\Messengers\ChatIds;
 use Fastleo\Page;
 use Fastleo\Resource;
 use Fastleo\Resources\UserResource;
+use Fastleo\Resources\Users\ImpersonateUser;
 use Fastleo\Resources\Users\UserGuard;
 use Fastleo\Settings;
 use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\Html\HtmlLoss;
 use Fastleo\Support\Html\RichTextSettings;
+use Illuminate\Cache\NullStore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Migrations\MigrationRepositoryInterface;
@@ -52,6 +56,7 @@ use Illuminate\Http\Request;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
@@ -62,8 +67,8 @@ use ReflectionProperty;
 use Throwable;
 
 /**
- * Проверка сайта и описанных разделов: находит то, что сломается при работе админки, до первого открытия страницы.
- * Источник для `fastleo:doctor`. Ошибка — админка или раздел не заработают, предупреждение — работает, но не так, как задумано.
+ * Проверка сайта и описанных разделов: находит то, что сломается при работе панели, до первого открытия страницы.
+ * Источник для `fastleo:doctor`. Ошибка — панель или раздел не заработают, предупреждение — работает, но не так, как задумано.
  *
  * ```php
  * foreach ((new Doctor)->run() as $problem) {
@@ -88,6 +93,8 @@ final class Doctor
         '2026_10_31_000200_create_fastleo_publications_table' => ['fastleo_publications', 'fastleo_publication_deliveries'],
         '2026_11_01_000000_create_fastleo_dashboard_layouts_table' => ['fastleo_dashboard_layouts'],
         '2026_11_09_000000_add_user_created_index_to_fastleo_notifications_table' => [],
+        '2026_11_10_000000_create_fastleo_leads_table' => ['fastleo_leads'],
+        '2026_11_10_000100_create_fastleo_lead_api_keys_table' => ['fastleo_lead_api_keys'],
     ];
 
     /** Миграция колонки `fastleo_admin` в таблице пользователей. */
@@ -183,6 +190,16 @@ final class Doctor
             $this->importTimeout();
         }
 
+        // «Войти как» включён, а владельца сайт не назвал: функция не работает (иначе войти под кем угодно мог бы любой).
+        if (config()->boolean('fastleo.users.impersonate', false) && ! RoleMatrix::enabled() && ! Fastleo::hasOwnerResolver()) {
+            $this->add('error', 'site', 'impersonate_without_owner', hint: 'impersonate_without_owner_hint');
+        }
+
+        // Включено и владелец есть, а кнопки нет: раздел пользователей выключен или свой наследник без `ImpersonateUser` в actions().
+        if (Impersonation::enabled() && ! $this->hasImpersonateAction($registry)) {
+            $this->add('warning', 'site', 'impersonate_no_action', hint: 'impersonate_no_action_hint');
+        }
+
         if (! Fastleo::bell() && ($importable || config('fastleo.publishing.publications') !== null)) {
             $this->add('warning', 'site', 'bell_off', hint: 'bell_off_hint');
         }
@@ -211,7 +228,7 @@ final class Doctor
     }
 
     /**
-     * Роли администраторов: включены без трейта `HasRoles` и таблиц; нет владельца; администраторы без ролей и с прямыми правами;
+     * Роли пользователей: включены без трейта `HasRoles` и таблиц; нет владельца; пользователи без ролей и с прямыми правами;
      * у разделов нет прав; роли заведены, а флаг выключен (ограничения молча не действуют).
      */
     private function roles(): void
@@ -255,7 +272,7 @@ final class Doctor
         $missing = [];
 
         foreach (Fastleo::resources()->all() as $slug => $resource) {
-            // «Администраторы» при ролях открыты только владельцу: прав на этот раздел не нужно.
+            // «Пользователи» при ролях открыты только владельцу: прав на этот раздел не нужно.
             if (! is_a($resource, UserResource::class, true) && ! in_array(RoleMatrix::permission($slug, 'view'), $known, true)) {
                 $missing[] = $slug;
             }
@@ -267,7 +284,7 @@ final class Doctor
     }
 
     /**
-     * Владельцы и администраторы без ролей guard `fastleo`; администраторы с прямыми правами мимо ролей.
+     * Владельцы и пользователи без ролей guard `fastleo`; пользователи с прямыми правами мимо ролей.
      */
     private function rolesOfAdmins(Model $user): void
     {
@@ -300,6 +317,17 @@ final class Doctor
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * В разделе пользователей есть действие «Войти как» (раздел не выключен и наследник не убрал его из `actions()`).
+     */
+    private function hasImpersonateAction(ResourceRegistry $registry): bool
+    {
+        $users = $registry->find('users');
+
+        return $users instanceof \Fastleo\Resource
+            && array_filter($users->actions(), fn (Action $action): bool => $action instanceof ImpersonateUser) !== [];
     }
 
     /**
@@ -354,6 +382,13 @@ final class Doctor
             $this->add('warning', 'site', 'queue_sync', hint: 'queue_sync_hint');
         }
 
+        // Без кеша `Cache::add` всегда «занято»: приём по API отвечал бы `duplicate` и терял заявки, а лимиты бы не работали.
+        if (Leads::apiEnabled() && Cache::store()->getStore() instanceof NullStore) {
+            $this->add('error', 'site', 'leads_cache_null', hint: 'leads_cache_null_hint');
+        }
+
+        $this->appUrl();
+
         if (app()->isProduction() && SchedulerPulse::isStale()) {
             $this->add('warning', 'site', 'scheduler', ['minutes' => (string) intdiv(SchedulerPulse::STALE_SECONDS, 60)], 'scheduler_hint');
         }
@@ -378,7 +413,7 @@ final class Doctor
     }
 
     /**
-     * Маршруты закешированы (`route:cache`), а адрес или домен админки в конфиге с тех пор изменили: кеш держит старые.
+     * Маршруты закешированы (`route:cache`), а адрес или домен панели в конфиге с тех пор изменили: кеш держит старые.
      */
     private function routeCache(): void
     {
@@ -395,11 +430,11 @@ final class Doctor
     }
 
     /**
-     * Админка на корне домена сайта (`path` пустой, `domain` не задан): адреса админки и сайта перекрывают друг друга.
-     * Смотрим GET-маршруты сайта без параметров: маршрут на адресе, который есть у админки (`/`, `/login`, `/files`…),
-     * заменяет её маршрут вместе с именем (роутер оставляет последний из одинаковых) — это ошибка: страницы админки строят ссылки
-     * по имени (`route('fastleo.dashboard')`) и падают; остальные адреса роутер может отдать разделам админки — предупреждение.
-     * Адреса админки берём из её файла маршрутов, загруженного в отдельный список: заменённых в общем списке уже нет.
+     * Панель на корне домена сайта (`path` пустой, `domain` не задан): адреса панели и сайта перекрывают друг друга.
+     * Смотрим GET-маршруты сайта без параметров: маршрут на адресе, который есть у панели (`/`, `/login`, `/files`…),
+     * заменяет её маршрут вместе с именем (роутер оставляет последний из одинаковых) — это ошибка: страницы панели строят ссылки
+     * по имени (`route('fastleo.dashboard')`) и падают; остальные адреса роутер может отдать разделам панели — предупреждение.
+     * Адреса панели берём из её файла маршрутов, загруженного в отдельный список: заменённых в общем списке уже нет.
      */
     private function rootRoutes(): void
     {
@@ -461,7 +496,7 @@ final class Doctor
     }
 
     /**
-     * Файлы админки лежат на локальном диске `public`, а ссылки `public/storage` нет — загруженное не откроется по адресу.
+     * Файлы панели лежат на локальном диске `public`, а ссылки `public/storage` нет — загруженное не откроется по адресу.
      *
      * ```php
      * Doctor::storageLinkMissing(); // true до php artisan storage:link
@@ -540,7 +575,7 @@ final class Doctor
 
     /**
      * Миграция пакета не записана в таблице `migrations`, а её таблица или колонка уже есть (старая версия fastleo,
-     * прежняя админка, потерянная запись) — `migrate` упадёт с ошибкой «уже существует». Если раньше неё выполнятся
+     * прежняя панель, потерянная запись) — `migrate` упадёт с ошибкой «уже существует». Если раньше неё выполнятся
      * ещё не выполненные миграции сайта (подготовка по инструкции перехода), они могут убрать помеху — тогда предупреждение.
      */
     private function migrationConflicts(bool $adminColumn): void
@@ -732,7 +767,7 @@ final class Doctor
             return;
         }
 
-        // Неизвестная иконка роняет каждую страницу админки (меню рисует иконку раздела), поэтому ловим её здесь.
+        // Неизвестная иконка роняет каждую страницу панели (меню рисует иконку раздела), поэтому ловим её здесь.
         foreach ([$resource::icon(), ...array_map(fn (Action $action): string => $action->getIcon(), $resource->listActions())] as $icon) {
             $this->icon($icon, $scope);
         }
@@ -1294,6 +1329,21 @@ final class Doctor
             $this->fields($field->schema()->fields(), $related, $columns, $path, $editable);
         } catch (Throwable $e) {
             $this->add('error', $path, 'resource', ['message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * `APP_URL` указывает на localhost: адреса файлов (`/storage/...`), миниатюры в панели и ссылки в письмах строятся от него
+     * и на сайте с другим адресом не откроются (скелет Laravel ставит `http://localhost:8000`).
+     */
+    private function appUrl(): void
+    {
+        // `APP_URL=null` в .env даёт null: config()->string() бросил бы исключение и doctor упал.
+        $url = is_string($value = config('app.url')) ? $value : '';
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+
+        if (in_array($host, ['localhost', '127.0.0.1', '[::1]'], true)) {
+            $this->add('warning', 'site', 'app_url_localhost', ['url' => $url], 'app_url_localhost_hint');
         }
     }
 

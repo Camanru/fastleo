@@ -11,7 +11,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 
 /**
- * Свои страницы админки (`Fastleo\Page`): шаблон и данные задаёт класс страницы.
+ * Свои страницы панели (`Fastleo\Page`): шаблон и данные задаёт класс страницы.
  */
 final class PagesController
 {

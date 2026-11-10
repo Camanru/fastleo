@@ -78,7 +78,7 @@ it('removes the files of the import reports of the deleted user', function (): v
         $import = Import::query()->where('user_id', (string) $user->id)->firstOrFail();
         $disk->put($import->path, 'xlsx');
         $disk->put($import->errorsPath(), 'errors');
-        // Файл пропущенных строк прежней версии (xlsx): в нём строки клиентов, он не должен остаться после удаления администратора.
+        // Файл пропущенных строк прежней версии (xlsx): в нём строки клиентов, он не должен остаться после удаления пользователя.
         $disk->put('fastleo/imports/'.$import->id.'-errors.xlsx', 'old errors');
     }
 

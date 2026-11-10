@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Админка всегда на русском, даже если у сайта другая локаль: тексты пакета есть только в ru.
+ * Панель всегда на русском, даже если у сайта другая локаль: тексты пакета есть только в ru.
  */
 final class SetLocale
 {

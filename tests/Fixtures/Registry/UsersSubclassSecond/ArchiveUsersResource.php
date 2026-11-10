@@ -9,7 +9,7 @@ use Fastleo\Resource;
 use Workbench\App\Models\User;
 
 /**
- * Свой раздел с адресом «users», не наследник «Администраторов»: он идёт первым по имени файла.
+ * Свой раздел с адресом «users», не наследник «Пользователей»: он идёт первым по имени файла.
  */
 final class ArchiveUsersResource extends Resource
 {

@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Models\MenuItem;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('builds the tree of the published items of one place in the order set in the panel', function (): void {
+    $about = MenuItem::factory()->create(['title' => 'О нас', 'url' => '/about', 'sort' => 2]);
+    MenuItem::factory()->create(['title' => 'Главная', 'url' => '/', 'sort' => 1]);
+    MenuItem::factory()->create(['title' => 'Команда', 'url' => '/team', 'parent_id' => $about->id]);
+    MenuItem::factory()->create(['title' => 'Скрытый', 'url' => '/hidden', 'is_published' => false, 'sort' => 3]);
+    MenuItem::factory()->create(['title' => 'Подвал', 'url' => '/privacy', 'location' => MenuItem::FOOTER]);
+
+    $tree = MenuItem::tree('header');
+
+    expect($tree->pluck('title')->all())->toBe(['Главная', 'О нас'])
+        ->and($tree->last()->children->pluck('title')->all())->toBe(['Команда'])
+        ->and(MenuItem::tree(MenuItem::FOOTER)->pluck('title')->all())->toBe(['Подвал']);
+});
+
+it('drops the items of a hidden parent from the tree', function (): void {
+    $hidden = MenuItem::factory()->create(['title' => 'Скрытый', 'is_published' => false]);
+    MenuItem::factory()->create(['title' => 'Вложенный', 'parent_id' => $hidden->id]);
+
+    expect(MenuItem::tree()->all())->toBe([]);
+});
+
+it('lets an administrator add a menu item', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'menu-items'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'menu-items'), ['title' => 'Контакты', 'url' => '/contacts', 'location' => 'header', 'is_published' => '1'])->assertRedirect();
+
+    expect(MenuItem::query()->where('url', '/contacts')->exists())->toBeTrue();
+});

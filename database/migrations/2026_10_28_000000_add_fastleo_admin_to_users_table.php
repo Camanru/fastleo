@@ -9,7 +9,7 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Колонка fastleo_admin в таблице пользователей — флаг доступа в админку (трейт HasFastleoAccess).
+ * Колонка fastleo_admin в таблице пользователей — флаг доступа в панель (трейт HasFastleoAccess).
  *
  * Таблица берётся из модели провайдера guard fastleo.
  */

@@ -149,7 +149,7 @@ describe('records', function (): void {
         enableSitemap(['cache_minutes' => 0, 'urls' => ['/a']]);
         DB::enableQueryLog();
 
-        // Публичный 404 карты — обычная страница сайта, а не экран ошибки админки.
+        // Публичный 404 карты — обычная страница сайта, а не экран ошибки панели.
         $this->get('/sitemap-'.(Sitemap::MAX_FILES + 1).'.xml')->assertNotFound()->assertDontSee('Страница не найдена');
         $this->get('/sitemap-999.xml')->assertNotFound();
 

@@ -15,7 +15,7 @@
 @endphp
 @if ($field->isMultiple())
     @php
-        // Сохранённые значения вне вариантов остаются плашками, пока админ их не снимет.
+        // Сохранённые значения вне вариантов остаются плашками, пока пользователь их не снимет.
         $chips = $options;
         foreach ($field->savedValues($record) as $savedValue) {
             if (! array_key_exists($savedValue, $chips)) {

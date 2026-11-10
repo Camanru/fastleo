@@ -27,7 +27,7 @@ final class PageResource extends Resource
 {
     protected static string $model = Page::class;
 
-    /** Адрес pages занят самой админкой. */
+    /** Адрес pages занят самой панелью. */
     protected static ?string $slug = 'site-pages';
 
     protected static ?string $label = 'Страницы';

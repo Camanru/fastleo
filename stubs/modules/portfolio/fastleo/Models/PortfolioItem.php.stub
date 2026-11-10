@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }}\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Database\Factories\Fastleo\PortfolioItemFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Работа портфолио. Вывод на сайте — ваш.
+ *
+ * ```php
+ * PortfolioItem::query()->published()->paginate(12);
+ * PortfolioItem::query()->published()->where('slug', $slug)->firstOrFail();
+ * ```
+ *
+ * @property int $id
+ * @property string $title
+ * @property string $slug
+ * @property string|null $category
+ * @property string|null $client
+ * @property \Illuminate\Support\Carbon|null $completed_at
+ * @property string|null $cover
+ * @property list<string>|null $photos
+ * @property string|null $excerpt
+ * @property string|null $body
+ * @property bool $is_published
+ * @property int $sort
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ */
+#[UseFactory(PortfolioItemFactory::class)]
+class PortfolioItem extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['title', 'slug', 'category', 'client', 'completed_at', 'cover', 'photos', 'excerpt', 'body', 'is_published', 'sort', 'seo'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'completed_at' => 'date',
+            'photos' => 'array',
+            'is_published' => 'boolean',
+            'seo' => 'array',
+        ];
+    }
+
+    /**
+     * Только опубликованные работы в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<PortfolioItem>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

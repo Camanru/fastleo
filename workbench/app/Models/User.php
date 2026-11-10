@@ -14,7 +14,7 @@ use Illuminate\Notifications\Notifiable;
 use Workbench\Database\Factories\UserFactory;
 
 /**
- * Пользователь демо-сайта: обычная модель Laravel + доступ в админку по колонке fastleo_admin.
+ * Пользователь демо-сайта: обычная модель Laravel + доступ в панель по колонке fastleo_admin.
  *
  * @property int $id
  * @property string $name

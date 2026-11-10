@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Workbench\App\Providers;
 
+use Fastleo\Leads\LeadResource;
 use Fastleo\Notifications\NotificationBotResource;
 use Fastleo\Publishing\ChannelResource;
 use Fastleo\Publishing\PublicationResource;
@@ -17,7 +18,7 @@ use Workbench\App\Policies\ArticlePolicy;
 use Workbench\App\Policies\TaskPolicy;
 
 /**
- * Настройки демо-сайта: ресурсы админки лежат в workbench/app/Fastleo, размеры вариантов картинок
+ * Настройки демо-сайта: ресурсы панели лежат в workbench/app/Fastleo, размеры вариантов картинок
  * и водяной знак, права на статьи — ArticlePolicy, на задачи витрины — TaskPolicy и TaskObserver.
  */
 final class WorkbenchServiceProvider extends ServiceProvider
@@ -44,6 +45,7 @@ final class WorkbenchServiceProvider extends ServiceProvider
             'fastleo.notifications.bots' => NotificationBotResource::class,
             'fastleo.publishing.channels' => ChannelResource::class,
             'fastleo.publishing.publications' => PublicationResource::class,
+            'fastleo.leads.resource' => LeadResource::class,
         ]);
     }
 

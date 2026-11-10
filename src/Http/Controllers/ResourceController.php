@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Http\Controllers;
 
+use Fastleo\Auth\Impersonation;
 use Fastleo\Fastleo;
 use Fastleo\Fields\Password;
 use Fastleo\Resource;
@@ -448,13 +449,14 @@ final class ResourceController
 
     /**
      * Открытая запись раздела с `$readColumn` становится просмотренной (без событий модели), если раздел не отключил это
-     * свойством `$readOnOpen = false`.
+     * свойством `$readOnOpen = false`. Под «Войти как» отметка не ставится: владелец смотрит глазами пользователя, но его работу
+     * не меняет.
      */
     private function markRead(Resource $resource, Model $record): void
     {
         $column = $resource::readColumn();
 
-        if ($column !== null && $resource::readOnOpen() && $record->getAttribute($column) === null && $resource->markRead([$record->getKey()]) > 0) {
+        if ($column !== null && $resource::readOnOpen() && ! Impersonation::active() && $record->getAttribute($column) === null && $resource->markRead([$record->getKey()]) > 0) {
             $record->setAttribute($column, $record->freshTimestamp());
             $record->syncOriginalAttribute($column);
         }

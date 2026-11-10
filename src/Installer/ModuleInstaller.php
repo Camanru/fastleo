@@ -171,6 +171,12 @@ final class ModuleInstaller
                 }
             }
 
+            foreach ($module->slugs as $slug) {
+                if ($this->slugTaken($slug)) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_conflict_slug', ['module' => $module->name, 'slug' => $slug]);
+                }
+            }
+
             foreach ($module->uris as $uri) {
                 if ($this->routeTaken($uri)) {
                     $conflicts[$module->name][] = __('fastleo::console.module_conflict_uri', ['module' => $module->name, 'uri' => '/'.Str::afterLast($uri, ' ')]);
@@ -267,7 +273,17 @@ final class ModuleInstaller
     }
 
     /**
-     * Адрес сайта уже занят маршрутом. Запись `POST leads` проверяет только маршруты с методом POST.
+     * Адрес раздела или страницы настроек уже занят разделом сайта.
+     */
+    private function slugTaken(string $slug): bool
+    {
+        $registry = Fastleo::resources();
+
+        return isset($registry->all()[$slug]) || isset($registry->settings()[$slug]);
+    }
+
+    /**
+     * Адрес сайта уже занят маршрутом. Запись `POST shop` проверяет только маршруты с методом POST.
      */
     private function routeTaken(string $address): bool
     {

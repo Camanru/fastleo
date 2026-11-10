@@ -19,7 +19,7 @@ use Workbench\App\Models\Topic;
 
 beforeEach(function (): void {
     useFixtureResources('Exports');
-    // xlsx в админке отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
+    // xlsx в панели отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
     config(['fastleo.xlsx' => true]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });

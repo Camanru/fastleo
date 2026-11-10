@@ -18,14 +18,14 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use function Laravel\Prompts\text;
 
 /**
- * Создать Policy модели со всеми способностями, которые спрашивает админка
+ * Создать Policy модели со всеми способностями, которые спрашивает панель
  *
  * ```bash
  * php artisan fastleo:make-policy Product
  * ```
  */
 #[AsCommand(name: 'fastleo:make-policy')]
-#[Description('Создать Policy модели (app/Policies) со всеми способностями, которые спрашивает админка')]
+#[Description('Создать Policy модели (app/Policies) со всеми способностями, которые спрашивает панель')]
 #[Signature('fastleo:make-policy {name? : имя модели, например Product} {--model= : класс модели (по умолчанию App\\Models\\{name})} {--force : перезаписать существующий файл}')]
 final class MakePolicyCommand extends Command
 {

@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Models\Page;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published pages in the published scope', function (): void {
+    Page::factory()->create(['slug' => 'open']);
+    Page::factory()->create(['slug' => 'closed', 'is_published' => false]);
+
+    expect(Page::query()->published()->pluck('slug')->all())->toBe(['open']);
+});
+
+it('lets an administrator manage pages in the admin panel', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'site-pages'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'site-pages'), ['title' => 'Контакты', 'slug' => 'contacts', 'is_published' => '1'])->assertRedirect();
+
+    expect(Page::query()->where('slug', 'contacts')->exists())->toBeTrue();
+});

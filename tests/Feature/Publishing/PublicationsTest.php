@@ -347,7 +347,7 @@ describe('journal', function (): void {
         $publication = publication();
 
         FastleoServer::actingAs($this->me, 'fastleo')->tool(RunAction::class, ['resource' => 'publications', 'action' => 'send', 'ids' => [(string) $publication->id]])
-            ->assertHasErrors(['Это действие запускает только человек в админке']);
+            ->assertHasErrors(['Это действие запускает только человек в панели']);
         expect(Delivery::query()->count())->toBe(0);
     });
 });

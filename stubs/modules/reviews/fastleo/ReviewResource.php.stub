@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ namespace }}\Models\Review;
+use Fastleo\Fields\Date;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Отзывы»: автор, оценка, текст, фото. Порядок на сайте — перетаскиванием в списке.
+ * Показ отзывов на сайте — ваши маршруты и шаблоны: `Review::query()->published()->get()`.
+ */
+final class ReviewResource extends Resource
+{
+    protected static string $model = Review::class;
+
+    protected static ?string $label = 'Отзывы';
+
+    protected static ?string $singular = 'Отзыв';
+
+    protected static string $icon = 'message-square-quote';
+
+    protected static int $position = 30;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля отзыва.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('author', 'Автор')->required()->maxLength(100)->searchable()->sortable(),
+            Text::make('company', 'Должность или компания')->maxLength(150)->hideInList(),
+            Number::make('rating', 'Оценка')->integer()->min(1)->max(5)->default(5)->required(),
+            Textarea::make('body', 'Текст отзыва')->rows(5)->required()->searchable(),
+            Image::make('photo', 'Фото')->directory('reviews')->hideInList(),
+            Date::make('reviewed_at', 'Дата отзыва')->hideInList(),
+            Toggle::make('is_published', 'Опубликован')->default(true)->quickToggle(),
+        ];
+    }
+}

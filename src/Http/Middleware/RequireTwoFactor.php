@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Http\Middleware;
 
 use Closure;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Auth\TwoFactor;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -12,7 +13,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * При `fastleo.auth.two_factor_required` отправляет администратора без двухфакторной защиты
+ * При `fastleo.auth.two_factor_required` отправляет пользователя без двухфакторной защиты
  * в профиль: пока не включит, остальные страницы недоступны (выход и профиль открыты).
  */
 final readonly class RequireTwoFactor
@@ -34,6 +35,7 @@ final readonly class RequireTwoFactor
         if (! config()->boolean('fastleo.auth.two_factor_required')
             || ! $user instanceof Authenticatable
             || $request->routeIs('fastleo.profile.*', 'fastleo.logout')
+            || Impersonation::active()
             || $this->twoFactor->isEnabled($user)) {
             return $next($request);
         }

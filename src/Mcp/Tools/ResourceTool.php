@@ -17,13 +17,13 @@ use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
 
 /**
- * Основа инструментов MCP: проверяет, что работает администратор админки, находит раздел и запись
+ * Основа инструментов MCP: проверяет, что работает пользователь панели, находит раздел и запись
  * по аргументам и сверяет права по Policy. Ошибки возвращаются агенту текстом, а не падением сервера.
  */
 abstract class ResourceTool extends Tool
 {
     /**
-     * Выполнить инструмент от имени администратора.
+     * Выполнить инструмент от имени пользователя.
      */
     final public function handle(Request $request): Response
     {
@@ -31,7 +31,7 @@ abstract class ResourceTool extends Tool
 
         try {
             $user = Fastleo::guard()->user();
-            // Сервер живёт долго: доступ, снятый администратору после запуска, действует со следующего вызова.
+            // Сервер живёт долго: доступ, снятый пользователю после запуска, действует со следующего вызова.
             $user = $user instanceof Model ? $user->fresh() : $user;
 
             if (! $user instanceof FastleoUser || ! $user->canAccessFastleo()) {
@@ -39,10 +39,10 @@ abstract class ResourceTool extends Tool
             }
 
             Fastleo::guard()->setUser($user);
-            // Как в страницах админки (там это делает middleware входа): `auth()` и `Gate` в коде сайта (`query()`, `can()`, observers) видят администратора.
+            // Как в страницах панели (там это делает middleware входа): `auth()` и `Gate` в коде сайта (`query()`, `can()`, observers) видят пользователя.
             Auth::shouldUse(Fastleo::GUARD);
 
-            // Права и роли spatie кешируются в памяти процесса: изменённые в админке действуют со следующего вызова.
+            // Права и роли spatie кешируются в памяти процесса: изменённые в панели действуют со следующего вызова.
             if (method_exists($user, 'forgetCachedPermissions')) {
                 $user->forgetCachedPermissions();
             }
@@ -71,7 +71,7 @@ abstract class ResourceTool extends Tool
         $resource = is_string($slug) ? Fastleo::resources()->find($slug) : null;
 
         if (! $resource instanceof Resource || ! $resource->isAvailableInMcp()) {
-            // Только разделы, которые администратору можно открыть: чужие названия ошибка не раскрывает.
+            // Только разделы, которые пользователю можно открыть: чужие названия ошибка не раскрывает.
             $slugs = array_filter(array_keys(Fastleo::resources()->all()), function (string $slug): bool {
                 $other = Fastleo::resources()->find($slug);
 

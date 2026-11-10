@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
 /**
- * Бот, который отправляет уведомления `notifyAdmins()` администраторам в Telegram или Max (раздел «Боты уведомлений»).
+ * Бот, который отправляет уведомления `notifyAdmins()` пользователям в Telegram или Max (раздел «Боты уведомлений»).
  * Токен хранится зашифрованным и скрыт при выводе модели.
  *
  * @property int $id

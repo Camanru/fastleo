@@ -35,15 +35,15 @@ afterEach(function (): void {
 });
 
 it('adds the listed modules without questions and leaves the setup steps to the owner', function (): void {
-    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'contacts, leads'])
+    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'contacts, news'])
         ->expectsOutputToContain('app/Fastleo/ContactsSettings.php')
         ->expectsOutputToContain('php artisan fastleo:user')
         ->assertSuccessful();
 
     expect($this->sandbox.'/app/Fastleo/ContactsSettings.php')->toBeFile()
-        ->and($this->sandbox.'/app/Fastleo/LeadResource.php')->toBeFile()
-        ->and(glob($this->sandbox.'/database/migrations/*_create_leads_table.php'))->toHaveCount(1)
-        ->and(Schema::hasTable('leads'))->toBeFalse();
+        ->and($this->sandbox.'/app/Fastleo/NewsResource.php')->toBeFile()
+        ->and(glob($this->sandbox.'/database/migrations/*_create_news_table.php'))->toHaveCount(1)
+        ->and(Schema::hasTable('news'))->toBeFalse();
 });
 
 it('adds no modules with --type=basic or --type=custom and no module names', function (): void {
@@ -56,7 +56,7 @@ it('adds no modules with --type=basic or --type=custom and no module names', fun
 it('goes straight to the steps after the basic installation without asking about modules', function (): void {
     $this->artisan('fastleo:install', $this->base)
         ->expectsChoice('Какая установка?', 'basic', Modules::types())
-        ->expectsConfirmation('Создать администратора сейчас?', 'no')
+        ->expectsConfirmation('Создать первого пользователя сейчас?', 'no')
         ->assertSuccessful();
 
     expect($this->sandbox.'/app/Fastleo')->not->toBeDirectory();
@@ -97,8 +97,8 @@ it('rejects an unknown site type and an unknown module', function (): void {
         ->expectsOutputToContain('Нет вида установки «shop». Доступно: basic, custom')
         ->assertFailed();
 
-    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'shop'])
-        ->expectsOutputToContain('Нет модуля «shop»')
+    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'blog'])
+        ->expectsOutputToContain('Нет модуля «blog»')
         ->assertFailed();
 });
 
@@ -106,18 +106,19 @@ it('stops with the list of conflicts and writes no module when a place is taken'
     File::ensureDirectoryExists($this->sandbox.'/app/Fastleo');
     File::put($this->sandbox.'/app/Fastleo/ContactsSettings.php', 'мой код');
 
-    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'contacts,leads'])
+    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'contacts,news'])
         ->expectsOutputToContain('ContactsSettings.php уже есть')
         ->assertFailed();
 
-    expect($this->sandbox.'/app/Fastleo/LeadResource.php')->not->toBeFile();
+    expect($this->sandbox.'/app/Fastleo/NewsResource.php')->not->toBeFile();
 });
 
 it('runs the setup steps by flags: migrate, examples, administrator', function (): void {
     // Как composer на сайте: App\\ — папка app, Database\\Seeders\\ — database/seeders.
     spl_autoload_register($loader = function (string $class): void {
         $file = match (true) {
-            str_starts_with($class, 'Database\\Seeders\\') => $this->sandbox.'/database/seeders/'.class_basename($class).'.php',
+            str_starts_with($class, 'Database\\Seeders\\') => $this->sandbox.'/database/seeders/'.str_replace('\\', '/', substr($class, 17)).'.php',
+            str_starts_with($class, 'Database\\Factories\\') => $this->sandbox.'/database/factories/'.str_replace('\\', '/', substr($class, 19)).'.php',
             str_starts_with($class, 'App\\') => $this->sandbox.'/app/'.str_replace('\\', '/', substr($class, 4)).'.php',
             default => '',
         };
@@ -152,7 +153,7 @@ it('asks for the site type and the modules, then for each step', function (): vo
         ->expectsChoice('Какая установка?', 'custom', $types)
         ->expectsChoice('Что будет на сайте? (пробел — отметить, Enter — дальше)', ['contacts'], $modules)
         ->expectsConfirmation('Выполнить миграции сейчас?', 'yes')
-        ->expectsConfirmation('Создать администратора сейчас?', 'no')
+        ->expectsConfirmation('Создать первого пользователя сейчас?', 'no')
         ->assertSuccessful();
 
     expect($this->sandbox.'/app/Fastleo/ContactsSettings.php')->toBeFile();
@@ -188,7 +189,7 @@ it('shows the conflicts of the chosen modules and asks again without them', func
         ->expectsConfirmation('Выполнить миграции сейчас?', 'no')
         ->assertSuccessful();
 
-    expect($this->sandbox.'/app/Models/Page.php')->not->toBeFile()
+    expect($this->sandbox.'/app/Fastleo/Models/Page.php')->not->toBeFile()
         ->and($this->sandbox.'/app/Fastleo/ContactsSettings.php')->toBeFile();
 });
 
@@ -234,7 +235,7 @@ it('fails when fastleo:doctor finds an error', function (): void {
 });
 
 it('reminds to run migrate once, in the final steps, after adding modules with tables', function (): void {
-    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'leads'])
+    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'news'])
         ->doesntExpectOutputToContain('выполните php artisan migrate')
         ->expectsOutputToContain('php artisan migrate —')
         ->assertSuccessful();
@@ -254,7 +255,7 @@ it('fails when the administrator was asked for but the migrations have not run',
     DB::table('migrations')->where('migration', '2026_10_28_000000_add_fastleo_admin_to_users_table')->delete();
 
     $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--no-modules' => true, '--admin-email' => 'new@example.com', '--admin-password' => 'secret-pass-1'])
-        ->expectsOutputToContain('Администратор new@example.com не создан: таблиц ещё нет')
+        ->expectsOutputToContain('Пользователь new@example.com не создан: таблиц ещё нет')
         ->assertFailed();
 
     expect(User::query()->where('email', 'new@example.com')->exists())->toBeFalse();
@@ -276,7 +277,7 @@ it('fails and says which examples were not added when a seeder cannot run', func
     });
 
     $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'news', '--setup' => true, '--seed' => true])
-        ->expectsOutputToContain('Примеры не добавлены (Database\Seeders\NewsSeeder): нет сидера')
+        ->expectsOutputToContain('Примеры не добавлены (Database\Seeders\Fastleo\NewsSeeder): нет сидера')
         ->assertFailed();
 });
 
@@ -291,7 +292,7 @@ it('does not ask again when every chosen module is taken', function (): void {
         ->expectsChoice('Какая установка?', 'custom', $types)
         ->expectsChoice('Что будет на сайте? (пробел — отметить, Enter — дальше)', ['pages'], $modules)
         ->expectsOutputToContain('таблица pages уже есть')
-        ->expectsConfirmation('Создать администратора сейчас?', 'no')
+        ->expectsConfirmation('Создать первого пользователя сейчас?', 'no')
         ->assertSuccessful();
 });
 
@@ -311,6 +312,6 @@ it('still asks about the administrator when the users table has no fastleo_admin
 
     $this->artisan('fastleo:install', $this->base)
         ->expectsChoice('Какая установка?', 'basic', Modules::types())
-        ->expectsConfirmation('Создать администратора сейчас?', 'no')
-        ->assertFailed(); // doctor ругается на отсутствие колонки, вопрос об администраторе при этом задан
+        ->expectsConfirmation('Создать первого пользователя сейчас?', 'no')
+        ->assertFailed(); // doctor ругается на отсутствие колонки, вопрос об пользователе при этом задан
 });

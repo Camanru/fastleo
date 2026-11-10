@@ -207,7 +207,7 @@ it('opens the editor as usual for a stored text the cleaner takes and for a text
         ->assertSee('name="content"', false)
         ->assertDontSee('Текст слишком сложный для редактора', false);
 
-    // Слишком сложный текст, который администратор прислал сам, не сохранён: форма остаётся с редактором и ошибкой.
+    // Слишком сложный текст, который пользователь прислал сам, не сохранён: форма остаётся с редактором и ошибкой.
     $this->followingRedirects()
         ->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['content' => str_repeat('<b>', 30_000).'x']))
         ->assertOk()

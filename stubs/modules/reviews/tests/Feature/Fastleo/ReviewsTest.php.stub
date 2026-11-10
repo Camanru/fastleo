@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ namespace }}\Models\Review;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published reviews in the order set in the panel', function (): void {
+    Review::factory()->create(['author' => 'Второй', 'sort' => 2]);
+    Review::factory()->create(['author' => 'Первый', 'sort' => 1]);
+    Review::factory()->create(['author' => 'Скрытый', 'is_published' => false]);
+
+    expect(Review::query()->published()->pluck('author')->all())->toBe(['Первый', 'Второй']);
+});
+
+it('lets an administrator add a review', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'reviews'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'reviews'), ['author' => 'Анна', 'rating' => '5', 'body' => 'Спасибо!', 'is_published' => '1'])->assertRedirect();
+
+    expect(Review::query()->where('author', 'Анна')->exists())->toBeTrue();
+});

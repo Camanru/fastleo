@@ -14,21 +14,21 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 
 /**
- * История входов администратора: запись входа, список устройств, письмо о новом устройстве.
+ * История входов пользователя: запись входа, список устройств, письмо о новом устройстве.
  *
  * Устройство — пара «IP + строка браузера»; повторный вход с него обновляет время, а не добавляет строку.
  */
 final readonly class LoginHistory
 {
     /**
-     * Слушатель события входа: пишет вход и, если устройство новое для администратора,
+     * Слушатель события входа: пишет вход и, если устройство новое для пользователя,
      * который уже входил раньше, отправляет письмо (если оно не выключено в `fastleo.auth.new_login_mail`).
      *
      * Сбой почты не мешает входу.
      */
     public function handle(Login $event): void
     {
-        if ($event->guard !== Fastleo::GUARD) {
+        if ($event->guard !== Fastleo::GUARD || Impersonation::silent()) {
             return;
         }
 
@@ -42,7 +42,7 @@ final readonly class LoginHistory
     }
 
     /**
-     * Записать вход. Возвращает true, если с этого устройства администратор вошёл впервые.
+     * Записать вход. Возвращает true, если с этого устройства пользователь вошёл впервые.
      */
     public function record(Authenticatable $user, Request $request): bool
     {
@@ -78,7 +78,7 @@ final readonly class LoginHistory
     }
 
     /**
-     * Устройства администратора, свежие сверху.
+     * Устройства пользователя, свежие сверху.
      *
      * @return Collection<int, LoginRecord>
      */
@@ -96,7 +96,7 @@ final readonly class LoginHistory
     }
 
     /**
-     * Забыть все устройства администратора, кроме текущего (после «выйти на других устройствах»).
+     * Забыть все устройства пользователя, кроме текущего (после «выйти на других устройствах»).
      */
     public function forgetOthers(Authenticatable $user, Request $request): void
     {
@@ -117,7 +117,7 @@ final readonly class LoginHistory
     }
 
     /**
-     * Входил ли администратор раньше.
+     * Входил ли пользователь раньше.
      */
     private function hasHistory(Authenticatable $user): bool
     {

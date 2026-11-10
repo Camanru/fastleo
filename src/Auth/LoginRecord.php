@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Устройство, с которого администратор входил в админку: пара «IP + браузер».
+ * Устройство, с которого пользователь входил в панель: пара «IP + браузер».
  *
  * @property int $id
  * @property string $user_id

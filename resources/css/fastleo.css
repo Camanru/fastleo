@@ -181,7 +181,7 @@
         scroll-padding-bottom: 6rem;
     }
 
-    /* Чекбокс и радио в стиле админки (переключатель Toggle — отдельный, у него поле sr-only). */
+    /* Чекбокс и радио в стиле панели (переключатель Toggle — отдельный, у него поле sr-only). */
     input[type="checkbox"]:not(.sr-only),
     input[type="radio"]:not(.sr-only) {
         appearance: none;

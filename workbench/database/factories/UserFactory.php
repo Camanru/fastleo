@@ -9,10 +9,10 @@ use Illuminate\Support\Str;
 use Workbench\App\Models\User;
 
 /**
- * Фабрика пользователей демо-сайта. По умолчанию — обычный пользователь без доступа в админку.
+ * Фабрика пользователей демо-сайта. По умолчанию — обычный пользователь без доступа в панель.
  *
  * ```php
- * User::factory()->admin()->create(); // администратор с паролем «password»
+ * User::factory()->admin()->create(); // пользователь с паролем «password»
  * ```
  *
  * @extends Factory<User>
@@ -39,7 +39,7 @@ final class UserFactory extends Factory
     }
 
     /**
-     * Администратор fastleo.
+     * Пользователь fastleo.
      */
     public function admin(): self
     {

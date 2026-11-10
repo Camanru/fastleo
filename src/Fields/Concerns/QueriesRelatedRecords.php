@@ -411,7 +411,7 @@ trait QueriesRelatedRecords
             ? collect($this->prefetched)
             : $this->optionsQuery($dependency)->whereKey($keys)->get()->keyBy(fn (Model $record): string => self::key($record));
         $missing = array_values(array_intersect(array_diff($keys, array_map(strval(...), $records->keys()->all())), $kept));
-        // Одиночная сохранённая связь подписывается так же, как в списке: запись уже связана, её подпись не новость для администратора.
+        // Одиночная сохранённая связь подписывается так же, как в списке: запись уже связана, её подпись не новость для пользователя.
         // В списке нескольких записей скрытая `query()` не показывается: её связь сохранение не трогает, и снять её там нельзя.
         $base = $missing === [] ? collect() : ($this->isMultiple() ? $this->baseOptionsQuery() : $this->relatedModel()->newQuery())
             ->whereKey($missing)->get()->keyBy(fn (Model $record): string => self::key($record));

@@ -6,6 +6,7 @@ namespace Fastleo\Http\Controllers;
 
 use Fastleo\Auth\FailedLogins;
 use Fastleo\Auth\FastleoUser;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Auth\LoginRedirect;
 use Fastleo\Auth\LoginThrottle;
 use Fastleo\Auth\TwoFactor;
@@ -24,12 +25,12 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * Вход в админку и выход.
+ * Вход в панель и выход.
  */
 final class AuthController
 {
     /**
-     * Форма входа. Вошедший администратор сразу попадает на стартовую страницу.
+     * Форма входа. Вошедший пользователь сразу попадает на стартовую страницу.
      */
     public function create(): View|RedirectResponse
     {
@@ -47,7 +48,7 @@ final class AuthController
      * только точное совпадение email, хеширование пароля и для несуществующего
      * пользователя (по времени ответа не узнать, есть ли учётная запись),
      * одинаковая ошибка для неверного пароля и пользователя без доступа,
-     * новая сессия после входа. Если у администратора включена двухфакторная защита,
+     * новая сессия после входа. Если у пользователя включена двухфакторная защита,
      * вход не выполняется, пока не введён код (`TwoFactorChallengeController`).
      */
     public function store(LoginRequest $request, LoginThrottle $throttle, TwoFactor $twoFactor): RedirectResponse
@@ -102,6 +103,7 @@ final class AuthController
         }
 
         $throttle->clear($account, $ip);
+        Impersonation::forget();
         $guard->login($user, $request->boolean('remember'));
         $request->session()->regenerate();
 
@@ -113,7 +115,7 @@ final class AuthController
      */
     public function destroy(Request $request): RedirectResponse
     {
-        Fastleo::guard()->logout();
+        Impersonation::signOut();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
@@ -152,7 +154,7 @@ final class AuthController
     }
 
     /**
-     * Вошедший администратор с доступом или null.
+     * Вошедший пользователь с доступом или null.
      */
     private function currentAdmin(): ?FastleoUser
     {

@@ -15,7 +15,7 @@ enum TaskStatus: string
     case Cancelled = 'cancelled';
 
     /**
-     * Подпись для админки.
+     * Подпись для панели.
      */
     public function label(): string
     {

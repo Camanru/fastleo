@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo;
 
 use Closure;
+use Fastleo\Auth\Impersonation;
 use Fastleo\Auth\RoleMatrix;
 use Fastleo\Auth\UserLookup;
 use Fastleo\Health\HealthChecks;
@@ -16,6 +17,7 @@ use Fastleo\Http\Middleware\EnsureCanAccessFastleo;
 use Fastleo\Http\Middleware\RequireTwoFactor;
 use Fastleo\Http\Middleware\SecurityHeaders;
 use Fastleo\Http\Middleware\SetLocale;
+use Fastleo\Http\Middleware\ValidateImpersonation;
 use Fastleo\Notifications\FastleoMessage;
 use Fastleo\Notifications\MessageMailNotification;
 use Fastleo\Notifications\MessageNotification;
@@ -42,21 +44,21 @@ use WeakMap;
 final class Fastleo
 {
     /**
-     * Имя guard, через который входят в админку. Регистрируется провайдером пакета
+     * Имя guard, через который входят в панель. Регистрируется провайдером пакета
      * поверх провайдера пользователей из config('fastleo.auth.provider').
      */
     public const string GUARD = 'fastleo';
 
     /**
-     * Язык интерфейса админки: тексты пакета есть только на русском.
+     * Язык интерфейса панели: тексты пакета есть только на русском.
      */
     public const string LOCALE = 'ru';
 
     /**
-     * Guard админки.
+     * Guard панели.
      *
      * ```php
-     * Fastleo::guard()->user(); // вошедший администратор или null
+     * Fastleo::guard()->user(); // вошедший пользователь или null
      * ```
      */
     public static function guard(): SessionGuard
@@ -83,7 +85,7 @@ final class Fastleo
     }
 
     /**
-     * Middleware страниц админки после входа: проверка входа, сеанса, доступа, обязательной 2FA.
+     * Middleware страниц панели после входа: проверка входа, сеанса, доступа, обязательной 2FA.
      *
      * @return list<string>
      */
@@ -92,19 +94,20 @@ final class Fastleo
         return [
             Authenticate::using(self::GUARD),
             AuthenticateSession::class,
+            ValidateImpersonation::class,
             EnsureCanAccessFastleo::class,
             RequireTwoFactor::class,
         ];
     }
 
     /**
-     * Свои маршруты сайта внутри админки: с префиксом, доменом и защитой админки (вход, CSRF, русский язык, заголовки).
+     * Свои маршруты сайта внутри панели: с префиксом, доменом и защитой панели (вход, CSRF, русский язык, заголовки).
      * Адреса — `/fastleo/pages/…`, имена — `fastleo.pages.…`. Берите маршруты длиннее одного сегмента
      * (`report/run`), чтобы не пересечься со страницей `/fastleo/pages/{страница}`.
      *
      * Маршруты кнопок и форм своей страницы привязывайте к ней (`page:`): тогда они проверяют то же, что и страница, —
-     * `isAvailable()` (иначе 404) и `canAccess()` администратора (иначе 403). Без `page` маршрут открыт любому
-     * администратору.
+     * `isAvailable()` (иначе 404) и `canAccess()` пользователя (иначе 403). Без `page` маршрут открыт любому
+     * пользователю.
      *
      * ```php
      * // routes/web.php
@@ -135,7 +138,7 @@ final class Fastleo
     }
 
     /**
-     * Как найти администраторов для `notifyAdmins()` (по умолчанию — пользователи с `fastleo_admin`, которым
+     * Как найти пользователей для `notifyAdmins()` (по умолчанию — пользователи с `fastleo_admin`, которым
      * `canAccessFastleo()` разрешает вход).
      *
      * @var (Closure(): iterable<int, Authenticatable>)|null
@@ -143,7 +146,7 @@ final class Fastleo
     private static ?Closure $adminsResolver = null;
 
     /**
-     * Кому показывать колокольчик (по умолчанию — всем администраторам, пока он включён в конфиге).
+     * Кому показывать колокольчик (по умолчанию — всем пользователям, пока он включён в конфиге).
      *
      * @var (Closure(Authenticatable): bool)|null
      */
@@ -165,7 +168,7 @@ final class Fastleo
     private static ?WeakMap $ownerCache = null;
 
     /**
-     * Абсолютный адрес страницы админки для писем: от `APP_URL` (или от `fastleo.domain`), а не от заголовка Host
+     * Абсолютный адрес страницы панели для писем: от `APP_URL` (или от `fastleo.domain`), а не от заголовка Host
      * запроса, — иначе подменённый Host попал бы в ссылку сброса пароля.
      *
      * ```php
@@ -180,7 +183,7 @@ final class Fastleo
     }
 
     /**
-     * Полный адрес по пути внутри админки (`/fastleo/leads/5`): если задан `fastleo.domain` — на нём (схема от `APP_URL`),
+     * Полный адрес по пути внутри панели (`/fastleo/leads/5`): если задан `fastleo.domain` — на нём (схема от `APP_URL`),
      * иначе от `APP_URL`. Заголовок Host запроса не используется: посетитель сайта не может подменить домен ссылки,
      * а письмо из очереди и вебхук получают тот же адрес. Полный адрес (`https://…`) возвращается как есть.
      *
@@ -202,7 +205,7 @@ final class Fastleo
     }
 
     /**
-     * Свой способ выбрать администраторов для уведомлений (например, по роли). Вызывается в `AppServiceProvider::boot()`.
+     * Свой способ выбрать пользователей для уведомлений (например, по роли). Вызывается в `AppServiceProvider::boot()`.
      *
      * ```php
      * Fastleo::resolveAdminsUsing(fn () => User::role('editor')->get());
@@ -216,7 +219,7 @@ final class Fastleo
     }
 
     /**
-     * Администраторы, которым идут уведомления.
+     * Пользователи, которым идут уведомления.
      *
      * @return list<Authenticatable>
      */
@@ -275,6 +278,20 @@ final class Fastleo
     }
 
     /**
+     * Владелец, который сейчас вошёл в панель под чужим именем («Войти как», `fastleo.users.impersonate`), или null.
+     * Нужен сайту, чтобы записать в свой журнал, кто на самом деле правил запись: пакет пишет в журнал только начало и конец
+     * подмены. Вне запроса с сессией (консоль, очередь) всегда null.
+     *
+     * ```php
+     * $author = Fastleo::impersonator() ?? Fastleo::guard()->user();
+     * ```
+     */
+    public static function impersonator(): ?Authenticatable
+    {
+        return Impersonation::impersonator();
+    }
+
+    /**
      * Пользователь — владелец: роль-владелец при включённых ролях, иначе ответ `resolveOwnerUsing()`; нет ни того ни другого —
      * нет. Без аргумента — вошедший в панель; без пользователя (консоль, очередь без входа) — нет. Сайту: проверка в Policy
      * и в коде вместо своего `$user->is_owner`.
@@ -315,7 +332,7 @@ final class Fastleo
     }
 
     /**
-     * Показывать колокольчик (и раздел «Уведомления») только некоторым администраторам, например владельцу: у остальных нет
+     * Показывать колокольчик (и раздел «Уведомления») только некоторым пользователям, например владельцу: у остальных нет
      * колокольчика, их адреса отвечают 404, а уведомления им не сохраняются. Вызывается в `AppServiceProvider::boot()`;
      * включённый в конфиге колокольчик остаётся главным выключателем.
      *
@@ -323,7 +340,7 @@ final class Fastleo
      * Fastleo::showBellTo(fn (User $user) => $user->is_owner);
      * ```
      *
-     * @param  (Closure(Authenticatable): bool)|null  $resolver  null возвращает показ всем администраторам
+     * @param  (Closure(Authenticatable): bool)|null  $resolver  null возвращает показ всем пользователям
      */
     public static function showBellTo(?Closure $resolver): void
     {
@@ -331,7 +348,7 @@ final class Fastleo
     }
 
     /**
-     * Колокольчик включён в конфиге и показывается этому администратору (см. `showBellTo()`). Адресат, который не
+     * Колокольчик включён в конфиге и показывается этому пользователю (см. `showBellTo()`). Адресат, который не
      * Authenticatable, при заданном выборе колокольчика не получает.
      */
     public static function bellFor(?object $user): bool
@@ -378,7 +395,7 @@ final class Fastleo
     public const array CHANNELS = ['bell', 'mail', 'bots'];
 
     /**
-     * Уведомить всех администраторов во включённые каналы: колокольчик в шапке (`notifications.bell`), письмо
+     * Уведомить всех пользователей во включённые каналы: колокольчик в шапке (`notifications.bell`), письмо
      * (`notifications.mail`), чаты ботов раздела «Боты уведомлений» (`notifications.bots`, Telegram и Max).
      * Строка — заголовок уведомления. `$via` — только эти каналы из `bell`, `mail`, `bots` (выключенный в конфиге
      * пропускается); null — все включённые. Неизвестное имя канала или пустой список — `InvalidArgumentException`.
@@ -408,7 +425,7 @@ final class Fastleo
         $message = is_string($message) ? FastleoMessage::make($message) : $message;
         $bell = in_array('bell', $via, true) && self::bell();
         $mail = in_array('mail', $via, true) && self::mail();
-        // Список администраторов нужен только колокольчику и почте: форма заявки без них не делает лишний запрос.
+        // Список пользователей нужен только колокольчику и почте: форма заявки без них не делает лишний запрос.
         $admins = $bell || $mail ? self::admins() : [];
 
         if ($bell) {
@@ -441,7 +458,7 @@ final class Fastleo
     }
 
     /**
-     * Письмо с уведомлением каждому администратору, у которого есть адрес. Сбой отправки одного письма не мешает
+     * Письмо с уведомлением каждому пользователю, у которого есть адрес. Сбой отправки одного письма не мешает
      * остальным и не ломает код сайта, который вызвал `notifyAdmins()`.
      *
      * @param  list<Authenticatable>  $admins
@@ -458,9 +475,9 @@ final class Fastleo
     }
 
     /**
-     * Адрес, по которому администратору открыть запись (для уведомлений, писем, ссылок сайта): страница просмотра, если она
+     * Адрес, по которому пользователю открыть запись (для уведомлений, писем, ссылок сайта): страница просмотра, если она
      * включена (`fastleo.record_view`), иначе форма правки; null — у модели нет раздела. Права не проверяются (ссылку строят и там,
-     * где администратора нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. Полный адрес строится через
+     * где пользователя нет: вебхук, очередь, команда), открывшаяся страница проверит их сама. Полный адрес строится через
      * `adminUrl()` — от `fastleo.domain` или `APP_URL`, а не от хоста запроса; `$absolute = false` — путь без хоста
      * (`FastleoMessage` достроит его так же). Адрес с проверкой прав для списков и поиска — `Resource::openUrl()`.
      *
@@ -476,7 +493,7 @@ final class Fastleo
     }
 
     /**
-     * Уведомить одного администратора (только колокольчик; при выключенном колокольчике ничего не делает).
+     * Уведомить одного пользователя (только колокольчик; при выключенном колокольчике ничего не делает).
      */
     public static function notify(Authenticatable $user, FastleoMessage|string $message): void
     {
@@ -556,7 +573,7 @@ final class Fastleo
     }
 
     /**
-     * Часовой пояс админки: в нём показываются и вводятся дата и время.
+     * Часовой пояс панели: в нём показываются и вводятся дата и время.
      * `fastleo.timezone`, если это известный пояс, иначе пояс сайта (`app.timezone`).
      *
      * ```php

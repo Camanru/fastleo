@@ -14,7 +14,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Сайт закрыт в настройках: посетители получают 503 («Сайт временно не работает»; запросам JSON — ответ JSON),
- * админка и вошедшие администраторы работают как обычно. Вошедший администратор видит сайт как всегда, а в шаблоны
+ * панель и вошедшие пользователи работают как обычно. Вошедший пользователь видит сайт как всегда, а в шаблоны
  * приходит переменная `$fastleoSiteClosed` — сайт может показать пометку «посетителям сайт недоступен».
  */
 final class CloseSiteForVisitors
@@ -44,7 +44,7 @@ final class CloseSiteForVisitors
     }
 
     /**
-     * Запрос идёт в админку (маршруты `fastleo.*`).
+     * Запрос идёт в панель (маршруты `fastleo.*`).
      */
     private function isAdminPanel(Request $request): bool
     {
@@ -52,7 +52,7 @@ final class CloseSiteForVisitors
     }
 
     /**
-     * В запросе вошёл администратор панели.
+     * В запросе вошёл пользователь панели.
      */
     private function isAdmin(Request $request): bool
     {
@@ -67,7 +67,7 @@ final class CloseSiteForVisitors
             return false;
         }
 
-        // Сеанс, закрытый сменой пароля («выйти на других устройствах»), сайт открытым не видит: хеш, который админка записала при входе.
+        // Сеанс, закрытый сменой пароля («выйти на других устройствах»), сайт открытым не видит: хеш, который панель записала при входе.
         $stored = $request->session()->get('password_hash_'.Fastleo::GUARD);
         $password = $user->getAuthPassword();
 

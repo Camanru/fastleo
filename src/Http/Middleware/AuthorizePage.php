@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Права своей страницы на её маршрутах из `Fastleo::routes(..., page: ReportPage::class)`: те же проверки,
  * что при открытии страницы, — недоступная страница (не найдена, `isAvailable()` = false) отвечает 404,
- * закрытая для администратора (`canAccess()`) — 403.
+ * закрытая для пользователя (`canAccess()`) — 403.
  */
 final class AuthorizePage
 {

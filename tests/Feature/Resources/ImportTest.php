@@ -34,7 +34,7 @@ use Workbench\App\Models\User;
 beforeEach(function (): void {
     useFixtureResources('Imports');
     Storage::fake('local');
-    // xlsx в админке отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
+    // xlsx в панели отключён (`fastleo.xlsx`); код чтения и записи остаётся, и здесь он проверяется включённым.
     config(['fastleo.xlsx' => true]);
     $this->actingAs(admin(), Fastleo::GUARD);
 });
@@ -694,7 +694,7 @@ it('runs the rows of a worker as the uploader in the guard and the language of t
     Article::creating(function () use (&$seen): void {
         $seen = ['user' => auth()->id(), 'locale' => app()->getLocale()];
     });
-    // Воркер очереди: ни guard админки, ни её языка по умолчанию нет.
+    // Воркер очереди: ни guard панели, ни её языка по умолчанию нет.
     Auth::shouldUse('web');
     app()->setLocale('en');
 

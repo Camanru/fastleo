@@ -29,7 +29,7 @@ use function Laravel\Prompts\select;
  *
  * Публикует конфиг (если его ещё нет) и ассеты, подключает модель пользователя (интерфейс FastleoUser и трейт
  * HasFastleoAccess), проверяет очередь, спрашивает, какие готовые модули добавить на сайт (вид установки → модули),
- * и с подтверждения выполняет миграции, `storage:link` и создаёт администратора. Без вопросов (`--no-interaction`)
+ * и с подтверждения выполняет миграции, `storage:link` и создаёт пользователя. Без вопросов (`--no-interaction`)
  * ничего из этого не выполняется, пока не указаны флаги.
  *
  * ```bash
@@ -38,16 +38,16 @@ use function Laravel\Prompts\select;
  * ```
  */
 #[AsCommand(name: 'fastleo:install')]
-#[Description('Установить fastleo: конфиг, ассеты, skill для Claude, модель пользователя, готовые модули сайта, миграции и администратор')]
+#[Description('Установить fastleo: конфиг, ассеты, skill для Claude, модель пользователя, готовые модули сайта, миграции и пользователь')]
 #[Signature('fastleo:install
         {--skill-path= : папка для skill Claude (по умолчанию .claude/skills/fastleo)}
         {--type= : вид установки: basic (без модулей) или custom (с выбором модулей)}
-        {--modules= : модули через запятую (contacts,pages,news,leads) — без опроса}
+        {--modules= : модули через запятую (contacts,pages,news,menu,reviews,portfolio,faq,shop) — без опроса}
         {--no-modules : не добавлять модули}
         {--setup : выполнить миграции и storage:link без вопросов}
         {--seed : заполнить модули примерами}
-        {--admin-email= : создать администратора с этим email}
-        {--admin-password= : пароль администратора}')]
+        {--admin-email= : создать пользователя с этим email}
+        {--admin-password= : пароль пользователя}')]
 final class InstallCommand extends Command
 {
     /**
@@ -178,11 +178,11 @@ final class InstallCommand extends Command
     }
 
     /**
-     * Миграции, `storage:link`, примеры данных, администратор и проверка — с подтверждением (без вопросов — по флагам).
+     * Миграции, `storage:link`, примеры данных, пользователь и проверка — с подтверждением (без вопросов — по флагам).
      * `failed` — шаг, который просили выполнить, не удался (код выхода 1).
      *
      * Класс модели пользователя загружен до правки её файла и в этом процессе остался прежним, поэтому в запуске,
-     * где модель только что подключена (`$child` задан), администратор и проверка выполняются отдельным процессом.
+     * где модель только что подключена (`$child` задан), пользователь и проверка выполняются отдельным процессом.
      *
      * @param  list<string>  $modules
      * @return array{migrated: bool, admin: bool, failed: bool}
@@ -211,7 +211,7 @@ final class InstallCommand extends Command
 
         // Таблицы готовы: миграции выполнены сейчас или нечего выполнять (модулей нет, миграции пакета были).
         if ($needsMigrate && ! $done['migrated']) {
-            // Администратора просили флагом, а таблиц ещё нет: молча пропустить нельзя (CI и Claude решат, что он создан).
+            // Пользователя просили флагом, а таблиц ещё нет: молча пропустить нельзя (CI и Claude решат, что он создан).
             if ($this->adminRequested()) {
                 $this->components->error(__('fastleo::console.install_admin_needs_migrate', ['email' => (string) $this->option('admin-email')]));
                 $done['failed'] = true;
@@ -261,7 +261,7 @@ final class InstallCommand extends Command
     }
 
     /**
-     * Администратора просили создать флагом.
+     * Пользователя просили создать флагом.
      */
     private function adminRequested(): bool
     {
@@ -271,7 +271,7 @@ final class InstallCommand extends Command
     }
 
     /**
-     * В таблице пользователей уже есть администратор (`fastleo_admin`): спрашивать про нового незачем. Своя
+     * В таблице пользователей уже есть пользователь (`fastleo_admin`): спрашивать про нового незачем. Своя
      * `canAccessFastleo()` без этой колонки здесь не видна — тогда вопрос задаётся как обычно.
      */
     private function adminExists(): bool
@@ -288,7 +288,7 @@ final class InstallCommand extends Command
     }
 
     /**
-     * Создать администратора: из флагов или по вопросу (email, имя и пароль спрашивает `fastleo:user`).
+     * Создать пользователя: из флагов или по вопросу (email, имя и пароль спрашивает `fastleo:user`).
      */
     private function createAdmin(bool $interactive, ?ChildArtisan $child): bool
     {
@@ -301,7 +301,7 @@ final class InstallCommand extends Command
                 $this->components->warn(__('fastleo::console.install_admin_existing', ['email' => $email]));
             }
 
-            return $this->runStep('fastleo:user', ['email' => $email, '--name' => 'Администратор', '--password' => $this->option('admin-password')], $interactive, $child) === self::SUCCESS;
+            return $this->runStep('fastleo:user', ['email' => $email, '--password' => $this->option('admin-password')], $interactive, $child) === self::SUCCESS;
         }
 
         if ($interactive && $child instanceof ChildArtisan && ! $child->canAsk()) {
@@ -310,7 +310,7 @@ final class InstallCommand extends Command
             return false;
         }
 
-        // Администратор уже есть: шаг выполнен, просить «создайте пользователя» в итоге незачем.
+        // Пользователь уже есть: шаг выполнен, просить «создайте пользователя» в итоге незачем.
         if ($this->adminExists()) {
             return true;
         }

@@ -9,7 +9,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
 /**
- * Письмо со ссылкой для сброса пароля администратора.
+ * Письмо со ссылкой для сброса пароля пользователя.
  *
  * Не `ShouldQueue`: токен ссылки лежал бы в таблице `jobs` (и в `failed_jobs`) открытым текстом. Контроллер отправляет письмо
  * после ответа (`defer()`), так что запрос оно не задерживает и без очереди.
