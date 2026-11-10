@@ -211,7 +211,7 @@
                     @endforeach
                 </nav>
 
-                @if (\Fastleo\Fastleo::bell())
+                @if (\Fastleo\Fastleo::bellFor(\Fastleo\Fastleo::guard()->user()))
                 <div
                     x-data="fastleoBell({ url: @js(route('fastleo.notifications.feed')), readAllUrl: @js(route('fastleo.notifications.read-all')), readUrl: @js(route('fastleo.notifications.read', ['id' => '__id__'])), unread: {{ \Fastleo\Notifications\AdminNotification::unreadCount() }}, poll: {{ \Fastleo\Fastleo::bellPoll() }} })"
                     class="static lg:relative"

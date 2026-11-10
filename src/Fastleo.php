@@ -140,6 +140,13 @@ final class Fastleo
     private static ?Closure $adminsResolver = null;
 
     /**
+     * Кому показывать колокольчик (по умолчанию — всем администраторам, пока он включён в конфиге).
+     *
+     * @var (Closure(Authenticatable): bool)|null
+     */
+    private static ?Closure $bellResolver = null;
+
+    /**
      * Абсолютный адрес страницы админки для писем: от `APP_URL` (или от `fastleo.domain`), а не от заголовка Host
      * запроса, — иначе подменённый Host попал бы в ссылку сброса пароля.
      *
@@ -216,6 +223,35 @@ final class Fastleo
         }
 
         return $admins;
+    }
+
+    /**
+     * Показывать колокольчик (и раздел «Уведомления») только некоторым администраторам, например владельцу: у остальных нет
+     * колокольчика, их адреса отвечают 404, а уведомления им не сохраняются. Вызывается в `AppServiceProvider::boot()`;
+     * включённый в конфиге колокольчик остаётся главным выключателем.
+     *
+     * ```php
+     * Fastleo::showBellTo(fn (User $user) => $user->is_owner);
+     * ```
+     *
+     * @param  (Closure(Authenticatable): bool)|null  $resolver  null возвращает показ всем администраторам
+     */
+    public static function showBellTo(?Closure $resolver): void
+    {
+        self::$bellResolver = $resolver;
+    }
+
+    /**
+     * Колокольчик включён в конфиге и показывается этому администратору (см. `showBellTo()`). Адресат, который не
+     * Authenticatable, при заданном выборе колокольчика не получает.
+     */
+    public static function bellFor(?object $user): bool
+    {
+        if (! self::bell()) {
+            return false;
+        }
+
+        return ! self::$bellResolver instanceof Closure || ($user instanceof Authenticatable && (bool) (self::$bellResolver)($user));
     }
 
     /**

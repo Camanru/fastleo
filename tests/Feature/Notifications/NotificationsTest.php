@@ -26,6 +26,7 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     Fastleo::resolveAdminsUsing(null);
+    Fastleo::showBellTo(null);
 });
 
 describe('message', function (): void {
@@ -505,6 +506,47 @@ describe('section', function (): void {
 
         $this->get(route('fastleo.dashboard'))->assertDontSee(route('fastleo.notifications.index').'"', false);
         $this->get(route('fastleo.notifications.index'))->assertNotFound();
+    });
+});
+
+describe('bell for some admins only', function (): void {
+    beforeEach(function (): void {
+        $this->boris = admin(['name' => 'Борис', 'email' => 'boris@example.com']);
+        Fastleo::showBellTo(fn ($user): bool => $user->email === 'anna@example.com');
+    });
+
+    it('decides by the admin and by the config switch', function (): void {
+        expect(Fastleo::bellFor($this->me))->toBeTrue()
+            ->and(Fastleo::bellFor($this->boris))->toBeFalse()
+            ->and(Fastleo::bellFor(null))->toBeFalse()
+            ->and(Fastleo::bellFor(new stdClass()))->toBeFalse();
+
+        config(['fastleo.notifications.bell' => false]);
+        expect(Fastleo::bellFor($this->me))->toBeFalse();
+
+        config(['fastleo.notifications.bell' => true]);
+        Fastleo::showBellTo(null);
+        expect(Fastleo::bellFor($this->boris))->toBeTrue()->and(Fastleo::bellFor(null))->toBeTrue();
+    });
+
+    it('shows the bell and the section to the chosen admin only', function (): void {
+        $this->get(route('fastleo.dashboard'))->assertOk()->assertSee('data-bell', false);
+        $this->getJson(route('fastleo.notifications.feed'))->assertOk();
+
+        $this->app['auth']->forgetGuards();
+        $this->flushSession();
+        $this->actingAs($this->boris, Fastleo::GUARD);
+        $this->get(route('fastleo.dashboard'))->assertOk()->assertDontSee('data-bell', false);
+        $this->getJson(route('fastleo.notifications.feed'))->assertNotFound();
+        $this->get(route('fastleo.notifications.index'))->assertNotFound();
+        $system = collect(Menu::groups())->firstWhere('label', 'Система');
+        expect(array_column($system['items'] ?? [], 'label'))->not->toContain('Уведомления');
+    });
+
+    it('stores notifications for the chosen admin only', function (): void {
+        Fastleo::notifyAdmins('Новая заявка');
+
+        expect(AdminNotification::query()->pluck('user_id')->all())->toBe([(string) $this->me->id]);
     });
 });
 

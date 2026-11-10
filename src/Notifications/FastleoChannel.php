@@ -19,7 +19,7 @@ final class FastleoChannel
      */
     public function send(object $notifiable, Notification $notification): void
     {
-        if (! Fastleo::bell()) {
+        if (! Fastleo::bellFor($notifiable)) {
             return;
         }
 

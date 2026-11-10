@@ -94,7 +94,7 @@ final class Menu
             ];
         }
 
-        if (Fastleo::bell()) {
+        if (Fastleo::bellFor(Fastleo::guard()->user())) {
             $entries[] = [
                 'group' => is_string($systemGroup) ? $systemGroup : null,
                 'position' => 850,

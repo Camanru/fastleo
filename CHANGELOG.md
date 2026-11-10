@@ -6,6 +6,12 @@ The admin interface is in Russian: button, menu and section names are given here
 
 ## [Unreleased]
 
+## [4.9.4] — 2026-11-10
+
+### Added
+
+- **`Fastleo::showBellTo()`** — show the notification bell and the Notifications section only to some admins (e.g. owners); the others get no bell, their addresses answer 404 and nothing is stored for them. `Fastleo::bellFor($user)` tells whether a user sees it ([notifications](docs/notifications.md#колокольчик-только-некоторым)).
+
 ## [4.9.3] — 2026-11-09
 
 ### Added
@@ -679,6 +685,7 @@ The Composer name is `camanru/fastleo`, the namespace is `Fastleo\`.
 
 `fastleo:install`, `fastleo:user`, `fastleo:unlock`, `fastleo:cache`, `fastleo:clear`, `fastleo:images`, `fastleo:prune`, `fastleo:doctor`, `fastleo:inspect`, `fastleo:skill`, `fastleo:mcp`, `fastleo:softnetica-sync`, `fastleo:make-*`.
 
+[4.9.4]: https://github.com/Camanru/fastleo/releases/tag/4.9.4
 [4.9.3]: https://github.com/Camanru/fastleo/releases/tag/4.9.3
 [4.9.2]: https://github.com/Camanru/fastleo/releases/tag/4.9.2
 [4.9.1]: https://github.com/Camanru/fastleo/releases/tag/4.9.1

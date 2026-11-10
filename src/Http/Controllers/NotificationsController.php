@@ -149,9 +149,8 @@ final class NotificationsController
      */
     private function key(): string
     {
-        abort_unless(Fastleo::bell(), 404);
-
         $user = Fastleo::guard()->user();
+        abort_unless(Fastleo::bellFor($user), 404);
         $key = $user instanceof Authenticatable ? $user->getAuthIdentifier() : null;
         abort_unless(is_scalar($key), 403);
 
