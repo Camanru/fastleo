@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Branch;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published branches in the order set in the panel', function (): void {
+    Branch::factory()->create(['name' => 'Второй', 'sort' => 2]);
+    Branch::factory()->create(['name' => 'Первый', 'sort' => 1]);
+    Branch::factory()->create(['name' => 'Скрытый', 'is_published' => false]);
+
+    expect(Branch::query()->published()->pluck('name')->all())->toBe(['Первый', 'Второй']);
+});
+
+it('builds the phone links from the lines of the field, ten at most', function (): void {
+    $branch = Branch::factory()->make(['phones' => "+7 (495) 000-00-00\n\n  8 800 555-35-35 \nпо записи"]);
+
+    expect($branch->phoneLinks())->toBe([
+        ['text' => '+7 (495) 000-00-00', 'tel' => '+74950000000'],
+        ['text' => '8 800 555-35-35', 'tel' => '88005553535'],
+        ['text' => 'по записи', 'tel' => null],
+    ])->and(Branch::factory()->make(['phones' => implode("\n", array_fill(0, 12, '111'))])->phoneLinks())->toHaveCount(10);
+});
+
+it('points the map link at the coordinates (longitude first), or at a search by address when they are missing or wrong', function (): void {
+    expect(Branch::factory()->make(['latitude' => '55.7558000', 'longitude' => '37.6173000'])->mapUrl())->toBe('https://yandex.ru/maps/?pt=37.6173,55.7558&z=16&l=map')
+        ->and(Branch::factory()->make(['city' => 'Москва', 'address' => 'ул. Тверская, 1', 'latitude' => '55.7', 'longitude' => null])->mapUrl())->toBe('https://yandex.ru/maps/?text='.rawurlencode('Москва ул. Тверская, 1'))
+        ->and(Branch::factory()->make(['city' => null, 'address' => 'Тверская', 'latitude' => '95', 'longitude' => '37'])->mapUrl())->toBe('https://yandex.ru/maps/?text='.rawurlencode('Тверская'))
+        ->and(Branch::factory()->make(['city' => null, 'address' => ''])->mapUrl())->toBeNull();
+});
+
+it('lets an administrator add a branch and refuses coordinates out of range', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'branches'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'branches'), ['name' => 'Офис', 'address' => 'ул. Тверская, 1', 'latitude' => '95', 'is_published' => '1'])->assertSessionHasErrors('latitude');
+    $this->post(route('fastleo.resources.store', 'branches'), ['name' => 'Офис', 'address' => 'ул. Тверская, 1', 'latitude' => '55.7558', 'longitude' => '37.6173', 'is_published' => '1'])->assertRedirect();
+
+    expect(Branch::query()->where('name', 'Офис')->value('address'))->toBe('ул. Тверская, 1');
+});

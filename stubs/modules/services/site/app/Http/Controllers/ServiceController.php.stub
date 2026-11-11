@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Service;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Услуги на сайте: список и страница услуги. Шаблоны — `resources/views/services`.
+ */
+class ServiceController extends Controller
+{
+    /**
+     * Список услуг по 12 на страницу в порядке панели.
+     */
+    public function index(): View
+    {
+        return view('services.index', ['items' => Service::query()->published()->simplePaginate(12)]);
+    }
+
+    /**
+     * Страница услуги; нет услуги или она не опубликована — 404.
+     */
+    public function show(string $slug): View
+    {
+        return view('services.show', ['item' => Service::query()->published()->where('slug', $slug)->firstOrFail()]);
+    }
+}

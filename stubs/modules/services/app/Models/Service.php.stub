@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\ServiceFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Услуга компании. Вывод на сайте — публичная часть модуля (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * Service::query()->published()->paginate(12);
+ * Service::query()->published()->where('slug', $slug)->firstOrFail();
+ * ```
+ *
+ * @property int $id
+ * @property string $title
+ * @property string $slug
+ * @property string|null $category
+ * @property string|null $price
+ * @property string|null $cover
+ * @property string|null $excerpt
+ * @property string|null $body
+ * @property bool $is_published
+ * @property int $sort
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ */
+#[UseFactory(ServiceFactory::class)]
+class Service extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['title', 'slug', 'category', 'price', 'cover', 'excerpt', 'body', 'is_published', 'sort', 'seo'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+            'seo' => 'array',
+        ];
+    }
+
+    /**
+     * Только опубликованные услуги в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<Service>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

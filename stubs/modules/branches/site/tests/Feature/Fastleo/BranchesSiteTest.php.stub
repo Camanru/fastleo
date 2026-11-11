@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Branch;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published branches with the phone, the hours and the map link and hides the rest', function (): void {
+    Branch::factory()->create(['name' => 'Главный офис', 'city' => 'Москва', 'address' => 'ул. Тверская, 1', 'phones' => '+7 (495) 000-00-00', 'working_hours' => "Пн–Пт 9–18\nСб выходной", 'latitude' => '55.7558', 'longitude' => '37.6173']);
+    Branch::factory()->create(['name' => 'Чужая почта', 'email' => 'x?bcc=a@example.com']);
+    Branch::factory()->create(['name' => 'Скрытый офис', 'is_published' => false]);
+
+    $this->get('/branches')->assertOk()
+        ->assertSee('Главный офис')
+        ->assertSee('Москва, ул. Тверская, 1')
+        ->assertSee('href="tel:+74950000000"', false)
+        ->assertSee('Пн–Пт 9–18<br />', false)
+        ->assertSee('https://yandex.ru/maps/?pt=37.6173,55.7558&amp;z=16&amp;l=map', false)
+        ->assertDontSee('x?bcc', false)
+        ->assertDontSee('Скрытый офис');
+});

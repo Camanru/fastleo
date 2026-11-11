@@ -1,0 +1,2 @@
+\Illuminate\Support\Facades\Route::get('/services', [\{{ appNamespace }}\Http\Controllers\ServiceController::class, 'index'])->name('site.services.index');
+\Illuminate\Support\Facades\Route::get('/services/{slug}', [\{{ appNamespace }}\Http\Controllers\ServiceController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.services.show');

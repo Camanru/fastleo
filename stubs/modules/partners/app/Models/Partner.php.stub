@@ -1,0 +1,55 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\PartnerFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Партнёр или клиент компании: название, логотип и ссылка. Вывод на сайте — публичная часть модуля
+ * (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * Partner::query()->published()->get();
+ * ```
+ *
+ * @property int $id
+ * @property string $name
+ * @property string|null $logo
+ * @property string|null $url
+ * @property string|null $description
+ * @property bool $is_published
+ * @property int $sort
+ */
+#[UseFactory(PartnerFactory::class)]
+class Partner extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name', 'logo', 'url', 'description', 'is_published', 'sort'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованные партнёры в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<Partner>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

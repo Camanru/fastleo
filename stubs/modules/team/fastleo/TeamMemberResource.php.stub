@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\TeamMember;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Slug;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Команда»: сотрудники с фото, должностью, стажем, описанием и SEO. Порядок на сайте — перетаскиванием в списке.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `TeamMember::query()->published()->paginate(12)`.
+ */
+final class TeamMemberResource extends Resource
+{
+    protected static string $model = TeamMember::class;
+
+    protected static ?string $slug = 'team';
+
+    protected static ?string $label = 'Команда';
+
+    protected static ?string $singular = 'Сотрудник';
+
+    protected static ?string $group = 'Компания';
+
+    protected static string $icon = 'users';
+
+    protected static int $position = 30;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля сотрудника.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('name', 'Имя')->required()->searchable()->sortable(),
+            Slug::make('slug', 'Адрес')->from('name'),
+            Text::make('job_title', 'Должность')->maxLength(150)->help('Должность или специальность: «Юрист», «Старший мастер».')->searchable(),
+            Text::make('experience', 'Стаж')->maxLength(100)->help('Текстом: «Стаж 12 лет».')->hideInList(),
+            Image::make('photo', 'Фото')->directory('team')->hideInList(),
+            Textarea::make('excerpt', 'Кратко')->rows(3)->maxLength(5000)->hideInList(),
+            RichText::make('body', 'О сотруднике'),
+            Toggle::make('is_published', 'Опубликован')->default(true)->quickToggle(),
+            Seo::make('seo')->directory('team'),
+        ];
+    }
+}

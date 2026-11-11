@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\Certificate;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика лицензий и сертификатов.
+ *
+ * @extends Factory<Certificate>
+ */
+class CertificateFactory extends Factory
+{
+    protected $model = Certificate::class;
+
+    /**
+     * Опубликованный документ с датой выдачи.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'title' => fake()->unique()->sentence(3),
+            'issued_at' => fake()->dateTimeBetween('-5 years'),
+            'issuer' => fake()->company(),
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

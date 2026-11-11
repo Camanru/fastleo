@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\PriceItem;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры позиций прайс-листа (php artisan db:seed --class='Database\Seeders\PriceItemSeeder').
+ */
+class PriceItemSeeder extends Seeder
+{
+    /**
+     * Создать три позиции двух групп, если позиций с такими названиями ещё нет. Свой прайс-лист добавьте в панели: раздел «Прайс-лист».
+     */
+    public function run(): void
+    {
+        $items = [
+            1 => ['Первая позиция', 'Примеры', '1 000 ₽', 'за час'],
+            2 => ['Вторая позиция', 'Примеры', 'от 2 000 ₽', null],
+            3 => ['Третья позиция', 'Другая группа', '3 000 ₽', 'за штуку'],
+        ];
+
+        foreach ($items as $number => [$title, $category, $price, $unit]) {
+            PriceItem::query()->firstOrCreate(['title' => $title], [
+                'category' => $category,
+                'price' => $price,
+                'unit' => $unit,
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

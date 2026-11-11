@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\TeamMember;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры сотрудников (php artisan db:seed --class='Database\Seeders\TeamMemberSeeder').
+ */
+class TeamMemberSeeder extends Seeder
+{
+    /**
+     * Создать трёх сотрудников, если таких адресов ещё нет.
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Первый сотрудник', 2 => 'Второй сотрудник', 3 => 'Третий сотрудник'] as $number => $name) {
+            TeamMember::query()->firstOrCreate(['slug' => 'member-'.$number], [
+                'name' => $name,
+                'job_title' => 'Специалист',
+                'experience' => 'Стаж '.($number * 3).' лет',
+                'excerpt' => 'Коротко о сотруднике.',
+                'body' => '<p>Своих сотрудников добавьте в панели: раздел «Команда».</p>',
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

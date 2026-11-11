@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\PriceItem;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика позиций прайс-листа.
+ *
+ * @extends Factory<PriceItem>
+ */
+class PriceItemFactory extends Factory
+{
+    protected $model = PriceItem::class;
+
+    /**
+     * Опубликованная позиция с ценой и группой.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'title' => fake()->unique()->sentence(3),
+            'price' => fake()->numberBetween(5, 90) * 100 .' ₽',
+            'unit' => fake()->randomElement(['за час', 'за штуку', null]),
+            'category' => fake()->randomElement(['Консультации', 'Ремонт', 'Обслуживание']),
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

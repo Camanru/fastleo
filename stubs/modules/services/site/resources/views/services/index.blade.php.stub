@@ -1,0 +1,38 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Услуги" />
+@endsection
+
+@section('content')
+    <h1>Услуги</h1>
+
+    @forelse ($items as $item)
+        <article>
+            <a href="{{ route('site.services.show', $item->slug) }}">
+                <x-fastleo::picture :src="$item->cover" :alt="$item->title" />
+                <h2>{{ $item->title }}</h2>
+            </a>
+            @if ($item->category)
+                <p>{{ $item->category }}</p>
+            @endif
+            @if ($item->excerpt)
+                <p>{{ $item->excerpt }}</p>
+            @endif
+            @if ($item->price)
+                <p>{{ $item->price }}</p>
+            @endif
+        </article>
+    @empty
+        <p>Услуг пока нет.</p>
+    @endforelse
+
+    <nav>
+        @if ($items->previousPageUrl())
+            <a href="{{ $items->previousPageUrl() }}" rel="prev">← Назад</a>
+        @endif
+        @if ($items->nextPageUrl())
+            <a href="{{ $items->nextPageUrl() }}" rel="next">Дальше →</a>
+        @endif
+    </nav>
+@endsection

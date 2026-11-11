@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\CertificateFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
+
+/**
+ * Лицензия, сертификат или другой документ компании: скан и, по желанию, файл PDF.
+ * Вывод на сайте — публичная часть модуля (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * Certificate::query()->published()->paginate(24);
+ * ```
+ *
+ * @property int $id
+ * @property string $title
+ * @property string|null $image
+ * @property string|null $file
+ * @property Carbon|null $issued_at
+ * @property string|null $issuer
+ * @property bool $is_published
+ * @property int $sort
+ */
+#[UseFactory(CertificateFactory::class)]
+class Certificate extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['title', 'image', 'file', 'issued_at', 'issuer', 'is_published', 'sort'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'issued_at' => 'date',
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованные документы в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<Certificate>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

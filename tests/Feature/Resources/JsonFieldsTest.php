@@ -11,6 +11,7 @@ use Fastleo\Fields\Select;
 use Fastleo\Fields\Text;
 use Fastleo\Files\GenerateImageVariants;
 use Fastleo\Support\JsonItem;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -184,6 +185,22 @@ it('reads a sub field named like a method of the model', function (): void {
 
     expect(JsonItem::from(['question' => 'Когда?'])->getAttribute('from'))->toBeNull()
         ->and($field->display($page))->not->toBeNull();
+});
+
+it('opens the forms of a section with a Seo field in strict mode, even when the stored values lack keys', function (): void {
+    Model::shouldBeStrict();
+
+    try {
+        $this->get(route('fastleo.resources.create', 'articles'))->assertOk();
+
+        foreach ([null, ['title' => 'Заголовок']] as $seo) {
+            $article = Article::factory()->create(['seo' => $seo]);
+
+            $this->get(route('fastleo.resources.edit', ['articles', $article->id]))->assertOk();
+        }
+    } finally {
+        Model::shouldBeStrict(false);
+    }
 });
 
 describe('an untouched toggle in a new item', function (): void {

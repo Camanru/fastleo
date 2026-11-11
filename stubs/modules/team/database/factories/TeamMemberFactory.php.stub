@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\TeamMember;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+
+/**
+ * Фабрика сотрудников.
+ *
+ * @extends Factory<TeamMember>
+ */
+class TeamMemberFactory extends Factory
+{
+    protected $model = TeamMember::class;
+
+    /**
+     * Опубликованный сотрудник с должностью и описанием.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $name = fake()->unique()->name();
+
+        return [
+            'name' => $name,
+            'slug' => Str::slug($name) ?: 'member-'.fake()->unique()->numberBetween(1, 999999),
+            'job_title' => fake()->jobTitle(),
+            'experience' => 'Стаж '.fake()->numberBetween(1, 30).' лет',
+            'excerpt' => fake()->sentence(12),
+            'body' => '<p>'.fake()->paragraph().'</p>',
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

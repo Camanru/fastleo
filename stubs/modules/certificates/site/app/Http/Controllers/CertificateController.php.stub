@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Certificate;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Лицензии и сертификаты на сайте. Шаблон — `resources/views/certificates/index.blade.php`.
+ */
+class CertificateController extends Controller
+{
+    /**
+     * Список документов по 24 на страницу в порядке панели.
+     */
+    public function index(): View
+    {
+        return view('certificates.index', ['items' => Certificate::query()->published()->simplePaginate(24)]);
+    }
+}

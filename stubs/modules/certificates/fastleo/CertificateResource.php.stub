@@ -1,0 +1,51 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\Certificate;
+use Fastleo\Fields\Date;
+use Fastleo\Fields\File;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Документы» (лицензии и сертификаты): название, скан, файл PDF, дата выдачи и кем выдан. Порядок на сайте — перетаскиванием в списке.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `Certificate::query()->published()->paginate(24)`.
+ */
+final class CertificateResource extends Resource
+{
+    protected static string $model = Certificate::class;
+
+    protected static ?string $slug = 'certificates';
+
+    protected static ?string $label = 'Документы';
+
+    protected static ?string $singular = 'Документ';
+
+    protected static ?string $group = 'Компания';
+
+    protected static string $icon = 'award';
+
+    protected static int $position = 50;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля документа.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required()->maxLength(255)->searchable()->sortable(),
+            Image::make('image', 'Скан')->directory('certificates')->hideInList(),
+            File::make('file', 'Файл PDF')->directory('certificates')->extensions(['pdf'])->help('Необязательно: полная версия документа. Если файла нет, скан открывается крупнее.')->hideInList(),
+            Date::make('issued_at', 'Дата выдачи')->hideInList(),
+            Text::make('issuer', 'Кем выдан')->maxLength(150)->hideInList(),
+            Toggle::make('is_published', 'Опубликован')->default(true)->quickToggle(),
+        ];
+    }
+}

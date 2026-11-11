@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\TeamMemberFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Сотрудник компании (специалист, мастер, консультант). Вывод на сайте — публичная часть модуля (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * TeamMember::query()->published()->paginate(12);
+ * TeamMember::query()->published()->where('slug', $slug)->firstOrFail();
+ * ```
+ *
+ * @property int $id
+ * @property string $name
+ * @property string $slug
+ * @property string|null $job_title
+ * @property string|null $experience
+ * @property string|null $photo
+ * @property string|null $excerpt
+ * @property string|null $body
+ * @property bool $is_published
+ * @property int $sort
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ */
+#[UseFactory(TeamMemberFactory::class)]
+class TeamMember extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name', 'slug', 'job_title', 'experience', 'photo', 'excerpt', 'body', 'is_published', 'sort', 'seo'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+            'seo' => 'array',
+        ];
+    }
+
+    /**
+     * Только опубликованные сотрудники в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<TeamMember>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+}

@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\Service;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры услуг (php artisan db:seed --class='Database\Seeders\ServiceSeeder').
+ */
+class ServiceSeeder extends Seeder
+{
+    /**
+     * Создать три услуги, если таких адресов ещё нет.
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Первая услуга', 2 => 'Вторая услуга', 3 => 'Третья услуга'] as $number => $title) {
+            Service::query()->firstOrCreate(['slug' => 'service-'.$number], [
+                'title' => $title,
+                'category' => 'Примеры',
+                'price' => 'от '.($number * 1000).' ₽',
+                'excerpt' => 'Коротко об услуге.',
+                'body' => '<p>Свои услуги добавьте в панели: раздел «Услуги».</p>',
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

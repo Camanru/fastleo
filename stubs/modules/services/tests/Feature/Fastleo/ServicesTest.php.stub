@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Service;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published services in the order set in the panel', function (): void {
+    Service::factory()->create(['slug' => 'second', 'sort' => 2]);
+    Service::factory()->create(['slug' => 'first', 'sort' => 1]);
+    Service::factory()->create(['slug' => 'hidden', 'is_published' => false]);
+
+    expect(Service::query()->published()->pluck('slug')->all())->toBe(['first', 'second']);
+});
+
+it('lets an administrator add a service', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'services'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'services'), ['title' => 'Услуга', 'slug' => 'usluga', 'price' => 'от 1 500 ₽', 'is_published' => '1'])->assertRedirect();
+
+    expect(Service::query()->where('slug', 'usluga')->value('price'))->toBe('от 1 500 ₽');
+});

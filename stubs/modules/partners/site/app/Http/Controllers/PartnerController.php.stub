@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Partner;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Партнёры и клиенты на сайте. Шаблон — `resources/views/partners/index.blade.php`.
+ */
+class PartnerController extends Controller
+{
+    /**
+     * Список партнёров по 48 на страницу в порядке панели.
+     */
+    public function index(): View
+    {
+        return view('partners.index', ['items' => Partner::query()->published()->simplePaginate(48)]);
+    }
+}

@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Service;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published services and opens one by its address', function (): void {
+    Service::factory()->create(['title' => 'Настройка сервера', 'slug' => 'server']);
+    Service::factory()->create(['title' => 'Скрытая услуга', 'slug' => 'hidden', 'is_published' => false]);
+
+    $this->get('/services')->assertOk()->assertSee('Настройка сервера')->assertDontSee('Скрытая услуга');
+    $this->get('/services/server')->assertOk()->assertSee('Настройка сервера');
+    $this->get('/services/hidden')->assertNotFound();
+});

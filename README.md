@@ -53,7 +53,7 @@ php artisan fastleo:user admin@example.com
 
 Open `https://example.com/fastleo` and log in.
 
-`fastleo:install` also asks what the site needs: a basic install (the panel only) or a custom one with ready-made modules (contacts, pages, news, site menu, reviews, portfolio, FAQ, online store — a panel section, model and migration copied into your project as your own code, plus an optional public part: routes, controllers and plain Blade templates without styling, which the install asks about), and offers to run migrations and create the first user. Pass the answers as flags to skip the questions (`--type=basic`, or `--modules=pages,news --setup --admin-email=…`); add a module later with `php artisan fastleo:module` ([modules](docs/modules.md)).
+`fastleo:install` also asks what the site needs: a basic install (the panel only) or a custom one with ready-made modules (contacts, pages, news, site menu, reviews, portfolio, FAQ, services, price list, team, branches, licenses and certificates, partners, online store — a panel section, model and migration copied into your project as your own code, plus an optional public part: routes, controllers and plain Blade templates without styling, which the install asks about), and offers to run migrations and create the first user. Pass the answers as flags to skip the questions (`--type=basic`, or `--modules=pages,news --setup --admin-email=…`); add a module later with `php artisan fastleo:module` ([modules](docs/modules.md)).
 
 ## Your first section
 
@@ -104,7 +104,7 @@ Check the result with `php artisan fastleo:doctor` — it reports mistakes in se
 Reading order with short descriptions (in Russian): [docs/README.md](docs/README.md). Practical answers with code: [FAQ](docs/faq/README.md).
 
 - [Installation and upgrading](docs/installation.md)
-- [Ready-made modules: contacts, pages, news, site menu, reviews, portfolio, FAQ, online store](docs/modules.md)
+- [Ready-made modules: contacts, pages, news, site menu, reviews, portfolio, FAQ, services, price list, team, branches, licenses and certificates, partners, online store](docs/modules.md)
 - [Leads: site form and intake from other sites by API](docs/leads.md)
 - [Configuration: `config/fastleo.php`](docs/configuration.md)
 - [Sections (resources)](docs/resources.md)

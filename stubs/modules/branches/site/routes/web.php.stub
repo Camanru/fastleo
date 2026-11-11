@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/branches', [\{{ appNamespace }}\Http\Controllers\BranchController::class, 'index'])->name('site.branches.index');

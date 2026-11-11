@@ -1,0 +1,49 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\PriceItem;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+
+/**
+ * Раздел «Прайс-лист»: позиции с ценой, единицей и группой. Порядок на сайте — перетаскиванием в списке.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны:
+ * `PriceItem::query()->published()->get()->groupBy('category')`.
+ */
+final class PriceItemResource extends Resource
+{
+    protected static string $model = PriceItem::class;
+
+    protected static ?string $slug = 'prices';
+
+    protected static ?string $label = 'Прайс-лист';
+
+    protected static ?string $singular = 'Позиция прайса';
+
+    protected static ?string $group = 'Компания';
+
+    protected static string $icon = 'badge-russian-ruble';
+
+    protected static int $position = 20;
+
+    protected static ?string $sortColumn = 'sort';
+
+    /**
+     * Поля позиции прайс-листа.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required()->maxLength(255)->searchable()->sortable(),
+            Text::make('price', 'Цена')->required()->maxLength(100)->help('Текстом, как её увидят посетители: «1 500 ₽», «от 2 000 ₽».'),
+            Text::make('unit', 'Единица')->maxLength(50)->help('Необязательно: «за час», «за штуку», «за кв. м».')->hideInList(),
+            Text::make('category', 'Группа')->maxLength(100)->help('Необязательно: позиции с одинаковой группой показываются вместе («Стрижки», «Окрашивание»).')->sortable(),
+            Text::make('note', 'Примечание')->maxLength(255)->hideInList(),
+            Toggle::make('is_published', 'Показывать')->default(true)->quickToggle(),
+        ];
+    }
+}

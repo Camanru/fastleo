@@ -1,0 +1,33 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Прайс-лист" />
+@endsection
+
+@section('content')
+    <h1>Прайс-лист</h1>
+
+    @forelse ($groups as $group => $items)
+        @if ($group !== '')
+            <h2>{{ $group }}</h2>
+        @endif
+
+        <table>
+            <tbody>
+                @foreach ($items as $item)
+                    <tr>
+                        <td>
+                            {{ $item->title }}
+                            @if ($item->note)
+                                <br>{{ $item->note }}
+                            @endif
+                        </td>
+                        <td>{{ $item->price }}@if ($item->unit) {{ $item->unit }}@endif</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @empty
+        <p>Цен пока нет.</p>
+    @endforelse
+@endsection

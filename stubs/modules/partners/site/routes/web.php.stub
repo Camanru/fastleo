@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/partners', [\{{ appNamespace }}\Http\Controllers\PartnerController::class, 'index'])->name('site.partners.index');

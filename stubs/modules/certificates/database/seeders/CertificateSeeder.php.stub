@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\Certificate;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры лицензий и сертификатов (php artisan db:seed --class='Database\Seeders\CertificateSeeder').
+ */
+class CertificateSeeder extends Seeder
+{
+    /**
+     * Создать два документа, если документов с такими названиями ещё нет. Сканы добавьте в панели: раздел «Документы».
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Пример лицензии', 2 => 'Пример сертификата'] as $number => $title) {
+            Certificate::query()->firstOrCreate(['title' => $title], [
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Certificate;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published documents and links the file before the scan', function (): void {
+    Certificate::factory()->create(['title' => 'Лицензия на деятельность', 'image' => 'uploads/certificates/scan.jpg', 'file' => 'uploads/certificates/license.pdf']);
+    Certificate::factory()->create(['title' => 'Скрытый документ', 'is_published' => false]);
+
+    $this->get('/certificates')->assertOk()->assertSee('Лицензия на деятельность')->assertSee('uploads/certificates/license.pdf', false)->assertDontSee('Скрытый документ');
+});

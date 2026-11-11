@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Branch;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Филиалы и адреса на сайте. Шаблон — `resources/views/branches/index.blade.php`.
+ */
+class BranchController extends Controller
+{
+    /**
+     * Список филиалов в порядке панели (не больше 200).
+     */
+    public function index(): View
+    {
+        return view('branches.index', ['items' => Branch::query()->published()->limit(200)->get()]);
+    }
+}

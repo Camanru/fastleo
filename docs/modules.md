@@ -38,15 +38,21 @@ php artisan fastleo:module contacts   # модуль назван сразу; в
 | `reviews` | `/reviews` | `reviews/index` |
 | `portfolio` | `/portfolio`, `/portfolio/{адрес}` | `portfolio/index`, `portfolio/show` |
 | `faq` | `/faq` | `faq/index` |
+| `services` | `/services`, `/services/{адрес}` | `services/index`, `services/show` |
+| `prices` | `/prices` | `prices/index` |
+| `team` | `/team`, `/team/{адрес}` | `team/index`, `team/show` |
+| `branches` | `/branches` | `branches/index` |
+| `certificates` | `/certificates` | `certificates/index` |
+| `partners` | `/partners` | `partners/index` |
 | `shop` | `/shop`, `/shop/categories/{адрес}`, `/shop/{адрес}`, `/cart`, `/checkout`, `/checkout/thanks` | `shop/index`, `shop/category`, `shop/product`, `shop/cart`, `shop/checkout`, `shop/thanks`, `shop/products` (список товаров, общая часть витрины и категории) |
 
 Правила, общие для всех шаблонов:
 
 - Скрытое и неопубликованное отвечает 404; адрес в маршруте — только слаг (`a-z`, цифры и дефис), остальное — 404 без запроса к базе.
-- Весь вывод экранирован; как HTML выводятся только поля RichText (они очищены при сохранении). Ссылки, которые вводит пользователь панели (блок «Призыв», пункты меню), печатаются как ссылки, только если это адрес сайта (`/…`) или `http(s)://…`: `javascript:` и `//чужой-сайт` отбрасываются.
-- Списки идут страницами: новости по 10, отзывы по 20, работы по 12, товары по 24; ссылки «Назад» и «Дальше» — простая разметка (стандартная с иконками без CSS выглядит крупно). «Вопросы и ответы» выводят не больше 200 вопросов.
+- Весь вывод экранирован; как HTML выводятся только поля RichText (они очищены при сохранении). Ссылки, которые вводит пользователь панели (блок «Призыв», пункты меню), печатаются как ссылки, только если это адрес сайта (`/…`) или `http(s)://…`: `javascript:` и `//чужой-сайт` отбрасываются; у партнёров принимается только `http(s)://…`.
+- Списки идут страницами: новости по 10, отзывы по 20, работы, услуги и сотрудники по 12, документы и товары по 24, партнёры по 48; ссылки «Назад» и «Дальше» — простая разметка (стандартная с иконками без CSS выглядит крупно). «Вопросы и ответы» выводят не больше 200 вопросов, «Прайс-лист» — не больше 500 позиций, «Филиалы и адреса» — не больше 200 адресов.
 - Дата публикации в будущем откладывает показ только у новостей (скоуп `News::published()`), у остальных модулей показ решает галочка «Опубликована».
-- Слаги разделов (`news`, `contacts`, `shop`, …) заняты адресами модулей: страница «Страниц» с таким слагом не откроется — маршрут модуля выигрывает у запасного.
+- Слаги разделов (`news`, `contacts`, `shop`, `services`, `prices`, `team`, `branches`, `certificates`, `partners`, …) заняты адресами модулей: страница «Страниц» с таким слагом не откроется — маршрут модуля выигрывает у запасного. Если на сайте уже есть страница `services` или `team`, не ставьте публичную часть такого модуля (ответ «нет») или переименуйте адрес страницы.
 
 ## Модули
 
@@ -58,6 +64,12 @@ php artisan fastleo:module contacts   # модуль назван сразу; в
 | `reviews` | Раздел «Отзывы» (`ReviewResource`, адрес `reviews`): автор, должность или компания, оценка 1–5, текст, фото, дата, «Опубликован»; порядок — перетаскиванием. Модель `Review` со скоупом `published()` |
 | `portfolio` | Раздел «Портфолио» (`PortfolioResource`, адрес `portfolio`): название, адрес, категория, заказчик, дата, обложка, галерея, кратко, описание (RichText), SEO, «Опубликована»; порядок — перетаскиванием. Модель `PortfolioItem` со скоупом `published()` |
 | `faq` | Раздел «Вопросы и ответы» (`FaqResource`, адрес `faq`): вопрос, ответ (RichText), необязательная группа, «Опубликован»; порядок — перетаскиванием. Модель `FaqItem` со скоупом `published()` |
+| `services` | Раздел «Услуги» (`ServiceResource`, адрес `services`, группа меню «Компания»): название, адрес, категория, цена (текстом: «от 1 500 ₽»), обложка, кратко, описание (RichText), SEO, «Опубликована»; порядок — перетаскиванием. Модель `Service` со скоупом `published()`; на сайте — список и страница услуги. Подробнее — [ниже](#услуги-команда-прайс-лист-филиалы-сертификаты-партнёры) |
+| `prices` | Раздел «Прайс-лист» (`PriceItemResource`, адрес `prices`, группа «Компания»): название, цена (текстом), единица («за час»), группа, примечание, «Показывать»; порядок — перетаскиванием. Модель `PriceItem` со скоупом `published()`; на сайте — таблицы по группам |
+| `team` | Раздел «Команда» (`TeamMemberResource`, адрес `team`, группа «Компания»): имя, адрес, должность, стаж, фото, кратко, текст (RichText), SEO, «Опубликован»; порядок — перетаскиванием. Модель `TeamMember` со скоупом `published()`; на сайте — список и страница сотрудника |
+| `branches` | Раздел «Филиалы и адреса» (`BranchResource`, адрес `branches`, группа «Компания»): название, город, адрес, телефоны (по одному в строке), почта, часы работы, широта и долгота, фото, «Показывать»; порядок — перетаскиванием. Модель `Branch`: `phoneLinks()` и `mapUrl()`; на сайте — список со ссылкой «Показать на карте» |
+| `certificates` | Раздел «Документы» (лицензии и сертификаты; `CertificateResource`, адрес `certificates`, группа «Компания»): название, скан, файл PDF, дата выдачи, кем выдан, «Опубликован»; порядок — перетаскиванием. Модель `Certificate` со скоупом `published()`; на сайте — список сканов со ссылками на PDF |
+| `partners` | Раздел «Партнёры и клиенты» (`PartnerResource`, адрес `partners`, группа «Компания»): название, логотип, ссылка, описание, «Показывать»; порядок — перетаскиванием. Модель `Partner` со скоупом `published()`; на сайте — логотипы со ссылками |
 | `shop` | Каталог и заказы в панели: «Категории» (дерево), «Товары» (цена, остаток, фото, характеристики, SEO) и «Заказы» (статусы, «Оплачен», позиции). Модели `ShopCategory`, `ShopProduct`, `ShopOrder`, `ShopOrderItem`; `ShopOrder::place()` создаёт заказ; на сайте — каталог, корзина и оформление. Подробнее — [ниже](#интернет-магазин) |
 | `news` | Раздел «Новости» (`NewsResource`, адрес `news`): заголовок, адрес, дата публикации, «Опубликована», обложка, анонс, текст (RichText), SEO; виджет «Последние новости». Модель `News` со скоупом `published()`. Дата публикации в будущем откладывает показ до этой даты (в `published()`), пустая дата — показывать сразу |
 
@@ -111,6 +123,27 @@ php artisan fastleo:module contacts   # модуль назван сразу; в
 - **Портфолио:** обложка и галерея лежат в `storage/app/public/uploads/portfolio`; категория — обычная строка (`where('category', 'Сайты')`); `photos` — список путей галереи (`$item->photos`); SEO — `<x-fastleo::seo :model="$item" />`.
 - **Вопросы и ответы:** сначала вопросы без группы (без заголовка), затем группы в порядке первого вопроса; ответ — RichText (чистый HTML, выводите `{!! $item->answer !!}`); для разметки Schema.org соберите JSON-LD из `FaqItem::query()->published()->get()`.
 - **Примеры.** `php artisan db:seed --class='Database\Seeders\ReviewSeeder'` (и `PortfolioItemSeeder`, `FaqItemSeeder` в том же пространстве имён). Фабрики — `Review::factory()` и т. д.
+
+## Услуги, команда, прайс-лист, филиалы, сертификаты, партнёры
+
+Шесть разделов для сайта компании. Все шесть стоят в группе меню панели «Компания» (`$group` в классе ресурса: смените или уберите, если нужно). Если вы ответили «да» на вопрос о публичной части, на сайте уже подключены `/services` и `/services/{адрес}`, `/prices`, `/team` и `/team/{адрес}`, `/branches`, `/certificates`, `/partners` (контроллеры `ServiceController`, `PriceController`, `TeamController`, `BranchController`, `CertificateController`, `PartnerController`). Данные — `Service`, `PriceItem`, `TeamMember`, `Branch`, `Certificate`, `Partner`, у каждого скоуп `published()` (опубликованные в порядке, заданном перетаскиванием в списке). Свой вывод собирайте так:
+
+```php
+\App\Models\Service::query()->published()->paginate(12);
+\App\Models\Service::query()->published()->where('slug', $slug)->firstOrFail();
+\App\Models\PriceItem::query()->published()->get()->groupBy('category'); // позиции по группам
+\App\Models\TeamMember::query()->published()->get();
+\App\Models\Branch::query()->published()->get();
+\App\Models\Certificate::query()->published()->get();
+\App\Models\Partner::query()->published()->get();
+```
+
+- **Услуги и команда:** у записи есть адрес, кратко, описание (RichText, чистый HTML — выводите `{!! $item->body !!}`) и SEO (`<x-fastleo::seo :model="$item" />`); обложка и фото лежат в `storage/app/public/uploads/services` и `uploads/team`. Цена услуги и стаж сотрудника — обычные строки: пишите их так, как их должны увидеть посетители («от 1 500 ₽», «Стаж 12 лет»), поэтому по цене нельзя сортировать и фильтровать. Нужна числовая цена — добавьте колонку своей миграцией: код модуля принадлежит сайту.
+- **Прайс-лист:** одна таблица, группа — обычная строка (как у «Вопросов и ответов»): позиции без группы идут первыми без заголовка, затем группы в порядке первой позиции. Цена и единица — строки («от 2 000 ₽», «за час»).
+- **Филиалы и адреса:** телефоны — по одному в строке (на сайте не больше десяти); `$branch->phoneLinks()` отдаёт список `['text' => …, 'tel' => …]` для ссылок `tel:`; в `tel` идёт только первый номер строки, поэтому подпись («Бухгалтерия:») и добавочный («доб. 12») в звонок не попадают. Почта печатается ссылкой `mailto:` только обычным адресом, без `?`, `&`, `=`, `#` и `%` (иначе в письмо добавились бы лишние получатели и тема). Ссылка «Показать на карте» — `$branch->mapUrl()`: Яндекс.Карты по широте и долготе, если заданы обе, иначе поиск по городу и адресу; ни iframe, ни чужих скриптов в шаблоне нет. В Яндекс.Картах порядок «долгота, широта», а поля в панели — «широта» и «долгота» отдельно.
+- **Лицензии и сертификаты** (в панели раздел называется «Документы»: так подпись помещается в боковое меню): скан (картинка) и, по желанию, файл PDF в `storage/app/public/uploads/certificates`. Снятая с публикации запись пропадает со страницы, но её файлы лежат на публичном диске и открываются по прямому адресу тем, кто его знает: закрытые документы в этот раздел не кладите. На сайте миниатюра ведёт на PDF, а если его нет — на сам скан. Скан сохраняется с качеством и размером по `fastleo.images`, текст на документе остаётся читаемым.
+- **Партнёры и клиенты:** ссылка необязательна; в панели принимается только `http(s)://`, а шаблон дополнительно печатает ссылкой только такой адрес. Ссылки идут с `rel="noopener nofollow"`: уберите `nofollow` в `resources/views/partners/index.blade.php`, если обмениваетесь ссылками с партнёрами.
+- **Примеры.** `php artisan db:seed --class='Database\Seeders\ServiceSeeder'` (и `PriceItemSeeder`, `TeamMemberSeeder`, `BranchSeeder`, `CertificateSeeder`, `PartnerSeeder` в том же пространстве имён). Фабрики — `Service::factory()` и т. д.
 
 ## Интернет-магазин
 
@@ -176,7 +209,7 @@ $order = ShopOrder::place(
 Модуль — **стартовый код сайта**, а не зависимость: файлы копируются в ваш `app/`, `resources/` и `routes/` один раз, обновлений и точек расширения у них нет, правьте их как свои. Что менять чаще всего:
 
 - **Другая модель данных** (новости со статусами вместо «Опубликована»): модуль даёт 10 минут экономии на каркасе. Сделайте новую миграцию `alter`, перепишите ресурс, модель и фабрику, удалите сидер модуля (`NewsSeeder`) и строку виджета в `app/Fastleo/Dashboard.php`.
-- **Группа в меню панели.** Разделы модулей (`pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`) стоят без группы — в верхней части меню под «Дашбордом»; три раздела «Интернет-магазина» собраны в группу «Магазин». Чтобы поместить раздел в группу (существующую или новую), добавьте в его класс свойство, например `protected static ?string $group = 'Содержимое';`; порядок пунктов внутри — `$position` ([ресурсы](resources.md)).
+- **Группа в меню панели.** Разделы модулей (`pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`) стоят без группы — в верхней части меню под «Дашбордом»; три раздела «Интернет-магазина» собраны в группу «Магазин», шесть разделов для компании (`services`, `prices`, `team`, `branches`, `certificates`, `partners`) — в группу «Компания». Порядок групп — `menu.groups` в `config/fastleo.php`. Чтобы поместить раздел в группу (существующую или новую), добавьте в его класс свойство, например `protected static ?string $group = 'Содержимое';`; порядок пунктов внутри — `$position` ([ресурсы](resources.md)).
 - **Страница настроек «Контакты»**: если на сайте уже есть своя страница настроек, модуль `contacts` не ставьте — две страницы с телефоном запутают редакторов.
 - **Публичная часть нужна не всем.** Сайт со своей публичной частью отвечает на вопрос «нет» и получает только разделы панели. Добавить публичную часть позже повторной командой нельзя: файлы панели уже есть, и команда остановится. Удалите модуль ([как убрать](#как-убрать-модуль)) и поставьте заново с ответом «да» либо возьмите код из `vendor/camanru/fastleo/stubs/modules/<имя>/site` и общий макет `vendor/camanru/fastleo/stubs/modules/_site` (подставьте пространства имён вместо `{{ namespace }}` и `{{ appNamespace }}`, уберите `.stub` из имён) и добавьте маршруты: содержимое `site/routes/web.php.stub` (с подставленным `{{ appNamespace }}`) допишите в конец `routes/web.php` (блок «Страниц» с `Route::fallback` держите последним), как это делает команда.
 - **Оформление.** Менять нужно прежде всего общий макет `resources/views/layouts/site.blade.php`, затем шаблоны разделов. Классы CSS и скрипты в заготовки не входят.
@@ -191,7 +224,7 @@ $order = ShopOrder::place(
 
 ## Миграции
 
-Модули (`pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`, `shop`) кладут в `database/migrations` свои миграции (метка времени в имени — момент установки). Таблиц ещё нет, пока вы не выполните `php artisan migrate`; `fastleo:install` делает это за вас по вашему «да» или с `--setup`, а `fastleo:module` в конце печатает «Дальше»: выполнить `php artisan migrate` и, по желанию, добавить примеры данных (`php artisan db:seed --class='Database\Seeders\MenuItemSeeder'` — по сидеру на каждый добавленный модуль с таблицей). Миграции модулей не зависят друг от друга. Если в базе уже есть таблица с таким именем (`pages`, `news`, `menu_items`, `reviews`, `portfolio_items`, `faq_items`, `shop_categories`, `shop_products`, `shop_orders`, `shop_order_items`), модуль не ставится.
+Модули (`pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`, `services`, `prices`, `team`, `branches`, `certificates`, `partners`, `shop`) кладут в `database/migrations` свои миграции (метка времени в имени — момент установки). Таблиц ещё нет, пока вы не выполните `php artisan migrate`; `fastleo:install` делает это за вас по вашему «да» или с `--setup`, а `fastleo:module` в конце печатает «Дальше»: выполнить `php artisan migrate` и, по желанию, добавить примеры данных (`php artisan db:seed --class='Database\Seeders\MenuItemSeeder'` — по сидеру на каждый добавленный модуль с таблицей). Миграции модулей не зависят друг от друга. Если в базе уже есть таблица с таким именем (`pages`, `news`, `menu_items`, `reviews`, `portfolio_items`, `faq_items`, `services`, `price_items`, `team_members`, `branches`, `certificates`, `partners`, `shop_categories`, `shop_products`, `shop_orders`, `shop_order_items`), модуль не ставится.
 
 ## Как убрать модуль
 
@@ -211,6 +244,12 @@ $order = ShopOrder::place(
 | `portfolio` | `app/Models/PortfolioItem.php`, `app/Fastleo/PortfolioResource.php`, миграция `*_create_portfolio_items_table.php`, `database/factories/PortfolioItemFactory.php`, `database/seeders/PortfolioItemSeeder.php`, `tests/Feature/Fastleo/PortfolioTest.php` |
 | `shop` | `app/Models/Shop{Category,Product,Order,OrderItem}.php`, `app/Enums/ShopOrderStatus.php`, `app/Exceptions/{OutOfStock,ProductUnavailable,OrderLimit}Exception.php`, `app/Fastleo/Shop{Category,Product,Order,OrderItem}Resource.php`, `app/Fastleo/Actions/ChangeShopOrderStatus.php`, миграция `*_create_shop_tables.php` (при откате таблицы удаляются вместе с заказами), `database/factories/Shop{Category,Product,Order}Factory.php`, `database/seeders/ShopSeeder.php`, `tests/Feature/Fastleo/ShopTest.php` |
 | `faq` | `app/Models/FaqItem.php`, `app/Fastleo/FaqResource.php`, миграция `*_create_faq_items_table.php`, `database/factories/FaqItemFactory.php`, `database/seeders/FaqItemSeeder.php`, `tests/Feature/Fastleo/FaqTest.php` |
+| `services` | `app/Models/Service.php`, `app/Fastleo/ServiceResource.php`, миграция `*_create_services_table.php`, `database/factories/ServiceFactory.php`, `database/seeders/ServiceSeeder.php`, `tests/Feature/Fastleo/ServicesTest.php` |
+| `prices` | `app/Models/PriceItem.php`, `app/Fastleo/PriceItemResource.php`, миграция `*_create_price_items_table.php`, `database/factories/PriceItemFactory.php`, `database/seeders/PriceItemSeeder.php`, `tests/Feature/Fastleo/PricesTest.php` |
+| `team` | `app/Models/TeamMember.php`, `app/Fastleo/TeamMemberResource.php`, миграция `*_create_team_members_table.php`, `database/factories/TeamMemberFactory.php`, `database/seeders/TeamMemberSeeder.php`, `tests/Feature/Fastleo/TeamTest.php` |
+| `branches` | `app/Models/Branch.php`, `app/Fastleo/BranchResource.php`, миграция `*_create_branches_table.php`, `database/factories/BranchFactory.php`, `database/seeders/BranchSeeder.php`, `tests/Feature/Fastleo/BranchesTest.php` |
+| `certificates` | `app/Models/Certificate.php`, `app/Fastleo/CertificateResource.php`, миграция `*_create_certificates_table.php`, `database/factories/CertificateFactory.php`, `database/seeders/CertificateSeeder.php`, `tests/Feature/Fastleo/CertificatesTest.php` |
+| `partners` | `app/Models/Partner.php`, `app/Fastleo/PartnerResource.php`, миграция `*_create_partners_table.php`, `database/factories/PartnerFactory.php`, `database/seeders/PartnerSeeder.php`, `tests/Feature/Fastleo/PartnersTest.php` |
 
 Файлы публичной части (они есть, только если вы отвечали «да»): `app/Http/Controllers/<Имя>Controller.php`, `resources/views/<модуль>/` и `tests/Feature/Fastleo/<Модуль>SiteTest.php`; у `pages` — ещё `resources/views/blocks/{text,image,gallery,cta}.blade.php`, у `menu` контроллера и маршрутов нет, только `resources/views/menu/`, у `shop` — `app/Http/Controllers/{Shop,Cart,Checkout}Controller.php`, `app/Http/Requests/CheckoutRequest.php` и `app/Http/ShopCart.php`.
 

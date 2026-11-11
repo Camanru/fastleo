@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\Service;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+
+/**
+ * Фабрика услуг.
+ *
+ * @extends Factory<Service>
+ */
+class ServiceFactory extends Factory
+{
+    protected $model = Service::class;
+
+    /**
+     * Опубликованная услуга с ценой и описанием.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $title = fake()->unique()->sentence(3);
+
+        return [
+            'title' => $title,
+            'slug' => Str::slug($title),
+            'category' => fake()->randomElement(['Консультации', 'Ремонт', 'Обслуживание']),
+            'price' => 'от '.fake()->numberBetween(5, 90) * 100 .' ₽',
+            'excerpt' => fake()->sentence(12),
+            'body' => '<p>'.fake()->paragraph().'</p>',
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

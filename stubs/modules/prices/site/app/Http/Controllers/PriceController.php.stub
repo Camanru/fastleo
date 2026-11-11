@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\PriceItem;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
+
+/**
+ * Прайс-лист на сайте: опубликованные позиции по группам. Шаблон — `resources/views/prices/index.blade.php`.
+ */
+class PriceController extends Controller
+{
+    /**
+     * Позиции по группам (не больше 500): сначала позиции без группы (без заголовка), затем группы в порядке первой позиции.
+     */
+    public function index(): View
+    {
+        $groups = PriceItem::query()->published()->limit(500)->get()
+            ->groupBy(fn (PriceItem $item): string => (string) $item->category)
+            ->sortBy(fn (Collection $items, mixed $group): int => $group === '' ? 0 : 1);
+
+        return view('prices.index', ['groups' => $groups]);
+    }
+}

@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\TeamMember;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published team members in the order set in the panel', function (): void {
+    TeamMember::factory()->create(['slug' => 'second', 'sort' => 2]);
+    TeamMember::factory()->create(['slug' => 'first', 'sort' => 1]);
+    TeamMember::factory()->create(['slug' => 'hidden', 'is_published' => false]);
+
+    expect(TeamMember::query()->published()->pluck('slug')->all())->toBe(['first', 'second']);
+});
+
+it('lets an administrator add a team member', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'team'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'team'), ['name' => 'Анна Иванова', 'slug' => 'anna', 'job_title' => 'Старший мастер', 'is_published' => '1'])->assertRedirect();
+
+    expect(TeamMember::query()->where('slug', 'anna')->value('job_title'))->toBe('Старший мастер');
+});

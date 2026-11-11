@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/certificates', [\{{ appNamespace }}\Http\Controllers\CertificateController::class, 'index'])->name('site.certificates.index');

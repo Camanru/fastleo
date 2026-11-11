@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Partner;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published partners in the order set in the panel', function (): void {
+    Partner::factory()->create(['name' => 'Второй', 'sort' => 2]);
+    Partner::factory()->create(['name' => 'Первый', 'sort' => 1]);
+    Partner::factory()->create(['name' => 'Скрытый', 'is_published' => false]);
+
+    expect(Partner::query()->published()->pluck('name')->all())->toBe(['Первый', 'Второй']);
+});
+
+it('lets an administrator add a partner and refuses a link that is not http or https', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'partners'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'partners'), ['name' => 'Ромашка', 'url' => 'javascript:alert(1)', 'is_published' => '1'])->assertSessionHasErrors('url');
+    $this->post(route('fastleo.resources.store', 'partners'), ['name' => 'Ромашка', 'url' => 'https://example.com', 'is_published' => '1'])->assertRedirect();
+
+    expect(Partner::query()->where('name', 'Ромашка')->value('url'))->toBe('https://example.com');
+});

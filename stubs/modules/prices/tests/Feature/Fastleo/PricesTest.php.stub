@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\PriceItem;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published price items in the order set in the panel', function (): void {
+    PriceItem::factory()->create(['title' => 'Вторая', 'sort' => 2]);
+    PriceItem::factory()->create(['title' => 'Первая', 'sort' => 1]);
+    PriceItem::factory()->create(['title' => 'Скрытая', 'is_published' => false]);
+
+    expect(PriceItem::query()->published()->pluck('title')->all())->toBe(['Первая', 'Вторая']);
+});
+
+it('lets an administrator add a price item', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'prices'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'prices'), ['title' => 'Стрижка', 'price' => 'от 1 500 ₽', 'category' => 'Стрижки', 'is_published' => '1'])->assertRedirect();
+
+    expect(PriceItem::query()->where('title', 'Стрижка')->value('price'))->toBe('от 1 500 ₽');
+});

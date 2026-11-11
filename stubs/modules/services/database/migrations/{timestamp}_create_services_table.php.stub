@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Услуги: название, адрес, категория, цена (строкой: «от 1 500 ₽»), обложка, описание, SEO.
+     */
+    public function up(): void
+    {
+        Schema::create('services', function (Blueprint $table): void {
+            $table->id();
+            $table->string('title');
+            $table->string('slug')->unique();
+            $table->string('category', 100)->nullable()->index();
+            $table->string('price', 100)->nullable();
+            $table->string('cover')->nullable();
+            $table->text('excerpt')->nullable();
+            $table->longText('body')->nullable();
+            $table->boolean('is_published')->default(true);
+            $table->unsignedInteger('sort')->default(0);
+            $table->json('seo')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Удалить таблицу услуг.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('services');
+    }
+};

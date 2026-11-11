@@ -42,7 +42,7 @@ use function Laravel\Prompts\select;
 #[Signature('fastleo:install
         {--skill-path= : папка для skill Claude (по умолчанию .claude/skills/fastleo)}
         {--type= : вид установки: basic (без модулей) или custom (с выбором модулей)}
-        {--modules= : модули через запятую (contacts,pages,news,menu,reviews,portfolio,faq,shop) — без списка выбора (вопрос про публичную часть сайта в терминале остаётся)}
+        {--modules= : модули через запятую (contacts,pages,news,menu,reviews,portfolio,faq,services,prices,team,branches,certificates,partners,shop) — без списка выбора (вопрос про публичную часть сайта в терминале остаётся)}
         {--no-modules : не добавлять модули}
         {--setup : выполнить миграции и storage:link без вопросов}
         {--seed : заполнить модули примерами}

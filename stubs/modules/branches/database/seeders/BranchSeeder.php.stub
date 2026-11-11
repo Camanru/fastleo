@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\Branch;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры филиалов (php artisan db:seed --class='Database\Seeders\BranchSeeder').
+ */
+class BranchSeeder extends Seeder
+{
+    /**
+     * Создать два филиала, если филиалов с такими названиями ещё нет.
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Главный офис', 2 => 'Второй филиал'] as $number => $name) {
+            Branch::query()->firstOrCreate(['name' => $name], [
+                'city' => 'Москва',
+                'address' => 'ул. Примерная, '.$number,
+                'phones' => '+7 (495) 000-00-0'.$number,
+                'working_hours' => "Пн–Пт 9:00–18:00\nСб–Вс выходной",
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

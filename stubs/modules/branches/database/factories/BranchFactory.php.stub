@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\Branch;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика филиалов.
+ *
+ * @extends Factory<Branch>
+ */
+class BranchFactory extends Factory
+{
+    protected $model = Branch::class;
+
+    /**
+     * Опубликованный филиал с адресом, телефоном и часами работы (без координат).
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'name' => fake()->unique()->company(),
+            'city' => fake()->city(),
+            'address' => fake()->streetAddress(),
+            'phones' => '+7 (495) 000-00-00',
+            'working_hours' => 'Пн–Пт 9:00–18:00',
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

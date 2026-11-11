@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/prices', [\{{ appNamespace }}\Http\Controllers\PriceController::class, 'index'])->name('site.prices.index');

@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\TeamMember;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Команда на сайте: список сотрудников и страница сотрудника. Шаблоны — `resources/views/team`.
+ */
+class TeamController extends Controller
+{
+    /**
+     * Список сотрудников по 12 на страницу в порядке панели.
+     */
+    public function index(): View
+    {
+        return view('team.index', ['items' => TeamMember::query()->published()->simplePaginate(12)]);
+    }
+
+    /**
+     * Страница сотрудника; нет сотрудника или он не опубликован — 404.
+     */
+    public function show(string $slug): View
+    {
+        return view('team.show', ['item' => TeamMember::query()->published()->where('slug', $slug)->firstOrFail()]);
+    }
+}

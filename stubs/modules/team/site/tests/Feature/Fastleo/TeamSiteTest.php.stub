@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\TeamMember;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published team members and opens one by its address', function (): void {
+    TeamMember::factory()->create(['name' => 'Анна Иванова', 'slug' => 'anna']);
+    TeamMember::factory()->create(['name' => 'Скрытый сотрудник', 'slug' => 'hidden', 'is_published' => false]);
+
+    $this->get('/team')->assertOk()->assertSee('Анна Иванова')->assertDontSee('Скрытый сотрудник');
+    $this->get('/team/anna')->assertOk()->assertSee('Анна Иванова');
+    $this->get('/team/hidden')->assertNotFound();
+});

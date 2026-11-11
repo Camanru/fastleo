@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\Partner;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры партнёров (php artisan db:seed --class='Database\Seeders\PartnerSeeder').
+ */
+class PartnerSeeder extends Seeder
+{
+    /**
+     * Создать трёх партнёров, если партнёров с такими названиями ещё нет. Логотипы добавьте в панели: раздел «Партнёры и клиенты».
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Пример партнёра 1', 2 => 'Пример партнёра 2', 3 => 'Пример партнёра 3'] as $number => $name) {
+            Partner::query()->firstOrCreate(['name' => $name], [
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

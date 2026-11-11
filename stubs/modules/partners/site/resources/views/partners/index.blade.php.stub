@@ -1,0 +1,41 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Партнёры и клиенты" />
+@endsection
+
+@section('content')
+    <h1>Партнёры и клиенты</h1>
+
+    @forelse ($items as $item)
+        @php
+            // Ссылку вводит пользователь панели: на сайт попадает только http(s), без javascript: и //чужой-сайт.
+            $safeUrl = is_string($item->url) && preg_match('~^https?://~i', $item->url) === 1;
+        @endphp
+        <article>
+            @if ($safeUrl)
+                <a href="{{ $item->url }}" rel="noopener nofollow">
+                    <x-fastleo::picture :src="$item->logo" :alt="$item->name" />
+                    <h2>{{ $item->name }}</h2>
+                </a>
+            @else
+                <x-fastleo::picture :src="$item->logo" :alt="$item->name" />
+                <h2>{{ $item->name }}</h2>
+            @endif
+            @if ($item->description)
+                <p>{{ $item->description }}</p>
+            @endif
+        </article>
+    @empty
+        <p>Партнёров пока нет.</p>
+    @endforelse
+
+    <nav>
+        @if ($items->previousPageUrl())
+            <a href="{{ $items->previousPageUrl() }}" rel="prev">← Назад</a>
+        @endif
+        @if ($items->nextPageUrl())
+            <a href="{{ $items->nextPageUrl() }}" rel="next">Дальше →</a>
+        @endif
+    </nav>
+@endsection

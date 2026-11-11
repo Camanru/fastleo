@@ -1,0 +1,42 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Филиалы и адреса" />
+@endsection
+
+@section('content')
+    <h1>Филиалы и адреса</h1>
+
+    @forelse ($items as $item)
+        @php
+            $mapUrl = $item->mapUrl();
+            // Почту вводит пользователь панели: ссылкой печатается только обычный адрес, без «?», «&», «=», «#» и «%» (они добавляют в mailto получателей и тему).
+            $emailIsValid = is_string($item->email) && filter_var($item->email, FILTER_VALIDATE_EMAIL) !== false && preg_match('/[?&=#%]/', $item->email) === 0;
+        @endphp
+        <article>
+            <h2>{{ $item->name }}</h2>
+            <x-fastleo::picture :src="$item->photo" :alt="$item->name" />
+            <p>{{ $item->city ? $item->city.', ' : '' }}{{ $item->address }}</p>
+            @foreach ($item->phoneLinks() as $phone)
+                <p>
+                    @if ($phone['tel'])
+                        <a href="tel:{{ $phone['tel'] }}">{{ $phone['text'] }}</a>
+                    @else
+                        {{ $phone['text'] }}
+                    @endif
+                </p>
+            @endforeach
+            @if ($emailIsValid)
+                <p><a href="mailto:{{ $item->email }}">{{ $item->email }}</a></p>
+            @endif
+            @if ($item->working_hours)
+                <p>{!! nl2br(e($item->working_hours)) !!}</p>
+            @endif
+            @if ($mapUrl)
+                <p><a href="{{ $mapUrl }}" rel="noopener">Показать на карте</a></p>
+            @endif
+        </article>
+    @empty
+        <p>Адресов пока нет.</p>
+    @endforelse
+@endsection

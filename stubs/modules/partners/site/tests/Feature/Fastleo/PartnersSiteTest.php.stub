@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Partner;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published partners and links only the addresses that start with http or https', function (): void {
+    Partner::factory()->create(['name' => 'Ромашка', 'url' => 'https://example.com/romashka']);
+    Partner::factory()->create(['name' => 'Лютик', 'url' => 'javascript:alert(1)']);
+    Partner::factory()->create(['name' => 'Скрытый партнёр', 'is_published' => false]);
+
+    $this->get('/partners')->assertOk()
+        ->assertSee('Ромашка')
+        ->assertSee('href="https://example.com/romashka" rel="noopener nofollow"', false)
+        ->assertSee('Лютик')
+        ->assertDontSee('javascript:alert(1)', false)
+        ->assertDontSee('Скрытый партнёр');
+});

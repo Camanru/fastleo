@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\PriceItem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('shows the published prices by groups and hides the rest', function (): void {
+    PriceItem::factory()->create(['title' => 'Мужская стрижка', 'category' => 'Стрижки', 'price' => '1 500 ₽', 'sort' => 1]);
+    PriceItem::factory()->create(['title' => 'Скрытая позиция', 'is_published' => false]);
+
+    $this->get('/prices')->assertOk()->assertSeeInOrder(['Стрижки', 'Мужская стрижка', '1 500 ₽'])->assertDontSee('Скрытая позиция');
+});

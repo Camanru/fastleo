@@ -35,6 +35,20 @@ final class JsonItem extends Model
     }
 
     /**
+     * Отсутствующее подполе — пустое значение, а не ошибка: в JSON не обязаны быть все ключи (у `Seo` без заполненных
+     * полей их нет, в старой записи нет ключа нового подполя), поэтому `Model::shouldBeStrict()` сайта не должен
+     * ронять форму панели. Цена: опечатка в имени подполя в шаблоне сайта
+     * (`$item->quetsion`) тоже даст `null`, а не исключение strict-режима.
+     *
+     * @param  string  $key
+     */
+    #[\Override]
+    protected function throwMissingAttributeExceptionIfApplicable($key): mixed
+    {
+        return null;
+    }
+
+    /**
      * У элемента нет связей: подполе с именем метода модели (`from`) — обычное значение.
      *
      * @param  string  $key

@@ -4,6 +4,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The panel interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
+## [4.10.2] — 2026-11-12
+
+### Added
+
+- **Six more ready-made modules for `fastleo:module`**, for a company site: `services`, `prices` (price list), `team`, `branches` (branches and addresses), `certificates` (licenses and certificates) and `partners` (partners and clients). Each copies an admin section, model, migration, factory, seeder and Pest test into the site as your own code, plus the optional public part the command asks about. The six sections share the panel menu group "Company" (`$group` in the resource class).
+  - **Addresses:** `/services`, `/services/{slug}`; `/prices`; `/team`, `/team/{slug}`; `/branches`; `/certificates`; `/partners`. Services and team have a page of their own (slug, RichText body, SEO); the others are lists.
+  - **Services, price list:** the price is a plain string ("from 1 500 ₽") shown as typed; price list items are grouped by a plain-string group, items without a group first (like the FAQ).
+  - **Branches:** phones one per line (ten at most, `Branch::phoneLinks()` builds the `tel:` links), hours of work, optional latitude and longitude; `Branch::mapUrl()` gives a Yandex Maps link by the coordinates (longitude first) or by the address — no iframe and no third-party script in the template.
+  - **Certificates:** (the panel section is called "Documents", which fits the side menu) a scan and an optional PDF file; the thumbnail links to the PDF, or to the scan when there is no file.
+  - **Partners:** a logo and an optional link; the panel accepts only `http(s)://`, and the template links only such an address, with `rel="noopener nofollow"`.
+
+### Fixed
+
+- **The create and edit forms of a section with a `Seo` field (or a `Repeater`/`Blocks` item with missing keys) failed with a 500 error when the site enabled `Model::shouldBeStrict()`** (the usual advice for local development): a missing key of the stored JSON is an empty value, not an error. The sections of the `news`, `portfolio`, `services` and `team` modules were hit by it.
+
 ## [4.10.1] — 2026-11-11
 
 ### Added

@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Certificate;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('keeps only published documents in the order set in the panel', function (): void {
+    Certificate::factory()->create(['title' => 'Второй', 'sort' => 2]);
+    Certificate::factory()->create(['title' => 'Первый', 'sort' => 1]);
+    Certificate::factory()->create(['title' => 'Скрытый', 'is_published' => false]);
+
+    expect(Certificate::query()->published()->pluck('title')->all())->toBe(['Первый', 'Второй']);
+});
+
+it('lets an administrator add a document', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'certificates'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'certificates'), ['title' => 'Лицензия', 'issuer' => 'Министерство', 'is_published' => '1'])->assertRedirect();
+
+    expect(Certificate::query()->where('title', 'Лицензия')->value('issuer'))->toBe('Министерство');
+});

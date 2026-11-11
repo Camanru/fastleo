@@ -1,0 +1,34 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\Partner;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика партнёров и клиентов.
+ *
+ * @extends Factory<Partner>
+ */
+class PartnerFactory extends Factory
+{
+    protected $model = Partner::class;
+
+    /**
+     * Опубликованный партнёр со ссылкой.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'name' => fake()->unique()->company(),
+            'url' => 'https://example.com/'.fake()->unique()->slug(2),
+            'description' => fake()->sentence(6),
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

@@ -1,0 +1,44 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Лицензии и сертификаты" />
+@endsection
+
+@section('content')
+    <h1>Лицензии и сертификаты</h1>
+
+    @forelse ($items as $item)
+        @php
+            $file = is_string($item->file) && $item->file !== '' ? $item->file : null;
+            $image = is_string($item->image) && $item->image !== '' ? $item->image : null;
+            $link = $file ?? $image;
+        @endphp
+        <article>
+            @if ($link)
+                <a href="{{ \Fastleo\Files\FileStore::url($link) }}">
+                    <x-fastleo::picture :src="$image" :alt="$item->title" />
+                    <h2>{{ $item->title }}</h2>
+                </a>
+            @else
+                <h2>{{ $item->title }}</h2>
+            @endif
+            @if ($item->issuer)
+                <p>{{ $item->issuer }}</p>
+            @endif
+            @if ($item->issued_at)
+                <time datetime="{{ $item->issued_at->toDateString() }}">{{ $item->issued_at->format('d.m.Y') }}</time>
+            @endif
+        </article>
+    @empty
+        <p>Документов пока нет.</p>
+    @endforelse
+
+    <nav>
+        @if ($items->previousPageUrl())
+            <a href="{{ $items->previousPageUrl() }}" rel="prev">← Назад</a>
+        @endif
+        @if ($items->nextPageUrl())
+            <a href="{{ $items->nextPageUrl() }}" rel="next">Дальше →</a>
+        @endif
+    </nav>
+@endsection

@@ -1,0 +1,117 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\BranchFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Филиал или адрес компании: адрес, телефоны, часы работы и, по желанию, координаты для ссылки на карту.
+ * Вывод на сайте — публичная часть модуля (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * Branch::query()->published()->get();
+ * $branch->mapUrl();      // https://yandex.ru/maps/?pt=37.6173,55.7558&z=16&l=map
+ * $branch->phoneLinks();  // [['text' => '+7 (495) 000-00-00', 'tel' => '+74950000000']]
+ * ```
+ *
+ * @property int $id
+ * @property string $name
+ * @property string|null $city
+ * @property string $address
+ * @property string|null $phones
+ * @property string|null $email
+ * @property string|null $working_hours
+ * @property string|null $latitude
+ * @property string|null $longitude
+ * @property string|null $photo
+ * @property bool $is_published
+ * @property int $sort
+ */
+#[UseFactory(BranchFactory::class)]
+class Branch extends Model
+{
+    use HasFactory;
+
+    /** Сколько телефонов показывать у одного филиала. */
+    private const int MAX_PHONES = 10;
+
+    protected $fillable = ['name', 'city', 'address', 'phones', 'email', 'working_hours', 'latitude', 'longitude', 'photo', 'is_published', 'sort'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованные филиалы в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<Branch>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderByDesc('id');
+    }
+
+    /**
+     * Телефоны из поля «по номеру в строке»: текст как ввели и номер для ссылки `tel:` (цифры и ведущий `+`;
+     * `null`, если в строке нет цифр). В ссылку идёт только первый номер строки: подпись («Бухгалтерия:»),
+     * добавочный («доб. 12»), второй номер после запятой или косой черты в неё не попадают. Не больше десяти.
+     * Пример: `+7 (343) 000-00-01 доб. 12` → `+73430000001`.
+     *
+     * @return list<array{text: string, tel: string|null}>
+     */
+    public function phoneLinks(): array
+    {
+        $links = [];
+
+        foreach (preg_split('/\R/u', (string) $this->phones) ?: [] as $line) {
+            $text = trim($line);
+
+            if ($text === '') {
+                continue;
+            }
+
+            $number = preg_match('/(\+)?[\s(]*(\d[\d\s().\-]*)/u', $text, $match) === 1 ? ($match[1].preg_replace('/\D/', '', $match[2])) : null;
+            $links[] = ['text' => $text, 'tel' => $number];
+        }
+
+        return array_slice($links, 0, self::MAX_PHONES);
+    }
+
+    /**
+     * Ссылка на Яндекс.Карты: по координатам (если заданы обе и они настоящие), иначе поиск по адресу.
+     * В адресе Яндекса координаты идут «долгота,широта». Нет ни координат, ни адреса — `null`.
+     */
+    public function mapUrl(): ?string
+    {
+        $latitude = is_numeric($this->latitude) ? (float) $this->latitude : null;
+        $longitude = is_numeric($this->longitude) ? (float) $this->longitude : null;
+
+        if ($latitude !== null && $longitude !== null && abs($latitude) <= 90 && abs($longitude) <= 180) {
+            return 'https://yandex.ru/maps/?pt='.self::coordinate($longitude).','.self::coordinate($latitude).'&z=16&l=map';
+        }
+
+        $query = trim($this->city.' '.$this->address);
+
+        return $query === '' ? null : 'https://yandex.ru/maps/?text='.rawurlencode($query);
+    }
+
+    /**
+     * Координата без лишних нулей: 37.6173000 → 37.6173.
+     */
+    private static function coordinate(float $value): string
+    {
+        return rtrim(rtrim(sprintf('%.7F', $value), '0'), '.');
+    }
+}

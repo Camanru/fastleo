@@ -1,0 +1,2 @@
+\Illuminate\Support\Facades\Route::get('/team', [\{{ appNamespace }}\Http\Controllers\TeamController::class, 'index'])->name('site.team.index');
+\Illuminate\Support\Facades\Route::get('/team/{slug}', [\{{ appNamespace }}\Http\Controllers\TeamController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.team.show');
