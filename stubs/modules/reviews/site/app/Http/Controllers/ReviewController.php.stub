@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Review;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Отзывы на сайте: список опубликованных отзывов в порядке панели. Шаблон — `resources/views/reviews/index.blade.php`.
+ */
+class ReviewController extends Controller
+{
+    /**
+     * Список отзывов по 20 на страницу.
+     */
+    public function index(): View
+    {
+        return view('reviews.index', ['items' => Review::query()->published()->simplePaginate(20)]);
+    }
+}

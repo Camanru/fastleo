@@ -65,7 +65,27 @@ final class ActionInput
             }
         }
 
-        return validator($input, $rules, ValidationMessages::all(), $attributes);
+        return validator(self::limited($action, $input), $rules, ValidationMessages::all(), $attributes);
+    }
+
+    /**
+     * Ввод мини-формы со списками, обрезанными до «предел + 1» (`RecordWriter::limitLists()`): для проверки и для возврата
+     * в форму после ошибки.
+     *
+     * ```php
+     * back()->withInput(ActionInput::limited($action, $request->request->all()));
+     * ```
+     *
+     * @param  array<array-key, mixed>  $input  ввод с ключом `data`
+     * @return array<array-key, mixed>
+     */
+    public static function limited(Action $action, array $input): array
+    {
+        if (is_array($input['data'] ?? null)) {
+            $input['data'] = RecordWriter::limitLists(self::fields($action), $input['data']);
+        }
+
+        return $input;
     }
 
     /**

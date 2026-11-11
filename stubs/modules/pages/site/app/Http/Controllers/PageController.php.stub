@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\Page;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+
+/**
+ * Страницы сайта: главная («/») и любой адрес, который не занят другими маршрутами (запасной маршрут).
+ */
+class PageController extends Controller
+{
+    /**
+     * Страница по адресу; нет страницы или она (или её родитель) не опубликована — 404.
+     */
+    public function show(Request $request): View
+    {
+        $path = $request->path();
+
+        // Адрес не из слагов (`.env`, `wp-login.php`, `About`) — страницы быть не может: в базу ходить незачем.
+        abort_unless($path === '/' || preg_match('~^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)*$~D', $path) === 1, 404);
+
+        $page = $path === '/' ? Page::home() : Page::findByPath($path);
+
+        abort_if($page === null, 404);
+
+        return view('pages.show', ['page' => $page]);
+    }
+}

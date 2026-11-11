@@ -125,6 +125,23 @@ jobs:
         if: matrix.php != '8.4' || matrix.database != 'sqlite'
         run: vendor/bin/pest --exclude-testsuite=Browser
 
+  site:
+    name: Тесты, которые модули кладут на сайт
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
+        with:
+          php-version: '8.4'
+          extensions: pdo_sqlite, gd, exif
+          coverage: none
+
+      - run: composer test:site
+
   browser:
     name: Браузерные тесты
     runs-on: ubuntu-latest

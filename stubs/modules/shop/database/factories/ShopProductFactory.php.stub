@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\ShopProduct;
+use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
+
+/**
+ * Фабрика товаров магазина.
+ *
+ * @extends Factory<ShopProduct>
+ */
+class ShopProductFactory extends Factory
+{
+    protected $model = ShopProduct::class;
+
+    /**
+     * Опубликованный товар без учёта остатка.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        $title = fake()->unique()->words(3, true);
+
+        return [
+            'title' => $title,
+            'slug' => Str::slug($title),
+            'sku' => strtoupper(fake()->unique()->bothify('??-####')),
+            'price' => fake()->randomFloat(2, 100, 5000),
+            'stock' => null,
+            'description' => '<p>'.fake()->paragraph().'</p>',
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

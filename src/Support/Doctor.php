@@ -47,6 +47,7 @@ use Fastleo\SoftNetica\Connection;
 use Fastleo\SoftNetica\SyncState;
 use Fastleo\Support\Html\HtmlLoss;
 use Fastleo\Support\Html\RichTextSettings;
+use Illuminate\Cache\ArrayStore;
 use Illuminate\Cache\NullStore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -386,6 +387,8 @@ final class Doctor
         if (Leads::apiEnabled() && Cache::store()->getStore() instanceof NullStore) {
             $this->add('error', 'site', 'leads_cache_null', hint: 'leads_cache_null_hint');
         }
+
+        $this->shopCache();
 
         $this->appUrl();
 
@@ -1329,6 +1332,25 @@ final class Doctor
             $this->fields($field->schema()->fields(), $related, $columns, $path, $editable);
         } catch (Throwable $e) {
             $this->add('error', $path, 'resource', ['message' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Магазин (готовый модуль `shop`): метка формы оформления одноразовая, а лимит отправок считается в кеше. Кеш `null`
+     * отвечает на каждый заказ «форма уже отправлена», кеш `array` живёт один запрос — метка не одноразовая, лимит не работает.
+     */
+    private function shopCache(): void
+    {
+        if (! Route::has('site.shop.checkout')) {
+            return;
+        }
+
+        $store = Cache::store()->getStore();
+
+        if ($store instanceof NullStore) {
+            $this->add('error', 'site', 'shop_cache_null', hint: 'shop_cache_null_hint');
+        } elseif ($store instanceof ArrayStore) {
+            $this->add('warning', 'site', 'shop_cache_array', hint: 'shop_cache_array_hint');
         }
     }
 

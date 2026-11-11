@@ -225,4 +225,13 @@ class Gallery extends FileField
 
         return $paths;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->max;
+    }
 }

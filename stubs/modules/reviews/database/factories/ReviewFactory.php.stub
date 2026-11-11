@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\Review;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика отзывов.
+ *
+ * @extends Factory<Review>
+ */
+class ReviewFactory extends Factory
+{
+    protected $model = Review::class;
+
+    /**
+     * Опубликованный отзыв с оценкой от 4 до 5.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'author' => fake()->name(),
+            'company' => fake()->company(),
+            'rating' => fake()->numberBetween(4, 5),
+            'body' => fake()->paragraph(),
+            'reviewed_at' => fake()->dateTimeBetween('-1 year'),
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

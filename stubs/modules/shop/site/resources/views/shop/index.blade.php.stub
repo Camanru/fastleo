@@ -1,0 +1,21 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Магазин" />
+@endsection
+
+@section('content')
+    <h1>Магазин</h1>
+
+    @if ($categories->isNotEmpty())
+        <ul>
+            @foreach ($categories as $category)
+                <li><a href="{{ route('site.shop.category', $category->slug) }}">{{ $category->title }}</a></li>
+            @endforeach
+        </ul>
+    @endif
+
+    <p><a href="{{ route('site.shop.cart') }}">Корзина</a></p>
+
+    @include('shop.products')
+@endsection

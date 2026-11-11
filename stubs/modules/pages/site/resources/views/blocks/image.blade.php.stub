@@ -1,0 +1,9 @@
+@php
+    $caption = is_string($caption ?? null) ? $caption : '';
+@endphp
+<figure>
+    <x-fastleo::picture :src="is_string($src ?? null) ? $src : null" :alt="$caption" />
+    @if ($caption !== '')
+        <figcaption>{{ $caption }}</figcaption>
+    @endif
+</figure>

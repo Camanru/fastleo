@@ -1,0 +1,2 @@
+\Illuminate\Support\Facades\Route::get('/portfolio', [\{{ appNamespace }}\Http\Controllers\PortfolioController::class, 'index'])->name('site.portfolio.index');
+\Illuminate\Support\Facades\Route::get('/portfolio/{slug}', [\{{ appNamespace }}\Http\Controllers\PortfolioController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.portfolio.show');

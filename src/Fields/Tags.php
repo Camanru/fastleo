@@ -192,4 +192,13 @@ class Tags extends Field
     {
         return false;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return self::MAX_TAGS;
+    }
 }

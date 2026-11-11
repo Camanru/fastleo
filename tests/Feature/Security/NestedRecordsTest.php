@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Fastleo\Fastleo;
+use Fastleo\Support\RecordWriter;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\ArticleLink;
 
@@ -53,4 +54,22 @@ it('rejects a block that is not an array', function (): void {
         ->assertSessionHasErrors('links.0.title');
 
     expect($article->links()->count())->toBe(0);
+});
+
+it('cuts a list that is far over its limit before the rules are expanded per element', function (): void {
+    $article = Article::factory()->create();
+    $resource = Fastleo::resources()->find('articles');
+    $blocks = array_fill(0, 5000, ['title' => 'Ссылка']);
+
+    $input = RecordWriter::controllingInput($resource, $article, articleData(['links' => $blocks]));
+
+    // Один лишний элемент остаётся: правило `max:10` откажет, а разворачивать 5000 элементов не нужно.
+    expect($input['links'])->toHaveCount(11);
+
+    $this->put(route('fastleo.resources.update', ['articles', $article->id]), articleData(['links' => $blocks]))
+        ->assertSessionHasErrors('links');
+
+    // Форма после ошибки рисует блоки из старого ввода: в сессии остаётся обрезанный список, а не пять тысяч блоков.
+    expect(session()->getOldInput('links'))->toHaveCount(11)
+        ->and($article->links()->count())->toBe(0);
 });

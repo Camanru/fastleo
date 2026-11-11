@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\FaqItem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('shows the published questions with their answers by groups', function (): void {
+    FaqItem::factory()->create(['question' => 'Как заказать?', 'answer' => '<p>Позвоните нам.</p>', 'category' => 'Заказ']);
+    FaqItem::factory()->create(['question' => 'Скрытый вопрос?', 'is_published' => false]);
+
+    $this->get('/faq')->assertOk()->assertSee('Как заказать?')->assertSee('<p>Позвоните нам.</p>', false)->assertSee('Заказ')->assertDontSee('Скрытый вопрос?');
+});

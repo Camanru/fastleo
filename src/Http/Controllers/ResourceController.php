@@ -6,6 +6,7 @@ namespace Fastleo\Http\Controllers;
 
 use Fastleo\Auth\Impersonation;
 use Fastleo\Fastleo;
+use Fastleo\Fields\Field;
 use Fastleo\Fields\Password;
 use Fastleo\Resource;
 use Fastleo\Support\Authorization;
@@ -27,6 +28,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -283,15 +285,15 @@ final class ResourceController
 
         if ($validator->fails()) {
             // Пароли (в том числе поля с нестандартным именем) не возвращаются в форму через сессию.
-            throw new ValidationException($validator, redirect($formUrl)->withInput($request->except($this->secretInputs($resource)))->withErrors($validator));
+            throw new ValidationException($validator, redirect($formUrl)->withInput($this->oldInput($request, $resource, $fields))->withErrors($validator));
         }
 
         try {
             RecordWriter::write($resource, $record, $fields, RecordWriter::inInputOrder($validator->validated(), $input));
         } catch (QueryException $exception) {
-            return redirect($formUrl)->withInput($request->except($this->secretInputs($resource)))->with('fastleo.error', DatabaseErrors::explain($exception));
+            return redirect($formUrl)->withInput($this->oldInput($request, $resource, $fields))->with('fastleo.error', DatabaseErrors::explain($exception));
         } catch (OperationCancelled) {
-            return redirect($formUrl)->withInput($request->except($this->secretInputs($resource)))->with('fastleo.error', __('fastleo::resources.save_cancelled'));
+            return redirect($formUrl)->withInput($this->oldInput($request, $resource, $fields))->with('fastleo.error', __('fastleo::resources.save_cancelled'));
         }
 
         // Форма в окне: после сохранения — страница «сохранено» (она просит окно закрыться), а не выбор следующего шага.
@@ -344,6 +346,18 @@ final class ResourceController
         return $request->expectsJson()
             ? response()->json(['ok' => true])
             : back(fallback: route('fastleo.resources.index', $resource::slug()));
+    }
+
+    /**
+     * Ввод для возврата на форму после ошибки: без паролей и со списками, обрезанными до «предел + 1» (форма рисует блоки
+     * из старого ввода, и список в сотни тысяч элементов дорого обошёлся бы следующему открытию формы).
+     *
+     * @param  list<Field>  $fields
+     * @return array<array-key, mixed>
+     */
+    private function oldInput(Request $request, Resource $resource, array $fields): array
+    {
+        return Arr::except(RecordWriter::limitLists($fields, $request->all()), $this->secretInputs($resource));
     }
 
     /**

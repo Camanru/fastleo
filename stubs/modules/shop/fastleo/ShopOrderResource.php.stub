@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Enums\ShopOrderStatus;
+use {{ appNamespace }}\Enums\ShopOrderStatus;
 use {{ namespace }}\Actions\ChangeShopOrderStatus;
-use {{ namespace }}\Models\ShopOrder;
+use {{ appNamespace }}\Models\ShopOrder;
 use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Email;
 use Fastleo\Fields\Enum;
@@ -22,7 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 use Override;
 
 /**
- * Раздел «Заказы»: покупатель, сумма, статус и позиции. Заказы создаёт код сайта через `ShopOrder::place()`; менеджер меняет
+ * Раздел «Заказы»: покупатель, сумма, статус и позиции. Заказы создаёт форма оформления сайта (`CheckoutController` публичной части или ваш код) через `ShopOrder::place()`; менеджер меняет
  * статус (действие «Сменить статус»), «Оплачен», контакты и заметку. Позиции и сумма — снимок на момент заказа, не правятся.
  */
 final class ShopOrderResource extends Resource
@@ -42,6 +42,11 @@ final class ShopOrderResource extends Resource
     protected static int $position = 10;
 
     protected static ?array $defaultOrder = ['id', 'desc'];
+
+    /** Имена, телефоны и адреса покупателей не уходят ИИ-агентам через MCP и не выгружаются файлом (как «Заявки»). */
+    protected static bool $mcp = false;
+
+    protected static bool $exportable = false;
 
     /** Новые заказы появляются в списке сами. */
     protected static ?int $poll = 30;

@@ -28,8 +28,8 @@ use function Laravel\Prompts\select;
  * Первичная установка fastleo на сайт.
  *
  * Публикует конфиг (если его ещё нет) и ассеты, подключает модель пользователя (интерфейс FastleoUser и трейт
- * HasFastleoAccess), проверяет очередь, спрашивает, какие готовые модули добавить на сайт (вид установки → модули),
- * и с подтверждения выполняет миграции, `storage:link` и создаёт пользователя. Без вопросов (`--no-interaction`)
+ * HasFastleoAccess), проверяет очередь, спрашивает, какие готовые модули добавить на сайт (вид установки → модули →
+ * ставить ли публичную часть сайта: вопрос задаёт `fastleo:module`), и с подтверждения выполняет миграции, `storage:link` и создаёт пользователя. Без вопросов (`--no-interaction`)
  * ничего из этого не выполняется, пока не указаны флаги.
  *
  * ```bash
@@ -42,7 +42,7 @@ use function Laravel\Prompts\select;
 #[Signature('fastleo:install
         {--skill-path= : папка для skill Claude (по умолчанию .claude/skills/fastleo)}
         {--type= : вид установки: basic (без модулей) или custom (с выбором модулей)}
-        {--modules= : модули через запятую (contacts,pages,news,menu,reviews,portfolio,faq,shop) — без опроса}
+        {--modules= : модули через запятую (contacts,pages,news,menu,reviews,portfolio,faq,shop) — без списка выбора (вопрос про публичную часть сайта в терминале остаётся)}
         {--no-modules : не добавлять модули}
         {--setup : выполнить миграции и storage:link без вопросов}
         {--seed : заполнить модули примерами}
@@ -126,7 +126,20 @@ final class InstallCommand extends Command
         }
 
         if ($listed) {
-            return array_values(array_filter(array_map(trim(...), explode(',', $names))));
+            if (! $this->pestInstalled($installer)) {
+                return null;
+            }
+
+            $modules = array_values(array_filter(array_map(trim(...), explode(',', $names))));
+
+            // `--modules=,` не называет ни одного модуля: молча ничего не ставить нельзя, CI решит, что модули добавлены.
+            if ($modules === []) {
+                $this->components->error(__('fastleo::console.install_modules_empty', ['modules' => implode(', ', array_keys(Modules::all()))]));
+
+                return null;
+            }
+
+            return $modules;
         }
 
         $types = Modules::types();
@@ -149,6 +162,10 @@ final class InstallCommand extends Command
         // Базовая установка — без модулей; кастомная без вопросов (флаг --type=custom без --modules) тоже ничего не добавляет.
         if ($type === 'basic' || ! $this->input->isInteractive()) {
             return [];
+        }
+
+        if (! $this->pestInstalled($installer)) {
+            return null;
         }
 
         $selected = [];
@@ -175,6 +192,20 @@ final class InstallCommand extends Command
                 return [];
             }
         }
+    }
+
+    /**
+     * Модули копируют на сайт свои тесты на Pest: без него установка с модулями отказывается до опроса и записи файлов.
+     */
+    private function pestInstalled(ModuleInstaller $installer): bool
+    {
+        if ($installer->hasPest()) {
+            return true;
+        }
+
+        $this->components->error(__('fastleo::console.module_pest_required'));
+
+        return false;
     }
 
     /**

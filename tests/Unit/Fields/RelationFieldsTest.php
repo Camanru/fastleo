@@ -185,6 +185,42 @@ describe('nested', function (): void {
             ->and($validator->fails())->toBeTrue();
     });
 
+    it('counts only existing blocks of this record toward the minimum', function (): void {
+        $article = Article::factory()->create();
+        $own = $article->links()->create(['title' => 'Своя']);
+        $foreign = Article::factory()->create()->links()->create(['title' => 'Чужая']);
+        $links = HasMany::make('links')->min(1)->fields([Text::make('title')])->forModel(Article::class);
+
+        $errors = fn (array $blocks, ?Article $record): array => Validator::make(['links' => $blocks], $links->getRules($record))->errors()->get('links');
+
+        // Выдуманный и чужой id не остаются в записи после сохранения, поэтому минимум они не закрывают.
+        expect($errors([['id' => '999999999']], $article))->not->toBeEmpty()
+            ->and($errors([['id' => (string) $foreign->id]], $article))->not->toBeEmpty()
+            ->and($errors([['id' => '5']], null))->not->toBeEmpty()
+            ->and($errors([['id' => (string) $own->id, 'title' => 'Своя']], $article))->toBeEmpty()
+            ->and($errors([['id' => (string) $own->id, 'title' => '']], $article))->toBeEmpty()
+            ->and($errors([['title' => 'Новая']], $article))->toBeEmpty();
+    });
+
+    it('counts a repeated id of an existing block once and the blocks the form never saw as kept', function (): void {
+        $article = Article::factory()->create();
+        [$first, $second, $third] = [$article->links()->create(['title' => 'A']), $article->links()->create(['title' => 'B']), $article->links()->create(['title' => 'C'])];
+        $links = HasMany::make('links')->min(2)->fields([Text::make('title')])->forModel(Article::class);
+
+        $errors = fn (array $data): array => Validator::make($data, $links->getRules($article))->errors()->get('links');
+
+        // Повтор id сохраняет запись один раз, а остальные записи удаляются: это не два блока.
+        expect($errors(['links' => [['id' => (string) $first->id, 'title' => 'A'], ['id' => (string) $first->id, 'title' => 'A']]]))->not->toBeEmpty()
+            // Форма видела A и B (убрала B), а C добавил другой пользователь: сохранение его не удалит, и останется два блока.
+            ->and($errors(['links' => [['id' => (string) $first->id, 'title' => 'A']], 'links__seen' => $first->id.','.$second->id]))->toBeEmpty()
+            // Форма видела все три: останется один.
+            ->and($errors(['links' => [['id' => (string) $first->id, 'title' => 'A']], 'links__seen' => $first->id.','.$second->id.','.$third->id]))->not->toBeEmpty()
+            // Форма открылась без блоков (`__seen` пуст, middleware делает из '' null): сохранение не удалит ни одной записи.
+            ->and($errors(['links' => [['title' => 'Новая']], 'links__seen' => null]))->toBeEmpty()
+            // Форма не сообщила, что видела: убираются все, которых нет в запросе.
+            ->and($errors(['links' => [['id' => (string) $first->id, 'title' => 'A']]]))->not->toBeEmpty();
+    });
+
     it('allows at most 200 blocks unless the site sets its own limit', function (): void {
         $links = HasMany::make('links')->fields([Text::make('title')])->forModel(Article::class);
 
@@ -197,7 +233,7 @@ describe('nested', function (): void {
         $field = HasMany::make('links', 'Ссылки')->fields([Text::make('title', 'Название')->required()])->min(1)->max(3)->forModel(Article::class);
 
         $rules = $field->getRules(null);
-        $minimum = $rules['links'][2];
+        $minimum = $rules['links'][3];
         $rules['links'] = array_values(array_filter($rules['links'], is_string(...)));
 
         expect($rules)->toBe([
@@ -225,7 +261,6 @@ describe('nested', function (): void {
         'only an empty new block' => [[['title' => '']], false],
         'a new block with a single space' => [[['title' => ' ']], false],
         'an empty new block next to nothing else' => [[['id' => '', 'title' => '']], false],
-        'a saved block, even if its title is cleared' => [[['id' => '5', 'title' => '']], true],
         'a filled new block' => [[['title' => 'Прайс']], true],
         'an empty block and a filled one' => [[['title' => ''], ['title' => 'Прайс']], true],
         'no blocks at all' => [[], false],

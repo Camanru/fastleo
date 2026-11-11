@@ -95,7 +95,16 @@ final class PermissionMatrix extends Field
     #[Override]
     protected function typeRules(): array
     {
-        return ['array'];
+        return ['array', 'max:'.count(RolePermissions::names())];
+    }
+
+    /**
+     * Прав в запросе не больше, чем их существует (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): int
+    {
+        return count(RolePermissions::names());
     }
 
     #[Override]

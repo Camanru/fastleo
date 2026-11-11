@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Http\Controllers;
 
 use Closure;
+use Fastleo\Auth\LoginThrottle;
 use Fastleo\Auth\ResetPasswordNotification;
 use Fastleo\Auth\UserLookup;
 use Fastleo\Fastleo;
@@ -85,8 +86,10 @@ final class PasswordResetController
 
     /**
      * Сохранить новый пароль. Остальные сеансы завершаются: хеш пароля и токен «запомнить» меняются.
+     * Часовая блокировка ввода пароля снимается (счётчик кода 2FA — нет): письмо доходит только до владельца почты, а посетитель, знающий email,
+     * иначе мог бы бесконечно держать вход администратора закрытым неверными паролями.
      */
-    public function reset(Request $request): RedirectResponse
+    public function reset(Request $request, LoginThrottle $throttle): RedirectResponse
     {
         $request->validate([
             'token' => ['required', 'string', 'max:255'],
@@ -96,7 +99,7 @@ final class PasswordResetController
 
         $email = Str::lower(trim($request->string('email')->toString()));
 
-        $status = $this->boxed(function () use ($request, $email): string {
+        $status = $this->boxed(function () use ($request, $email, $throttle): string {
             // Модель без CanResetPassword письма не получала (см. send()) и брокер на ней бросил бы исключение.
             // Неизвестный адрес и не-пользователь отвечают за то же время, что и пользователь с неверным токеном.
             if (! UserLookup::adminByEmail($email) instanceof CanResetPassword) {
@@ -107,10 +110,12 @@ final class PasswordResetController
 
             return $this->broker()->reset(
                 ['email' => $email, 'token' => $request->string('token')->toString(), 'password' => $request->string('password')->toString()],
-                function (CanResetPassword&Authenticatable $user, string $password): void {
+                function (CanResetPassword&Authenticatable $user, string $password) use ($throttle): void {
                     $user->forceFill(['password' => Hash::make($password)]);
                     $user->setRememberToken(Str::random(60));
                     $user->save();
+                    $identifier = $user->getAuthIdentifier();
+                    $throttle->unlockPassword(is_scalar($identifier) ? (string) $identifier : '');
 
                     event(new PasswordReset($user));
                 },

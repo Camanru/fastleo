@@ -6,7 +6,6 @@ namespace Fastleo\Console;
 
 use Fastleo\Fastleo;
 use Fastleo\Installer\Module;
-use Fastleo\Installer\ModuleConflictException;
 use Fastleo\Installer\ModuleInstaller;
 use Fastleo\Installer\Modules;
 use Fastleo\Installer\ModuleWriteException;
@@ -15,15 +14,18 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Symfony\Component\Console\Attribute\AsCommand;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 
 /**
  * Добавляет в сайт готовые модули: код копируется в `app/`, `resources/`, `database/` и дальше принадлежит сайту.
- * Если хоть один файл, таблица или адрес занят, не записывается ничего.
+ * Нужен Pest (`pestphp/pest` и `tests/Pest.php`): тесты модулей копируются вместе с ним; без Pest команда ничего не делает.
+ * Если хоть один файл или таблица панельной части занят, не записывается ничего. После выбора модулей в терминале
+ * задаётся один вопрос: ставить ли публичную часть сайта (маршруты, контроллеры, шаблоны); без терминала — ставится.
  *
  * ```bash
- * php artisan fastleo:module            # список с галочками
- * php artisan fastleo:module contacts   # без вопросов
+ * php artisan fastleo:module            # список с галочками, затем вопрос про публичную часть
+ * php artisan fastleo:module contacts   # вопрос про публичную часть задаётся, если есть терминал
  * ```
  */
 #[AsCommand(name: 'fastleo:module')]
@@ -37,6 +39,12 @@ final class ModuleCommand extends Command
     public function handle(ModuleInstaller $installer): int
     {
         app()->setLocale(Fastleo::LOCALE);
+
+        if (! $installer->hasPest()) {
+            $this->components->error(__('fastleo::console.module_pest_required'));
+
+            return self::FAILURE;
+        }
 
         $names = array_values(array_unique((array) $this->argument('modules')));
 
@@ -68,13 +76,17 @@ final class ModuleCommand extends Command
             $modules[] = $module;
         }
 
-        try {
-            $written = $installer->install($modules);
-        } catch (ModuleConflictException $e) {
+        $conflicts = $installer->conflicts($modules);
+
+        if ($conflicts !== []) {
             $this->components->error(__('fastleo::console.module_conflicts'));
-            $this->components->bulletList($e->conflicts);
+            $this->components->bulletList($conflicts);
 
             return self::FAILURE;
+        }
+
+        try {
+            $written = $installer->install($modules, $this->wantsSite($installer, $modules));
         } catch (ModuleWriteException $e) {
             $this->components->error(__('fastleo::console.module_write_failed', ['message' => $e->getMessage()]));
 
@@ -85,6 +97,15 @@ final class ModuleCommand extends Command
         $this->components->info(__('fastleo::console.module_created'));
         $this->components->bulletList($written);
 
+        foreach ($installer->siteSkipped as $name => $reasons) {
+            $this->components->warn(__('fastleo::console.module_site_skipped', ['module' => $name]));
+            $this->components->bulletList($reasons);
+        }
+
+        foreach ($installer->warnings as $warning) {
+            $this->components->warn($warning);
+        }
+
         foreach ($installer->notes as $note) {
             $this->components->info($note);
         }
@@ -93,11 +114,22 @@ final class ModuleCommand extends Command
             $this->nextSteps($modules);
         }
 
-        if ($installer->testsSkipped) {
-            $this->components->warn(__('fastleo::console.module_no_pest'));
+        return self::SUCCESS;
+    }
+
+    /**
+     * Ставить ли публичную часть сайта: вопрос после выбора модулей и до записи файлов. Без терминала ответ «да».
+     * Если публичная часть занята у всех выбранных модулей, спрашивать не о чём: установка сама напечатает причины.
+     *
+     * @param  list<Module>  $modules
+     */
+    private function wantsSite(ModuleInstaller $installer, array $modules): bool
+    {
+        if (! $this->input->isInteractive() || count($installer->siteConflicts($modules)) === count($modules)) {
+            return true;
         }
 
-        return self::SUCCESS;
+        return confirm(label: __('fastleo::console.module_site_ask'), default: true);
     }
 
     /**

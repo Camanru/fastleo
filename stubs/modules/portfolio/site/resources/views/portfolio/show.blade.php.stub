@@ -1,0 +1,27 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo :model="$item" :title="$item->title" :description="$item->excerpt" :image="$item->cover" />
+@endsection
+
+@section('content')
+    <article>
+        <h1>{{ $item->title }}</h1>
+        @if ($item->category)
+            <p>{{ $item->category }}</p>
+        @endif
+        @if ($item->client)
+            <p>Заказчик: {{ $item->client }}</p>
+        @endif
+        @if ($item->completed_at)
+            <time datetime="{{ $item->completed_at->toDateString() }}">{{ $item->completed_at->format('d.m.Y') }}</time>
+        @endif
+        <x-fastleo::picture :src="$item->cover" :alt="$item->title" />
+        {{-- Поле RichText очищено при сохранении, поэтому его можно выводить как HTML. --}}
+        <div>{!! $item->body !!}</div>
+        @foreach (is_array($item->photos) ? $item->photos : [] as $photo)
+            <x-fastleo::picture :src="is_string($photo) ? $photo : null" :alt="$item->title" />
+        @endforeach
+    </article>
+    <p><a href="{{ route('site.portfolio.index') }}">Все работы</a></p>
+@endsection

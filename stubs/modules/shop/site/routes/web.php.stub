@@ -1,0 +1,15 @@
+\Illuminate\Support\Facades\Route::get('/shop', [\{{ appNamespace }}\Http\Controllers\ShopController::class, 'index'])->name('site.shop.index');
+\Illuminate\Support\Facades\Route::get('/shop/categories/{slug}', [\{{ appNamespace }}\Http\Controllers\ShopController::class, 'category'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.shop.category');
+\Illuminate\Support\Facades\Route::get('/shop/{slug}', [\{{ appNamespace }}\Http\Controllers\ShopController::class, 'product'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.shop.product');
+
+\Illuminate\Support\Facades\Route::get('/cart', [\{{ appNamespace }}\Http\Controllers\CartController::class, 'show'])->name('site.shop.cart');
+
+\Illuminate\Support\Facades\Route::middleware('throttle:60,1,shop-cart')->group(function (): void {
+    \Illuminate\Support\Facades\Route::post('/cart', [\{{ appNamespace }}\Http\Controllers\CartController::class, 'store'])->name('site.shop.cart.add');
+    \Illuminate\Support\Facades\Route::patch('/cart/{id}', [\{{ appNamespace }}\Http\Controllers\CartController::class, 'update'])->where('id', '[0-9]{1,9}')->name('site.shop.cart.update');
+    \Illuminate\Support\Facades\Route::delete('/cart/{id}', [\{{ appNamespace }}\Http\Controllers\CartController::class, 'destroy'])->where('id', '[0-9]{1,9}')->name('site.shop.cart.remove');
+});
+
+\Illuminate\Support\Facades\Route::get('/checkout', [\{{ appNamespace }}\Http\Controllers\CheckoutController::class, 'create'])->name('site.shop.checkout');
+\Illuminate\Support\Facades\Route::post('/checkout', [\{{ appNamespace }}\Http\Controllers\CheckoutController::class, 'store'])->middleware('throttle:5,10,shop-checkout')->name('site.shop.checkout.store');
+\Illuminate\Support\Facades\Route::get('/checkout/thanks', [\{{ appNamespace }}\Http\Controllers\CheckoutController::class, 'thanks'])->name('site.shop.thanks');

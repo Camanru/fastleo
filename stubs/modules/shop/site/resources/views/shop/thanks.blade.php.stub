@@ -1,0 +1,12 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Заказ оформлен" />
+    <meta name="robots" content="noindex">
+@endsection
+
+@section('content')
+    <h1>Спасибо!</h1>
+    <p>Заказ №{{ $number }} оформлен. Мы свяжемся с вами.</p>
+    <p><a href="{{ route('site.shop.index') }}">В магазин</a></p>
+@endsection

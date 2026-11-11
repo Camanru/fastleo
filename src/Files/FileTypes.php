@@ -22,7 +22,9 @@ final class FileTypes
         'rss', 'atom', 'rdf', 'kml', 'mml', 'xspf',
         'htaccess', 'htpasswd', 'ini', 'user', 'cgi', 'pl', 'py', 'sh', 'asp', 'aspx', 'jsp', 'exe', 'swf',
         // Исполняются на машине посетителя или в браузере как программа.
-        'hta', 'jar', 'wasm',
+        'hta', 'jar', 'wasm', 'bat', 'cmd', 'com', 'msi', 'scr', 'vbs', 'vbe', 'ps1', 'lnk', 'dll',
+        // Ещё XML-форматы (`*+xml` с <script>), архивы веб-страниц и серверные страницы IIS/ColdFusion/JSP/Razor.
+        'mathml', 'xsd', 'wsdl', 'xul', 'dtd', 'gpx', 'mht', 'mhtml', 'config', 'asa', 'cer', 'ashx', 'asmx', 'cshtml', 'jspx', 'cfm', 'stm',
     ];
 
     /** Форматы картинок, которые пакет проверяет и пересохраняет. */

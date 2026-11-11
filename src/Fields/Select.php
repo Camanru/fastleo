@@ -30,6 +30,9 @@ use UnitEnum;
  */
 class Select extends Field implements SearchesOptions
 {
+    /** Сколько значений принимает список с `multiple()`. */
+    public const int MAX_CHOICES = 1000;
+
     /** Тона цветных меток (как у `<x-fastleo::badge>`). */
     private const array TONES = ['success', 'warning', 'danger', 'info', 'neutral'];
 
@@ -276,7 +279,7 @@ class Select extends Field implements SearchesOptions
     protected function typeRules(): array
     {
         if ($this->multiple) {
-            return ['array'];
+            return ['array', 'max:'.self::MAX_CHOICES];
         }
 
         return [$this->dependentRule()];
@@ -509,5 +512,14 @@ class Select extends Field implements SearchesOptions
         }
 
         return $case->name;
+    }
+
+    /**
+     * Сколько значений принимает список с `multiple()`; у обычного выбора — ничего (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->multiple ? self::MAX_CHOICES : null;
     }
 }

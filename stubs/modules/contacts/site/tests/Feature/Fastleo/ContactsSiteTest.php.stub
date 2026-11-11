@@ -1,0 +1,11 @@
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('shows the contacts page of the site', function (): void {
+    $this->get('/contacts')->assertOk()->assertSee('Контакты');
+});

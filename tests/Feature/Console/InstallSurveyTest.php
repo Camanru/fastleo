@@ -19,6 +19,7 @@ beforeEach(function (): void {
     File::ensureDirectoryExists($this->sandbox.'/config');
     File::put($this->sandbox.'/routes/web.php', "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n");
     File::put($this->sandbox.'/composer.json', '{"autoload": {"psr-4": {"App\\\\": "app/"}}}');
+    sandboxWithPest($this->sandbox);
     $this->app->setBasePath($this->sandbox);
     Schema::dropIfExists('pages'); // таблица демо-сайта: модуль не ставится поверх чужой
     config([
@@ -63,10 +64,12 @@ it('goes straight to the steps after the basic installation without asking about
 });
 
 it('asks for the modules at once when --type=custom is given', function (): void {
+    forgetRoute('contacts'); // демо-сайт занимает адрес /contacts: без этого вопроса про публичную часть модуля «Контакты» не было бы
     $modules = array_map(fn (Module $module): string => $module->label.' — '.$module->description, Modules::all());
 
     $this->artisan('fastleo:install', [...$this->base, '--type' => 'custom'])
         ->expectsChoice('Что будет на сайте? (пробел — отметить, Enter — дальше)', ['contacts'], $modules)
+        ->expectsConfirmation(siteQuestion(), 'yes')
         ->expectsConfirmation('Выполнить миграции сейчас?', 'no')
         ->assertSuccessful();
 
@@ -79,6 +82,14 @@ it('adds no modules with --no-modules or when nothing is asked and nobody can an
 
     expect($this->sandbox.'/app/Fastleo')->not->toBeDirectory();
 });
+
+it('refuses a module list without a single name and writes nothing', function (string $list): void {
+    $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => $list])
+        ->expectsOutputToContain('В --modules нет ни одного названия модуля')
+        ->assertFailed();
+
+    expect($this->sandbox.'/app/Fastleo')->not->toBeDirectory();
+})->with([',', ' , ,']);
 
 it('refuses contradictory flags and writes nothing', function (array $flags): void {
     $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, ...$flags])
@@ -100,6 +111,26 @@ it('rejects an unknown site type and an unknown module', function (): void {
     $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'blog'])
         ->expectsOutputToContain('Нет модуля «blog»')
         ->assertFailed();
+});
+
+it('refuses the modules before anything is chosen or written when the site has no Pest', function (): void {
+    File::delete($this->sandbox.'/tests/Pest.php');
+
+    $this->artisan('fastleo:install', ['--modules' => 'contacts', '--no-interaction' => true])
+        ->expectsOutputToContain('Модулям нужен Pest')
+        ->assertFailed();
+
+    expect($this->sandbox.'/app/Fastleo/ContactsSettings.php')->not->toBeFile();
+
+    $this->artisan('fastleo:install', ['--type' => 'custom'])
+        ->expectsOutputToContain('Модулям нужен Pest')
+        ->assertFailed();
+});
+
+it('does not ask for Pest when no module is wanted', function (): void {
+    File::delete($this->sandbox.'/tests/Pest.php');
+
+    $this->artisan('fastleo:install', ['--no-modules' => true, '--no-interaction' => true])->assertSuccessful();
 });
 
 it('stops with the list of conflicts and writes no module when a place is taken', function (): void {
@@ -146,12 +177,14 @@ it('runs the setup steps by flags: migrate, examples, administrator', function (
 });
 
 it('asks for the site type and the modules, then for each step', function (): void {
+    forgetRoute('contacts'); // демо-сайт занимает адрес /contacts: без этого вопроса про публичную часть модуля «Контакты» не было бы
     $types = Modules::types();
     $modules = array_map(fn (Module $module): string => $module->label.' — '.$module->description, Modules::all());
 
     $this->artisan('fastleo:install', $this->base)
         ->expectsChoice('Какая установка?', 'custom', $types)
         ->expectsChoice('Что будет на сайте? (пробел — отметить, Enter — дальше)', ['contacts'], $modules)
+        ->expectsConfirmation(siteQuestion(), 'yes')
         ->expectsConfirmation('Выполнить миграции сейчас?', 'yes')
         ->expectsConfirmation('Создать первого пользователя сейчас?', 'no')
         ->assertSuccessful();
@@ -166,6 +199,7 @@ it('does not ask about examples or the administrator when the migrations were de
     $this->artisan('fastleo:install', $this->base)
         ->expectsChoice('Какая установка?', 'custom', $types)
         ->expectsChoice('Что будет на сайте? (пробел — отметить, Enter — дальше)', ['news'], $modules)
+        ->expectsConfirmation(siteQuestion(), 'yes')
         ->expectsConfirmation('Выполнить миграции сейчас?', 'no')
         ->expectsOutputToContain('php artisan fastleo:user')
         ->assertSuccessful();
@@ -174,6 +208,7 @@ it('does not ask about examples or the administrator when the migrations were de
 });
 
 it('shows the conflicts of the chosen modules and asks again without them', function (): void {
+    forgetRoute('contacts'); // демо-сайт занимает адрес /contacts: без этого вопроса про публичную часть модуля «Контакты» не было бы
     Schema::create('pages', function ($table): void {
         $table->id();
     });
@@ -186,6 +221,7 @@ it('shows the conflicts of the chosen modules and asks again without them', func
         ->expectsChoice($question, ['pages', 'contacts'], $modules)
         ->expectsOutputToContain('таблица pages уже есть')
         ->expectsChoice($question, ['contacts'], $modules)
+        ->expectsConfirmation(siteQuestion(), 'yes')
         ->expectsConfirmation('Выполнить миграции сейчас?', 'no')
         ->assertSuccessful();
 
@@ -277,7 +313,7 @@ it('fails and says which examples were not added when a seeder cannot run', func
     });
 
     $this->artisan('fastleo:install', [...$this->base, '--no-interaction' => true, '--modules' => 'news', '--setup' => true, '--seed' => true])
-        ->expectsOutputToContain('Примеры не добавлены (Database\Seeders\Fastleo\NewsSeeder): нет сидера')
+        ->expectsOutputToContain('Примеры не добавлены (Database\Seeders\NewsSeeder): нет сидера')
         ->assertFailed();
 });
 

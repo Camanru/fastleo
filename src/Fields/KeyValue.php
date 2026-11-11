@@ -293,4 +293,26 @@ class KeyValue extends Field
     {
         return false;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->maxPairs;
+    }
+
+    /**
+     * Пар не больше предела, а в паре остаются только `key` и `value` (см. `Field::limitInput()`).
+     */
+    #[Override]
+    public function limitInput(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        return array_map(fn (mixed $pair): mixed => is_array($pair) ? array_map(self::flat(...), Arr::only($pair, ['key', 'value'])) : $pair, $this->sliceList($value));
+    }
 }

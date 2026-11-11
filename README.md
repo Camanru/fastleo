@@ -53,7 +53,7 @@ php artisan fastleo:user admin@example.com
 
 Open `https://example.com/fastleo` and log in.
 
-`fastleo:install` also asks what the site needs: a basic install (the panel only) or a custom one with ready-made modules (contacts, pages, news, site menu, reviews, portfolio, FAQ, online store — an admin section, model and migration copied into your project as your own code), and offers to run migrations and create the first user. Pass the answers as flags to skip the questions (`--type=basic`, or `--modules=pages,news --setup --admin-email=…`); add a module later with `php artisan fastleo:module` ([modules](docs/modules.md)).
+`fastleo:install` also asks what the site needs: a basic install (the panel only) or a custom one with ready-made modules (contacts, pages, news, site menu, reviews, portfolio, FAQ, online store — a panel section, model and migration copied into your project as your own code, plus an optional public part: routes, controllers and plain Blade templates without styling, which the install asks about), and offers to run migrations and create the first user. Pass the answers as flags to skip the questions (`--type=basic`, or `--modules=pages,news --setup --admin-email=…`); add a module later with `php artisan fastleo:module` ([modules](docs/modules.md)).
 
 ## Your first section
 

@@ -1,0 +1,24 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\MenuItem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('shows the published items of the header menu with their children', function (): void {
+    $about = MenuItem::factory()->create(['title' => 'О нас', 'url' => '/about', 'location' => 'header']);
+    MenuItem::factory()->create(['title' => 'Команда', 'url' => '/team', 'location' => 'header', 'parent_id' => $about->id]);
+    MenuItem::factory()->create(['title' => 'Скрытый', 'url' => '/hidden', 'location' => 'header', 'is_published' => false]);
+
+    $html = view('menu.header')->render();
+
+    expect($html)->toContain('О нас')->toContain('Команда')->not->toContain('Скрытый');
+});
+
+it('does not print the link of an item with an unsafe address', function (): void {
+    MenuItem::factory()->create(['title' => 'Плохая', 'url' => 'javascript:alert(1)', 'location' => 'footer']);
+
+    expect(view('menu.footer')->render())->toContain('Плохая')->not->toContain('javascript:');
+});

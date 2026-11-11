@@ -1,0 +1,75 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Оформление заказа" />
+    <meta name="robots" content="noindex">
+@endsection
+
+@section('content')
+    <h1>Оформление заказа</h1>
+
+    @if ($removed > 0)
+        <p role="status">Некоторые товары стали недоступны и убраны из корзины.</p>
+    @endif
+    @if ($reduced > 0)
+        <p role="status">Количество некоторых товаров уменьшено: столько их осталось на складе.</p>
+    @endif
+
+    <ul>
+        @foreach ($lines as $line)
+            <li>{{ $line['product']->title }} × {{ $line['quantity'] }} — {{ number_format((float) $line['sum'], 2, ',', ' ') }} ₽</li>
+        @endforeach
+    </ul>
+    <p>Итого: {{ number_format((float) $total, 2, ',', ' ') }} ₽</p>
+    <p><a href="{{ route('site.shop.cart') }}">Изменить корзину</a></p>
+
+    <form method="POST" action="{{ route('site.shop.checkout.store') }}">
+        @csrf
+        <input type="hidden" name="form_token" value="{{ $token }}">
+        <input type="hidden" name="shown_total" value="{{ $total }}">
+        <div style="position: absolute; left: -9999px;" aria-hidden="true">
+            <input type="text" name="leave_empty" tabindex="-1" autocomplete="off">
+        </div>
+
+        <label>
+            Имя
+            <input type="text" name="name" value="{{ old('name') }}" maxlength="150" required>
+        </label>
+        @error('name') <p role="alert">{{ $message }}</p> @enderror
+
+        <label>
+            Телефон
+            <input type="tel" name="phone" value="{{ old('phone') }}" maxlength="32" required>
+        </label>
+        @error('phone') <p role="alert">{{ $message }}</p> @enderror
+
+        <label>
+            Почта
+            <input type="email" name="email" value="{{ old('email') }}" maxlength="255">
+        </label>
+        @error('email') <p role="alert">{{ $message }}</p> @enderror
+
+        <label>
+            Адрес доставки
+            <textarea name="address" maxlength="1000">{{ old('address') }}</textarea>
+        </label>
+        @error('address') <p role="alert">{{ $message }}</p> @enderror
+
+        <label>
+            Способ доставки
+            <input type="text" name="delivery" value="{{ old('delivery') }}" maxlength="150">
+        </label>
+        @error('delivery') <p role="alert">{{ $message }}</p> @enderror
+
+        <label>
+            Комментарий
+            <textarea name="comment" maxlength="2000">{{ old('comment') }}</textarea>
+        </label>
+        @error('comment') <p role="alert">{{ $message }}</p> @enderror
+
+        @error('form_token') <p role="alert">{{ $message }}</p> @enderror
+        @error('cart') <p role="alert">{{ $message }}</p> @enderror
+
+        <button type="submit">Оформить заказ</button>
+    </form>
+@endsection

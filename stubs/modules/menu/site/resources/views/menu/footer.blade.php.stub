@@ -1,0 +1,1 @@
+@include('menu.list', ['items' => \{{ appNamespace }}\Models\MenuItem::tree('footer')])

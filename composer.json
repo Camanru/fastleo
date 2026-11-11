@@ -96,6 +96,10 @@
             "Composer\\Config::disableProcessTimeout",
             "scripts/test-databases.sh"
         ],
+        "test:site": [
+            "Composer\\Config::disableProcessTimeout",
+            "scripts/test-site.sh"
+        ],
         "check": [
             "@lint",
             "@test:types",

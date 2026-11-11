@@ -6,10 +6,11 @@ namespace Fastleo\Leads;
 
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Str;
 
 /**
- * Метка формы заявки для скрытого поля `form_token`: зашифрованное время показа формы и номер сессии посетителя. Защита от ботов
- * без внешних сервисов: бот, собравший форму заранее или не показывавший её, метки нужного вида не имеет.
+ * Метка формы заявки для скрытого поля `form_token`: зашифрованное время показа формы, номер сессии посетителя и случайная часть
+ * (каждый показ формы даёт свою метку, её можно сделать одноразовой). Защита от ботов без внешних сервисов: бот, собравший форму заранее или не показывавший её, метки нужного вида не имеет.
  *
  * ```blade
  * <input type="hidden" name="form_token" value="{{ \Fastleo\Leads\FormToken::make() }}">
@@ -18,11 +19,11 @@ use Illuminate\Support\Facades\Crypt;
 final class FormToken
 {
     /**
-     * Метка для формы, показываемой сейчас: время показа и номер сессии посетителя.
+     * Метка для формы, показываемой сейчас: время показа, номер сессии посетителя и случайная часть.
      */
     public static function make(): string
     {
-        return Crypt::encryptString(now()->timestamp.'|'.session()->getId());
+        return Crypt::encryptString(now()->timestamp.'|'.session()->getId().'|'.Str::random(16));
     }
 
     /**

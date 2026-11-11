@@ -239,7 +239,25 @@ final class MaxBot extends Bot
     }
 
     /**
-     * Загрузить картинку: `POST /uploads?type=image` даёт адрес загрузки (только https, без перенаправлений,
+     * Адрес загрузки из ответа Max годится, только если это https на обычный порт и имя сайта из интернета: не IP-адрес
+     * (`169.254.169.254`, `10.0.0.5`), не имя без точки и не внутренняя зона (`.local`, `.internal`…), без логина в адресе.
+     * Иначе подменённый ответ API заставил бы сервер сайта отправить картинку публикации во внутреннюю сеть.
+     */
+    private function isPublicUploadUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        $host = is_array($parts) ? ($parts['host'] ?? null) : null;
+
+        return is_array($parts) && is_string($host)
+            && ($parts['scheme'] ?? null) === 'https'
+            && ! isset($parts['user']) && ! isset($parts['pass'])
+            && ($parts['port'] ?? 443) === 443
+            && preg_match('/^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+(?:[a-z]{2,}|xn--[a-z0-9-]{2,})$/i', $host) === 1
+            && ! array_any(['localhost', 'localdomain', 'local', 'internal', 'intranet', 'lan', 'corp', 'home', 'arpa', 'svc', 'consul', 'private', 'test'], fn (string $zone): bool => str_ends_with(strtolower($host), '.'.$zone));
+    }
+
+    /**
+     * Загрузить картинку: `POST /uploads?type=image` даёт адрес загрузки (только https на публичное имя сайта, без перенаправлений,
      * обычные сертификаты), туда уходит файл, в ответ — токен картинки.
      *
      * @param  array{name: string, open: Closure(): (resource|string)}  $image
@@ -250,7 +268,7 @@ final class MaxBot extends Bot
     {
         $url = $this->request('post', '/uploads', query: ['type' => 'image'])['url'] ?? null;
 
-        if (! is_string($url) || ! str_starts_with($url, 'https://')) {
+        if (! is_string($url) || ! $this->isPublicUploadUrl($url)) {
             throw new MessengerFailed(__('fastleo::messengers.bad_response', ['messenger' => 'Max'], Fastleo::LOCALE));
         }
 

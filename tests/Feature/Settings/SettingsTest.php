@@ -46,6 +46,14 @@ describe('page', function (): void {
             ->assertSee('value="10"', false);
     });
 
+    it('cuts a long list before the check and in the old input of the form', function (): void {
+        $this->put(route('fastleo.settings.update', 'site'), siteForm(['title' => '', 'keywords' => array_fill(0, 5000, ['x' => 'y'])]))
+            ->assertSessionHasErrors(['title', 'keywords']);
+
+        // Тегов не больше 100: остаётся 101, и каждый элемент-массив стал пустым.
+        expect(session()->getOldInput('keywords'))->toHaveCount(101)->and(session()->getOldInput('keywords.0'))->toBe([]);
+    });
+
     it('saves described fields only and shows the saved values', function (): void {
         $this->put(route('fastleo.settings.update', 'site'), siteForm(['hacker' => 'x', 'fastleo_admin' => '1', 'keywords' => ['a', 'b']]))
             ->assertRedirect(route('fastleo.settings.edit', 'site'))

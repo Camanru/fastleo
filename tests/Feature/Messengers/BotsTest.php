@@ -324,6 +324,38 @@ describe('max posts', function (): void {
         Http::assertNotSent(fn (HttpRequest $request): bool => str_starts_with($request->url(), 'http://upload.example'));
     });
 
+    it('sends the picture to an upload address in a punycode zone', function (): void {
+        Http::fake([
+            'platform-api2.max.ru/uploads*' => Http::response(['url' => 'https://upload.xn--p1ai/up']),
+            'upload.xn--p1ai/*' => Http::response(['message' => 'upload.failed'], 500),
+        ]);
+
+        messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null));
+
+        Http::assertSent(fn (HttpRequest $request): bool => str_starts_with($request->url(), 'https://upload.xn--p1ai/up'));
+    });
+
+    it('does not send the post to an upload address that points into a private network', function (string $address): void {
+        Http::fake(['platform-api2.max.ru/uploads*' => Http::response(['url' => $address])]);
+
+        expect(messengerFailure(fn () => new MaxBot(MAX_TOKEN)->publish('1', 'Текст', [botImage()], null, [], fn (array $step, string $layout): null => null))->getMessage())->toBe('Max прислал непонятный ответ');
+        Http::assertSentCount(1);
+    })->with([
+        'metadata address' => 'https://169.254.169.254/latest',
+        'private address' => 'https://10.0.0.5/up',
+        'loopback' => 'https://127.0.0.1/up',
+        'ipv6' => 'https://[::1]/up',
+        'name without a dot' => 'https://redis/up',
+        'internal zone' => 'https://jenkins.internal/up',
+        'cluster service' => 'https://kubernetes.default.svc/up',
+        'local domain' => 'https://host.localdomain/up',
+        'consul service' => 'https://db.service.consul/up',
+        'private zone' => 'https://host.private/up',
+        'test zone' => 'https://host.test/up',
+        'login in the address' => 'https://user:pass@iu.oneme.ru/up',
+        'other port' => 'https://iu.oneme.ru:6379/up',
+    ]);
+
     it('explains a rejection of the picture without asking Max to publish', function (): void {
         Http::fake([
             'platform-api2.max.ru/uploads*' => Http::response(['url' => 'https://iu.oneme.ru/upload?id=1']),

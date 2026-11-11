@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    @hasSection('seo')
+        @yield('seo')
+    @else
+        <x-fastleo::seo />
+    @endif
+    @stack('head')
+</head>
+<body>
+    <header>
+        <a href="{{ url('/') }}">{{ config('app.name') }}</a>
+        <nav>
+            @if (view()->exists('menu.header'))
+                @include('menu.header')
+            @elseif (view()->exists('pages.menu'))
+                @include('pages.menu')
+            @endif
+        </nav>
+    </header>
+
+    <main>
+        @yield('content')
+    </main>
+
+    <footer>
+        @includeIf('menu.footer')
+
+        @if ($phone = fastleo_setting('contacts.phone'))
+            <p><a href="tel:{{ preg_replace('/[^+\d]/', '', (string) $phone) }}">{{ $phone }}</a></p>
+        @endif
+        @if ($email = fastleo_setting('contacts.email'))
+            <p><a href="mailto:{{ $email }}">{{ $email }}</a></p>
+        @endif
+        @if ($address = fastleo_setting('contacts.address'))
+            <p>{{ $address }}</p>
+        @endif
+    </footer>
+</body>
+</html>

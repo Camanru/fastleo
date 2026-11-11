@@ -4,17 +4,21 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\ShopCategory;
+use {{ appNamespace }}\Models\ShopCategory;
+use {{ appNamespace }}\Models\ShopProduct;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Seo;
 use Fastleo\Fields\Slug;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
+use Fastleo\Support\OperationCancelled;
+use Illuminate\Database\Eloquent\Model;
+use Override;
 
 /**
- * Раздел «Категории» магазина: дерево с ручным порядком (перетаскиванием). Показ на сайте — ваши маршруты и шаблоны:
- * `ShopCategory::query()->published()->whereNull('parent_id')->get()`.
+ * Раздел «Категории» магазина: дерево с ручным порядком (перетаскиванием). Показ на сайте — `ShopController` и шаблоны
+ * `resources/views/shop` публичной части модуля (если вы поставили её при установке): `ShopCategory::query()->visible()->whereNull('parent_id')->get()`.
  */
 final class ShopCategoryResource extends Resource
 {
@@ -48,5 +52,17 @@ final class ShopCategoryResource extends Resource
             Toggle::make('is_published', 'Показывать')->default(true)->quickToggle(),
             Seo::make('seo')->directory('shop'),
         ];
+    }
+
+    /**
+     * Категорию с товарами или подкатегориями не удалить: товар без категории доступен покупателям, и удаление скрытой категории
+     * открыло бы её товары в каталоге. Сначала перенесите или удалите товары и подкатегории.
+     */
+    #[Override]
+    public function beforeDelete(Model $record): void
+    {
+        if (ShopProduct::query()->where('category_id', $record->getKey())->exists() || ShopCategory::query()->where('parent_id', $record->getKey())->exists()) {
+            throw new OperationCancelled('В категории есть товары или подкатегории: сначала перенесите или удалите их.');
+        }
     }
 }

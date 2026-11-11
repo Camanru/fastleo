@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/faq', [\{{ appNamespace }}\Http\Controllers\FaqController::class, 'index'])->name('site.faq.index');

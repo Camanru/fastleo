@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\News;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Новости на сайте: список и страница новости. Шаблоны — `resources/views/news`.
+ */
+class NewsController extends Controller
+{
+    /**
+     * Список новостей по 10 на страницу.
+     */
+    public function index(): View
+    {
+        return view('news.index', ['items' => News::query()->published()->simplePaginate(10)]);
+    }
+
+    /**
+     * Страница новости; нет новости или она не опубликована — 404.
+     */
+    public function show(string $slug): View
+    {
+        return view('news.show', ['item' => News::query()->published()->where('slug', $slug)->firstOrFail()]);
+    }
+}

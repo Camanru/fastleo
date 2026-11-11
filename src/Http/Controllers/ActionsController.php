@@ -99,7 +99,8 @@ final class ActionsController
 
         if ($validator->fails()) {
             // Тело запроса без файлов: загруженный файл не сериализуется в сессию (драйвер file, database) и ломает ответ 500.
-            $input = Arr::except($request->request->all(), ['data.password', 'data.password_confirmation', 'data.current_password']);
+            // Списки обрезаны, как при проверке: в сессию и обратно в форму не уходят сотни тысяч элементов.
+            $input = Arr::except(ActionInput::limited($action, $request->request->all()), ['data.password', 'data.password_confirmation', 'data.current_password']);
             $relation = $request->input('_related');
             $parent = $request->input('_related_parent', '');
 

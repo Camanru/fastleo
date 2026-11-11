@@ -1,0 +1,29 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\FaqItem;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
+
+/**
+ * Вопросы и ответы на сайте: опубликованные вопросы по группам. Шаблон — `resources/views/faq/index.blade.php`.
+ */
+class FaqController extends Controller
+{
+    /**
+     * Вопросы по группам (не больше 200): сначала вопросы без группы (без заголовка), затем группы в порядке первого вопроса.
+     * Без группы они шли бы где придётся и выглядели бы частью предыдущей группы.
+     */
+    public function index(): View
+    {
+        $groups = FaqItem::query()->published()->limit(200)->get()
+            ->groupBy(fn (FaqItem $item): string => (string) $item->category)
+            ->sortBy(fn (Collection $items, mixed $group): int => $group === '' ? 0 : 1);
+
+        return view('faq.index', ['groups' => $groups]);
+    }
+}

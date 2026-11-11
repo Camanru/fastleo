@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use {{ namespace }}\Models\PortfolioItem;
+use {{ appNamespace }}\Models\PortfolioItem;
 use {{ appNamespace }}\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

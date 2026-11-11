@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Exceptions;
+
+use InvalidArgumentException;
+
+/**
+ * Заказ больше предела: слишком много позиций, количество одного товара или сумма заказа. Покажите покупателю `getMessage()`.
+ */
+final class OrderLimitException extends InvalidArgumentException
+{
+    /**
+     * В заказе слишком много позиций.
+     *
+     * @param  int  $max  сколько позиций можно
+     */
+    public static function lines(int $max): self
+    {
+        return new self("В заказе не больше {$max} позиций.");
+    }
+
+    /**
+     * Слишком много одного товара.
+     *
+     * @param  int  $max  сколько штук одного товара можно
+     */
+    public static function quantity(int $max): self
+    {
+        return new self("Одного товара в заказе не больше {$max} шт.");
+    }
+
+    /**
+     * Сумма заказа больше предела колонки.
+     */
+    public static function total(): self
+    {
+        return new self('Сумма заказа слишком велика.');
+    }
+}

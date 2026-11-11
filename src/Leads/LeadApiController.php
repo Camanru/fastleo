@@ -36,7 +36,7 @@ final class LeadApiController extends Controller
         $data = Validator::make($input, [
             'phone' => ['required', 'string', 'max:50', StoreLeadRequest::PHONE],
             'name' => ['nullable', 'string', 'max:100', StoreLeadRequest::TEXT],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['bail', 'nullable', 'string', 'max:255', 'email'],
             'message' => ['nullable', 'string', 'max:2000', StoreLeadRequest::TEXT],
             'page' => ['nullable', 'string', 'url:http,https', 'max:500', StoreLeadRequest::TEXT],
             'form' => ['nullable', 'string', 'max:100', StoreLeadRequest::TEXT],

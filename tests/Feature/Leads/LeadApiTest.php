@@ -71,6 +71,12 @@ describe('accepting a lead', function (): void {
             ->assertHeaderMissing('Location');
     });
 
+    it('measures the length of an email before it parses it', function (): void {
+        $response = sendLead(['email' => str_repeat('a', 300)])->assertUnprocessable()->assertJsonValidationErrors(['email']);
+
+        expect($response->json('errors.email'))->toHaveCount(1);
+    });
+
     it('takes a phone sent as a number and fills in a missing name', function (): void {
         sendLead(['phone' => 79001234567, 'name' => null])->assertCreated();
 

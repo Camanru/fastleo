@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\ShopOrder;
+use {{ appNamespace }}\Models\ShopProduct;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Str;
+
+uses(RefreshDatabase::class);
+
+// Покупатель с постоянной сессией: метка формы оформления привязана к её номеру.
+beforeEach(fn () => $this->withCookie(config('session.cookie'), Str::random(40)));
+
+it('lets a visitor put a product in the cart and place an order', function (): void {
+    $product = ShopProduct::factory()->create(['title' => 'Чайник', 'slug' => 'kettle', 'price' => '1500.00', 'stock' => 5]);
+
+    $this->get('/shop')->assertOk()->assertSee('Чайник');
+    $this->get('/shop/kettle')->assertOk()->assertSee('1 500,00');
+    $this->post('/cart', ['product_id' => $product->id, 'quantity' => 2])->assertRedirect(route('site.shop.cart'));
+    $this->get('/cart')->assertOk()->assertSee('Чайник')->assertSee('3 000,00');
+
+    $token = $this->get('/checkout')->assertOk()->viewData('token');
+    $this->travel(5)->seconds();
+
+    $this->post('/checkout', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form_token' => $token])->assertRedirect(route('site.shop.thanks'));
+    $this->get('/checkout/thanks')->assertOk()->assertSee('Спасибо');
+
+    expect(ShopOrder::query()->count())->toBe(1)
+        ->and($product->fresh()->stock)->toBe(3);
+});
+
+it('does not show a hidden product', function (): void {
+    ShopProduct::factory()->create(['title' => 'Скрытый товар', 'slug' => 'hidden', 'is_published' => false]);
+
+    $this->get('/shop')->assertOk()->assertDontSee('Скрытый товар');
+    $this->get('/shop/hidden')->assertNotFound();
+});

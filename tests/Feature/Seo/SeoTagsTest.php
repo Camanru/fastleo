@@ -6,6 +6,7 @@ use Fastleo\Files\FileStore;
 use Fastleo\Support\SeoTags;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Workbench\App\Models\Article;
 
@@ -63,6 +64,23 @@ describe('component', function (): void {
         articlePage($this, $article, '?utm_source=mail&page=2', ['HTTP_HOST' => 'evil.example'])
             ->assertSee('<link rel="canonical" href="https://site.test/articles/'.$article->id.'">', false)
             ->assertDontSee('evil.example');
+    });
+
+    it('points the canonical address of a twin address with an encoded slash to the real address of the page', function (): void {
+        $article = Article::factory()->create();
+
+        // Маршрут сопоставляется с раскодированным путём, поэтому `/articles%2F1` открывает ту же страницу.
+        $this->call('GET', '/articles%2F'.$article->id)
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="https://site.test/articles/'.$article->id.'">', false);
+    });
+
+    it('keeps the encoded characters of the path in the canonical address', function (): void {
+        Route::get('/pages/{name}', fn (): string => Blade::render('<x-fastleo::seo title="Страница" />'));
+
+        $this->call('GET', '/pages/'.rawurlencode('кофе и чай'))
+            ->assertOk()
+            ->assertSee('<link rel="canonical" href="https://site.test/pages/'.rawurlencode('кофе и чай').'">', false);
     });
 
     it('escapes the values', function (): void {

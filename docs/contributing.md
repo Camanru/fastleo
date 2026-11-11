@@ -72,13 +72,14 @@ composer check          # всё сразу: Pint, Rector, PHPStan, покрыт
 composer lint           # pint --test, rector --dry-run, phpstan (уровень max)
 composer test           # тесты параллельно, без браузерных
 composer test:browser   # браузерные тесты (Playwright)
+composer test:site      # настоящий сайт: свежий Laravel с Pest, все модули с публичной частью, тесты, которые модули кладут на сайт (SITE_DIR=/пустая/папка — сайт останется для осмотра)
 vendor/bin/pest --filter=имя
 vendor/bin/pint         # исправить оформление кода
 ```
 
 Skill для Claude (`resources/boost/skills/fastleo`), гайдлайны Boost и `docs/llms.txt` собираются из `docs/` командой `composer docs:build` и руками не правятся; тест проверяет, что они свежие. Правьте `docs/`, затем пересоберите.
 
-Требования: PHPStan уровня max без baseline, покрытие строк 100 %, покрытие типами 100 %. Перед выпуском — `composer test:databases` (SQLite, MySQL и PostgreSQL одновременно).
+Требования: PHPStan уровня max без baseline, покрытие строк 100 %, покрытие типами 100 %. Перед выпуском — `composer test:databases` (SQLite, MySQL и PostgreSQL одновременно) и `composer test:site` (нужна сеть: Composer ставит Laravel и Pest; тесты, которые готовые модули копируют на сайт, пакет иначе только компилирует). `test:site` идёт и в CI.
 
 Тесты (Pest):
 

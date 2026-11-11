@@ -285,4 +285,13 @@ class BelongsToMany extends Field implements SearchesOptions
     {
         return false;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return self::MAX_LINKS;
+    }
 }

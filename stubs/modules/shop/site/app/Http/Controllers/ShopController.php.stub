@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\ShopCategory;
+use {{ appNamespace }}\Models\ShopProduct;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Витрина магазина: каталог, категория и страница товара. Шаблоны — `resources/views/shop`.
+ * Показываются только доступные товары и видимые категории: скрытая категория скрывает и свои товары.
+ */
+class ShopController extends Controller
+{
+    /**
+     * Каталог: категории верхнего уровня и товары по 24 на страницу.
+     */
+    public function index(): View
+    {
+        return view('shop.index', [
+            'categories' => ShopCategory::query()->visible()->whereNull('parent_id')->get(),
+            'products' => ShopProduct::query()->available()->simplePaginate(24),
+        ]);
+    }
+
+    /**
+     * Категория: вложенные категории и её товары; нет категории или она скрыта — 404.
+     */
+    public function category(string $slug): View
+    {
+        $category = ShopCategory::query()->visible()->where('slug', $slug)->firstOrFail();
+
+        return view('shop.category', [
+            'category' => $category,
+            'children' => ShopCategory::query()->visible()->where('parent_id', $category->id)->get(),
+            'products' => ShopProduct::query()->available()->where('category_id', $category->id)->simplePaginate(24),
+        ]);
+    }
+
+    /**
+     * Страница товара; нет товара или он недоступен — 404.
+     */
+    public function product(string $slug): View
+    {
+        return view('shop.product', ['product' => ShopProduct::query()->available()->with('category')->where('slug', $slug)->firstOrFail()]);
+    }
+}

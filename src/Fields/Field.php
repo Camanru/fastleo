@@ -1664,6 +1664,84 @@ abstract class Field
     }
 
     /**
+     * Наибольшее число элементов, которое принимает поле-список (`max:N` его правил); `null` — поле не список.
+     * Переопределяйте в своём поле-списке вместе с `typeRules()`: присланный список длиннее `listLimit() + 1` обрезается
+     * (см. `limitInput()`), и поле с большим `max`, но без `listLimit()` молча теряло бы лишние элементы.
+     *
+     * ```php
+     * public function listLimit(): ?int
+     * {
+     *     return 500; // как 'max:500' в typeRules()
+     * }
+     * ```
+     */
+    public function listLimit(): ?int
+    {
+        return null;
+    }
+
+    /**
+     * Ограничить присланное значение до проверки правил: Laravel разворачивает `поле.*` через `Arr::dot` по всему поддереву
+     * поля раньше, чем сработает `max`, а JSON-тело не ограничено `max_input_vars`. Список обрезается до `listLimit() + 1`
+     * (лишний элемент оставляет ошибку `max`), а элемент-массив у списка простых значений заменяется пустым массивом
+     * (правило типа откажет ему и так). Поля-контейнеры (`Repeater`, `Blocks`, `HasMany`, `HasOne`) делают то же внутри
+     * своих элементов. Поля без `listLimit()` остаются как есть.
+     *
+     * @see RecordWriter::controllingInput()
+     */
+    public function limitInput(mixed $value): mixed
+    {
+        if ($this->listLimit() === null || ! is_array($value)) {
+            return $value;
+        }
+
+        return array_map(self::flat(...), $this->sliceList($value));
+    }
+
+    /**
+     * Первые `listLimit() + 1` элементов списка (ключи сохраняются).
+     *
+     * @param  array<array-key, mixed>  $value
+     * @return array<array-key, mixed>
+     */
+    protected function sliceList(array $value): array
+    {
+        $limit = $this->listLimit();
+
+        return $limit !== null && count($value) > $limit + 1 ? array_slice($value, 0, $limit + 1, true) : $value;
+    }
+
+    /**
+     * Массив → пустой массив: правило типа (`string`, ключ записи) откажет ему так же, как и целому.
+     */
+    protected static function flat(mixed $value): mixed
+    {
+        return is_array($value) ? [] : $value;
+    }
+
+    /**
+     * `limitInput()` для значений подполей одного элемента контейнера; чего нет среди `$fields`, то лишь сплющивается.
+     *
+     * @param  list<Field>  $fields
+     * @param  array<array-key, mixed>  $item
+     * @return array<array-key, mixed>
+     */
+    public static function limitItem(array $fields, array $item): array
+    {
+        $byName = [];
+
+        foreach ($fields as $field) {
+            $byName[$field->name] = $field;
+        }
+
+        foreach ($item as $name => $value) {
+            $item[$name] = isset($byName[$name]) ? $byName[$name]->limitInput($value) : self::flat($value);
+        }
+
+        return $item;
+    }
+
+    /**
      * Правила для вложенных значений (`tags.*`) — для полей-массивов.
      *
      * @return array<string, list<mixed>>

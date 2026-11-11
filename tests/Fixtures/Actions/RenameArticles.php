@@ -6,6 +6,7 @@ namespace Fastleo\Tests\Fixtures\Actions;
 
 use Fastleo\Actions\Action;
 use Fastleo\Actions\ActionResult;
+use Fastleo\Fields\Tags;
 use Fastleo\Fields\Text;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ final class RenameArticles extends Action
      */
     public function fields(): array
     {
-        return [Text::make('suffix', 'Окончание')->required()->maxLength(20)];
+        return [Text::make('suffix', 'Окончание')->required()->maxLength(20), Tags::make('labels', 'Метки')];
     }
 
     /**

@@ -5,26 +5,27 @@ declare(strict_types=1);
 namespace Fastleo\Installer;
 
 use Fastleo\Fastleo;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RouteDefinition;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 /**
- * Копирует файлы модулей в сайт. Сначала проверяет всё, потом пишет: если занят хоть один файл, таблица или адрес,
- * не записывается ничего, чужой код не перезаписывается.
+ * Копирует файлы модулей в сайт. Сначала проверяет всё, потом пишет: если занят хоть один файл или таблица панельной
+ * части, не записывается ничего, чужой код не перезаписывается. Публичная часть (каталог `site/` модуля) ставится по
+ * желанию и по модулям: занятый адрес или файл пропускает публичную часть этого модуля, а панельная остаётся.
  *
  * ```php
- * new ModuleInstaller()->install([Modules::find('contacts')]);   // список записанных путей от корня сайта
+ * new ModuleInstaller()->install([Modules::find('news')]);                    // панельная и публичная часть
+ * new ModuleInstaller()->install([Modules::find('news')], withSite: false);   // только панельная
  * ```
  */
 final class ModuleInstaller
 {
-    /** Тесты модулей, которые не скопированы, потому что на сайте нет Pest (после `install()`). */
-    public private(set) bool $testsSkipped = false;
-
     /**
      * Сообщения о правках `routes/web.php` (после `install()`).
      *
@@ -33,15 +34,29 @@ final class ModuleInstaller
     public private(set) array $notes = [];
 
     /**
-     * Записать файлы модулей.
+     * Предупреждения об оставленных шаблонах сайта и непригодном макете (после `install()`).
+     *
+     * @var list<string>
+     */
+    public private(set) array $warnings = [];
+
+    /**
+     * Модули, чья публичная часть не записана из-за занятого адреса или файла: имя модуля → причины (после `install()`).
+     *
+     * @var array<string, list<string>>
+     */
+    public private(set) array $siteSkipped = [];
+
+    /**
+     * Записать файлы модулей: панельную часть и, если `$withSite`, публичную часть модулей, у которых ничего не занято.
      *
      * @param  list<Module>  $modules
      * @return list<string> записанные пути от корня сайта
      *
-     * @throws ModuleConflictException если что-то занято
+     * @throws ModuleConflictException если что-то занято в панельной части
      * @throws ModuleWriteException если файл записать не удалось (записанное удалено)
      */
-    public function install(array $modules): array
+    public function install(array $modules, bool $withSite = true): array
     {
         $conflicts = $this->conflicts($modules);
 
@@ -53,10 +68,14 @@ final class ModuleInstaller
         $absolute = [];
         $directories = [];
         $this->notes = [];
+        $this->warnings = [];
+        $this->siteSkipped = [];
         $second = 0;
+        $siteModules = $withSite ? $this->siteModules($modules) : [];
+        $this->warnings = $this->shadowWarnings($siteModules);
 
         try {
-            foreach ($this->plan($modules) as $target => $source) {
+            foreach ($this->plan($modules, $siteModules) as $target => $source) {
                 if (str_contains($target, '{timestamp}')) {
                     $target = str_replace('{timestamp}', now()->addSeconds($second++)->format('Y_m_d_His'), $target);
                 }
@@ -73,8 +92,33 @@ final class ModuleInstaller
                 $written[] = $this->relative($target);
             }
 
-            if (array_any($written, fn (string $path): bool => str_starts_with($path, 'routes/site/')) && new WebRoutes()->ensureSiteRoutes()) {
-                $this->notes[] = __('fastleo::console.module_routes');
+            // Маршруты модулей дописываются в конец `routes/web.php` последней записью: до неё всё, что записано, можно откатить.
+            $blocks = [];
+
+            foreach ($siteModules as $module) {
+                $block = $this->routeBlock($module);
+
+                if ($block !== null) {
+                    $blocks[$module->name] = $block;
+                }
+            }
+
+            if ($blocks !== []) {
+                if (! $this->webRoutesConnected()) {
+                    $this->warnings[] = __('fastleo::console.module_site_web_unconnected');
+                }
+
+                $routes = new WebRoutes()->append($blocks, array_any($siteModules, fn (Module $module): bool => $module->takesHome), $this->catchAllBlocks());
+                $this->notes[] = __('fastleo::console.module_routes', ['modules' => implode(', ', $routes['appended'])]);
+
+                if ($routes['welcomeReplaced']) {
+                    $this->notes[] = __('fastleo::console.module_home');
+                }
+
+                // Своя главная сайта (не пример Laravel) остаётся: «Главная» модуля её не заменит.
+                if (! $routes['welcomeReplaced'] && array_any($siteModules, fn (Module $module): bool => $module->takesHome) && $this->routeAt('/') instanceof RouteDefinition) {
+                    $this->warnings[] = __('fastleo::console.module_site_home_taken');
+                }
             }
         } catch (Throwable $e) {
             File::delete($absolute);
@@ -93,6 +137,16 @@ final class ModuleInstaller
             }
         }
 
+        foreach ($siteModules as $module) {
+            if ($module->siteNote !== null) {
+                $this->notes[] = $module->siteNote;
+            }
+        }
+
+        if ($siteModules !== [] && app()->routesAreCached()) {
+            $this->notes[] = __('fastleo::console.module_route_cache');
+        }
+
         // Кеш списка разделов (`fastleo:cache`) не знает новых классов: разделы появятся только после его обновления.
         if (is_file(Fastleo::resources()->cachePath())) {
             $this->notes[] = __('fastleo::console.module_cache');
@@ -107,7 +161,7 @@ final class ModuleInstaller
             // Файл или папка недоступны для записи: модули уже записаны, виджеты остаются на ручное добавление.
             array_push($this->notes, ...(rescue(fn (): bool => $dashboard->add($widgets), false, false)
                 ? [__('fastleo::console.module_dashboard')]
-                : [__('fastleo::console.module_dashboard_manual'), ...$widgets]));
+                : [__('fastleo::console.module_dashboard_manual'), ...array_map(fn (string $widget): string => strtr($widget, $this->placeholders()), $widgets)]));
 
             // Файл Dashboard.php создан установкой — он тоже файл сайта, о нём нужно сказать в списке.
             if (! $existed && File::exists($dashboard->path())) {
@@ -134,7 +188,7 @@ final class ModuleInstaller
     }
 
     /**
-     * Что мешает установке: занятые файлы, таблицы и адреса.
+     * Что мешает установке панельной части: занятые файлы, таблицы и адреса разделов.
      *
      * @param  list<Module>  $modules
      * @return list<string>
@@ -145,7 +199,7 @@ final class ModuleInstaller
     }
 
     /**
-     * Что мешает установке, по модулям: имя модуля → описания конфликтов (модули без конфликтов не входят).
+     * Что мешает установке панельной части, по модулям: имя модуля → описания конфликтов (модули без конфликтов не входят).
      *
      * @param  list<Module>  $modules
      * @return array<string, list<string>>
@@ -156,9 +210,7 @@ final class ModuleInstaller
 
         foreach ($modules as $module) {
             foreach ($this->files($module->directory) as $target => $source) {
-                $skipped = ! $this->hasPest() && str_starts_with($this->relative($target), 'tests/');
-
-                $existing = $skipped ? null : $this->existing($target);
+                $existing = $this->existing($target);
 
                 if ($existing !== null) {
                     $conflicts[$module->name][] = __('fastleo::console.module_conflict_file', ['module' => $module->name, 'path' => $this->relative($existing)]);
@@ -176,11 +228,74 @@ final class ModuleInstaller
                     $conflicts[$module->name][] = __('fastleo::console.module_conflict_slug', ['module' => $module->name, 'slug' => $slug]);
                 }
             }
+        }
+
+        return $conflicts;
+    }
+
+    /**
+     * Что мешает публичной части, по модулям: имя модуля → причины (модули без публичной части и без конфликтов не входят).
+     * Свой Blade-шаблон сайта конфликтом не считается: он остаётся как есть.
+     *
+     * @param  list<Module>  $modules
+     * @return array<string, list<string>>
+     */
+    public function siteConflicts(array $modules): array
+    {
+        $conflicts = [];
+        $web = base_path('routes/web.php');
+        $routes = new WebRoutes();
+        $panelAtRoot = trim(config()->string('fastleo.path', 'fastleo'), '/') === '' && blank(config('fastleo.domain'));
+        $webReadonly = is_file($web) && ! is_writable($web);
+
+        foreach ($modules as $module) {
+            $files = array_keys($this->files($module->directory.'/site'));
+            $block = $this->routeBlock($module);
+
+            if ($files === [] && $block === null) {
+                continue;
+            }
+
+            // Маршруты дописываются в `routes/web.php`; без своих маршрутов (меню) модулю этот файл не нужен.
+            if ($block !== null) {
+                if ($panelAtRoot) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_site_panel_root');
+                }
+
+                if ($webReadonly) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_site_routes_readonly');
+                }
+            }
+
+            foreach ($files as $target) {
+                $relative = $this->relative($target);
+
+                if (! str_starts_with($relative, 'resources/views/') && File::exists($target)) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_site_file', ['path' => $relative]);
+                }
+            }
+
+            // Такая запись уже есть: блок модуля в файле маршрутов второй раз не дописывается, а адреса и имена его маршрутов, конечно, заняты.
+            if ($block !== null && $routes->has($block)) {
+                $conflicts[$module->name][] = __('fastleo::console.module_site_routes_present', ['module' => $module->name]);
+
+                continue;
+            }
 
             foreach ($module->uris as $uri) {
                 if ($this->routeTaken($uri)) {
-                    $conflicts[$module->name][] = __('fastleo::console.module_conflict_uri', ['module' => $module->name, 'uri' => '/'.Str::afterLast($uri, ' ')]);
+                    $conflicts[$module->name][] = __('fastleo::console.module_site_uri', ['uri' => '/'.Str::afterLast($uri, ' ')]);
                 }
+            }
+
+            foreach ($this->routeNames((string) $block) as $name) {
+                if (Route::has($name)) {
+                    $conflicts[$module->name][] = __('fastleo::console.module_site_route_name', ['name' => $name]);
+                }
+            }
+
+            if ($module->takesFallback && array_any(Route::getRoutes()->getRoutes(), fn (RouteDefinition $route): bool => $route->isFallback)) {
+                $conflicts[$module->name][] = __('fastleo::console.module_site_fallback');
             }
         }
 
@@ -188,12 +303,102 @@ final class ModuleInstaller
     }
 
     /**
-     * Файлы к записи: путь в сайте => исходная заготовка.
+     * Предупреждения о своих маршрутах сайта, которые перекроют адреса публичной части: маршруты модулей подключаются в
+     * конец `routes/web.php`, и побеждает тот, что зарегистрирован раньше (`/{slug}` без `where` забирает `/news`, а
+     * `/{category}/{slug}` — страницы записей `/news/…`).
+     *
+     * @param  list<Module>  $siteModules
+     * @return list<string>
+     */
+    private function shadowWarnings(array $siteModules): array
+    {
+        $warnings = [];
+
+        foreach ($siteModules as $module) {
+            $addresses = array_map(fn (string $address): array => str_contains($address, ' ') ? explode(' ', $address, 2) : ['GET', $address], $module->uris);
+
+            // Страницы записей: адрес с параметром (`news/{slug}`) проверяется на подставленном значении.
+            foreach ($this->routeAddresses((string) $this->routeBlock($module)) as [$method, $uri]) {
+                if (str_contains($uri, '{')) {
+                    $addresses[] = [$method, $uri];
+                }
+            }
+
+            foreach ($addresses as [$method, $uri]) {
+                $route = $this->routeAt('/'.preg_replace('~\{[^}]+\}~', '1', $uri), $method);
+
+                if ($route instanceof RouteDefinition) {
+                    $warnings[] = __('fastleo::console.module_site_shadowed', ['route' => $route->uri(), 'uri' => $uri, 'module' => $module->name]);
+                }
+            }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * Адреса маршрутов в коде блока: метод и адрес без начального `/`.
+     *
+     * @return list<array{string, string}>
+     */
+    private function routeAddresses(string $block): array
+    {
+        preg_match_all("~Route::(get|post|put|patch|delete)\\(\\s*'/?([^']*)'~i", $block, $matches, PREG_SET_ORDER);
+
+        return array_map(fn (array $match): array => [strtoupper($match[1]), $match[2]], $matches);
+    }
+
+    /**
+     * Код блоков маршрутов, которые должны стоять в конце `routes/web.php` (запасной маршрут страниц).
+     *
+     * @return list<string>
+     */
+    private function catchAllBlocks(): array
+    {
+        return array_values(array_filter(array_map(fn (Module $module): ?string => $module->takesFallback ? $this->routeBlock($module) : null, Modules::all())));
+    }
+
+    /**
+     * В `bootstrap/app.php` подключён `routes/web.php`; сайту без `web:` в `withRouting()` (только API) маршруты модулей не помогут.
+     */
+    private function webRoutesConnected(): bool
+    {
+        $bootstrap = base_path('bootstrap/app.php');
+
+        return ! File::exists($bootstrap) || str_contains(File::get($bootstrap), 'routes/web.php');
+    }
+
+    /**
+     * Маршрут сайта, который ответит на запрос по адресу (запасной маршрут `Route::fallback` не считается).
+     */
+    private function routeAt(string $uri, string $method = 'GET'): ?RouteDefinition
+    {
+        $request = Request::create($uri, $method);
+
+        return array_find(Route::getRoutes()->getRoutes(), fn (RouteDefinition $route): bool => ! $route->isFallback && $route->matches($request));
+    }
+
+    /**
+     * Модули, публичную часть которых можно записать: она есть и ничего не занято. Причины пропуска остаются в `siteSkipped`.
      *
      * @param  list<Module>  $modules
+     * @return list<Module>
+     */
+    private function siteModules(array $modules): array
+    {
+        $this->siteSkipped = $this->siteConflicts($modules);
+
+        return array_values(array_filter($modules, fn (Module $module): bool => ! isset($this->siteSkipped[$module->name]) && ($this->files($module->directory.'/site') !== [] || $this->routeBlock($module) !== null)));
+    }
+
+    /**
+     * Файлы к записи: путь в сайте => исходная заготовка. Свой шаблон сайта не перезаписывается.
+     *
+     * @param  list<Module>  $modules
+     * @param  list<Module>  $siteModules  модули, чья публичная часть записывается
      * @return array<string, string>
      */
-    private function plan(array $modules): array
+    private function plan(array $modules, array $siteModules): array
     {
         $plan = [];
 
@@ -201,13 +406,19 @@ final class ModuleInstaller
             $plan += $this->files($module->directory);
         }
 
-        $this->testsSkipped = false;
+        if ($siteModules !== []) {
+            // Общий макет кладётся, только если его ещё нет: у второго модуля он уже будет.
+            $site = $this->files(Modules::sharedDirectory());
 
-        if (! $this->hasPest()) {
-            foreach (array_keys($plan) as $target) {
-                if (str_starts_with($this->relative($target), 'tests/')) {
-                    unset($plan[$target]);
-                    $this->testsSkipped = true;
+            foreach ($siteModules as $module) {
+                $site += $this->files($module->directory.'/site');
+            }
+
+            foreach ($site as $target => $source) {
+                if (! File::exists($target)) {
+                    $plan[$target] = $source;
+                } else {
+                    $this->keepExisting($target);
                 }
             }
         }
@@ -216,16 +427,43 @@ final class ModuleInstaller
     }
 
     /**
-     * Файлы каталога заготовок: путь в сайте => путь заготовки.
+     * Свой шаблон сайта остаётся: предупреждение об этом, а у макета — о том, что страница модуля в нём не выведется.
+     */
+    private function keepExisting(string $target): void
+    {
+        $relative = $this->relative($target);
+
+        if ($target === base_path('resources/views/layouts/site.blade.php')) {
+            if (preg_match('/@yield\(\s*[\'"]content[\'"]/', File::get($target)) !== 1) {
+                $this->warnings[] = __('fastleo::console.module_site_layout', ['path' => $relative]);
+            }
+        } elseif (str_starts_with($relative, 'resources/views/')) {
+            $this->warnings[] = __('fastleo::console.module_site_kept', ['path' => $relative]);
+        }
+    }
+
+    /**
+     * Файлы каталога заготовок: путь в сайте => путь заготовки. Каталог `site/` модуля (публичная часть) не входит:
+     * он берётся отдельно, как свой каталог. Нет каталога — нет файлов.
      *
      * @return array<string, string>
      */
     private function files(string $directory): array
     {
+        if (! is_dir($directory)) {
+            return [];
+        }
+
         $files = [];
 
         foreach (File::allFiles($directory, true) as $file) {
             $relative = str_replace('\\', '/', $file->getRelativePathname());
+
+            // Заготовка маршрутов не файл сайта: её код дописывается в `routes/web.php` (`routeBlock()`).
+            if (str_starts_with($relative, 'site/') || $relative === 'routes/web.php.stub') {
+                continue;
+            }
+
             $relative = str_ends_with($relative, '.stub') ? substr($relative, 0, -5) : $relative;
             $files[$this->target($relative)] = $file->getPathname();
         }
@@ -248,15 +486,43 @@ final class ModuleInstaller
     }
 
     /**
+     * Код маршрутов публичной части модуля с подстановками (без `<?php`) или null, если у модуля нет своих маршрутов.
+     */
+    private function routeBlock(Module $module): ?string
+    {
+        $source = $module->directory.'/site/routes/web.php.stub';
+
+        return is_file($source) ? strtr(File::get($source), $this->placeholders()) : null;
+    }
+
+    /**
+     * Имена маршрутов в коде блока: `->name('site.news.index')`.
+     *
+     * @return list<string>
+     */
+    private function routeNames(string $block): array
+    {
+        preg_match_all("~->name\\('([^']+)'\\)~", $block, $matches);
+
+        return $matches[1];
+    }
+
+    /**
      * Подстановки в заготовках.
      *
      * @return array<string, string>
      */
     private function placeholders(): array
     {
+        try {
+            $appNamespace = app()->getNamespace();
+        } catch (RuntimeException $e) {
+            throw new ModuleWriteException(__('fastleo::console.module_namespace_unknown'), $e->getCode(), previous: $e);
+        }
+
         return [
             '{{ namespace }}' => trim(config()->string('fastleo.resources.namespace'), '\\'),
-            '{{ appNamespace }}' => trim(app()->getNamespace(), '\\'),
+            '{{ appNamespace }}' => trim($appNamespace, '\\'),
         ];
     }
 
@@ -295,9 +561,10 @@ final class ModuleInstaller
     }
 
     /**
-     * На сайте стоит Pest и он инициализирован (`tests/Pest.php`): тесты модулей пишутся на нём и без этого файла падают.
+     * На сайте стоит Pest и он инициализирован (`tests/Pest.php`): вместе с модулем на сайт копируются его тесты, они
+     * написаны на Pest и без этого файла падают.
      */
-    private function hasPest(): bool
+    public function hasPest(): bool
     {
         $composer = base_path('composer.json');
 
@@ -325,6 +592,7 @@ final class ModuleInstaller
      */
     private function relative(string $path): string
     {
-        return ltrim(str_replace(str_replace('\\', '/', base_path()), '', str_replace('\\', '/', $path)), '/');
+        // Убирается только начало: базовый путь вроде `/app` встречается и внутри пути (`/app/app/Fastleo`).
+        return Str::chopStart(str_replace('\\', '/', $path), str_replace('\\', '/', base_path()).'/');
     }
 }

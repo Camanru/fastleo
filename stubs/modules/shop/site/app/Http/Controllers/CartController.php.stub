@@ -1,0 +1,73 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Http\ShopCart;
+use {{ appNamespace }}\Models\ShopProduct;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+
+/**
+ * Корзина: показать, добавить товар, изменить количество, убрать. Все изменения — POST, PATCH и DELETE с токеном формы.
+ */
+class CartController extends Controller
+{
+    /**
+     * Корзина с товарами из базы; недоступные товары уже убраны, количество не больше остатка.
+     */
+    public function show(ShopCart $cart): View
+    {
+        $lines = $cart->lines();
+
+        return view('shop.cart', ['lines' => $lines, 'total' => $cart->total, 'removed' => $cart->removed, 'reduced' => $cart->reduced]);
+    }
+
+    /**
+     * Добавить товар; нет товара, он скрыт или закончился — покупатель остаётся на странице и видит сообщение.
+     */
+    public function store(Request $request, ShopCart $cart): RedirectResponse
+    {
+        $data = $request->validate([
+            'product_id' => ['required', 'integer', 'min:1', 'max:2147483647'],
+            'quantity' => ['nullable', 'integer', 'min:1', 'max:'.ShopCart::MAX_QUANTITY],
+        ]);
+
+        $product = ShopProduct::query()->available()->inStock()->find($data['product_id']);
+
+        if ($product === null) {
+            return back()->withErrors(['cart' => 'Этого товара уже нет в наличии или он скрыт.']);
+        }
+
+        if (! $cart->add($product->id, (int) ($data['quantity'] ?? 1))) {
+            return back()->withErrors(['cart' => 'В корзине не больше '.ShopCart::MAX_LINES.' позиций.']);
+        }
+
+        return redirect()->route('site.shop.cart');
+    }
+
+    /**
+     * Изменить количество товара в корзине; 0 убирает его.
+     */
+    public function update(Request $request, ShopCart $cart, int $id): RedirectResponse
+    {
+        $data = $request->validate(['quantity' => ['required', 'integer', 'min:0', 'max:'.ShopCart::MAX_QUANTITY]]);
+
+        $cart->set($id, (int) $data['quantity']);
+
+        return redirect()->route('site.shop.cart');
+    }
+
+    /**
+     * Убрать товар из корзины.
+     */
+    public function destroy(ShopCart $cart, int $id): RedirectResponse
+    {
+        $cart->remove($id);
+
+        return redirect()->route('site.shop.cart');
+    }
+}

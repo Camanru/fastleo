@@ -7,8 +7,10 @@ use Fastleo\Fastleo;
 use Fastleo\Installer\DashboardPatcher;
 use Fastleo\Support\UserModelPatcher;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 
 beforeEach(function (): void {
@@ -16,13 +18,15 @@ beforeEach(function (): void {
     $this->sandbox = sys_get_temp_dir().'/fastleo-news-'.getmypid().'-'.uniqid();
     File::ensureDirectoryExists($this->sandbox.'/routes');
     File::put($this->sandbox.'/routes/web.php', "<?php\n\nuse Illuminate\\Support\\Facades\\Route;\n");
-    File::put($this->sandbox.'/composer.json', '{"autoload": {"psr-4": {"App\\\\": "app/"}}}');
+    File::put($this->sandbox.'/composer.json', '{"autoload": {"psr-4": {"App\\\\FastleoNews\\\\": "app/"}}}');
+    sandboxWithPest($this->sandbox);
     $this->app->setBasePath($this->sandbox);
     Schema::dropIfExists('news');
     config(['fastleo.resources.path' => $this->sandbox.'/app/Fastleo', 'fastleo.resources.namespace' => 'App\\FastleoNews']);
 });
 
 afterEach(function (): void {
+    Model::shouldBeStrict(false);
     Factory::flushState();
     File::deleteDirectory($this->sandbox);
 });
@@ -36,10 +40,10 @@ function bootCopiedNews(object $test): void
 
     // Классы объявляются один раз на процесс: каждый тест копирует модуль в свою папку.
     $classes = [
-        'app/Fastleo/Models/News.php' => 'App\\FastleoNews\\Models\\News',
+        'app/Models/News.php' => 'App\\FastleoNews\\Models\\News',
         'app/Fastleo/NewsResource.php' => 'App\\FastleoNews\\NewsResource',
         'app/Fastleo/Dashboard.php' => 'App\\FastleoNews\\Dashboard',
-        'database/factories/Fastleo/NewsFactory.php' => 'Database\\Factories\\Fastleo\\NewsFactory',
+        'database/factories/NewsFactory.php' => 'Database\\Factories\\NewsFactory',
     ];
 
     foreach ($classes as $file => $class) {
@@ -47,12 +51,20 @@ function bootCopiedNews(object $test): void
             require $test->sandbox.'/'.$file;
         }
     }
+}
 
+/**
+ * Поднять и публичную часть скопированного модуля: контроллер, маршруты и шаблоны сайта.
+ */
+function bootCopiedNewsSite(object $test): void
+{
+    bootCopiedNews($test);
+    bootSiteRoutes($test, ['App\\FastleoNews\\Http\\Controllers\\NewsController' => 'app/Http/Controllers/NewsController.php'], ['routes/web.php']);
 }
 
 it('copies the news module and puts its widget on the dashboard', function (): void {
-    $this->artisan('fastleo:module', ['modules' => ['news']])
-        ->expectsOutputToContain('app/Fastleo/Models/News.php')
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])
+        ->expectsOutputToContain('app/Models/News.php')
         ->expectsOutputToContain('виджеты модулей добавлены')
         ->assertSuccessful();
 
@@ -61,23 +73,25 @@ it('copies the news module and puts its widget on the dashboard', function (): v
     expect($dashboard)->toContain("Table::make('Последние новости')->resource(\\App\\FastleoNews\\NewsResource::class)")
         ->toContain('ServerStatus::make()')
         ->and(glob($this->sandbox.'/database/migrations/*_create_news_table.php'))->toHaveCount(1)
-        ->and($this->sandbox.'/routes/site')->not->toBeDirectory()
-        ->and($this->sandbox.'/resources')->not->toBeDirectory();
+        ->and($this->sandbox.'/app/Http/Controllers/NewsController.php')->toBeFile()
+        ->and($this->sandbox.'/resources/views/news/show.blade.php')->toBeFile()
+        ->and($this->sandbox.'/resources/views/layouts/site.blade.php')->toBeFile()
+        ->and(File::get($this->sandbox.'/routes/web.php'))->toContain('NewsController::class')->not->toContain('fastleo');
 });
 
 it('lists the dashboard file among the created ones only when the installation has created it', function (): void {
-    Artisan::call('fastleo:module', ['modules' => ['news']]);
+    Artisan::call('fastleo:module', ['modules' => ['news'], '--no-interaction' => true]);
     expect(Artisan::output())->toContain('app/Fastleo/Dashboard.php');
 
-    Artisan::call('fastleo:module', ['modules' => ['news']]);
+    Artisan::call('fastleo:module', ['modules' => ['news'], '--no-interaction' => true]);
     expect(Artisan::output())->toContain('Ничего не записано');
 
     File::deleteDirectory($this->sandbox.'/database');
     Schema::dropIfExists('news');
-    File::delete($this->sandbox.'/app/Fastleo/Models/News.php');
+    File::delete($this->sandbox.'/app/Models/News.php');
     File::delete($this->sandbox.'/app/Fastleo/NewsResource.php');
 
-    Artisan::call('fastleo:module', ['modules' => ['news']]);
+    Artisan::call('fastleo:module', ['modules' => ['news'], '--no-interaction' => true]);
     expect(Artisan::output())->not->toContain('app/Fastleo/Dashboard.php');
 });
 
@@ -141,9 +155,9 @@ it('tells what to add by hand when the dashboard of the site is built differentl
     File::ensureDirectoryExists($this->sandbox.'/app/Fastleo');
     File::put($this->sandbox.'/app/Fastleo/Dashboard.php', "<?php\n\nfinal class Dashboard\n{\n    public function widgets(): array\n    {\n        return array_merge([], []);\n    }\n}\n");
 
-    $this->artisan('fastleo:module', ['modules' => ['news']])
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])
         ->expectsOutputToContain('Dashboard.php устроен необычно')
-        ->expectsOutputToContain("Table::make('Последние новости')")
+        ->expectsOutputToContain("Table::make('Последние новости')->resource(\\App\\FastleoNews\\NewsResource::class)")
         ->assertSuccessful();
 
     expect(File::get($this->sandbox.'/app/Fastleo/Dashboard.php'))->not->toContain('Последние новости');
@@ -152,7 +166,7 @@ it('tells what to add by hand when the dashboard of the site is built differentl
 it('keeps the written modules and asks to add widgets by hand when the dashboard cannot be written', function (): void {
     File::ensureDirectoryExists($this->sandbox.'/app/Fastleo/Dashboard.php');
 
-    $this->artisan('fastleo:module', ['modules' => ['news']])
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])
         ->expectsOutputToContain('Dashboard.php устроен необычно')
         ->expectsOutputToContain("Table::make('Последние новости')")
         ->assertSuccessful();
@@ -161,7 +175,7 @@ it('keeps the written modules and asks to add widgets by hand when the dashboard
 });
 
 it('shows only published news whose date has come in the published scope', function (): void {
-    $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
     bootCopiedNews($this);
 
     News::factory()->create(['slug' => 'opening', 'published_at' => now()]);
@@ -173,7 +187,7 @@ it('shows only published news whose date has come in the published scope', funct
 });
 
 it('puts undated news among dated ones by the day they were created', function (): void {
-    $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
     bootCopiedNews($this);
 
     News::factory()->create(['slug' => 'old', 'published_at' => now()->subDays(5)]);
@@ -184,7 +198,7 @@ it('puts undated news among dated ones by the day they were created', function (
 });
 
 it('gives the administrator a working news section that passes fastleo:doctor and shows the widget', function (): void {
-    $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
     bootCopiedNews($this);
     Fastleo::resources()->flush();
     $this->actingAs(admin(), Fastleo::GUARD);
@@ -205,7 +219,7 @@ it('gives the administrator a working news section that passes fastleo:doctor an
 });
 
 it('lists the newest news first in the admin list, with or without a publication date', function (): void {
-    $this->artisan('fastleo:module', ['modules' => ['news']])->assertSuccessful();
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
     bootCopiedNews($this);
     Fastleo::resources()->flush();
     $this->actingAs(admin(), Fastleo::GUARD);
@@ -214,4 +228,108 @@ it('lists the newest news first in the admin list, with or without a publication
     News::factory()->create(['title' => 'Вчерашняя без даты', 'published_at' => null, 'created_at' => now()->subDay()]);
 
     $this->get(route('fastleo.resources.index', 'news'))->assertOk()->assertSeeInOrder(['Свежая с датой', 'Вчерашняя без даты', 'Старая без даты']);
+});
+
+it('asks after the choice of modules whether the public part is wanted and writes it on yes', function (): void {
+    $this->artisan('fastleo:module')
+        ->expectsChoice('Какие модули добавить на сайт?', ['news'], moduleOptions())
+        ->expectsConfirmation(siteQuestion(), 'yes')
+        ->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/routes/web.php'))->toContain('NewsController::class')
+        ->and($this->sandbox.'/resources/views/layouts/site.blade.php')->toBeFile();
+});
+
+it('writes only the panel part of the module on no and leaves routes/web.php alone', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['news']])
+        ->expectsConfirmation(siteQuestion(), 'no')
+        ->assertSuccessful();
+
+    expect($this->sandbox.'/app/Fastleo/NewsResource.php')->toBeFile()
+        ->and($this->sandbox.'/app/Http')->not->toBeDirectory()
+        ->and($this->sandbox.'/resources')->not->toBeDirectory()
+        ->and(File::get($this->sandbox.'/routes/web.php'))->not->toContain('NewsController::class');
+});
+
+it('asks the question before it writes any file', function (): void {
+    File::ensureDirectoryExists($this->sandbox.'/app');
+    File::put($this->sandbox.'/app/Fastleo', 'не папка');
+
+    $this->artisan('fastleo:module', ['modules' => ['news']])
+        ->expectsConfirmation(siteQuestion(), 'yes')
+        ->expectsOutputToContain('файл записать не удалось')
+        ->assertFailed();
+
+    expect(File::get($this->sandbox.'/app/Fastleo'))->toBe('не папка')
+        ->and($this->sandbox.'/resources')->not->toBeDirectory();
+});
+
+it('stops before the question when the panel part is taken', function (): void {
+    Schema::create('news', function ($table): void {
+        $table->id();
+    });
+
+    $this->artisan('fastleo:module', ['modules' => ['news']])
+        ->expectsOutputToContain('таблица news уже есть')
+        ->assertFailed();
+});
+
+it('does not ask and installs only the panel part when the address /news is taken by the site', function (): void {
+    Route::get('news', fn (): string => 'свои новости');
+
+    $this->artisan('fastleo:module', ['modules' => ['news']])
+        ->expectsOutputToContain('Публичная часть модуля news не добавлена')
+        ->expectsOutputToContain('адрес /news уже занят')
+        ->assertSuccessful();
+
+    expect($this->sandbox.'/app/Fastleo/NewsResource.php')->toBeFile()
+        ->and($this->sandbox.'/resources')->not->toBeDirectory();
+});
+
+it('keeps the template of the site and says so', function (): void {
+    File::ensureDirectoryExists($this->sandbox.'/resources/views/news');
+    File::put($this->sandbox.'/resources/views/news/index.blade.php', 'мой список');
+
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])
+        ->expectsOutputToContain('Оставлен ваш шаблон resources/views/news/index.blade.php')
+        ->assertSuccessful();
+
+    expect(File::get($this->sandbox.'/resources/views/news/index.blade.php'))->toBe('мой список')
+        ->and($this->sandbox.'/resources/views/news/show.blade.php')->toBeFile();
+});
+
+it('shows the published news on the site and hides the rest', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
+    bootCopiedNewsSite($this);
+    Model::shouldBeStrict();
+
+    News::factory()->create(['title' => 'Открытие', 'slug' => 'opening', 'excerpt' => 'Анонс открытия', 'body' => '<p>Текст открытия</p>']);
+    News::factory()->create(['title' => 'Черновик', 'slug' => 'draft', 'is_published' => false]);
+    News::factory()->create(['title' => 'Скоро', 'slug' => 'soon', 'published_at' => now()->addDay()]);
+
+    $this->get('/news')->assertOk()->assertSee('<main>', false)->assertSee('Открытие')->assertSee('Анонс открытия')->assertDontSee('Черновик')->assertDontSee('Скоро');
+    $this->get('/news/opening')->assertOk()->assertSee('<p>Текст открытия</p>', false)->assertSee('og:type" content="article"', false);
+
+    foreach (['draft', 'soon', 'no-such-news', 'Opening', 'a%00b'] as $slug) {
+        $this->get('/news/'.$slug)->assertNotFound();
+    }
+});
+
+it('escapes the fields of the news that visitors can see', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
+    bootCopiedNewsSite($this);
+    News::factory()->create(['title' => '<script>alert(1)</script>', 'slug' => 'xss', 'excerpt' => '<img src=x onerror=alert(2)>']);
+
+    foreach (['/news', '/news/xss'] as $url) {
+        $this->get($url)->assertOk()->assertDontSee('<script>alert(1)</script>', false)->assertDontSee('<img src=x', false);
+    }
+});
+
+it('pages the list of news ten at a time with links to the neighbour pages', function (): void {
+    $this->artisan('fastleo:module', ['modules' => ['news'], '--no-interaction' => true])->assertSuccessful();
+    bootCopiedNewsSite($this);
+    News::factory()->count(11)->create();
+
+    $this->get('/news')->assertOk()->assertSee('rel="next"', false)->assertDontSee('rel="prev"', false);
+    $this->get('/news?page=2')->assertOk()->assertSee('rel="prev"', false)->assertDontSee('rel="next"', false);
 });

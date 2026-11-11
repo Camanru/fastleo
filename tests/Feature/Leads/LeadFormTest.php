@@ -75,6 +75,13 @@ describe('the site form', function (): void {
             ->and($lead->read_at)->toBeNull();
     });
 
+    it('measures the length of an email before it parses it', function (): void {
+        $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'email' => str_repeat('a', 300), 'form_token' => leadToken()])
+            ->assertSessionHasErrors(['email']);
+
+        expect(session('errors')->get('email'))->toHaveCount(1);
+    });
+
     it('checks the fields of the form', function (): void {
         $this->post('/leads', ['name' => '', 'phone' => 'abc', 'email' => 'не почта', 'form_token' => leadToken()])
             ->assertSessionHasErrors(['name', 'phone', 'email']);
@@ -119,6 +126,13 @@ describe('the site form', function (): void {
         expect($token)->toBe(['shown_at' => now()->timestamp, 'session' => $this->sessionId])
             ->and(FormToken::read('мусор'))->toBeNull()
             ->and(FormToken::read(null))->toBeNull();
+    });
+
+    it('gives every shown form its own token even within one second and one session', function (): void {
+        Date::setTestNow('2026-11-10 12:00:00');
+        session()->setId($this->sessionId);
+
+        expect(Crypt::decryptString(FormToken::make()))->not->toBe(Crypt::decryptString(FormToken::make()));
     });
 
     it('stops one address after five leads in ten minutes', function (): void {

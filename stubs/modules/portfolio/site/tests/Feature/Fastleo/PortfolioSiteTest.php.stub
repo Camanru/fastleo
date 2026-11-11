@@ -1,0 +1,17 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\PortfolioItem;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published works and opens one by its address', function (): void {
+    PortfolioItem::factory()->create(['title' => 'Сайт кофейни', 'slug' => 'coffee']);
+    PortfolioItem::factory()->create(['title' => 'Скрытая работа', 'slug' => 'hidden', 'is_published' => false]);
+
+    $this->get('/portfolio')->assertOk()->assertSee('Сайт кофейни')->assertDontSee('Скрытая работа');
+    $this->get('/portfolio/coffee')->assertOk()->assertSee('Сайт кофейни');
+    $this->get('/portfolio/hidden')->assertNotFound();
+});

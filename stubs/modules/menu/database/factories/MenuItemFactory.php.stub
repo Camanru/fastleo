@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\MenuItem;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика пунктов меню.
+ *
+ * @extends Factory<MenuItem>
+ */
+class MenuItemFactory extends Factory
+{
+    protected $model = MenuItem::class;
+
+    /**
+     * Показываемый пункт шапки.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'location' => MenuItem::HEADER,
+            'title' => fake()->unique()->words(2, true),
+            'url' => '/'.fake()->unique()->slug(2),
+            'new_tab' => false,
+            'is_published' => true,
+            'sort' => 0,
+        ];
+    }
+}

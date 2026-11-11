@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::fallback([\{{ appNamespace }}\Http\Controllers\PageController::class, 'show']);

@@ -1,0 +1,43 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\ShopCategory;
+use {{ appNamespace }}\Models\ShopOrder;
+use {{ appNamespace }}\Models\ShopProduct;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры магазина: категория, три товара и один заказ (php artisan db:seed --class='Database\Seeders\ShopSeeder').
+ */
+class ShopSeeder extends Seeder
+{
+    /**
+     * Создать примеры, если товаров с такими адресами ещё нет.
+     */
+    public function run(): void
+    {
+        $category = ShopCategory::query()->firstOrCreate(['slug' => 'examples'], ['title' => 'Примеры', 'sort' => 1, 'is_published' => true]);
+
+        $products = [];
+
+        foreach ([1 => ['Первый товар', '990.00', 10], 2 => ['Второй товар', '1490.50', null], 3 => ['Третий товар', '250.00', 3]] as $number => [$title, $price, $stock]) {
+            $products[$number] = ShopProduct::query()->firstOrCreate(['slug' => 'product-'.$number], [
+                'category_id' => $category->id,
+                'title' => $title,
+                'sku' => 'SKU-'.$number,
+                'price' => $price,
+                'stock' => $stock,
+                'description' => '<p>Свои товары добавьте в панели: раздел «Товары».</p>',
+                'sort' => $number,
+                'is_published' => true,
+            ]);
+        }
+
+        if (! ShopOrder::query()->exists()) {
+            ShopOrder::place(['name' => 'Иван Покупатель', 'phone' => '+7 900 000-00-00', 'comment' => 'Пример заказа'], [$products[1]->id => 2, $products[2]->id => 1]);
+        }
+    }
+}

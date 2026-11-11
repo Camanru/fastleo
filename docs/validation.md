@@ -21,7 +21,7 @@ Text::make('code', 'Код')->required()->maxLength(20)->rules(['alpha_dash']);
 | `Textarea` | `string` (+ `max` при `maxLength()`) |
 | `Number` | `numeric` или `integer`, `min`, `max` |
 | `Checkbox`, `Toggle` | `boolean` |
-| `Select` | значение из вариантов; `multiple()` — `array` и каждое значение из вариантов без повторов |
+| `Select` | значение из вариантов; `multiple()` — `array` не длиннее 1000 и каждое значение из вариантов без повторов |
 | `Date` | `date_format:Y-m-d` |
 | `DateTime` | `date_format:Y-m-d\TH:i` |
 | `Time` | `date_format:H:i` |

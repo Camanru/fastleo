@@ -1,0 +1,112 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Requests;
+
+use Fastleo\Leads\FormToken;
+use Fastleo\Leads\StoreLeadRequest;
+use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\Crypt;
+
+/**
+ * Оформление заказа: проверка полей и защита от ботов без внешних сервисов (как у заявок): скрытое поле-ловушка
+ * `leave_empty`, которое человек не заполняет, и метка времени показа формы `form_token`.
+ */
+class CheckoutRequest extends FormRequest
+{
+    /** Быстрее этого числа секунд после показа формы человек её не отправит. */
+    private const int MIN_SECONDS = 3;
+
+    /** Форма старше суток считается устаревшей. */
+    private const int MAX_SECONDS = 86400;
+
+    /**
+     * Правила полей. Текст без байта NUL и в верном UTF-8: иначе PostgreSQL отвечает ошибкой 500. В телефоне не меньше пяти цифр:
+     * «.....» и «+-()» заказом не считаются.
+     *
+     * @return array<string, array<int, string>>
+     */
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:150', StoreLeadRequest::TEXT],
+            'phone' => ['required', 'string', 'max:32', StoreLeadRequest::PHONE, 'regex:/(?:\D*\d){5}/'],
+            'email' => ['bail', 'nullable', 'string', 'max:255', 'email'],
+            'address' => ['nullable', 'string', 'max:1000', StoreLeadRequest::TEXT],
+            'delivery' => ['nullable', 'string', 'max:150', StoreLeadRequest::TEXT],
+            'comment' => ['nullable', 'string', 'max:2000', StoreLeadRequest::TEXT],
+            'leave_empty' => ['nullable', 'string', 'max:255'],
+            'form_token' => ['nullable', 'string', 'max:1000'],
+            'shown_total' => ['nullable', 'string', 'max:20'],
+        ];
+    }
+
+    /**
+     * Данные покупателя для `ShopOrder::place()`.
+     *
+     * @return array{name: string, phone: string, email?: ?string, address?: ?string, delivery?: ?string, comment?: ?string}
+     */
+    public function customer(): array
+    {
+        /** @var array{name: string, phone: string, email?: ?string, address?: ?string, delivery?: ?string, comment?: ?string} */
+        return $this->safe()->only(['name', 'phone', 'email', 'address', 'delivery', 'comment']);
+    }
+
+    /**
+     * Заказ отправил бот: заполнено скрытое поле-ловушка либо нет метки времени формы (или она подделана).
+     */
+    public function isBot(): bool
+    {
+        return $this->filled('leave_empty') || $this->shownToken() === null;
+    }
+
+    /**
+     * Форма отправлена слишком быстро, давно или с чужой сессии: бывает и у живого покупателя (автозаполнение, долго
+     * открытая вкладка), поэтому ему показывают ошибку.
+     */
+    public function isOutOfTime(): bool
+    {
+        $token = $this->shownToken();
+
+        if ($token === null) {
+            return false;
+        }
+
+        $seconds = now()->getTimestamp() - $token['shown_at'];
+
+        return $seconds < self::MIN_SECONDS || $seconds > self::MAX_SECONDS || ! hash_equals($this->session()->getId(), $token['session']);
+    }
+
+    /**
+     * Сумма корзины, которую покупатель видел на форме, или null (форма без суммы: открыта до обновления сайта).
+     */
+    public function shownTotal(): ?string
+    {
+        $total = $this->input('shown_total');
+
+        return is_string($total) && $total !== '' ? $total : null;
+    }
+
+    /**
+     * Метка формы, которую можно использовать один раз: ключ для `Cache::add()`. Берётся от расшифрованного содержимого, а не от
+     * строки метки: Laravel принимает и испорченную метку (лишний символ в конце), и ключ по строке давал бы «новую» метку каждый раз.
+     * Вызывать только после `isBot()`: у подделанной метки содержимого нет.
+     */
+    public function tokenKey(): string
+    {
+        return 'shop-checkout:'.hash('sha256', Crypt::decryptString((string) $this->input('form_token')));
+    }
+
+    /**
+     * Метка формы или null, если её нет или она подделана.
+     *
+     * @return array{shown_at: int, session: string}|null
+     */
+    private function shownToken(): ?array
+    {
+        $token = $this->input('form_token');
+
+        return FormToken::read(is_string($token) ? $token : null);
+    }
+}

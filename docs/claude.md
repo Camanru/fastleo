@@ -185,7 +185,7 @@ class ProductsAdminTest extends TestCase
 | Владелец и менеджеры без ролей: настройки, файлы, журнал — только владельцу; в разделе удаление/правка/выгрузка — только владельцу | `Fastleo::resolveOwnerUsing(fn ($user) => $user->is_owner)` в `AppServiceProvider::boot()` + `$ownerOnly = ['update', 'delete', 'export']` (`'*'` — раздел целиком, `$ownerOnlyIndex` — только общий список); в Policy и коде — `Fastleo::isOwner()` | [authorization.md](authorization.md#владелец-и-owneronly) |
 | Владелец проверяет панель глазами менеджера | `'users' => ['impersonate' => true]` в `config/fastleo.php` (нужен владелец: роли или `resolveOwnerUsing()`); в «Пользователях» — действие «Войти как»; кто на самом деле работает — `Fastleo::impersonator()` | [auth.md](auth.md#войти-как) |
 | Несколько телефонов, «взять в работу» без гонки, заявки с сайта по API, старые пароли | готовые рецепты | [recipes.md](recipes.md) |
-| Готовый раздел «Страницы», «Новости», «Контакты», «Меню сайта», «Отзывы», «Портфолио», «Вопросы и ответы» или «Интернет-магазин» (каталог и заказы) в панели (без вёрстки сайта) | `php artisan fastleo:module pages` (или `news`, `contacts`, `menu`, `reviews`, `portfolio`, `faq`, `shop`) | [modules.md](modules.md) |
+| Готовый раздел «Страницы», «Новости», «Контакты», «Меню сайта», «Отзывы», «Портфолио», «Вопросы и ответы» или «Интернет-магазин» (каталог и заказы) в панели и по желанию публичная часть сайта: маршруты, контроллеры и простые шаблоны без оформления | `php artisan fastleo:module pages` (или `news`, `contacts`, `menu`, `reviews`, `portfolio`, `faq`, `shop`) | [modules.md](modules.md) |
 | Заявки с формы сайта и с других сайтов по API с ключами (встроенная часть, без копирования файлов) | `'leads' => ['resource' => Fastleo\Leads\LeadResource::class]` в `config/fastleo.php`; форма — `<x-fastleo::lead-form />`; ключи — «Настройки → Доступы для сайтов» | [leads.md](leads.md) |
 | Выгрузка и загрузка CSV | `$exportable`, `$importable` | [import-export.md](import-export.md) |
 
@@ -271,6 +271,7 @@ Doctor работает без вошедшего пользователя: `fie
 | расширение PHP GD не установлено (`image_gd`): любая загруженная картинка отклоняется; GD собрано без WebP или JPEG (`image_gd_formats`): не загрузятся картинки этого формата, а варианты WebP не создадутся | `php-gd` с поддержкой JPEG и WebP (`apt install php8.4-gd`; в Docker — `docker-php-ext-configure gd --with-webp --with-jpeg`) |
 | `Secret` пишет в колонку без шифрующего каста (`secret_cast`): токен лежал бы в базе открытым текстом | `'поле' => 'encrypted'` (или `AsEncrypted…`) в `$casts` модели |
 | включён приём заявок по API (`leads.keys`), а кеш сайта на драйвере `null` (`leads_cache_null`): каждая заявка получает ответ `duplicate` и не сохраняется, лимиты не работают | рабочий кеш: `CACHE_STORE=database` (или `redis`, `file`) |
+| на сайте стоит оформление заказа магазина (маршрут `site.shop.checkout`), а кеш сайта на драйвере `null` (`shop_cache_null`): каждый заказ получает ответ «форма уже отправлена» | рабочий кеш: `CACHE_STORE=database` (или `redis`, `file`) |
 | `fastleo.record_view` или `$recordView` раздела — не `'modal'`, `'page'` и не `false` (у раздела допустим ещё `null`) | одно из трёх значений ([configuration.md](configuration.md#страница-просмотра-записи)) |
 | раздел с `$ownerOnly`/`$ownerOnlyIndex`, а владельца нет (`owner_only_without_owner`): раздел закрыт всем | задать `Fastleo::resolveOwnerUsing(...)` или включить роли ([authorization.md](authorization.md#владелец-и-owneronly)) |
 | включён «Войти как» (`users.impersonate`), а владельца нет (`impersonate_without_owner`): функция не работает | задать `Fastleo::resolveOwnerUsing(...)` или включить роли ([auth.md](auth.md#войти-как)) |
@@ -291,6 +292,7 @@ Doctor работает без вошедшего пользователя: `fie
 | Проверка | Что делать |
 |---|---|
 | очередь `sync` | `QUEUE_CONNECTION=database` и `php artisan queue:work` |
+| на сайте стоит оформление заказа магазина, а кеш на драйвере `array` (`shop_cache_array`): метка формы не одноразовая, лимит отправок не работает | рабочий кеш: `CACHE_STORE=database` (или `redis`, `file`) |
 | `APP_URL` указывает на `localhost`, `127.0.0.1` или `[::1]` (`app_url_localhost`): адреса файлов и ссылки в письмах не откроются на настоящем адресе сайта | задать настоящий адрес в `.env` и `php artisan config:clear` |
 | включён «Войти как», а в разделе пользователей нет действия «Войти как» (`impersonate_no_action`): раздел выключен или свой наследник `UserResource` не вернул действие | вернуть `new \Fastleo\Resources\Users\ImpersonateUser()` или `parent::actions()` в `actions()` ([auth.md](auth.md#войти-как)) |
 | на сайте есть импорт, а `retry_after` соединения очереди не больше 3600 с (у `database` по умолчанию 90) — долгий импорт очередь отдаст второму обработчику и он упадёт | `retry_after` больше 3600 в `config/queue.php`; хостинг с одним cron — [рецепт](installation.md#очередь-на-хостинге-с-одним-cron) |
@@ -352,7 +354,7 @@ php artisan fastleo:roles --presets   # ещё и готовые роли «Ад
 | `fastleo:make-field Phone` | `Fields/Phone.php` + шаблон | `fields()` ресурса: [fields/custom.md](fields/custom.md) |
 | `fastleo:make-settings Contacts` | `ContactsSettings.php` со страницей настроек | находится сама: [settings.md](settings.md) |
 | `fastleo:make-dashboard` | `Dashboard.php` с набором виджетов | находится сам: [dashboard.md](dashboard.md) |
-| `fastleo:module news` | готовые разделы панели: `contacts`, `pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`, `shop` — миграции, модель, раздел, виджеты и тесты копируются в сайт (код сайта, не пакета); публичную часть (шаблоны, маршруты страниц) модули не создают | находятся сами: [modules.md](modules.md) |
+| `fastleo:module news` | готовые разделы панели: `contacts`, `pages`, `news`, `menu`, `reviews`, `portfolio`, `faq`, `shop` — миграции, модель, раздел, виджеты и тесты копируются в сайт (код сайта, не пакета); после выбора модулей команда спрашивает, ставить ли публичную часть (маршруты, контроллеры, шаблоны без оформления), без терминала она ставится | находятся сами: [modules.md](modules.md) |
 | `fastleo:make-policy Product [--model=…]` | `app/Policies/ProductPolicy.php` со всеми способностями, которые спрашивает панель (везде `true`) | находится по правилам Laravel: [authorization.md](authorization.md) |
 
 ## MCP-сервер

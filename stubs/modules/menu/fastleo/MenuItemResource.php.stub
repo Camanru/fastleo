@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\MenuItem;
+use {{ appNamespace }}\Models\MenuItem;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Select;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Раздел «Меню сайта»: дерево пунктов шапки и подвала, порядок — перетаскиванием.
- * Вывод на сайте — ваши шаблоны: `MenuItem::tree('header')`.
+ * Вывод на сайте — шаблоны `resources/views/menu` (если вы поставили публичную часть при установке) или ваши: `MenuItem::tree('header')`.
  */
 final class MenuItemResource extends Resource
 {
@@ -44,7 +45,10 @@ final class MenuItemResource extends Resource
                 ->help('Адрес вида /contacts или https://… (вложенные пункты и порядок — в списке, перетаскиванием).')
                 ->rules(['regex:~^(/(?![/\\\\\x00-\x20])|https?://)~i']),
             Select::make('location', 'Где показывать')->options([MenuItem::HEADER => 'Шапка', MenuItem::FOOTER => 'Подвал'])->default(MenuItem::HEADER)->required(),
-            BelongsTo::make('parent_id', 'Родитель')->hideInList(),
+            // Пункт показывается в своём месте, а вложенные берутся из него же: родитель из шапки у пункта подвала не нашёл бы
+            // своего места нигде, поэтому варианты родителя — только пункты выбранного места.
+            BelongsTo::make('parent_id', 'Родитель')->hideInList()
+                ->dependsOn('location', fn (Builder $query, mixed $location) => $query->where('location', $location ?? MenuItem::HEADER)),
             Toggle::make('new_tab', 'Открывать в новой вкладке')->hideInList(),
             Toggle::make('is_published', 'Показывать')->default(true)->quickToggle(),
         ];

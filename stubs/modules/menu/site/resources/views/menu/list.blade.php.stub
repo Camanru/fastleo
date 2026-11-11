@@ -1,0 +1,18 @@
+@php
+    // Адрес вводит пользователь панели: на сайт попадают только адрес сайта и http(s), без javascript: и //чужой-сайт.
+    $safe = fn (string $url): bool => preg_match('~^(/(?![/\\\\\x00-\x20])|https?://)~i', $url) === 1;
+@endphp
+@if ($items->isNotEmpty())
+    <ul>
+        @foreach ($items as $item)
+            <li>
+                @if ($safe($item->url))
+                    <a href="{{ $item->url }}"@if ($item->new_tab) target="_blank" rel="noopener"@endif>{{ $item->title }}</a>
+                @else
+                    {{ $item->title }}
+                @endif
+                @include('menu.list', ['items' => $item->children])
+            </li>
+        @endforeach
+    </ul>
+@endif

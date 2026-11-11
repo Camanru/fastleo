@@ -1,0 +1,35 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Отзывы" />
+@endsection
+
+@section('content')
+    <h1>Отзывы</h1>
+
+    @forelse ($items as $review)
+        <article>
+            <x-fastleo::picture :src="$review->photo" :alt="$review->author" />
+            <h2>{{ $review->author }}</h2>
+            @if ($review->company)
+                <p>{{ $review->company }}</p>
+            @endif
+            <p>Оценка: {{ $review->rating }} из 5</p>
+            <p>{!! nl2br(e($review->body)) !!}</p>
+            @if ($review->reviewed_at)
+                <time datetime="{{ $review->reviewed_at->toDateString() }}">{{ $review->reviewed_at->format('d.m.Y') }}</time>
+            @endif
+        </article>
+    @empty
+        <p>Отзывов пока нет.</p>
+    @endforelse
+
+    <nav>
+        @if ($items->previousPageUrl())
+            <a href="{{ $items->previousPageUrl() }}" rel="prev">← Назад</a>
+        @endif
+        @if ($items->nextPageUrl())
+            <a href="{{ $items->nextPageUrl() }}" rel="next">Дальше →</a>
+        @endif
+    </nav>
+@endsection

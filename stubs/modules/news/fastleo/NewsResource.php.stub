@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\News;
+use {{ appNamespace }}\Models\News;
 use Fastleo\Fields\DateTime;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\RichText;
@@ -17,7 +17,7 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Новости»: обложка, анонс, текст, дата публикации и SEO.
- * Показ новостей на сайте — ваши маршруты и шаблоны: `News::query()->published()->paginate(10)`.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `News::query()->published()->paginate(10)`.
  */
 final class NewsResource extends Resource
 {

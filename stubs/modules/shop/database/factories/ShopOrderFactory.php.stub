@@ -1,0 +1,36 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Enums\ShopOrderStatus;
+use {{ appNamespace }}\Models\ShopOrder;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика заказов (без позиций; настоящий заказ создаёт `ShopOrder::place()`).
+ *
+ * @extends Factory<ShopOrder>
+ */
+class ShopOrderFactory extends Factory
+{
+    protected $model = ShopOrder::class;
+
+    /**
+     * Новый заказ.
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'status' => ShopOrderStatus::New,
+            'customer_name' => fake()->name(),
+            'customer_phone' => fake()->numerify('+7 9## ###-##-##'),
+            'customer_email' => fake()->safeEmail(),
+            'address' => fake()->address(),
+            'total' => fake()->randomFloat(2, 100, 20000),
+        ];
+    }
+}

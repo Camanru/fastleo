@@ -1,0 +1,28 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\FaqItem;
+use Illuminate\Database\Seeder;
+
+/**
+ * Примеры вопросов и ответов (php artisan db:seed --class='Database\Seeders\FaqItemSeeder').
+ */
+class FaqItemSeeder extends Seeder
+{
+    /**
+     * Создать три вопроса, если таких ещё нет.
+     */
+    public function run(): void
+    {
+        foreach ([1 => 'Как сделать заказ?', 2 => 'Как оплатить?', 3 => 'Как связаться с вами?'] as $number => $question) {
+            FaqItem::query()->firstOrCreate(['question' => $question], [
+                'answer' => '<p>Ответ добавьте в панели: раздел «Вопросы и ответы».</p>',
+                'is_published' => true,
+                'sort' => $number,
+            ]);
+        }
+    }
+}

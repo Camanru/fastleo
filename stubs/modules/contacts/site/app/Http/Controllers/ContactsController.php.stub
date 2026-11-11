@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Страница «Контакты»: значения берутся из настроек панели (`fastleo_setting('contacts.phone')`).
+ */
+class ContactsController extends Controller
+{
+    /**
+     * Страница контактов.
+     */
+    public function show(): View
+    {
+        return view('contacts.show');
+    }
+}

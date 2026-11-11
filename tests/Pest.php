@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use Fastleo\Auth\TwoFactor;
 use Fastleo\Fastleo;
+use Fastleo\Installer\Module;
+use Fastleo\Installer\Modules;
 use Fastleo\Notifications\NotificationBot;
 use Fastleo\Publishing\Channel;
 use Fastleo\SoftNetica\Synchronizer;
@@ -14,11 +16,14 @@ use Fastleo\Tests\Fixtures\Roles\RoleUser;
 use Fastleo\Tests\TestCase;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\View;
 use Illuminate\Testing\TestResponse;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -59,6 +64,88 @@ expect()->extend('toBeStoredJson', function (array $expected): object {
  *
  * @param  array<string, mixed>  $attributes
  */
+/**
+ * Вопрос «ставить ли публичную часть сайта», который `fastleo:module` задаёт после выбора модулей.
+ */
+function siteQuestion(): string
+{
+    return 'Поставить и публичную часть сайта (маршруты, контроллеры, шаблоны)? Без неё модули добавят только разделы в панели.';
+}
+
+/**
+ * Варианты списка модулей в `fastleo:module` и `fastleo:install` (для `expectsChoice`).
+ *
+ * @return array<string, string>
+ */
+function moduleOptions(): array
+{
+    return array_map(fn (Module $module): string => $module->label.' — '.$module->description, Modules::all());
+}
+
+/**
+ * Поднять публичную часть скопированного модуля в тестовом приложении: контроллеры (классы объявляются один раз на
+ * процесс), маршруты (блоки модулей в `routes/web.php` песочницы) и шаблоны песочницы. Скомпилированные шаблоны лежат в песочнице: общий каркас
+ * Testbench читают параллельные процессы тестов.
+ *
+ * @param  array<class-string, string>  $controllers  класс => файл относительно песочницы
+ * @param  list<string>  $routes  файлы маршрутов относительно песочницы
+ */
+function bootSiteRoutes(object $test, array $controllers, array $routes): void
+{
+    foreach ($controllers as $class => $file) {
+        if (! class_exists($class, false)) {
+            require $test->sandbox.'/'.$file;
+        }
+    }
+
+    File::ensureDirectoryExists($test->sandbox.'/views');
+    config(['view.compiled' => $test->sandbox.'/views']);
+    View::prependLocation($test->sandbox.'/resources/views');
+
+    foreach ($routes as $file) {
+        Route::middleware('web')->group($test->sandbox.'/'.$file);
+    }
+
+    Route::getRoutes()->refreshNameLookups();
+}
+
+/**
+ * Содержимое `routes/web.php` песочницы теста (пустая строка, если файла нет): в нём лежат блоки маршрутов модулей.
+ */
+function siteRoutesOf(object $test): string
+{
+    return is_file($test->sandbox.'/routes/web.php') ? File::get($test->sandbox.'/routes/web.php') : '';
+}
+
+/**
+ * Убрать маршруты демо-сайта (workbench): они занимают адреса `/contacts` и другие, которые берёт публичная часть модулей.
+ * Маршруты панели тоже уходят: для проверок панели такой тест не годится.
+ */
+function forgetDemoRoutes(): void
+{
+    Route::setRoutes(new RouteCollection());
+    resolve('url')->setRoutes(Route::getRoutes());
+}
+
+/**
+ * Убрать из маршрутов один адрес демо-сайта (например, `contacts`), остальные маршруты, в том числе панели, оставить.
+ */
+function forgetRoute(string $uri): void
+{
+    $kept = new RouteCollection();
+
+    foreach (Route::getRoutes()->getRoutes() as $route) {
+        if ($route->uri() !== $uri) {
+            $kept->add($route);
+        }
+    }
+
+    $kept->refreshNameLookups();
+    $kept->refreshActionLookups();
+    Route::setRoutes($kept);
+    resolve('url')->setRoutes($kept);
+}
+
 function admin(array $attributes = []): User
 {
     return User::factory()->admin()->create($attributes);
@@ -469,4 +556,18 @@ function sortedJsonKeys(mixed $value): mixed
     }
 
     return $value;
+}
+
+/**
+ * Песочница сайта с Pest: `pestphp/pest` в composer.json и `tests/Pest.php`. Без них модули не устанавливаются
+ * (вместе с модулем на сайт копируются его тесты, написанные на Pest).
+ */
+function sandboxWithPest(string $sandbox): void
+{
+    $composer = json_decode(File::get($sandbox.'/composer.json'), true);
+    $composer['require-dev']['pestphp/pest'] = '^4.0';
+
+    File::put($sandbox.'/composer.json', (string) json_encode($composer, JSON_UNESCAPED_SLASHES));
+    File::ensureDirectoryExists($sandbox.'/tests');
+    File::put($sandbox.'/tests/Pest.php', "<?php\n");
 }

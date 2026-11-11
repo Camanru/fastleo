@@ -36,7 +36,7 @@ final class StoreLeadRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:100', self::TEXT],
             'phone' => ['required', 'string', 'max:50', self::PHONE],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['bail', 'nullable', 'string', 'max:255', 'email'],
             'message' => ['nullable', 'string', 'max:2000', self::TEXT],
             'leave_empty' => ['nullable', 'string', 'max:255'],
             'form_token' => ['nullable', 'string', 'max:1000'],

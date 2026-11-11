@@ -1,0 +1,18 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo :model="$item" :title="$item->title" :description="$item->excerpt" :image="$item->cover" type="article" />
+@endsection
+
+@section('content')
+    <article>
+        <h1>{{ $item->title }}</h1>
+        @if ($item->published_at)
+            <time datetime="{{ $item->published_at->toDateString() }}">{{ $item->published_at->format('d.m.Y') }}</time>
+        @endif
+        <x-fastleo::picture :src="$item->cover" :alt="$item->title" />
+        {{-- Поле RichText очищено при сохранении, поэтому его можно выводить как HTML. --}}
+        <div>{!! $item->body !!}</div>
+    </article>
+    <p><a href="{{ route('site.news.index') }}">Все новости</a></p>
+@endsection

@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Exceptions;
+
+use RuntimeException;
+
+/**
+ * Товара нет в нужном количестве: `ShopOrder::place()` не создаёт заказ. Покажите покупателю `getMessage()`.
+ */
+final class OutOfStockException extends RuntimeException
+{
+    /**
+     * @param  string  $title  название товара
+     * @param  int  $available  сколько осталось
+     */
+    public static function for(string $title, int $available): self
+    {
+        return new self("«{$title}»: в наличии {$available} шт.");
+    }
+}

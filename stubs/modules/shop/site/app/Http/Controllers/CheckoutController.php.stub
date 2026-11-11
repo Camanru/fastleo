@@ -1,0 +1,109 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Exceptions\OrderLimitException;
+use {{ appNamespace }}\Exceptions\OutOfStockException;
+use {{ appNamespace }}\Exceptions\ProductUnavailableException;
+use {{ appNamespace }}\Http\Requests\CheckoutRequest;
+use {{ appNamespace }}\Http\ShopCart;
+use {{ appNamespace }}\Models\ShopOrder;
+use Fastleo\Leads\FormToken;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\Cache;
+use Throwable;
+
+/**
+ * Оформление заказа: форма, создание заказа через `ShopOrder::place()` и страница «Спасибо».
+ */
+class CheckoutController extends Controller
+{
+    /**
+     * Форма оформления; корзина пуста — переход в корзину.
+     */
+    public function create(ShopCart $cart): View|RedirectResponse
+    {
+        $lines = $cart->lines();
+
+        if ($lines === []) {
+            return redirect()->route('site.shop.cart');
+        }
+
+        return view('shop.checkout', ['lines' => $lines, 'total' => $cart->total, 'removed' => $cart->removed, 'reduced' => $cart->reduced, 'token' => FormToken::make()]);
+    }
+
+    /**
+     * Создать заказ. Метка формы одноразовая: повторная или параллельная отправка той же формы заказа не создаёт.
+     */
+    public function store(CheckoutRequest $request, ShopCart $cart): RedirectResponse
+    {
+        // Бот: заказ молча не создаётся.
+        if ($request->isBot()) {
+            return redirect()->route('site.shop.index');
+        }
+
+        if ($request->isOutOfTime()) {
+            return back()->withInput()->withErrors(['form_token' => 'Форма устарела: обновите страницу и отправьте заказ ещё раз.']);
+        }
+
+        $before = $cart->items();
+
+        if ($cart->lines() === []) {
+            return redirect()->route('site.shop.cart')->withErrors(['cart' => 'В корзине нет доступных товаров.']);
+        }
+
+        // Пока покупатель заполнял форму, товар закончился, скрыт или подорожал: заказ с другим составом или суммой не оформляется, пока он его не увидит.
+        if ($cart->items() !== $before) {
+            return redirect()->route('site.shop.checkout')->withInput()->withErrors(['cart' => 'Состав корзины изменился: какого-то товара не осталось. Проверьте заказ и отправьте его ещё раз.']);
+        }
+
+        if ($request->shownTotal() !== null && $request->shownTotal() !== $cart->total) {
+            return redirect()->route('site.shop.checkout')->withInput()->withErrors(['cart' => 'Цена в корзине изменилась. Проверьте сумму заказа и отправьте его ещё раз.']);
+        }
+
+        if (! Cache::add($request->tokenKey(), 1, now()->addDay())) {
+            return back()->withInput()->withErrors(['form_token' => 'Эта форма уже отправлена: обновите страницу, если заказ не оформился.']);
+        }
+
+        try {
+            $order = ShopOrder::place($request->customer(), $cart->items());
+        } catch (OutOfStockException|OrderLimitException $e) {
+            Cache::forget($request->tokenKey());
+
+            return back()->withInput()->withErrors(['cart' => $e->getMessage()]);
+        } catch (ProductUnavailableException $e) {
+            Cache::forget($request->tokenKey());
+            $cart->remove($e->productId);
+
+            return redirect()->route('site.shop.cart')->withErrors(['cart' => 'Один из товаров стал недоступен и убран из корзины.']);
+        } catch (Throwable $e) {
+            // Непредвиденная ошибка (например, взаимная блокировка в базе): метка освобождается, повтор этой же формы возможен.
+            Cache::forget($request->tokenKey());
+
+            throw $e;
+        }
+
+        $cart->clear();
+        session()->flash('fastleo.shop.order', $order->id);
+
+        return redirect()->route('site.shop.thanks');
+    }
+
+    /**
+     * Страница «Спасибо»: только номер заказа из сессии, без персональных данных; открыта не после заказа — переход в каталог.
+     */
+    public function thanks(): View|RedirectResponse
+    {
+        $number = session('fastleo.shop.order');
+
+        if (! is_int($number)) {
+            return redirect()->route('site.shop.index');
+        }
+
+        return view('shop.thanks', ['number' => $number]);
+    }
+}

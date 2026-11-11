@@ -1,0 +1,17 @@
+@php
+    // Поля блока приходят из базы: не строка (смена типа поля) не выводится, а не роняет страницу.
+    $title = is_string($title ?? null) ? $title : '';
+    $text = is_string($text ?? null) ? $text : '';
+    $button = is_string($button ?? null) ? $button : '';
+    // Ссылку вводит пользователь панели: на сайт попадают только адрес сайта и http(s), без javascript: и //чужой-сайт.
+    $safeUrl = is_string($url ?? null) && preg_match('~^(/(?![/\\\\\x00-\x20])|https?://)~i', $url) === 1;
+@endphp
+<section>
+    <h2>{{ $title }}</h2>
+    @if ($text !== '')
+        <p>{{ $text }}</p>
+    @endif
+    @if ($button !== '' && $safeUrl)
+        <a href="{{ $url }}">{{ $button }}</a>
+    @endif
+</section>

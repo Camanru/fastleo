@@ -1,0 +1,32 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Новости" />
+@endsection
+
+@section('content')
+    <h1>Новости</h1>
+
+    @forelse ($items as $item)
+        <article>
+            <h2><a href="{{ route('site.news.show', $item->slug) }}">{{ $item->title }}</a></h2>
+            @if ($item->published_at)
+                <time datetime="{{ $item->published_at->toDateString() }}">{{ $item->published_at->format('d.m.Y') }}</time>
+            @endif
+            @if ($item->excerpt)
+                <p>{{ $item->excerpt }}</p>
+            @endif
+        </article>
+    @empty
+        <p>Новостей пока нет.</p>
+    @endforelse
+
+    <nav>
+        @if ($items->previousPageUrl())
+            <a href="{{ $items->previousPageUrl() }}" rel="prev">← Назад</a>
+        @endif
+        @if ($items->nextPageUrl())
+            <a href="{{ $items->nextPageUrl() }}" rel="next">Дальше →</a>
+        @endif
+    </nav>
+@endsection

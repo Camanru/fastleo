@@ -1,0 +1,50 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo :model="$product" :title="$product->title" :description="$product->description" :image="$product->cover" />
+@endsection
+
+@section('content')
+    <article>
+        @if ($product->category)
+            <p><a href="{{ route('site.shop.category', $product->category->slug) }}">{{ $product->category->title }}</a></p>
+        @endif
+
+        <h1>{{ $product->title }}</h1>
+        <x-fastleo::picture :src="$product->cover" :alt="$product->title" />
+        @foreach (is_array($product->photos) ? $product->photos : [] as $photo)
+            <x-fastleo::picture :src="is_string($photo) ? $photo : null" :alt="$product->title" />
+        @endforeach
+
+        <p>{{ number_format((float) $product->price, 2, ',', ' ') }} ₽</p>
+        @if ($product->sku)
+            <p>Артикул: {{ $product->sku }}</p>
+        @endif
+
+        @if ($product->stock !== null && $product->stock < 1)
+            <p>Нет в наличии</p>
+        @else
+            <form method="POST" action="{{ route('site.shop.cart.add') }}">
+                @csrf
+                <input type="hidden" name="product_id" value="{{ $product->id }}">
+                <label>Количество <input type="number" name="quantity" value="1" min="1" max="99"></label>
+                <button type="submit">В корзину</button>
+            </form>
+            @error('cart') <p role="alert">{{ $message }}</p> @enderror
+        @endif
+
+        {{-- Поле RichText очищено при сохранении, поэтому его можно выводить как HTML. --}}
+        <div>{!! $product->description !!}</div>
+
+        @if (is_array($product->specs) && $product->specs !== [])
+            <dl>
+                @foreach ($product->specs as $name => $value)
+                    <dt>{{ $name }}</dt>
+                    <dd>{{ $value }}</dd>
+                @endforeach
+            </dl>
+        @endif
+    </article>
+
+    <p><a href="{{ route('site.shop.index') }}">Весь каталог</a></p>
+@endsection

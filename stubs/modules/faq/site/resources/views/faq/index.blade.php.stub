@@ -1,0 +1,25 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Вопросы и ответы" />
+@endsection
+
+@section('content')
+    <h1>Вопросы и ответы</h1>
+
+    @forelse ($groups as $group => $items)
+        @if ($group !== '')
+            <h2>{{ $group }}</h2>
+        @endif
+
+        @foreach ($items as $item)
+            <details>
+                <summary>{{ $item->question }}</summary>
+                {{-- Поле RichText очищено при сохранении, поэтому его можно выводить как HTML. --}}
+                <div>{!! $item->answer !!}</div>
+            </details>
+        @endforeach
+    @empty
+        <p>Вопросов пока нет.</p>
+    @endforelse
+@endsection

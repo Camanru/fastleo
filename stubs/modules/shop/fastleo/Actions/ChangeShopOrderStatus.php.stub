@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace {{ namespace }}\Actions;
 
-use {{ namespace }}\Enums\ShopOrderStatus;
-use {{ namespace }}\Models\ShopOrder;
+use {{ appNamespace }}\Enums\ShopOrderStatus;
+use {{ appNamespace }}\Models\ShopOrder;
 use Fastleo\Actions\Action;
 use Fastleo\Actions\ActionResult;
 use Fastleo\Fields\Select;

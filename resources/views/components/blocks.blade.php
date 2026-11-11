@@ -2,7 +2,8 @@
 {{--
     Вывод блоков поля Blocks на сайте: каждый блок — шаблон сайта «{prefix}.{тип}»
     (по умолчанию resources/views/blocks/text.blade.php). Шаблон получает поля блока переменными
-    ($body, $src…), а также $block (все поля массивом) и $type. Блок без шаблона пропускается.
+    ($body, $src…), а также $block (все поля массивом) и $type. Блок без шаблона пропускается; поле с именем, которое
+    занимает Blade (`__env`, `errors`, `obLevel`), в переменную не попадает (оно остаётся в $block).
 
     <x-fastleo::blocks :blocks="$page->content" />
     <x-fastleo::blocks :blocks="$page->content" prefix="landing.blocks" />
@@ -17,6 +18,6 @@
         $view = $type === null ? null : $prefix.'.'.$type;
     @endphp
     @if ($view !== null && view()->exists($view))
-        @include($view, [...array_filter($data, fn ($key) => is_string($key) && preg_match('/^[A-Za-z_]\w*$/', $key) === 1, ARRAY_FILTER_USE_KEY), 'block' => $data, 'type' => $type])
+        @include($view, [...array_filter($data, fn ($key) => is_string($key) && preg_match('/^[A-Za-z]\w*$/', $key) === 1 && ! in_array($key, ['errors', 'obLevel'], true), ARRAY_FILTER_USE_KEY), 'block' => $data, 'type' => $type])
     @endif
 @endforeach

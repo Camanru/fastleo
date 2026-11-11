@@ -1,0 +1,21 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo :model="$category" :title="$category->title" />
+@endsection
+
+@section('content')
+    <h1>{{ $category->title }}</h1>
+
+    @if ($children->isNotEmpty())
+        <ul>
+            @foreach ($children as $child)
+                <li><a href="{{ route('site.shop.category', $child->slug) }}">{{ $child->title }}</a></li>
+            @endforeach
+        </ul>
+    @endif
+
+    <p><a href="{{ route('site.shop.index') }}">Весь каталог</a></p>
+
+    @include('shop.products')
+@endsection

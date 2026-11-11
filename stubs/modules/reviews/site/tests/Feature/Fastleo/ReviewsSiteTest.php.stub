@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\Review;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists the published reviews and hides the rest', function (): void {
+    Review::factory()->create(['author' => 'Анна', 'body' => 'Всё понравилось']);
+    Review::factory()->create(['author' => 'Скрытый автор', 'is_published' => false]);
+
+    $this->get('/reviews')->assertOk()->assertSee('Анна')->assertSee('Всё понравилось')->assertDontSee('Скрытый автор');
+});

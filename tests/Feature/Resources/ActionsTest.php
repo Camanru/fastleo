@@ -86,6 +86,16 @@ it('asks for the mini form again with the errors when it is not valid', function
     expect($article->fresh()?->title)->toBe('Отчёт');
 });
 
+it('returns a long list of the action form cut to its limit', function (): void {
+    $article = Article::factory()->create();
+
+    runAction('rename-articles', [(string) $article->id], ['data' => ['suffix' => '', 'labels' => array_fill(0, 5000, 'метка')]])
+        ->assertSessionHasErrors('data.suffix');
+
+    // Тегов не больше 100: в старом вводе остаётся 101 (лишний даёт ошибку `max`), а не пять тысяч.
+    expect(session()->getOldInput('data.labels'))->toHaveCount(101);
+});
+
 it('does not put a password-like value of the mini form into the session after an error', function (): void {
     $article = Article::factory()->create();
 

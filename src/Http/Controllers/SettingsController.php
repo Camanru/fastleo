@@ -15,6 +15,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -66,11 +67,12 @@ final readonly class SettingsController
             $attributes = [...$attributes, ...$field->validationAttributes()];
         }
 
-        $validator = Validator::make($request->all(), $rules, ValidationMessages::all($rules), $attributes);
+        $limited = RecordWriter::limitLists($fields, $request->all());
+        $validator = Validator::make($limited, $rules, ValidationMessages::all($rules), $attributes);
 
         if ($validator->fails()) {
             // Зашифрованные в базе поля не возвращаются в форму через сессию: хранилище сессий их значение не шифрует.
-            throw new ValidationException($validator, back()->withInput($request->except($settings->encrypted()))->withErrors($validator));
+            throw new ValidationException($validator, back()->withInput(Arr::except($limited, $settings->encrypted()))->withErrors($validator));
         }
 
         $input = RecordWriter::inInputOrder($validator->validated(), $request->all());

@@ -1,0 +1,142 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\PageFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Collection;
+
+/**
+ * Страница сайта: дерево (`parent_id`), содержимое из блоков, SEO. Адрес — слаги родителей и своя: `about` и `about/team`.
+ * Вывод страниц на сайте — `PageController` и шаблоны `resources/views/pages` публичной части модуля (если вы поставили её при установке).
+ *
+ * ```php
+ * Page::home();                      // главная
+ * Page::findByPath('about/team');    // страница по адресу или null
+ * ```
+ *
+ * @property int $id
+ * @property int|null $parent_id
+ * @property string $title
+ * @property string $slug
+ * @property list<array{type: string, data: array<string, mixed>}>|null $content
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ * @property bool $is_published
+ * @property bool $show_in_menu
+ * @property bool $is_home
+ */
+#[UseFactory(PageFactory::class)]
+class Page extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['parent_id', 'sort', 'title', 'slug', 'content', 'seo', 'is_published', 'show_in_menu', 'is_home'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'content' => 'array',
+            'seo' => 'array',
+            'is_published' => 'boolean',
+            'show_in_menu' => 'boolean',
+            'is_home' => 'boolean',
+        ];
+    }
+
+    /**
+     * Родительская страница.
+     *
+     * @return BelongsTo<Page, $this>
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    /**
+     * Только опубликованные страницы.
+     *
+     * @param  Builder<Page>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true);
+    }
+
+    /**
+     * Главная страница сайта — опубликованная страница с отметкой «Главная» (родитель не важен); если таких несколько, берётся первая.
+     */
+    public static function home(): ?self
+    {
+        return self::query()->published()->where('is_home', true)->orderBy('id')->first();
+    }
+
+    /**
+     * Страница по адресу `about/team` (кроме главной): каждая часть — слаг, следующая страница лежит внутри предыдущей.
+     * Если страница или любой её родитель не опубликованы, страницы нет.
+     */
+    public static function findByPath(string $path): ?self
+    {
+        $page = null;
+
+        foreach (explode('/', trim($path, '/')) as $slug) {
+            $page = self::query()->published()->where('slug', $slug)->where('parent_id', $page?->id)->first();
+
+            // Точное сравнение: сортировка MySQL не различает регистр и пробелы на конце (`/ABOUT`, `/about%20`).
+            if ($page === null || $page->slug !== $slug) {
+                return null;
+            }
+        }
+
+        // Главная открывается только по «/», а не ещё и по своему слагу.
+        return $page->is_home ? null : $page;
+    }
+
+    /**
+     * Адрес страницы на сайте: `/` для главной, иначе `/about/team`.
+     */
+    public function url(): string
+    {
+        if ($this->is_home) {
+            return url('/');
+        }
+
+        $slugs = [$this->slug];
+        $parentId = $this->parent_id;
+
+        // Явные запросы вместо связи: работает и при `Model::shouldBeStrict()` (ленивая загрузка запрещена).
+        for ($depth = 0; $parentId !== null && $depth < 10; $depth++) {
+            $parent = self::query()->select(['id', 'slug', 'parent_id'])->find($parentId);
+
+            if ($parent === null) {
+                break;
+            }
+
+            array_unshift($slugs, $parent->slug);
+            $parentId = $parent->parent_id;
+        }
+
+        return url('/'.implode('/', $slugs));
+    }
+
+    /**
+     * Пункты меню сайта: опубликованные страницы верхнего уровня с отметкой «В меню сайта», по порядку.
+     *
+     * @return Collection<int, array{title: string, url: string}>
+     */
+    public static function menu(): Collection
+    {
+        // Только нужные колонки: `content` (все блоки страницы) для меню не читается.
+        return self::query()->select(['id', 'title', 'slug', 'parent_id', 'is_home'])->published()->whereNull('parent_id')->where('show_in_menu', true)->orderBy('sort')->orderBy('id')->get()
+            ->map(fn (self $page): array => ['title' => $page->title, 'url' => $page->url()]);
+    }
+}

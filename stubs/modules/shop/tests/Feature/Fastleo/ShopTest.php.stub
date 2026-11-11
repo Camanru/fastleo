@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-use {{ namespace }}\Enums\ShopOrderStatus;
-use {{ namespace }}\Exceptions\OutOfStockException;
-use {{ namespace }}\Models\ShopOrder;
-use {{ namespace }}\Models\ShopProduct;
+use {{ appNamespace }}\Enums\ShopOrderStatus;
+use {{ appNamespace }}\Exceptions\OutOfStockException;
+use {{ appNamespace }}\Models\ShopOrder;
+use {{ appNamespace }}\Models\ShopProduct;
 use {{ appNamespace }}\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

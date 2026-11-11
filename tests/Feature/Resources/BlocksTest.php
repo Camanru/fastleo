@@ -121,6 +121,17 @@ it('renders the blocks with the templates of the site and skips the rest', funct
         ->and(Blade::render('<x-fastleo::blocks :blocks="null" />'))->toBe('');
 });
 
+it('does not let a field of a block replace the variables of Blade', function (): void {
+    // Шаблон с `@foreach` пользуется `$__env`: поле с таким именем сломало бы его.
+    $html = Blade::render('<x-fastleo::blocks :blocks="$blocks" />', ['blocks' => [
+        ['type' => 'gallery', 'data' => ['__env' => 'x', 'errors' => 'y', 'obLevel' => 'z', 'photos' => ['uploads/blocks/one.jpg']]],
+        ['type' => 'text', 'data' => ['body' => '<p>Живой текст</p>']],
+    ]]);
+
+    expect($html)->toContain('uploads/blocks/one.jpg')
+        ->toContain('<div class="block-text"><p>Живой текст</p></div>');
+});
+
 it('shows the blocks on the page of the site', function (): void {
     $page = Page::factory()->create();
 

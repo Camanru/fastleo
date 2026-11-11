@@ -1,0 +1,5 @@
+<div>
+    @foreach (is_array($photos ?? null) ? $photos : [] as $photo)
+        <x-fastleo::picture :src="is_string($photo) ? $photo : null" />
+    @endforeach
+</div>

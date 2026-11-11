@@ -355,4 +355,28 @@ class Repeater extends Field
     {
         return false;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->maxItems;
+    }
+
+    /**
+     * Список элементов обрезается, а подполя каждого элемента ограничиваются по своим пределам (см. `Field::limitInput()`).
+     */
+    #[Override]
+    public function limitInput(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $fields = $this->itemFields();
+
+        return array_map(fn (mixed $item): mixed => is_array($item) ? self::limitItem($fields, $item) : $item, $this->sliceList($value));
+    }
 }

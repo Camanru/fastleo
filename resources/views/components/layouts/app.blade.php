@@ -24,6 +24,7 @@
     $profileTag = $impersonating ? 'div' : 'a';
     $initials = \Illuminate\Support\Str::of($userName)->explode(' ')->filter()->take(2)->map(fn ($word) => \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($word, 0, 1)))->implode('');
     $iconButton = 'flex size-8 items-center justify-center rounded-[8px] text-ink-2 transition-colors hover:bg-hover hover:text-ink';
+    $siteUrl = \Fastleo\Fastleo::siteUrl();
 @endphp
 <!DOCTYPE html>
 <html lang="ru" class="h-full" data-theme="{{ \Fastleo\Support\Branding::theme() }}">
@@ -212,6 +213,13 @@
                         @endif
                     @endforeach
                 </nav>
+
+                @if ($siteUrl !== null)
+                    <a href="{{ $siteUrl }}" target="_blank" rel="noopener" class="{{ $iconButton }} lg:w-auto lg:gap-1.5 lg:px-2.5" title="{{ __('fastleo::layout.site_open') }}" data-site-link>
+                        <x-fastleo::icon name="external-link" class="size-[15px]" />
+                        <span class="sr-only lg:not-sr-only lg:text-sm lg:font-medium">{{ __('fastleo::layout.site') }}</span>
+                    </a>
+                @endif
 
                 @if (\Fastleo\Fastleo::bellFor(\Fastleo\Fastleo::guard()->user()))
                 <div

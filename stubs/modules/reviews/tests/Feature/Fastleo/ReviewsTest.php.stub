@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use {{ namespace }}\Models\Review;
+use {{ appNamespace }}\Models\Review;
 use {{ appNamespace }}\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\Review;
+use {{ appNamespace }}\Models\Review;
 use Fastleo\Fields\Date;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\Number;
@@ -15,7 +15,7 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Отзывы»: автор, оценка, текст, фото. Порядок на сайте — перетаскиванием в списке.
- * Показ отзывов на сайте — ваши маршруты и шаблоны: `Review::query()->published()->get()`.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `Review::query()->published()->get()`.
  */
 final class ReviewResource extends Resource
 {

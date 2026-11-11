@@ -59,22 +59,25 @@ final class Import extends Model
     }
 
     /**
-     * Путь на диске к csv с пропущенными строками (файл появляется, только если строки пропущены).
+     * Путь на диске к csv с пропущенными строками (файл появляется, только если строки пропущены). Имя строится от имени
+     * загруженного файла (в нём UUID), а не от номера импорта: номера перебираются, и на диске, который отдаёт веб-сервер,
+     * чужой отчёт с строками клиентов нашёл бы любой посетитель.
      */
     public function errorsPath(): string
     {
-        return 'fastleo/imports/'.$this->id.'-errors.csv';
+        return pathinfo($this->path, PATHINFO_DIRNAME).'/'.pathinfo($this->path, PATHINFO_FILENAME).'-errors.csv';
     }
 
     /**
-     * Все файлы импорта на диске: загруженный файл и файл пропущенных строк (в том числе прежнего вида `-errors.xlsx`:
-     * в нём исходные строки клиентов, и после обновления он не должен остаться на диске навсегда).
+     * Все файлы импорта на диске: загруженный файл и файл пропущенных строк. Отчёты прежних версий с именем по номеру
+     * (`{id}-errors.csv`, `{id}-errors.xlsx`) тоже удаляются: в них исходные строки клиентов, и после обновления они не должны
+     * остаться на диске навсегда.
      *
      * @return list<string>
      */
     public function files(): array
     {
-        return [$this->path, $this->errorsPath(), 'fastleo/imports/'.$this->id.'-errors.xlsx'];
+        return [$this->path, $this->errorsPath(), 'fastleo/imports/'.$this->id.'-errors.csv', 'fastleo/imports/'.$this->id.'-errors.xlsx'];
     }
 
     /**

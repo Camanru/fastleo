@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\News;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('lists published news and opens one by its address', function (): void {
+    News::factory()->create(['title' => 'Открытие', 'slug' => 'opening']);
+    News::factory()->create(['title' => 'Черновик', 'slug' => 'draft', 'is_published' => false]);
+    News::factory()->create(['title' => 'Скоро', 'slug' => 'soon', 'published_at' => now()->addDay()]);
+
+    $this->get('/news')->assertOk()->assertSee('Открытие')->assertDontSee('Черновик')->assertDontSee('Скоро');
+    $this->get('/news/opening')->assertOk()->assertSee('Открытие');
+    $this->get('/news/draft')->assertNotFound();
+    $this->get('/news/soon')->assertNotFound();
+    $this->get('/news/no-such-news')->assertNotFound();
+});
+
+it('escapes the title of the news', function (): void {
+    News::factory()->create(['title' => '<script>alert(1)</script>', 'slug' => 'xss']);
+
+    $this->get('/news')->assertOk()->assertDontSee('<script>alert(1)</script>', false);
+    $this->get('/news/xss')->assertOk()->assertDontSee('<script>alert(1)</script>', false);
+});

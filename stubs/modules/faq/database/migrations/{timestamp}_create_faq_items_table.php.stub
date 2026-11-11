@@ -16,7 +16,7 @@ return new class extends Migration
         Schema::create('faq_items', function (Blueprint $table): void {
             $table->id();
             $table->string('question');
-            $table->text('answer');
+            $table->mediumText('answer');
             $table->string('category', 100)->nullable()->index();
             $table->boolean('is_published')->default(true);
             $table->unsignedInteger('sort')->default(0);

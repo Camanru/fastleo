@@ -9,6 +9,8 @@ return [
     'menu_open' => 'Открыть меню',
     'menu_close' => 'Закрыть меню',
     'flash_close' => 'Закрыть сообщение',
+    'site' => 'На сайт',
+    'site_open' => 'Открыть сайт в новой вкладке',
     'theme' => 'Тема',
     'sidebar_collapse' => 'Свернуть меню',
     'sidebar_expand' => 'Развернуть меню',

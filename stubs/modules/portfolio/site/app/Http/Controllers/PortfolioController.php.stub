@@ -1,0 +1,31 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\PortfolioItem;
+use Illuminate\Contracts\View\View;
+use Illuminate\Routing\Controller;
+
+/**
+ * Портфолио на сайте: список работ и страница работы. Шаблоны — `resources/views/portfolio`.
+ */
+class PortfolioController extends Controller
+{
+    /**
+     * Список работ по 12 на страницу в порядке панели.
+     */
+    public function index(): View
+    {
+        return view('portfolio.index', ['items' => PortfolioItem::query()->published()->simplePaginate(12)]);
+    }
+
+    /**
+     * Страница работы; нет работы или она не опубликована — 404.
+     */
+    public function show(string $slug): View
+    {
+        return view('portfolio.show', ['item' => PortfolioItem::query()->published()->where('slug', $slug)->firstOrFail()]);
+    }
+}

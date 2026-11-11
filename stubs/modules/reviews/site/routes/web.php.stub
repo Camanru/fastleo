@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/reviews', [\{{ appNamespace }}\Http\Controllers\ReviewController::class, 'index'])->name('site.reviews.index');

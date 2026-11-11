@@ -1,0 +1,167 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http;
+
+use {{ appNamespace }}\Models\ShopProduct;
+
+/**
+ * Корзина посетителя в сессии: только «номер товара → количество», цены и названия берутся из базы при каждом показе.
+ * Не больше 50 позиций и 99 штук в позиции; недоступные товары (скрыты, удалены, закончились) из корзины убираются.
+ *
+ * ```php
+ * $cart->add(12, 2);          // добавить
+ * $lines = $cart->lines();    // позиции с товарами; $cart->total — сумма, $cart->removed — сколько позиций убрано,
+ *                             // $cart->reduced — у скольких количество уменьшено до остатка
+ * ```
+ */
+final class ShopCart
+{
+    /** Сколько позиций можно в корзине. */
+    public const int MAX_LINES = 50;
+
+    /** Сколько штук одного товара можно в корзине. */
+    public const int MAX_QUANTITY = 99;
+
+    /** Ключ сессии: точка даёт вложенный массив, чужие ключи сессии корзину не затрагивают. */
+    private const string KEY = 'fastleo.shop.cart';
+
+    /** Сумма корзины со строки `lines()`, `'0.00'`, если корзина пуста. */
+    public private(set) string $total = '0.00';
+
+    /** Сколько позиций убрано из корзины как недоступные при последнем `lines()`. */
+    public private(set) int $removed = 0;
+
+    /** У скольких позиций количество уменьшено до остатка на складе при последнем `lines()`. */
+    public private(set) int $reduced = 0;
+
+    /**
+     * Содержимое сессии: номер товара → количество (мусор в сессии отбрасывается).
+     *
+     * @return array<int, int>
+     */
+    public function items(): array
+    {
+        $raw = session()->get(self::KEY, []);
+        $items = [];
+
+        foreach (is_array($raw) ? $raw : [] as $productId => $quantity) {
+            if (is_int($productId) && is_int($quantity) && $productId > 0 && $quantity > 0) {
+                $items[$productId] = min($quantity, self::MAX_QUANTITY);
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Добавить товар (количество прибавляется к имеющемуся). `false` — позиций уже слишком много.
+     */
+    public function add(int $productId, int $quantity): bool
+    {
+        $items = $this->items();
+
+        if (! isset($items[$productId]) && count($items) >= self::MAX_LINES) {
+            return false;
+        }
+
+        $items[$productId] = min(($items[$productId] ?? 0) + max($quantity, 1), self::MAX_QUANTITY);
+        $this->store($items);
+
+        return true;
+    }
+
+    /**
+     * Задать количество товара, который уже в корзине; 0 убирает его.
+     */
+    public function set(int $productId, int $quantity): void
+    {
+        $items = $this->items();
+
+        if (! isset($items[$productId])) {
+            return;
+        }
+
+        if ($quantity < 1) {
+            unset($items[$productId]);
+        } else {
+            $items[$productId] = min($quantity, self::MAX_QUANTITY);
+        }
+
+        $this->store($items);
+    }
+
+    /**
+     * Убрать товар из корзины.
+     */
+    public function remove(int $productId): void
+    {
+        $items = $this->items();
+        unset($items[$productId]);
+
+        $this->store($items);
+    }
+
+    /**
+     * Очистить корзину.
+     */
+    public function clear(): void
+    {
+        session()->forget(self::KEY);
+    }
+
+    /**
+     * Позиции корзины с товарами из базы. Недоступные товары убираются из корзины (`$removed`), количество уменьшается до остатка (`$reduced`).
+     *
+     * @return list<array{product: ShopProduct, quantity: int, sum: string}>
+     */
+    public function lines(): array
+    {
+        $items = $this->items();
+        $products = $items === [] ? collect() : ShopProduct::query()->available()->whereKey(array_keys($items))->get()->keyBy('id');
+        $lines = [];
+        $kept = [];
+        $totalCents = 0;
+        $this->removed = 0;
+        $this->reduced = 0;
+
+        foreach ($items as $productId => $quantity) {
+            $product = $products->get($productId);
+
+            if (! $product instanceof ShopProduct || ($product->stock !== null && $product->stock < 1)) {
+                $this->removed++;
+
+                continue;
+            }
+
+            if ($product->stock !== null && $quantity > $product->stock) {
+                $quantity = $product->stock;
+                $this->reduced++;
+            }
+
+            $sumCents = (int) round((float) $product->price * 100) * $quantity;
+            $kept[$productId] = $quantity;
+            $totalCents += $sumCents;
+            $lines[] = ['product' => $product, 'quantity' => $quantity, 'sum' => number_format($sumCents / 100, 2, '.', '')];
+        }
+
+        if ($kept !== $items) {
+            $this->store($kept);
+        }
+
+        $this->total = number_format($totalCents / 100, 2, '.', '');
+
+        return $lines;
+    }
+
+    /**
+     * Записать содержимое корзины в сессию.
+     *
+     * @param  array<int, int>  $items
+     */
+    private function store(array $items): void
+    {
+        session()->put(self::KEY, $items);
+    }
+}

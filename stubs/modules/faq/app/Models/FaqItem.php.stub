@@ -1,0 +1,54 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\FaqItemFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Вопрос и ответ. Вывод на сайте — публичная часть модуля (если вы поставили её при установке) или ваш.
+ *
+ * ```php
+ * FaqItem::query()->published()->get();
+ * FaqItem::query()->published()->get()->groupBy('category'); // по группам
+ * ```
+ *
+ * @property int $id
+ * @property string $question
+ * @property string $answer
+ * @property string|null $category
+ * @property bool $is_published
+ * @property int $sort
+ */
+#[UseFactory(FaqItemFactory::class)]
+class FaqItem extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['question', 'answer', 'category', 'is_published', 'sort'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованные вопросы в порядке, заданном в панели (перетаскиванием в списке).
+     *
+     * @param  Builder<FaqItem>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true)->orderBy('sort')->orderBy('id');
+    }
+}

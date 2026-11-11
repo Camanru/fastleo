@@ -11,6 +11,7 @@ use Fastleo\Support\OperationCancelled;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany as HasManyRelation;
+use Illuminate\Validation\Validator;
 use InvalidArgumentException;
 use Override;
 use Throwable;
@@ -153,18 +154,19 @@ class HasMany extends Nested
     {
         return [
             ...parent::typeRules(),
-            ...($this->minBlocks !== null ? [$this->minBlocksRule($this->minBlocks)] : []),
             ...($this->maxBlocks !== null ? ['max:'.$this->maxBlocks] : []),
         ];
     }
 
     /**
-     * Не меньше `$min` блоков, которые останутся после сохранения: уже существующие и заполненные новые. Пустой новый блок
-     * не создаётся, поэтому счётчик `min:N` по сырому массиву позволил бы убрать все существующие блоки, добавив один пустой.
+     * Не меньше `$min` блоков, которые останутся после сохранения (см. `afterSave()`): существующие записи этого родителя,
+     * присланные в запросе (каждая один раз), записи, которых форма не видела при открытии (их сохранение не удаляет), и
+     * заполненные новые блоки. Пустой новый блок не создаётся, блок с чужим или выдуманным `id` пропускается, а повтор `id`
+     * сохраняет запись один раз, поэтому счётчик `min:N` по сырому массиву позволил бы убрать все существующие блоки.
      */
-    private function minBlocksRule(int $min): Closure
+    private function minBlocksRule(int $min, ?Model $record): Closure
     {
-        return function (string $attribute, mixed $value, Closure $fail) use ($min): void {
+        return function (string $attribute, mixed $value, Closure $fail, Validator $validator) use ($min, $record): void {
             try {
                 $blocks = self::blocks($this->dehydrate($value));
             } catch (Throwable) {
@@ -172,9 +174,21 @@ class HasMany extends Nested
                 return;
             }
 
-            $kept = array_filter($blocks, fn (array $block): bool => $block['id'] !== null || ! $this->isEmptyBlock($block['values']));
+            $existing = $record instanceof Model && $record->exists
+                ? $this->relationInstance($record)->get()->map(fn (Model $child): string => $this->childKey($child))->all()
+                : [];
 
-            if (count($kept) < $min) {
+            $sent = array_values(array_unique(array_filter(
+                array_map(fn (array $block): ?string => $block['id'] === null ? null : (string) $block['id'], $blocks),
+                fn (?string $id): bool => $id !== null && in_array($id, $existing, true),
+            )));
+            // Как в `RecordWriter::write()`: поле `__seen` прислано пустым (middleware превращает '' в null) — форма не видела ни одной записи.
+            $data = $validator->getData();
+            $seen = array_key_exists($this->seenInputName(), $data) ? self::parseSeen($data[$this->seenInputName()] ?? '') : null;
+            $unseen = $seen === null ? [] : array_diff($existing, $sent, $seen);
+            $filled = array_filter($blocks, fn (array $block): bool => $block['id'] === null && ! $this->isEmptyBlock($block['values']));
+
+            if (count($sent) + count($unseen) + count($filled) < $min) {
                 $fail(__('fastleo::resources.has_many_min', ['min' => $min], Fastleo::LOCALE));
             }
         };
@@ -183,7 +197,13 @@ class HasMany extends Nested
     #[Override]
     public function getRules(?Model $record): array
     {
-        return [...parent::getRules($record), ...$this->seenRules()];
+        $rules = [...parent::getRules($record), ...$this->seenRules()];
+
+        if ($this->minBlocks !== null) {
+            $rules[$this->name][] = $this->minBlocksRule($this->minBlocks, $record);
+        }
+
+        return $rules;
     }
 
     /**
@@ -249,5 +269,14 @@ class HasMany extends Nested
         $key = $child->getKey();
 
         return is_scalar($key) ? (string) $key : '';
+    }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->maxBlocks;
     }
 }

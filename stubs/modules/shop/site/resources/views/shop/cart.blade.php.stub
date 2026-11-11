@@ -1,0 +1,56 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Корзина" />
+    <meta name="robots" content="noindex">
+@endsection
+
+@section('content')
+    <h1>Корзина</h1>
+
+    @if ($removed > 0)
+        <p role="status">Некоторые товары стали недоступны и убраны из корзины.</p>
+    @endif
+    @if ($reduced > 0)
+        <p role="status">Количество некоторых товаров уменьшено: столько их осталось на складе.</p>
+    @endif
+    @error('cart') <p role="alert">{{ $message }}</p> @enderror
+
+    @if ($lines === [])
+        <p>Корзина пуста.</p>
+        <p><a href="{{ route('site.shop.index') }}">В магазин</a></p>
+    @else
+        <table>
+            <thead>
+                <tr><th>Товар</th><th>Цена</th><th>Количество</th><th>Сумма</th><th></th></tr>
+            </thead>
+            <tbody>
+                @foreach ($lines as $line)
+                    <tr>
+                        <td><a href="{{ route('site.shop.product', $line['product']->slug) }}">{{ $line['product']->title }}</a></td>
+                        <td>{{ number_format((float) $line['product']->price, 2, ',', ' ') }} ₽</td>
+                        <td>
+                            <form method="POST" action="{{ route('site.shop.cart.update', $line['product']->id) }}">
+                                @csrf
+                                @method('PATCH')
+                                <input type="number" name="quantity" value="{{ $line['quantity'] }}" min="0" max="99">
+                                <button type="submit">Изменить</button>
+                            </form>
+                        </td>
+                        <td>{{ number_format((float) $line['sum'], 2, ',', ' ') }} ₽</td>
+                        <td>
+                            <form method="POST" action="{{ route('site.shop.cart.remove', $line['product']->id) }}">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit">Убрать</button>
+                            </form>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+
+        <p>Итого: {{ number_format((float) $total, 2, ',', ' ') }} ₽</p>
+        <p><a href="{{ route('site.shop.checkout') }}">Оформить заказ</a></p>
+    @endif
+@endsection

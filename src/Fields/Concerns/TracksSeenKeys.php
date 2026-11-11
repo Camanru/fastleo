@@ -53,7 +53,17 @@ trait TracksSeenKeys
      */
     public function rememberSeen(mixed $input): void
     {
-        $this->seenKeys = is_string($input)
+        $this->seenKeys = self::parseSeen($input);
+    }
+
+    /**
+     * Ключи из скрытого поля `{имя}__seen` (через запятую); не строка — `null` («форма не сообщила, что видела»).
+     *
+     * @return list<string>|null
+     */
+    protected static function parseSeen(mixed $input): ?array
+    {
+        return is_string($input)
             ? array_values(array_unique(array_filter(explode(',', $input), fn (string $key): bool => $key !== '' && strlen($key) <= 64)))
             : null;
     }

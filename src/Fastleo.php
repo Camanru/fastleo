@@ -205,6 +205,33 @@ final class Fastleo
     }
 
     /**
+     * Адрес главной страницы сайта для ссылки «На сайт» в шапке панели; `null` — ссылки нет.
+     *
+     * Панель за префиксом (`path` = `fastleo`, `admin`) — главная того же домена. Панель на своём домене
+     * (`domain` = `admin.site.ru`) — сайт живёт на другом домене, это `APP_URL`; если у `APP_URL` тот же хост,
+     * что и у панели, перейти некуда. Панель на корне домена сама главная страница: ссылки нет.
+     *
+     * ```php
+     * Fastleo::siteUrl();   // https://site.ru/ или null
+     * ```
+     */
+    public static function siteUrl(): ?string
+    {
+        $domain = config('fastleo.domain');
+
+        if (is_string($domain) && $domain !== '') {
+            $appUrl = config()->string('app.url', '');
+            $host = parse_url($appUrl, PHP_URL_HOST);
+
+            return preg_match('#^https?://#i', $appUrl) === 1 && is_string($host) && strcasecmp($host, $domain) !== 0
+                ? rtrim($appUrl, '/').'/'
+                : null;
+        }
+
+        return trim(config()->string('fastleo.path', 'fastleo'), '/') === '' ? null : url('/');
+    }
+
+    /**
      * Свой способ выбрать пользователей для уведомлений (например, по роли). Вызывается в `AppServiceProvider::boot()`.
      *
      * ```php

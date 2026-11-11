@@ -195,7 +195,10 @@ final class RecordWriter
      */
     public static function controllingInput(Resource $resource, ?Model $existing, array $input): array
     {
-        $writable = array_map(fn (Field $field): string => $field->name, $resource->writableFields($existing));
+        $writableFields = $resource->writableFields($existing);
+        $writable = array_map(fn (Field $field): string => $field->name, $writableFields);
+
+        $input = self::limitLists($writableFields, $input);
 
         foreach ($resource->schema()->fields() as $field) {
             foreach (array_filter([$field->getVisibleWhen()['field'] ?? null, $field->getDependsOn()]) as $controlling) {
@@ -211,6 +214,26 @@ final class RecordWriter
 
             if ($source !== null && ! in_array($source, $writable, true)) {
                 $input[$source] = $existing instanceof Model ? $field->sourceOf($existing) : null;
+            }
+        }
+
+        return $input;
+    }
+
+    /**
+     * Списки полей (и списки внутри элементов контейнеров) обрезаются до «предел + 1»: правило `max` всё равно откажет, а Laravel
+     * не разворачивает `поле.*` по сотням тысяч элементов и форма после ошибки не рисует их все из старого ввода (`Field::limitInput()`).
+     * Вызывайте перед `validator()` везде, где данные приходят из запроса.
+     *
+     * @param  list<Field>  $fields
+     * @param  array<array-key, mixed>  $input
+     * @return array<array-key, mixed>
+     */
+    public static function limitLists(array $fields, array $input): array
+    {
+        foreach ($fields as $field) {
+            if (array_key_exists($field->name, $input)) {
+                $input[$field->name] = $field->limitInput($input[$field->name]);
             }
         }
 

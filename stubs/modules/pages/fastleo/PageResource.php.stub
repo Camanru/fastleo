@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\Page;
+use {{ appNamespace }}\Models\Page;
+use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Block;
 use Fastleo\Fields\Blocks;
-use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Gallery;
 use Fastleo\Fields\Image;
 use Fastleo\Fields\RichText;
@@ -18,8 +18,8 @@ use Fastleo\Fields\Toggle;
 use Fastleo\Resource;
 
 /**
- * Раздел «Страницы»: дерево страниц сайта, каждая собирается из блоков. Показ страниц на сайте — ваши маршруты и шаблоны
- * (блоки выводит `<x-fastleo::blocks :blocks="$page->content" />`, SEO — `<x-fastleo::seo :model="$page" />`).
+ * Раздел «Страницы»: дерево страниц сайта, каждая собирается из блоков. Показ страниц на сайте — публичная часть модуля (`PageController`,
+ * шаблон страницы `resources/views/pages/show.blade.php` и шаблоны блоков `resources/views/blocks/{тип}.blade.php`), если вы поставили её при установке.
  */
 final class PageResource extends Resource
 {
@@ -50,8 +50,8 @@ final class PageResource extends Resource
             Slug::make('slug', 'Адрес')->from('title'),
             BelongsTo::make('parent_id', 'Родитель')->hideInList(),
             Toggle::make('is_published', 'Опубликована')->default(true)->quickToggle(),
-            Toggle::make('show_in_menu', 'В меню сайта')->help('Отметка для меню вашего сайта.'),
-            Toggle::make('is_home', 'Главная')->help('Отметка главной страницы для вашего сайта; отметьте одну.'),
+            Toggle::make('show_in_menu', 'В меню сайта')->help('Только страницы верхнего уровня. Если стоит модуль «Меню сайта», шапку собирает он: пункты задаются там.'),
+            Toggle::make('is_home', 'Главная')->help('Откроется по адресу «/». Отметьте одну страницу.'),
             Blocks::make('content', 'Содержимое')->blocks([
                 Block::make('text', 'Текст')->icon('text')->fields([RichText::make('body', 'Текст')->required()]),
                 Block::make('image', 'Картинка')->icon('image')->fields([

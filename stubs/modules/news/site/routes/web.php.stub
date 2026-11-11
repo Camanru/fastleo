@@ -1,0 +1,2 @@
+\Illuminate\Support\Facades\Route::get('/news', [\{{ appNamespace }}\Http\Controllers\NewsController::class, 'index'])->name('site.news.index');
+\Illuminate\Support\Facades\Route::get('/news/{slug}', [\{{ appNamespace }}\Http\Controllers\NewsController::class, 'show'])->where('slug', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.news.show');

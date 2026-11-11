@@ -89,6 +89,33 @@ it('shows the formatted text on the record page and cleans it again', function (
         ->assertDontSee('<script>alert(1)</script>', false);
 });
 
+it('does not show the class attribute that the site allowed on the record page', function (): void {
+    config(['fastleo.rich_text.tags' => ['span'], 'fastleo.rich_text.attributes' => ['class']]);
+    $overlay = '<p><a href="https://evil.example/login"><span class="fixed inset-0 z-50 opacity-0">.</span></a></p>';
+    $article = Article::factory()->create(['content' => $overlay]);
+
+    // Сайту класс нужен на своей странице, а в панели он превратил бы ссылку в невидимую накладку.
+    expect(RichText::make('content')->sanitize($overlay))->toContain('class="fixed inset-0 z-50 opacity-0"');
+
+    $this->get(route('fastleo.resources.show', ['articles', $article->id]))
+        ->assertOk()
+        ->assertSee('evil.example/login', false)
+        ->assertSee('<span>.</span>', false)
+        ->assertDontSee('opacity-0">.</span>', false);
+});
+
+it('shows the record page through the sanitize() of a field that overrides it', function (): void {
+    $field = new class('content') extends RichText
+    {
+        public function sanitize(?string $html): ?string
+        {
+            return $html === null ? null : str_replace('<b>', '', $html);
+        }
+    };
+
+    expect((string) $field->display(new Article(['content' => '<p><b>Текст</b></p>'])))->toContain('<p>Текст</p>')->not->toContain('<b>');
+});
+
 it('shows the beginning of the text without tags in the list', function (): void {
     $field = RichText::make('content');
     $article = new Article(['content' => '<h2>Цены &amp; акции</h2><p>'.str_repeat('слово ', 40).'</p>']);

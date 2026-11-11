@@ -1,0 +1,3 @@
+@foreach (\{{ appNamespace }}\Models\Page::menu() as $item)
+    <a href="{{ $item['url'] }}">{{ $item['title'] }}</a>
+@endforeach

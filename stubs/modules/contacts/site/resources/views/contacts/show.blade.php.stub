@@ -1,0 +1,22 @@
+@extends('layouts.site')
+
+@section('seo')
+    <x-fastleo::seo title="Контакты" />
+@endsection
+
+@section('content')
+    <h1>Контакты</h1>
+
+    @if ($phone = fastleo_setting('contacts.phone'))
+        <p>Телефон: <a href="tel:{{ preg_replace('/[^+\d]/', '', (string) $phone) }}">{{ $phone }}</a></p>
+    @endif
+    @if ($email = fastleo_setting('contacts.email'))
+        <p>Почта: <a href="mailto:{{ $email }}">{{ $email }}</a></p>
+    @endif
+    @if ($address = fastleo_setting('contacts.address'))
+        <p>Адрес: {{ $address }}</p>
+    @endif
+    @if ($hours = fastleo_setting('contacts.working_hours'))
+        <p>Часы работы:<br>{!! nl2br(e($hours)) !!}</p>
+    @endif
+@endsection

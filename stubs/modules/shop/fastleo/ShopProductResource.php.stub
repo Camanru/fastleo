@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\ShopProduct;
+use {{ appNamespace }}\Models\ShopProduct;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Gallery;
 use Fastleo\Fields\Image;
@@ -19,7 +19,7 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Товары»: цена, остаток (необязательный), фото, характеристики и описание. Порядок на сайте — перетаскиванием.
- * Показ на сайте — ваши маршруты и шаблоны: `ShopProduct::query()->published()->inStock()->paginate(24)`.
+ * Показ на сайте — `ShopController` и шаблоны `resources/views/shop` публичной части модуля (если вы поставили её при установке): `ShopProduct::query()->available()->inStock()->paginate(24)`.
  */
 final class ShopProductResource extends Resource
 {

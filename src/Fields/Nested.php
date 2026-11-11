@@ -506,4 +506,23 @@ abstract class Nested extends Field
     {
         return false;
     }
+
+    /**
+     * Список блоков обрезается, а подполя каждого блока ограничиваются по своим пределам (см. `Field::limitInput()`).
+     */
+    #[Override]
+    public function limitInput(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $fields = $this->blockFields(null);
+
+        if ($this->isSingle()) {
+            return self::limitItem($fields, $value);
+        }
+
+        return array_map(fn (mixed $block): mixed => is_array($block) ? self::limitItem($fields, $block) : $block, $this->sliceList($value));
+    }
 }

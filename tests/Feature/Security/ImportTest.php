@@ -112,3 +112,11 @@ it('cleans the HTML of a RichText field like the form does', function (): void {
     expect($body)->toContain('Текст')->toContain('ссылка')
         ->not->toContain('script')->not->toContain('onclick')->not->toContain('javascript:');
 });
+
+it('names the file of skipped rows after the uploaded file so that it cannot be found by the import number', function (): void {
+    $import = new Import(['path' => 'fastleo/imports/9b1c2d3e-aaaa-bbbb-cccc-0123456789ab.csv']);
+    $import->id = 7;
+
+    expect($import->errorsPath())->toBe('fastleo/imports/9b1c2d3e-aaaa-bbbb-cccc-0123456789ab-errors.csv')
+        ->and($import->files())->toContain('fastleo/imports/7-errors.csv', 'fastleo/imports/7-errors.xlsx');
+});

@@ -134,7 +134,9 @@ final class SeoTags
     }
 
     /**
-     * Canonical: заданный адрес или текущий путь запроса на `APP_URL` без параметров.
+     * Canonical: заданный адрес или текущий путь запроса на `APP_URL` без параметров. Маршрут сопоставляется с раскодированным
+     * путём (`/shop%2Fphone` открывает `/shop/phone`), поэтому путь раскодируется и снова кодируется по сегментам: адрес-двойник
+     * указывает на настоящий адрес страницы, а не на самого себя.
      */
     private static function canonical(?string $canonical): string
     {
@@ -144,6 +146,8 @@ final class SeoTags
             return self::absolute($canonical);
         }
 
-        return self::absolute(request()->path() === '/' ? '' : request()->path());
+        $path = trim(request()->decodedPath(), '/');
+
+        return self::absolute(implode('/', array_map(rawurlencode(...), explode('/', $path))));
     }
 }

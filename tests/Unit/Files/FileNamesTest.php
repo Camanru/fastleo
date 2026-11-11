@@ -54,8 +54,10 @@ it('never allows executable formats and treats only known formats as pictures', 
         ->and(FileTypes::images())->toBe(['jpg', 'png']);
 });
 
+const FORBIDDEN_EXTRA = ['bat', 'cmd', 'com', 'msi', 'scr', 'vbs', 'vbe', 'ps1', 'lnk', 'dll', 'mathml', 'xsd', 'wsdl', 'xul', 'dtd', 'gpx', 'mht', 'mhtml', 'config', 'asa', 'cer', 'ashx', 'asmx', 'cshtml', 'jspx', 'cfm', 'stm'];
+
 it('refuses the rarer names of executable files that a server or a visitor machine runs', function (): void {
-    config(['fastleo.files.extensions' => ['pdf', 'php2', 'php6', 'phtm', 'shtm', 'hta', 'jar', 'wasm']]);
+    config(['fastleo.files.extensions' => ['pdf', 'php2', 'php6', 'phtm', 'shtm', 'hta', 'jar', 'wasm', ...FORBIDDEN_EXTRA]]);
 
     expect(FileTypes::allowed())->toBe(['pdf']);
 });

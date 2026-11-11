@@ -34,7 +34,7 @@ class RichText extends Field
     /** Высота редактора в пикселях. */
     protected int $height = 400;
 
-    /** Дополнение профиля чистки или null. */
+    /** @var (Closure(HtmlSanitizerConfig): HtmlSanitizerConfig)|null Дополнение профиля чистки или null. */
     protected ?Closure $sanitizeUsing = null;
 
     /**
@@ -165,11 +165,16 @@ class RichText extends Field
 
     /**
      * На просмотре — оформленный текст (чистится ещё раз: в базе мог оказаться HTML не из панели).
+     * Атрибут `class`, который сайт разрешил для своей вёрстки, в панели снимается: классы панели (`fixed inset-0 opacity-0`)
+     * превратили бы ссылку редактора в невидимую накладку на всю страницу просмотра.
      */
     #[Override]
     protected function format(mixed $value): string|Htmlable|null
     {
-        $html = is_string($value) ? $this->sanitize($value) : null;
+        // Сначала чистка поля (в том числе переопределённый `sanitize()`), затем тот же профиль без `class`.
+        $html = is_string($value)
+            ? HtmlSanitizer::clean($this->sanitize($value), fn (HtmlSanitizerConfig $config): HtmlSanitizerConfig => ($this->sanitizeUsing instanceof Closure ? ($this->sanitizeUsing)($config) : $config)->dropAttribute('class', '*'))
+            : null;
 
         return $html === null ? null : new HtmlString('<div class="fastleo-prose">'.$html.'</div>');
     }

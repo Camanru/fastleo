@@ -448,4 +448,38 @@ class Blocks extends Field
     {
         return false;
     }
+
+    /**
+     * Сколько элементов принимает список (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): ?int
+    {
+        return $this->maxBlocks;
+    }
+
+    /**
+     * Список блоков обрезается, а поля каждого блока (под ключом его типа) ограничиваются по своим пределам (см. `Field::limitInput()`).
+     */
+    #[Override]
+    public function limitInput(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        return array_map(function (mixed $block): mixed {
+            if (! is_array($block)) {
+                return $block;
+            }
+
+            $type = is_string($block['type'] ?? null) && isset($this->types[$block['type']]) ? $block['type'] : null;
+
+            foreach ($block as $name => $data) {
+                $block[$name] = $type !== null && $name === $type && is_array($data) ? self::limitItem($this->typeFields($type), $data) : self::flat($data);
+            }
+
+            return $block;
+        }, $this->sliceList($value));
+    }
 }

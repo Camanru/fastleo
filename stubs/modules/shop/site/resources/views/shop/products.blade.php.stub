@@ -1,0 +1,31 @@
+@error('cart') <p role="alert">{{ $message }}</p> @enderror
+
+@forelse ($products as $product)
+    <article>
+        <a href="{{ route('site.shop.product', $product->slug) }}">
+            <x-fastleo::picture :src="$product->cover" :alt="$product->title" />
+            <h2>{{ $product->title }}</h2>
+        </a>
+        <p>{{ number_format((float) $product->price, 2, ',', ' ') }} ₽</p>
+        @if ($product->stock !== null && $product->stock < 1)
+            <p>Нет в наличии</p>
+        @else
+            <form method="POST" action="{{ route('site.shop.cart.add') }}">
+                @csrf
+                <input type="hidden" name="product_id" value="{{ $product->id }}">
+                <button type="submit">В корзину</button>
+            </form>
+        @endif
+    </article>
+@empty
+    <p>Товаров пока нет.</p>
+@endforelse
+
+<nav>
+    @if ($products->previousPageUrl())
+        <a href="{{ $products->previousPageUrl() }}" rel="prev">← Назад</a>
+    @endif
+    @if ($products->nextPageUrl())
+        <a href="{{ $products->nextPageUrl() }}" rel="next">Дальше →</a>
+    @endif
+</nav>

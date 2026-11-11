@@ -108,7 +108,16 @@ class ChatIds extends Tags
     #[Override]
     protected function typeRules(): array
     {
-        return ['array', 'max:'.($this->single ? 1 : 20)];
+        return ['array', 'max:'.$this->listLimit()];
+    }
+
+    /**
+     * Чатов не больше 20, у поля одного чата — один (см. `Field::listLimit()`).
+     */
+    #[Override]
+    public function listLimit(): int
+    {
+        return $this->single ? 1 : 20;
     }
 
     /**

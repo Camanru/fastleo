@@ -98,8 +98,21 @@ final readonly class LoginThrottle
      */
     public function unlock(string $userId): void
     {
-        $this->limiter->clear('fastleo-login-account:id:'.$userId);
+        $this->unlockPassword($userId);
         $this->limiter->clear('fastleo-login-account:2fa:'.$userId);
+    }
+
+    /**
+     * Снять только часовую блокировку ввода пароля (`id:N`), шаг кода 2FA остаётся под своим счётчиком: так делает сброс пароля
+     * по письму — доступ к почте не должен давать новые попытки подобрать код 2FA.
+     *
+     * ```php
+     * $throttle->unlockPassword('1');
+     * ```
+     */
+    public function unlockPassword(string $userId): void
+    {
+        $this->limiter->clear('fastleo-login-account:id:'.$userId);
     }
 
     /**

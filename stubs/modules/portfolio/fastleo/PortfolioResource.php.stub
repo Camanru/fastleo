@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\PortfolioItem;
+use {{ appNamespace }}\Models\PortfolioItem;
 use Fastleo\Fields\Date;
 use Fastleo\Fields\Gallery;
 use Fastleo\Fields\Image;
@@ -18,7 +18,7 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Портфолио»: работа с обложкой, галереей, описанием и категорией. Порядок на сайте — перетаскиванием в списке.
- * Показ на сайте — ваши маршруты и шаблоны: `PortfolioItem::query()->published()->paginate(12)`.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `PortfolioItem::query()->published()->paginate(12)`.
  */
 final class PortfolioResource extends Resource
 {

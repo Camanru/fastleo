@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Carbon\CarbonInterval;
+use Fastleo\Auth\LoginThrottle;
 use Fastleo\Auth\ResetPasswordNotification;
 use Fastleo\Fastleo;
 use Fastleo\Tests\Fixtures\Models\NoResetUser;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Sleep;
 use Workbench\App\Models\User;
 
@@ -127,6 +129,27 @@ it('resets the password with a valid token, rotates the remember token and does 
     $this->assertGuest(Fastleo::GUARD);
 
     login(['email' => 'anna@example.com', 'password' => 'new-secret-123'])->assertRedirect(route('fastleo.dashboard'));
+});
+
+it('lifts the hourly lock of the account when the password is reset by the link from the mail', function (): void {
+    $admin = admin(['email' => 'anna@example.com']);
+
+    foreach (range(1, LoginThrottle::PER_ACCOUNT_HOURLY) as $attempt) {
+        RateLimiter::hit('fastleo-login-account:id:'.$admin->id, 3600);
+        RateLimiter::hit('fastleo-login-account:2fa:'.$admin->id, 3600);
+    }
+
+    // Посетитель, знающий email, заполнил часовой счётчик: даже верный пароль не пускает.
+    login(['email' => 'anna@example.com', 'password' => 'password'])->assertSessionHasErrors('email');
+    $this->assertGuest(Fastleo::GUARD);
+
+    $this->post(route('fastleo.password.update'), ['token' => resetTokenFor($admin), 'email' => 'anna@example.com', 'password' => 'new-secret-123', 'password_confirmation' => 'new-secret-123'])
+        ->assertRedirect(route('fastleo.login'));
+
+    login(['email' => 'anna@example.com', 'password' => 'new-secret-123'])->assertRedirect(route('fastleo.dashboard'));
+
+    // Доступ к почте не даёт новых попыток подобрать код 2FA: его счётчик остаётся.
+    expect(RateLimiter::tooManyAttempts('fastleo-login-account:2fa:'.$admin->id, LoginThrottle::PER_ACCOUNT_HOURLY))->toBeTrue();
 });
 
 it('rejects a wrong, reused or foreign token with one generic message', function (): void {

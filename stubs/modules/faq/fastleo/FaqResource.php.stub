@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace {{ namespace }};
 
-use {{ namespace }}\Models\FaqItem;
+use {{ appNamespace }}\Models\FaqItem;
 use Fastleo\Fields\RichText;
 use Fastleo\Fields\Text;
 use Fastleo\Fields\Toggle;
@@ -12,7 +12,7 @@ use Fastleo\Resource;
 
 /**
  * Раздел «Вопросы и ответы»: вопрос, ответ, необязательная группа. Порядок на сайте — перетаскиванием в списке.
- * Показ на сайте — ваши маршруты и шаблоны: `FaqItem::query()->published()->get()->groupBy('category')`.
+ * Показ на сайте — публичная часть модуля (если вы поставили её при установке) или ваши маршруты и шаблоны: `FaqItem::query()->published()->get()->groupBy('category')`.
  */
 final class FaqResource extends Resource
 {

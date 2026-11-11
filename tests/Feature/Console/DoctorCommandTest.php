@@ -660,6 +660,27 @@ it('reports a cache that keeps nothing while leads are taken by API', function (
     expect(implode("\n", messages('site', 'error')))->not->toContain($message);
 });
 
+it('reports a cache that cannot hold the one-time form stamp of the shop checkout', function (): void {
+    config(['cache.stores.none' => ['driver' => 'null'], 'cache.default' => 'none']);
+
+    expect(implode("\n", messages('site', 'error')))->not->toContain('форма оформления заказа')
+        ->and(implode("\n", messages('site', 'warning')))->not->toContain('форма оформления заказа');
+
+    Route::get('/checkout', fn (): string => 'ok')->name('site.shop.checkout');
+    Route::getRoutes()->refreshNameLookups();
+
+    expect(implode("\n", messages('site', 'error')))->toContain('Кеш сайта ничего не хранит (драйвер null): форма оформления заказа');
+
+    config(['cache.default' => 'array']);
+
+    expect(implode("\n", messages('site', 'error')))->not->toContain('форма оформления заказа')
+        ->and(implode("\n", messages('site', 'warning')))->toContain('Кеш сайта живёт один запрос (драйвер array): метка формы оформления заказа');
+
+    config(['cache.default' => 'file']);
+
+    expect(implode("\n", messages('site', 'warning')))->not->toContain('форма оформления заказа');
+});
+
 it('warns that the queue hands an import to a second worker while the first still runs it', function (): void {
     $message = 'Очередь выдаёт задачу повторно через 90 с (retry_after), а импорт из файла может идти до 3600 с';
 

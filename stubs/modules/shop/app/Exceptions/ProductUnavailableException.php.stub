@@ -1,0 +1,21 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Exceptions;
+
+use InvalidArgumentException;
+
+/**
+ * Товара нет, он скрыт или его категория скрыта: `ShopOrder::place()` не создаёт заказ. `$productId` — какой товар убрать из корзины.
+ */
+final class ProductUnavailableException extends InvalidArgumentException
+{
+    /**
+     * @param  int  $productId  id недоступного товара
+     */
+    public function __construct(public readonly int $productId)
+    {
+        parent::__construct("Товар {$productId} недоступен для заказа.");
+    }
+}
