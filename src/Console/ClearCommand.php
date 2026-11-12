@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Fastleo\Console;
 
 use Fastleo\Fastleo;
-use Fastleo\Support\SettingsStore;
+use Fastleo\Support\CacheCleaner;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
 use Symfony\Component\Console\Attribute\AsCommand;
 
 /**
@@ -31,10 +30,7 @@ final class ClearCommand extends Command
     {
         app()->setLocale(Fastleo::LOCALE);
 
-        File::delete(Fastleo::resources()->cachePath());
-        Fastleo::resources()->flush();
-
-        SettingsStore::forgetCached();
+        CacheCleaner::forgetResources();
 
         $this->components->info(__('fastleo::console.clear_done'));
 

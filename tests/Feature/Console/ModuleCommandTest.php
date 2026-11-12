@@ -230,7 +230,84 @@ it('warns that the home page of the pages module will not open while the site ke
 
     $installer->install([$home]);
 
-    expect($installer->warnings)->toContain('У сайта свой маршрут для «/»: главная страница модуля «Страницы» не откроется, пока вы его не уберёте.');
+    expect($installer->warnings)->toContain('У сайта свой маршрут для «/»: главная страница («Магазин») не откроется, пока вы его не уберёте.');
+});
+
+/**
+ * Модуль с маршрутом на «/»: как лендинг, он занимает главную собственным маршрутом.
+ */
+function homeModule(string $sandbox, string $name, string $label, bool $fallback = false): Module
+{
+    $directory = $sandbox.'/stub-'.$name;
+    File::ensureDirectoryExists($directory.'/site/routes');
+    File::put($directory.'/site/routes/web.php.stub', $fallback
+        ? "\\Illuminate\\Support\\Facades\\Route::fallback(fn () => 'страница');\n"
+        : "\\Illuminate\\Support\\Facades\\Route::get('/', fn () => 'лендинг')->name('site.landing.show');\n");
+
+    return new Module($name, $label, 'Тест', $directory, takesFallback: $fallback, takesHome: true);
+}
+
+it('warns that the home page of one module will not open when two modules take the home page in one run', function (): void {
+    app()->setLocale('ru');
+    File::ensureDirectoryExists($this->sandbox.'/routes');
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\nRoute::get('/', function () {\n    return view('welcome');\n});\n");
+    $installer = new ModuleInstaller();
+
+    $installer->install([homeModule($this->sandbox, 'pages', 'Страницы', fallback: true), homeModule($this->sandbox, 'landing', 'Лендинг')]);
+
+    expect($installer->warnings)->toBe(['За «/» отвечают сразу несколько модулей: маршрут «Лендинг» занимает «/» первым, поэтому главная страница модулей «Страницы» не откроется, пока у модуля «Лендинг» есть своя страница на «/» (у лендинга — лендинг с адресом «/»). Остальные адреса (/about и другие) у них работают. Оставьте один модуль или перенесите маршрут «/» вручную.'])
+        ->and($installer->notes)->toContain('routes/web.php: убран пример главной страницы Laravel (welcome) — главную теперь показывает модуль «Лендинг»');
+});
+
+it('warns about two owners of the home page when the pages module is already in the routes of the site', function (): void {
+    app()->setLocale('ru');
+    $pages = Modules::find('pages');
+    File::ensureDirectoryExists($this->sandbox.'/routes');
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\n".trim(strtr(File::get($pages->directory.'/site/routes/web.php.stub'), ['{{ appNamespace }}' => 'App']))."\n");
+    $installer = new ModuleInstaller();
+
+    $installer->install([homeModule($this->sandbox, 'landing', 'Лендинг')]);
+
+    expect($installer->warnings)->toHaveCount(1)
+        ->and($installer->warnings[0])->toContain('маршрут «Лендинг» занимает «/» первым')
+        ->and($installer->warnings[0])->toContain('«Страницы» не откроется');
+});
+
+it('warns about two owners of the home page when the landing is already in the routes of the site and the pages come second', function (): void {
+    app()->setLocale('ru');
+    File::ensureDirectoryExists($this->sandbox.'/routes');
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\n".trim(strtr(File::get(Modules::find('landing')->directory.'/site/routes/web.php.stub'), ['{{ appNamespace }}' => 'App']))."\n");
+    $installer = new ModuleInstaller();
+
+    $installer->install([homeModule($this->sandbox, 'pages', 'Страницы', fallback: true)]);
+
+    expect($installer->warnings)->toHaveCount(1)
+        ->and($installer->warnings[0])->toContain('маршрут «Лендинг» занимает «/» первым')
+        ->and($installer->warnings[0])->toContain('«Страницы» не откроется');
+});
+
+it('says that no home page of the modules will open when the site has its own route for the root, whatever the number of the modules', function (): void {
+    app()->setLocale('ru');
+    Route::view('/', 'welcome');
+    $installer = new ModuleInstaller();
+
+    $installer->install([homeModule($this->sandbox, 'pages', 'Страницы', fallback: true), homeModule($this->sandbox, 'landing', 'Лендинг')]);
+
+    expect($installer->warnings)->toBe(['У сайта свой маршрут для «/»: главная страница («Страницы», «Лендинг») не откроется, пока вы его не уберёте.']);
+});
+
+it('says nothing about the home page when only one module owns it, or when a module without a home page is added', function (): void {
+    app()->setLocale('ru');
+    $installer = new ModuleInstaller();
+
+    $installer->install([homeModule($this->sandbox, 'pages', 'Страницы', fallback: true)]);
+
+    expect($installer->warnings)->toBe([]);
+
+    $installer = new ModuleInstaller();
+    $installer->install([routedModule($this->sandbox)]);
+
+    expect($installer->warnings)->toBe([]);
 });
 
 it('shows the paths of the written files without the base path even when it repeats inside the path', function (): void {
@@ -342,7 +419,7 @@ it('writes the public part with the shared layout and connects the routes', func
         ->and($written)->not->toContain('routes/web.php')
         ->and(File::get($this->sandbox.'/resources/views/layouts/site.blade.php'))->toContain("@yield('content')")
         ->and(siteRoutesOf($this))->toContain("\\Illuminate\\Support\\Facades\\Route::post('/shop'")->not->toContain('fastleo')
-        ->and($installer->notes)->toBe(['routes/web.php: в конец дописаны маршруты модулей: shop (блок «Страниц» остаётся последним среди маршрутов модулей). Комментариев в файл не добавляется: модуль убирают, удалив его маршруты (имена site.<модуль>.*, их видно в php artisan route:list --name=site)'])
+        ->and($installer->notes)->toBe(['routes/web.php: в конец дописаны маршруты модулей: shop (блоки «Страниц» и «Лендинга», подходящие под любой адрес, остаются в конце файла). Комментариев в файл не добавляется: модуль убирают, удалив его маршруты (имена site.<модуль>.*, их видно в php artisan route:list --name=site)'])
         ->and($installer->siteSkipped)->toBe([])
         ->and($installer->warnings)->toBe([]);
 });
@@ -511,7 +588,7 @@ it('replaces the untouched welcome route when the module takes the home page', f
     $installer->install([new Module('shop', 'Магазин', 'Тест', $directory, takesHome: true)]);
 
     expect(File::get($this->sandbox.'/routes/web.php'))->not->toContain("view('welcome')")
-        ->and($installer->notes)->toContain('routes/web.php: убран пример главной страницы Laravel (welcome) — главную теперь показывает модуль «Страницы»');
+        ->and($installer->notes)->toContain('routes/web.php: убран пример главной страницы Laravel (welcome) — главную теперь показывает модуль «Магазин»');
 });
 
 it('keeps the untouched welcome route when the module does not take the home page', function (): void {
@@ -593,6 +670,16 @@ it('warns that a route of the site with two parameters swallows the pages of the
 
     expect($installer->warnings)->toContain('Маршрут сайта /{category}/{slug} перекроет адрес /news/{slug} модуля news: маршруты модулей дописываются в конец routes/web.php. Сузьте свой маршрут (->where(…)) или перенесите его ниже маршрутов модуля.')
         ->and(implode("\n", $installer->warnings))->not->toContain('модуля reviews');
+});
+
+it('warns about a route of the site that takes letters only: the address with a parameter is tried with a digit and with a letter', function (): void {
+    app()->setLocale('ru');
+    Route::get('/{category}/{slug}', fn (): string => 'свой маршрут')->where(['category' => '[a-z]+', 'slug' => '[a-z]+']);
+    $installer = new ModuleInstaller();
+
+    $installer->install([Modules::find('news')]);
+
+    expect($installer->warnings)->toContain('Маршрут сайта /{category}/{slug} перекроет адрес /news/{slug} модуля news: маршруты модулей дописываются в конец routes/web.php. Сузьте свой маршрут (->where(…)) или перенесите его ниже маршрутов модуля.');
 });
 
 it('reports the test of the public part as a conflict when Pest is installed', function (): void {

@@ -1,0 +1,28 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <div class="landing-plans">
+        @foreach (is_array($plans ?? null) ? $plans : [] as $plan)
+            @continue(! is_array($plan) || $s($plan['name'] ?? null) === '')
+            @php
+                $features = array_slice(array_values(array_filter(array_map('trim', preg_split('/\R/u', $s($plan['features'] ?? null)) ?: []), fn (string $line): bool => $line !== '')), 0, 12);
+            @endphp
+            <article class="landing-plan{{ ! empty($plan['featured']) ? ' landing-plan--featured' : '' }}">
+                <h3>{{ $s($plan['name']) }}</h3>
+                @if ($s($plan['price'] ?? null) !== '')
+                    <p class="landing-price">{{ $s($plan['price']) }}</p>
+                @endif
+                @if ($features !== [])
+                    <ul>
+                        @foreach ($features as $feature)
+                            <li>{{ $feature }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+                @include('landing.partials.button', ['label' => $plan['btn_label'] ?? '', 'url' => $plan['btn_url'] ?? '', 'topic' => $s($plan['btn_topic'] ?? null) !== '' ? $plan['btn_topic'] : 'Тариф «'.$s($plan['name']).'»', 'class' => 'landing-btn'])
+            </article>
+        @endforeach
+    </div>
+@include('landing.partials.close')

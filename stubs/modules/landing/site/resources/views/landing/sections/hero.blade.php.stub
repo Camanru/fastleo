@@ -1,0 +1,41 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+    $position = in_array($image_position ?? null, ['right', 'background', 'below'], true) ? $image_position : 'right';
+    $bulletList = array_filter(is_array($bullets ?? null) ? $bullets : [], fn (mixed $bullet): bool => is_array($bullet) && $s($bullet['text'] ?? null) !== '');
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    <div class="landing-hero landing-hero--{{ $position }}">
+        <div class="landing-hero__text">
+            @if ($s($eyebrow ?? null) !== '')
+                <p class="landing-eyebrow">{{ $s($eyebrow ?? null) }}</p>
+            @endif
+            <h1>{{ $s($title ?? null) }}</h1>
+            @if ($s($subtitle ?? null) !== '')
+                <p class="landing-lead">{!! nl2br(e($s($subtitle ?? null))) !!}</p>
+            @endif
+            @if ($s($accent ?? null) !== '')
+                <p class="landing-accent">{{ $s($accent ?? null) }}</p>
+            @endif
+            @if ($bulletList !== [])
+                <ul class="landing-bullets">
+                    @foreach ($bulletList as $bullet)
+                        <li>{{ $s($bullet['text']) }}</li>
+                    @endforeach
+                </ul>
+            @endif
+            <p class="landing-buttons">
+                @include('landing.partials.button', ['label' => $primary_label ?? '', 'url' => $primary_url ?? '', 'topic' => $primary_topic ?? '', 'class' => 'landing-btn landing-btn--primary'])
+                @include('landing.partials.button', ['label' => $second_label ?? '', 'url' => $second_url ?? '', 'topic' => $second_topic ?? '', 'class' => 'landing-btn landing-btn--second'])
+            </p>
+            @if ($s($note ?? null) !== '')
+                <p class="landing-note">{{ $s($note ?? null) }}</p>
+            @endif
+        </div>
+        @if ($s($image ?? null) !== '')
+            <div class="landing-hero__image">
+                {{-- Картинка украшает заголовок: пустой alt, чтобы заголовок не озвучивали дважды. --}}
+                <x-fastleo::picture :src="$image" alt="" loading="eager" />
+            </div>
+        @endif
+    </div>
+@include('landing.partials.close')

@@ -1,0 +1,4 @@
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    @include('landing.partials.button', ['label' => $primary_label ?? '', 'url' => $primary_url ?? '', 'topic' => $primary_topic ?? '', 'class' => 'landing-btn landing-btn--primary'])
+@include('landing.partials.close')

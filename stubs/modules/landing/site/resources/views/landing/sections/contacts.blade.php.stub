@@ -1,0 +1,35 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+    $phoneDigits = (string) preg_replace('/\D/', '', $s($phone ?? null));
+    $emailAddress = $s($email ?? null);
+    $emailSafe = filter_var($emailAddress, FILTER_VALIDATE_EMAIL) !== false && preg_match('/[?&=#%]/', $emailAddress) !== 1;
+    $lat = is_numeric($latitude ?? null) ? (float) $latitude : null;
+    $lng = is_numeric($longitude ?? null) ? (float) $longitude : null;
+    $mapUrl = null;
+
+    if ($lat !== null && $lng !== null && abs($lat) <= 90 && abs($lng) <= 180) {
+        $mapUrl = 'https://yandex.ru/maps/?pt='.rtrim(rtrim(sprintf('%.7F', $lng), '0'), '.').','.rtrim(rtrim(sprintf('%.7F', $lat), '0'), '.').'&z=16&l=map';
+    } elseif ($s($address ?? null) !== '') {
+        $mapUrl = 'https://yandex.ru/maps/?text='.rawurlencode($s($address));
+    }
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <address class="landing-contacts">
+        @if (strlen($phoneDigits) >= 5)
+            <p><a href="tel:{{ str_starts_with($s($phone), '+') ? '+' : '' }}{{ $phoneDigits }}">{{ $s($phone) }}</a></p>
+        @endif
+        @if ($emailSafe)
+            <p><a href="mailto:{{ $emailAddress }}">{{ $emailAddress }}</a></p>
+        @endif
+        @if ($s($address ?? null) !== '')
+            <p>{{ $s($address) }}</p>
+        @endif
+        @if ($s($hours ?? null) !== '')
+            <p>{!! nl2br(e($s($hours))) !!}</p>
+        @endif
+        @if ($mapUrl !== null)
+            <p><a href="{{ $mapUrl }}" rel="noopener noreferrer nofollow">Показать на карте</a></p>
+        @endif
+    </address>
+@include('landing.partials.close')

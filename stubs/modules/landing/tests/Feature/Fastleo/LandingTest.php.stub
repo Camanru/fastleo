@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\LandingPage;
+use {{ appNamespace }}\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('finds a published landing by its address', function (): void {
+    LandingPage::factory()->create(['title' => 'Закрытый', 'url' => '/closed', 'is_published' => false]);
+    $home = LandingPage::factory()->create(['title' => 'Главная']);
+    $promo = LandingPage::factory()->create(['title' => 'Акция', 'url' => '/promo']);
+
+    expect(LandingPage::query()->published()->orderBy('id')->pluck('title')->all())->toBe(['Главная', 'Акция'])
+        ->and(LandingPage::findByUrl('/')?->is($home))->toBeTrue()
+        ->and(LandingPage::findByUrl('/promo')?->is($promo))->toBeTrue()
+        ->and(LandingPage::findByUrl('/closed'))->toBeNull()
+        ->and(LandingPage::findByUrl('/other'))->toBeNull();
+});
+
+it('leaves out hidden blocks, a second header and a repeating anchor, and builds the menu from the anchors', function (): void {
+    $landing = LandingPage::factory()->create(['content' => [
+        ['type' => 'header', 'data' => ['brand' => 'Первая']],
+        ['type' => 'header', 'data' => ['brand' => 'Вторая']],
+        ['type' => 'text', 'data' => ['anchor' => 'about', 'menu_title' => 'О нас']],
+        ['type' => 'text', 'data' => ['anchor' => 'about', 'menu_title' => 'Повтор']],
+        ['type' => 'text', 'data' => ['anchor' => 'secret', 'menu_title' => 'Скрытый', 'is_hidden' => true]],
+        ['type' => 'form', 'data' => []],
+    ]]);
+
+    expect(collect($landing->visibleBlocks())->pluck('type')->all())->toBe(['header', 'text', 'text', 'form'])
+        ->and($landing->menu())->toBe([['title' => 'О нас', 'anchor' => 'about']])
+        ->and($landing->formAnchor())->toBe('form');
+});
+
+it('lets an administrator open the landing section and create landings with their own addresses', function (): void {
+    $admin = User::factory()->create();
+    $admin->forceFill(['fastleo_admin' => true])->save();
+    $this->actingAs($admin, 'fastleo');
+
+    $this->get(route('fastleo.resources.index', 'landing'))->assertOk();
+    $this->post(route('fastleo.resources.store', 'landing'), ['title' => 'Студия', 'url' => '/', 'is_published' => '1'])->assertRedirect();
+    $this->post(route('fastleo.resources.store', 'landing'), ['title' => 'Акция', 'url' => '/promo', 'is_published' => '1'])->assertRedirect();
+    $this->post(route('fastleo.resources.store', 'landing'), ['title' => 'Повтор', 'url' => '/promo', 'is_published' => '1'])->assertSessionHasErrors('url');
+    $this->post(route('fastleo.resources.store', 'landing'), ['title' => 'Не адрес', 'url' => 'promo/two', 'is_published' => '1'])->assertSessionHasErrors('url');
+
+    expect(LandingPage::query()->orderBy('id')->pluck('url')->all())->toBe(['/', '/promo']);
+});

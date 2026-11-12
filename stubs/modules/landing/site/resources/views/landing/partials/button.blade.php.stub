@@ -1,0 +1,29 @@
+{{--
+    Кнопка-ссылка: @include('landing.partials.button', ['label' => …, 'url' => …, 'topic' => …, 'class' => 'landing-btn']).
+    Без ссылки ведёт к форме лендинга (с темой заявки), со ссылкой — на якорь (#pricing), адрес сайта (/contacts) или http(s).
+    Ссылки из базы: javascript: и //чужой-сайт не проходят; без подписи кнопки нет.
+--}}
+@php
+    $buttonLabel = is_string($label ?? null) ? trim($label) : '';
+    $buttonUrl = is_string($url ?? null) ? trim($url) : '';
+    $buttonTopic = is_string($topic ?? null) ? trim($topic) : '';
+    $formAnchor = $landingContext['form'] ?? null;
+    $root = request()->path() === '/' ? rtrim(url('/'), '/').'/' : url(request()->path());
+    $query = $buttonTopic !== '' ? '?topic='.rawurlencode($buttonTopic) : '';
+    $href = null;
+    $external = false;
+
+    if ($buttonLabel !== '') {
+        if ($buttonUrl === '' && is_string($formAnchor)) {
+            $href = $root.$query.'#'.$formAnchor;
+        } elseif (preg_match('~^#[a-z][a-z0-9-]*$~D', $buttonUrl) === 1) {
+            $href = $query === '' ? $buttonUrl : $root.$query.$buttonUrl;
+        } elseif (preg_match('~^(/(?![/\\\\\x00-\x20])|(?i:https?)://[^/\\\\\x00-\x20?#])~', $buttonUrl) === 1) {
+            $href = $buttonUrl;
+            $external = str_starts_with(strtolower($buttonUrl), 'http');
+        }
+    }
+@endphp
+@if ($href !== null)
+    <a href="{{ $href }}" class="{{ $class ?? 'landing-btn' }}"@if ($external) rel="noopener noreferrer nofollow"@endif>{{ $buttonLabel }}</a>
+@endif

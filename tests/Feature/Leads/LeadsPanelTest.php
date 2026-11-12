@@ -13,6 +13,8 @@ use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\MessageBag;
+use Illuminate\Support\ViewErrorBag;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -180,6 +182,58 @@ describe('the form for the site', function (): void {
             ->toContain('Заказать звонок')
             ->toContain('Ваше имя')
             ->toContain('class="lead-form"');
+    });
+
+    it('gives a form with an anchor its own id, error bag and hidden fields', function (): void {
+        $html = pageWith('<x-fastleo::lead-form anchor="hero" form-name="Первый экран" class="lead-form" />');
+
+        expect($html)->toContain('id="form-hero"')
+            ->toContain('class="lead-form"')
+            ->toContain('name="form_anchor" value="hero"')
+            ->toContain('name="form" value="Первый экран"');
+    });
+
+    it('does not draw a broken anchor or an empty name of the form', function (): void {
+        $html = pageWith('<x-fastleo::lead-form anchor="Bad Anchor" form-name="" />');
+
+        expect($html)->not->toContain('form_anchor')
+            ->not->toContain('id="form-')
+            ->not->toContain('name="form"');
+    });
+
+    it('shows the errors and the typed values only in the form that was sent', function (): void {
+        $this->withSession([
+            'errors' => new ViewErrorBag()->put('lead_final', new MessageBag(['phone' => ['Проверьте телефон.']])),
+            '_old_input' => ['form_anchor' => 'final', 'name' => 'Иван', 'phone' => 'abc'],
+        ]);
+
+        $html = pageWith('<x-fastleo::lead-form anchor="hero" /><x-fastleo::lead-form anchor="final" /><x-fastleo::lead-form />');
+
+        expect(substr_count($html, 'Проверьте телефон.'))->toBe(1)
+            ->and(substr_count($html, 'value="Иван"'))->toBe(1)
+            ->and(strpos($html, 'Проверьте телефон.'))->toBeGreaterThan(strpos($html, 'id="form-final"'));
+    });
+
+    it('shows the error of the form name next to the form that was sent', function (): void {
+        $this->withSession([
+            'errors' => new ViewErrorBag()->put('lead_final', new MessageBag(['form' => ['Название формы не подошло.']])),
+            '_old_input' => ['form_anchor' => 'final'],
+        ]);
+
+        $html = pageWith('<x-fastleo::lead-form anchor="hero" /><x-fastleo::lead-form anchor="final" />');
+
+        expect(substr_count($html, 'Название формы не подошло.'))->toBe(1)
+            ->and(strpos($html, 'Название формы не подошло.'))->toBeGreaterThan(strpos($html, 'id="form-final"'));
+    });
+
+    it('thanks only the form that was sent, and a form without an anchor only after a form without an anchor', function (): void {
+        $this->withSession(['lead_sent' => true, 'lead_sent_anchor' => 'final']);
+
+        $html = pageWith('<x-fastleo::lead-form anchor="hero" /><x-fastleo::lead-form anchor="final" /><x-fastleo::lead-form />');
+
+        expect(substr_count($html, 'Спасибо! Заявка отправлена.'))->toBe(1)
+            ->and(strpos($html, 'Спасибо! Заявка отправлена.'))->toBeGreaterThan(strpos($html, 'id="form-final"'))
+            ->and(strpos($html, 'Спасибо! Заявка отправлена.'))->toBeLessThan(strrpos($html, '<form'));
     });
 
     it('thanks the visitor once the lead has been sent', function (): void {

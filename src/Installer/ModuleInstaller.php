@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Installer;
 
+use Closure;
 use Fastleo\Fastleo;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RouteDefinition;
@@ -108,16 +109,32 @@ final class ModuleInstaller
                     $this->warnings[] = __('fastleo::console.module_site_web_unconnected');
                 }
 
-                $routes = new WebRoutes()->append($blocks, array_any($siteModules, fn (Module $module): bool => $module->takesHome), $this->catchAllBlocks());
+                $webRoutes = new WebRoutes();
+                $taker = array_find($siteModules, fn (Module $module): bool => $module->takesHome);
+                $routes = $webRoutes->append($blocks, $taker !== null, $this->catchAllBlocks());
                 $this->notes[] = __('fastleo::console.module_routes', ['modules' => implode(', ', $routes['appended'])]);
 
-                if ($routes['welcomeReplaced']) {
-                    $this->notes[] = __('fastleo::console.module_home');
+                if (array_any($siteModules, fn (Module $module): bool => $module->takesAnySegment)) {
+                    array_push($this->warnings, ...$this->anySegmentWarnings());
                 }
 
-                // Своя главная сайта (не пример Laravel) остаётся: «Главная» модуля её не заменит.
-                if (! $routes['welcomeReplaced'] && array_any($siteModules, fn (Module $module): bool => $module->takesHome) && $this->routeAt('/') instanceof RouteDefinition) {
-                    $this->warnings[] = __('fastleo::console.module_site_home_taken');
+                if ($taker !== null) {
+                    $owners = $this->homeOwners($siteModules, $webRoutes);
+                    $home = $this->homeOwner($owners) ?? $taker;
+                    $site = $this->routeAt('/');
+
+                    if ($routes['welcomeReplaced']) {
+                        $this->notes[] = __('fastleo::console.module_home', ['module' => $home->label]);
+                    }
+
+                    if (! $routes['welcomeReplaced'] && $site instanceof RouteDefinition && ! in_array($site->getName(), $this->routeNamesOf($owners), true)) {
+                        // Своя главная сайта (не пример Laravel) остаётся и стоит выше: главная ни одного модуля не откроется.
+                        $this->warnings[] = __('fastleo::console.module_site_home_taken', ['module' => implode('», «', array_map(fn (Module $module): string => $module->label, $owners !== [] ? $owners : [$taker]))]);
+                    } elseif (count($owners) > 1) {
+                        // Два модуля отвечают за «/»: открывается главная того, чей маршрут занимает «/» (лендинг), запасной маршрут «Страниц» до «/» не доходит.
+                        $others = array_map(fn (Module $module): string => $module->label, array_filter($owners, fn (Module $module): bool => $module !== $home));
+                        $this->warnings[] = __('fastleo::console.module_site_home_both', ['owner' => $home->label, 'others' => implode('», «', $others)]);
+                    }
                 }
             }
         } catch (Throwable $e) {
@@ -313,6 +330,9 @@ final class ModuleInstaller
     private function shadowWarnings(array $siteModules): array
     {
         $warnings = [];
+        $routes = new WebRoutes();
+        // Маршрут, подходящий под любой адрес из одного сегмента (лендинг), стоит в конце файла, ниже блоков, поставленных позже: он их не перекрывает.
+        $wide = $this->routeNamesOf(array_values(array_filter(Modules::all(), fn (Module $module): bool => $module->takesAnySegment && ($block = $this->routeBlock($module)) !== null && $routes->has($block))));
 
         foreach ($siteModules as $module) {
             $addresses = array_map(fn (string $address): array => str_contains($address, ' ') ? explode(' ', $address, 2) : ['GET', $address], $module->uris);
@@ -325,12 +345,51 @@ final class ModuleInstaller
             }
 
             foreach ($addresses as [$method, $uri]) {
-                $route = $this->routeAt('/'.preg_replace('~\{[^}]+\}~', '1', $uri), $method);
+                // Параметр подставляется цифрой и буквой: свой маршрут сайта с `where('slug', '[a-z-]+')` цифру не принимает.
+                $route = $this->routeAt('/'.preg_replace('~\{[^}]+\}~', '1', $uri), $method) ?? $this->routeAt('/'.preg_replace('~\{[^}]+\}~', 'a', $uri), $method);
 
-                if ($route instanceof RouteDefinition) {
+                if ($route instanceof RouteDefinition && ! in_array($route->getName(), $wide, true)) {
                     $warnings[] = __('fastleo::console.module_site_shadowed', ['route' => $route->uri(), 'uri' => $uri, 'module' => $module->name]);
                 }
             }
+        }
+
+        return $warnings;
+    }
+
+    /**
+     * Предупреждения для маршрута, который подходит под любой адрес из одного сегмента (лендинг): он стоит в конце
+     * `routes/web.php`, поэтому закроет адреса из файлов маршрутов, что грузятся после него, а запасной маршрут сайта
+     * выполняет без его middleware.
+     *
+     * @return list<string>
+     */
+    private function anySegmentWarnings(): array
+    {
+        $warnings = [];
+        $web = File::exists(base_path('routes/web.php')) ? File::get(base_path('routes/web.php')) : '';
+        // Файлы, подключённые из самого web.php (`require __DIR__.'/auth.php'`, стартовые наборы Laravel), лежат выше блока лендинга.
+        $files = array_filter(
+            array_map($this->relative(...), glob(base_path('routes/*.php')) ?: []),
+            fn (string $path): bool => ! in_array($path, ['routes/web.php', 'routes/console.php', 'routes/channels.php', 'routes/api.php'], true) && ! str_contains($web, basename($path)),
+        );
+        $bootstrap = base_path('bootstrap/app.php');
+
+        // Комментарий «// then: …» не считается: смотрим код без комментариев.
+        if (is_file($bootstrap) && preg_match('~\bthen\s*:~', WebRoutes::withoutComments(File::get($bootstrap))) === 1) {
+            $files[] = 'bootstrap/app.php (then:)';
+        }
+
+        if ($files !== []) {
+            $warnings[] = __('fastleo::console.module_site_other_routes', ['files' => implode(', ', $files)]);
+        }
+
+        $fallback = array_find(Route::getRoutes()->getRoutes(), fn (RouteDefinition $route): bool => $route->isFallback);
+        // Только объявленные на маршруте middleware: `gatherMiddleware()` создал бы контроллер сайта, а его конструктор может упасть (например, до migrate).
+        $middleware = array_values(array_diff(array_filter($fallback?->middleware() ?? [], is_string(...)), ['web']));
+
+        if ($middleware !== []) {
+            $warnings[] = __('fastleo::console.module_site_fallback_middleware', ['middleware' => implode('», «', $middleware)]);
         }
 
         return $warnings;
@@ -349,13 +408,60 @@ final class ModuleInstaller
     }
 
     /**
-     * Код блоков маршрутов, которые должны стоять в конце `routes/web.php` (запасной маршрут страниц).
+     * Модули, которые отвечают за «/»: берущие главную (`takesHome`) и уже записавшие свой блок маршрутов в `routes/web.php`
+     * (в этом запуске или раньше). Модули этого запуска стоят в списке вместо одноимённых из каталога.
+     *
+     * @param  list<Module>  $siteModules
+     * @return list<Module>
+     */
+    private function homeOwners(array $siteModules, WebRoutes $webRoutes): array
+    {
+        $candidates = [];
+
+        foreach ([...$siteModules, ...Modules::all()] as $module) {
+            $candidates[$module->name] ??= $module;
+        }
+
+        return array_values(array_filter($candidates, function (Module $module) use ($webRoutes): bool {
+            $block = $module->takesHome ? $this->routeBlock($module) : null;
+
+            return $block !== null && $webRoutes->has($block);
+        }));
+    }
+
+    /**
+     * Имена маршрутов блоков этих модулей (`site.landing.show`): по ним отличают маршрут модуля от своего маршрута сайта.
+     *
+     * @param  list<Module>  $modules
+     * @return list<string>
+     */
+    private function routeNamesOf(array $modules): array
+    {
+        return array_merge(...array_map(fn (Module $module): array => $this->routeNames((string) $this->routeBlock($module)), $modules));
+    }
+
+    /**
+     * Модуль, чья главная откроется по «/»: тот, что занимает «/» собственным маршрутом (без запасного), иначе первый.
+     *
+     * @param  list<Module>  $owners
+     */
+    private function homeOwner(array $owners): ?Module
+    {
+        return array_find($owners, fn (Module $module): bool => ! $module->takesFallback) ?? ($owners[0] ?? null);
+    }
+
+    /**
+     * Код блоков маршрутов, которые должны стоять в конце `routes/web.php`: запасной маршрут страниц и маршрут лендинга, который
+     * подходит под любой адрес из одного сегмента.
      *
      * @return list<string>
      */
     private function catchAllBlocks(): array
     {
-        return array_values(array_filter(array_map(fn (Module $module): ?string => $module->takesFallback ? $this->routeBlock($module) : null, Modules::all())));
+        $blocks = fn (Closure $take): array => array_filter(array_map(fn (Module $module): ?string => $take($module) ? $this->routeBlock($module) : null, Modules::all()));
+
+        // Сначала маршрут для любого одного сегмента, самым последним — запасной маршрут: он подходит под любой адрес.
+        return array_values([...$blocks(fn (Module $module): bool => $module->takesAnySegment), ...$blocks(fn (Module $module): bool => $module->takesFallback)]);
     }
 
     /**

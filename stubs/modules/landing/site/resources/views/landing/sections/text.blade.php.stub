@@ -1,0 +1,5 @@
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    {{-- RichText очищен от опасного HTML при сохранении в панели: единственное поле, которое выводится без экранирования. --}}
+    <div class="landing-prose">{!! is_string($body ?? null) ? $body : '' !!}</div>
+@include('landing.partials.close')

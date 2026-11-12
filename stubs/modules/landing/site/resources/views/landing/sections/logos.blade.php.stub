@@ -1,0 +1,10 @@
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <div class="landing-logos">
+        @foreach (is_array($logos ?? null) ? $logos : [] as $logo)
+            @if (is_string($logo) && $logo !== '')
+                <x-fastleo::picture :src="$logo" />
+            @endif
+        @endforeach
+    </div>
+@include('landing.partials.close')

@@ -1,0 +1,33 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Factories;
+
+use {{ appNamespace }}\Models\LandingPage;
+use Illuminate\Database\Eloquent\Factories\Factory;
+
+/**
+ * Фабрика лендинга сайта.
+ *
+ * @extends Factory<LandingPage>
+ */
+class LandingPageFactory extends Factory
+{
+    protected $model = LandingPage::class;
+
+    /**
+     * Опубликованный лендинг на главной («/») с одним блоком «Текст»; для второго лендинга задайте другой `url` (адрес уникален).
+     *
+     * @return array<string, mixed>
+     */
+    public function definition(): array
+    {
+        return [
+            'title' => fake()->unique()->sentence(3),
+            'url' => '/',
+            'content' => [['type' => 'text', 'data' => ['title' => fake()->sentence(3), 'body' => '<p>'.fake()->paragraph().'</p>']]],
+            'is_published' => true,
+        ];
+    }
+}

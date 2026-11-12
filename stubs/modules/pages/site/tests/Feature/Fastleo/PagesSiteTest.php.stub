@@ -7,12 +7,17 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-it('shows the home page at the root and the pages by their address', function (): void {
+it('shows the home page at the root', function (): void {
+    Page::factory()->create(['title' => 'Добро пожаловать', 'slug' => 'home', 'is_home' => true]);
+
+    $this->get('/')->assertOk()->assertSee('Добро пожаловать');
+});
+
+it('shows the pages by their address and keeps the home page off its own slug', function (): void {
     Page::factory()->create(['title' => 'Добро пожаловать', 'slug' => 'home', 'is_home' => true]);
     $about = Page::factory()->create(['title' => 'О компании', 'slug' => 'about']);
     Page::factory()->create(['title' => 'Команда', 'slug' => 'team', 'parent_id' => $about->id]);
 
-    $this->get('/')->assertOk()->assertSee('Добро пожаловать');
     $this->get('/about')->assertOk()->assertSee('О компании');
     $this->get('/about/team')->assertOk()->assertSee('Команда');
     $this->get('/home')->assertNotFound();

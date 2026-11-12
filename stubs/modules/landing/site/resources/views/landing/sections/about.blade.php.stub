@@ -1,0 +1,16 @@
+@php
+    $position = in_array($image_position ?? null, ['right', 'left'], true) ? $image_position : 'right';
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    <div class="landing-about landing-about--{{ $position }}">
+        <div class="landing-about__text">
+            @include('landing.partials.heading')
+            <div class="landing-prose">{!! is_string($body ?? null) ? $body : '' !!}</div>
+        </div>
+        @if (is_string($image ?? null) && $image !== '')
+            <div class="landing-about__image">
+                <x-fastleo::picture :src="$image" alt="" />
+            </div>
+        @endif
+    </div>
+@include('landing.partials.close')

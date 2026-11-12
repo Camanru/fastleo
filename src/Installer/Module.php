@@ -31,6 +31,7 @@ final readonly class Module
      * @param  bool  $takesFallback  публичная часть занимает запасной маршрут `Route::fallback`: если у сайта он уже есть, публичная часть не ставится
      * @param  bool  $takesHome  публичная часть сама отвечает за главную `/`: нетронутый маршрут `welcome` из нового Laravel заменяется
      * @param  string|null  $siteNote  что стоит знать о публичной части (печатается, только когда она записана)
+     * @param  bool  $takesAnySegment  маршрут публичной части подходит под любой адрес из одного сегмента (`/{landing?}`): блок остаётся в конце `routes/web.php`, а маршруты модулей, поставленных позже, вставляются выше него (иначе он перекрыл бы `/news`)
      */
     public function __construct(
         public string $name,
@@ -46,5 +47,6 @@ final readonly class Module
         public bool $takesFallback = false,
         public bool $takesHome = false,
         public ?string $siteNote = null,
+        public bool $takesAnySegment = false,
     ) {}
 }

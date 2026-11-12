@@ -1,0 +1,1 @@
+\Illuminate\Support\Facades\Route::get('/{landing?}', [\{{ appNamespace }}\Http\Controllers\LandingController::class, 'show'])->where('landing', '[a-z0-9]+(?:-[a-z0-9]+)*')->name('site.landing.show');

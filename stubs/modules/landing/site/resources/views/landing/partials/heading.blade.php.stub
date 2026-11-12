@@ -1,0 +1,19 @@
+{{-- Заголовок блока: надпись над ним, сам заголовок и пояснение (поля eyebrow, title, lead). --}}
+@php
+    $eyebrowText = is_string($eyebrow ?? null) ? trim($eyebrow) : '';
+    $titleText = is_string($title ?? null) ? trim($title) : '';
+    $leadText = is_string($lead ?? null) ? trim($lead) : '';
+@endphp
+@if ($eyebrowText !== '' || $titleText !== '' || $leadText !== '')
+    <div class="landing-heading">
+        @if ($eyebrowText !== '')
+            <p class="landing-eyebrow">{{ $eyebrowText }}</p>
+        @endif
+        @if ($titleText !== '')
+            <h2>{{ $titleText }}</h2>
+        @endif
+        @if ($leadText !== '')
+            <p class="landing-lead">{{ $leadText }}</p>
+        @endif
+    </div>
+@endif

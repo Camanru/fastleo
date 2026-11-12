@@ -1,0 +1,28 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    <div class="landing-highlight">
+        @if ($s($eyebrow ?? null) !== '')
+            <p class="landing-eyebrow">{{ $s($eyebrow ?? null) }}</p>
+        @endif
+        <p class="landing-highlight__value">{{ $s($value ?? null) }}</p>
+        @if ($s($title ?? null) !== '' || $s($muted ?? null) !== '')
+            <h2>{{ $s($title ?? null) }} <span class="landing-muted">{{ $s($muted ?? null) }}</span></h2>
+        @endif
+        @if ($s($note ?? null) !== '')
+            <p class="landing-note">{{ $s($note ?? null) }}</p>
+        @endif
+        <div class="landing-cards">
+            @foreach (is_array($rows ?? null) ? $rows : [] as $row)
+                @continue(! is_array($row) || $s($row['title'] ?? null) === '')
+                <article class="landing-card">
+                    <h3>{{ $s($row['title']) }}</h3>
+                    @if ($s($row['text'] ?? null) !== '')
+                        <p>{{ $s($row['text']) }}</p>
+                    @endif
+                </article>
+            @endforeach
+        </div>
+    </div>
+@include('landing.partials.close')

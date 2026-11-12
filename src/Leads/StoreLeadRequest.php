@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Fastleo\Leads;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Override;
 
 /**
  * Заявка с формы сайта (`POST /leads`): проверка полей и защита от ботов без внешних сервисов.
@@ -38,6 +41,7 @@ final class StoreLeadRequest extends FormRequest
             'phone' => ['required', 'string', 'max:50', self::PHONE],
             'email' => ['bail', 'nullable', 'string', 'max:255', 'email'],
             'message' => ['nullable', 'string', 'max:2000', self::TEXT],
+            'form' => ['nullable', 'string', 'max:500', self::TEXT],
             'leave_empty' => ['nullable', 'string', 'max:255'],
             'form_token' => ['nullable', 'string', 'max:1000'],
         ];
@@ -67,6 +71,56 @@ final class StoreLeadRequest extends FormRequest
         $seconds = now()->getTimestamp() - $token['shown_at'];
 
         return $seconds < self::MIN_SECONDS || $seconds > self::MAX_SECONDS || ! hash_equals($this->session()->getId(), $token['session']);
+    }
+
+    /**
+     * Якорь формы, с которой пришла заявка (`<x-fastleo::lead-form anchor="…" />`); нет или неверный — `null`.
+     */
+    public function anchor(): ?string
+    {
+        return Leads::anchor($this->input('form_anchor'));
+    }
+
+    /**
+     * Набор ошибок формы с якорем (`lead_{якорь}`): у каждой формы страницы свои ошибки; без якоря — набор по умолчанию.
+     */
+    public function bag(): string
+    {
+        $anchor = $this->anchor();
+
+        return $anchor === null ? 'default' : 'lead_'.$anchor;
+    }
+
+    /**
+     * Название формы или тема заявки из скрытого поля `form`: одна строка, до 100 знаков; пусто — `null`.
+     * Посетитель ошибок скрытого поля не видит, поэтому лишнее отрезается, а не отклоняется.
+     */
+    public function formName(): ?string
+    {
+        return Leads::formName($this->input('form'));
+    }
+
+    /**
+     * Ошибки проверки уходят в набор формы с якорем (`bag()`) и на страницу формы с фрагментом: ответ собирается здесь, а не обработчиком
+     * исключений Laravel, который берёт имя набора из поля запроса `_error_bag` — посетитель мог бы назвать его как угодно.
+     */
+    #[Override]
+    protected function failedValidation(Validator $validator): never
+    {
+        throw new HttpResponseException(redirect($this->getRedirectUrl())->withInput()->withErrors($validator->errors(), $this->bag()));
+    }
+
+    /**
+     * Адрес возврата при ошибке проверки: страница, с которой отправлена форма, и фрагмент `#form-{якорь}` — посетитель
+     * остаётся у своей формы, а не наверху длинной страницы.
+     */
+    #[Override]
+    protected function getRedirectUrl(): string
+    {
+        $url = parent::getRedirectUrl();
+        $anchor = $this->anchor();
+
+        return $anchor === null ? $url : $url.'#form-'.$anchor;
     }
 
     /**

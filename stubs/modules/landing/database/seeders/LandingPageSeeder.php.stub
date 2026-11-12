@@ -1,0 +1,91 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Database\Seeders;
+
+use {{ appNamespace }}\Models\LandingPage;
+use Illuminate\Database\Seeder;
+
+/**
+ * Пример лендинга вымышленной студии «Север» (php artisan db:seed --class='Database\Seeders\LandingPageSeeder').
+ */
+class LandingPageSeeder extends Seeder
+{
+    /**
+     * Создать пример на главной («/»), если лендинга с таким адресом ещё нет. Свой лендинг соберите в панели: раздел «Лендинг».
+     */
+    public function run(): void
+    {
+        if (LandingPage::query()->where('url', '/')->exists()) {
+            return;
+        }
+
+        LandingPage::query()->create([
+            'title' => 'Студия «Север»',
+            'url' => '/',
+            'is_published' => true,
+            'content' => [
+                ['type' => 'header', 'data' => ['brand' => 'Север', 'phone' => '+7 900 000-00-00', 'primary_label' => 'Заказать', 'tone' => 'light']],
+                ['type' => 'hero', 'data' => [
+                    'eyebrow' => 'Студия «Север»',
+                    'title' => 'Сайт, который приводит заявки.',
+                    'subtitle' => 'Делаем сайты и следим, чтобы они работали: быстро, без сбоев и по понятной цене.',
+                    'accent' => 'Первый макет — бесплатно.',
+                    'bullets' => [['text' => 'Запуск за 3 недели'], ['text' => 'Фиксированная цена'], ['text' => 'Поддержка после запуска']],
+                    'primary_label' => 'Обсудить проект',
+                    'primary_topic' => 'Новый сайт',
+                    'note' => 'Отвечаем в течение рабочего дня',
+                    'image_position' => 'right',
+                ]],
+                ['type' => 'benefits', 'data' => [
+                    'anchor' => 'benefits', 'menu_title' => 'Преимущества', 'tone' => 'muted',
+                    'title' => 'Почему с нами спокойно',
+                    'lead' => 'Три вещи, за которые нас выбирают.',
+                    'rows' => [
+                        ['icon' => 'zap', 'title' => 'Быстро', 'text' => 'Первый вариант вы увидите через неделю.', 'btn_label' => 'Хочу так же'],
+                        ['icon' => 'shield-check', 'title' => 'Надёжно', 'text' => 'Резервные копии и наблюдение за сайтом каждую ночь.'],
+                        ['icon' => 'wallet', 'title' => 'Понятно', 'text' => 'Цена фиксируется в договоре, без доплат по ходу работы.'],
+                    ],
+                    'outro' => 'И всё это — в одном договоре.',
+                ]],
+                ['type' => 'steps', 'data' => [
+                    'anchor' => 'steps', 'menu_title' => 'Как работаем',
+                    'title' => 'Как мы работаем',
+                    'rows' => [
+                        ['title' => 'Заявка', 'text' => 'Вы оставляете контакт.'],
+                        ['title' => 'Консультация', 'text' => 'Обсуждаем задачу и называем цену.'],
+                        ['title' => 'Работа', 'text' => 'Делаем и показываем результат по шагам.'],
+                    ],
+                    'primary_label' => 'Начать',
+                ]],
+                ['type' => 'pricing', 'data' => [
+                    'anchor' => 'pricing', 'menu_title' => 'Цены', 'tone' => 'muted',
+                    'title' => 'Тарифы',
+                    'plans' => [
+                        ['name' => 'Старт', 'price' => 'от 30 000 ₽', 'features' => "Сайт до 5 страниц\nФорма заявки", 'btn_label' => 'Выбрать'],
+                        ['name' => 'Бизнес', 'price' => 'от 80 000 ₽', 'features' => "Сайт до 15 страниц\nПанель управления\nПоддержка 3 месяца", 'featured' => true, 'btn_label' => 'Выбрать'],
+                    ],
+                ]],
+                ['type' => 'faq', 'data' => [
+                    'anchor' => 'faq', 'menu_title' => 'Вопросы',
+                    'title' => 'Частые вопросы',
+                    'rows' => [
+                        ['question' => 'Сколько занимает работа?', 'answer' => 'Обычно от двух до шести недель, зависит от объёма.'],
+                        ['question' => 'Можно менять сайт самому?', 'answer' => 'Да: вы получаете панель управления и короткую инструкцию.'],
+                    ],
+                ]],
+                ['type' => 'cta', 'data' => ['title' => 'Готовы обсудить?', 'lead' => 'Расскажите о задаче — предложим решение.', 'primary_label' => 'Оставить заявку', 'tone' => 'accent']],
+                ['type' => 'form', 'data' => [
+                    'anchor' => 'form', 'menu_title' => 'Заявка',
+                    'title' => 'Оставьте заявку',
+                    'text' => 'Перезвоним в течение рабочего дня.',
+                    'button' => 'Отправить заявку',
+                    'with_message' => true,
+                    'consent' => 'Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности.',
+                ]],
+                ['type' => 'footer', 'data' => ['copyright' => '© Студия «Север»', 'links' => [['title' => 'Цены', 'url' => '#pricing']]]],
+            ],
+        ]);
+    }
+}

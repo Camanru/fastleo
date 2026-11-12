@@ -1,0 +1,9 @@
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <div class="landing-video">
+        <x-fastleo::video :url="is_string($video ?? null) ? $video : null" :title="is_string($title ?? null) ? $title : ''" />
+        @if (is_string($caption ?? null) && trim($caption) !== '')
+            <p class="landing-note">{{ trim($caption) }}</p>
+        @endif
+    </div>
+@include('landing.partials.close')

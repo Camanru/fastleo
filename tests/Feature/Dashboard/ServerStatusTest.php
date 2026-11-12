@@ -11,10 +11,13 @@ use Fastleo\Support\ServerReport;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Illuminate\Queue\Failed\NullFailedJobProvider;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Symfony\Component\Console\Exception\CommandNotFoundException;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -414,6 +417,77 @@ describe('clearing the cache', function (): void {
         file_put_contents($this->sandbox.'/views/d.php', str_repeat('x', 40));
 
         expect(CacheCleaner::cachedSize())->toBe(40);
+    });
+
+    it('forgets the list of resources and the settings on its own, without the commands of the package', function (): void {
+        // Настройки лежат в кеше по умолчанию, который `cache:clear` тоже чистит: проверяем забывание отдельно от него.
+        Cache::forever('fastleo.settings', ['contacts' => '{"phone":"+7 000"}']);
+        file_put_contents(Fastleo::resources()->cachePath(), '<?php return [];');
+
+        CacheCleaner::forgetResources();
+
+        expect(file_exists(Fastleo::resources()->cachePath()))->toBeFalse()
+            ->and(Cache::has('fastleo.settings'))->toBeFalse();
+    });
+
+    it('clears the cache in a web request, where the commands of the package are not registered', function (): void {
+        $console = resolve(Kernel::class);
+        // Консоль, как в веб-запросе: команды Laravel работают, а `fastleo:*` нет; все вызовы записываются.
+        $web = new class($console) implements Kernel
+        {
+            /** @var list<string> */
+            public array $called = [];
+
+            public function __construct(private readonly Kernel $inner) {}
+
+            public function bootstrap(): void
+            {
+                $this->inner->bootstrap();
+            }
+
+            public function handle($input, $output = null): int
+            {
+                return $this->inner->handle($input, $output);
+            }
+
+            public function call($command, array $parameters = [], $outputBuffer = null): int
+            {
+                $this->called[] = $command;
+
+                return str_starts_with($command, 'fastleo:') ? throw new CommandNotFoundException($command) : $this->inner->call($command, $parameters, $outputBuffer);
+            }
+
+            public function queue($command, array $parameters = []): mixed
+            {
+                return $this->inner->queue($command, $parameters);
+            }
+
+            public function all(): array
+            {
+                return $this->inner->all();
+            }
+
+            public function output(): string
+            {
+                return $this->inner->output();
+            }
+
+            public function terminate($input, $status): void
+            {
+                $this->inner->terminate($input, $status);
+            }
+        };
+        app()->instance(Kernel::class, $web);
+        Artisan::clearResolvedInstance(Kernel::class);
+
+        Cache::forever('fastleo.settings', ['contacts' => '{"phone":"+7 000"}']);
+        file_put_contents(Fastleo::resources()->cachePath(), '<?php return [];');
+
+        CacheCleaner::clear();
+
+        expect($web->called)->toBe(['cache:clear', 'view:clear'])
+            ->and(file_exists(Fastleo::resources()->cachePath()))->toBeFalse()
+            ->and(Cache::has('fastleo.settings'))->toBeFalse();
     });
 
     it('clears the cache by POST and reports the freed size', function (): void {

@@ -1,0 +1,29 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <div class="landing-reviews">
+        @foreach (is_array($rows ?? null) ? $rows : [] as $row)
+            @continue(! is_array($row) || $s($row['text'] ?? null) === '')
+            @php
+                $stars = is_numeric($row['rating'] ?? null) ? max(0, min(5, (int) $row['rating'])) : 0;
+            @endphp
+            <figure class="landing-review">
+                @if ($stars > 0)
+                    <p class="landing-rating" aria-label="Оценка {{ $stars }} из 5">{{ str_repeat('★', $stars) }}{{ str_repeat('☆', 5 - $stars) }}</p>
+                @endif
+                <blockquote>{!! nl2br(e($s($row['text']))) !!}</blockquote>
+                <figcaption>
+                    @if ($s($row['photo'] ?? null) !== '')
+                        <x-fastleo::picture :src="$row['photo']" :alt="$s($row['author'] ?? null)" />
+                    @endif
+                    <strong>{{ $s($row['author'] ?? null) }}</strong>
+                    @if ($s($row['role'] ?? null) !== '')
+                        <span>{{ $s($row['role']) }}</span>
+                    @endif
+                </figcaption>
+            </figure>
+        @endforeach
+    </div>
+@include('landing.partials.close')

@@ -23,6 +23,7 @@
     <div
         x-data="fastleoBlocks({ min: @js($field->getMin() ?? 0), max: @js($field->getMax()), sortable: @js($writable), placeholder: @js($field->keyPlaceholder()) })"
         data-blocks="{{ $path }}"
+        @keydown.escape="if (menu) { $event.preventDefault(); $event.stopPropagation(); menu = false; anchor?.focus(); }"
         class="flex flex-col gap-3"
     >
         @if ($writable)
@@ -40,11 +41,11 @@
                     @include('fastleo::fields.blocks-block', ['key' => $field->keyPlaceholder(), 'type' => $type, 'item' => null])
                 </template>
             @endforeach
-            <div x-data="fastleoMenu" class="relative" @keydown.escape="if (menu) { $event.preventDefault(); $event.stopPropagation(); menu = false; }" @click.outside="menu = false" @scroll.window="place()" x-show="max === null || count < max">
-                <x-fastleo::button variant="dashed" icon="plus" x-ref="button" x-on:click="toggle()" x-bind:aria-expanded="menu" aria-haspopup="menu" data-block-add>
+            <div class="relative" @click.outside="if ($event.target.closest('[data-block-insert]')?.closest('[data-blocks]') !== $root) menu = false" @scroll.window="place()" @resize.window="place()" x-show="max === null || count < max">
+                <x-fastleo::button variant="dashed" icon="plus" x-ref="button" x-on:click="openMenu($el)" x-bind:aria-expanded="menu && anchor === $el" aria-haspopup="menu" data-block-add>
                     {{ __('fastleo::resources.blocks_add') }}
                 </x-fastleo::button>
-                <div x-show="menu" x-cloak role="menu" :style="style" class="fixed z-40 grid w-[min(28rem,calc(100vw-1rem))] grid-cols-3 gap-0.5 rounded-card border border-line bg-surface p-1.5 text-base shadow-pop sm:grid-cols-4">
+                <div x-show="menu" x-cloak x-ref="menu" role="menu" :style="style" class="fixed z-40 grid w-[min(28rem,calc(100vw-1rem))] grid-cols-3 gap-0.5 rounded-card border border-line bg-surface p-1.5 text-base shadow-pop sm:grid-cols-4">
                     @foreach ($field->getTypes() as $type => $definition)
                         <button type="button" role="menuitem" class="flex flex-col items-center gap-1.5 rounded-[8px] px-1 py-3 text-xs font-medium text-ink hover:bg-hover" x-on:click="menu = false; add(@js($type))" data-block-type="{{ $type }}">
                             <x-fastleo::icon :name="$definition->getIcon()" class="size-[18px] shrink-0 text-ink-2" />

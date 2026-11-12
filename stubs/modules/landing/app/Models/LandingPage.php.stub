@@ -1,0 +1,224 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Models;
+
+use Database\Factories\LandingPageFactory;
+use Illuminate\Database\Eloquent\Attributes\UseFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Лендинг сайта: адрес (`url`: «/» — главная, «/promo» — своя страница), содержимое из блоков (`content`), SEO. Лендингов может быть
+ * несколько, адрес у каждого свой. Вывод на сайте — `LandingController` и шаблоны `resources/views/landing` публичной части модуля
+ * (если вы поставили её при установке).
+ *
+ * ```php
+ * LandingPage::findByUrl('/promo');  // опубликованный лендинг по адресу или null
+ * $landing->visibleBlocks();         // блоки для вывода: без скрытых, с проверенными якорями и фоном
+ * $landing->menu();                  // пункты меню шапки: [['title' => 'Цены', 'anchor' => 'pricing']]
+ * ```
+ *
+ * @property int $id
+ * @property string $title
+ * @property string $url
+ * @property list<array{type: string, data: array<string, mixed>}>|null $content
+ * @property array{title?: string, description?: string, image?: string, noindex?: bool}|null $seo
+ * @property bool $is_published
+ */
+#[UseFactory(LandingPageFactory::class)]
+class LandingPage extends Model
+{
+    use HasFactory;
+
+    /** Фон блока: значения поля «Фон» (в шаблоне — класс `landing-tone-{фон}`). */
+    private const array TONES = ['light', 'muted', 'dark', 'accent'];
+
+    /** Блоки, из которых выводится только первый: шапка и подвал бывают одни на странице. */
+    private const array ONCE = ['header', 'footer'];
+
+    protected $fillable = ['title', 'url', 'content', 'seo', 'is_published'];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'content' => 'array',
+            'seo' => 'array',
+            'is_published' => 'boolean',
+        ];
+    }
+
+    /**
+     * Только опубликованный лендинг.
+     *
+     * @param  Builder<LandingPage>  $query
+     */
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('is_published', true);
+    }
+
+    /**
+     * Опубликованный лендинг по адресу: «/» — главная, «/promo» — страница `promo`. Нет такого или он не опубликован — null.
+     */
+    public static function findByUrl(string $url): ?self
+    {
+        return self::query()->published()->where('url', $url)->first();
+    }
+
+    /**
+     * Блоки для вывода на сайте по порядку: без скрытых («Скрыть, не удаляя»), без чужой структуры, шапка и подвал — по одной.
+     * Данные блока приводятся к безопасному виду: якорь — латиница, цифры и дефис, и не повторяется (повтор очищается, у блока
+     * «Форма» без якоря он `form` (у следующих `form-2`, `form-3`), и чужой блок с таким якорем его не отнимет), фон — из списка, пункт
+     * меню — строка; у шапки и подвала якоря и пункта меню нет.
+     *
+     * @return list<array{type: string, data: array<string, mixed>}>
+     */
+    public function visibleBlocks(): array
+    {
+        $content = is_array($this->content) ? $this->content : [];
+        $blocks = [];
+        $anchors = [];
+        $once = [];
+        // Якорь `form` по умолчанию принадлежит блоку «Форма» без своего якоря: чужой блок с таким якорем его не отнимет.
+        $forms = array_filter($content, fn (mixed $block): bool => is_array($block) && ($block['type'] ?? null) === 'form' && is_array($block['data'] ?? null) && empty($block['data']['is_hidden']));
+        $formDefault = array_any($forms, fn (array $block): bool => $this->anchorOf($block['data']['anchor'] ?? null) === null);
+        // Свои якоря форм не занимает ни одна из выданных по умолчанию.
+        $formAnchors = array_flip(array_filter(array_map(fn (array $block): ?string => $this->anchorOf($block['data']['anchor'] ?? null), $forms)));
+
+        foreach ($content as $block) {
+            if (! is_array($block) || ! is_string($block['type'] ?? null) || ! is_array($block['data'] ?? null)) {
+                continue;
+            }
+
+            $type = $block['type'];
+            $data = $block['data'];
+
+            if (! empty($data['is_hidden']) || (in_array($type, self::ONCE, true) && isset($once[$type]))) {
+                continue;
+            }
+
+            $once[$type] = true;
+            $anchor = $this->anchorOf($data['anchor'] ?? null) ?? '';
+
+            // Шапка и подвал — не секции страницы: якоря и пункта меню у них нет.
+            if (in_array($type, self::ONCE, true) || ($formDefault && $type !== 'form' && $anchor === 'form')) {
+                $anchor = '';
+            }
+
+            if ($anchor !== '' && isset($anchors[$anchor])) {
+                $anchor = '';
+            }
+
+            // Каждая форма получает якорь, иначе после отправки не к чему вернуться: первая `form`, следующие `form-2`, `form-3`.
+            for ($number = 1; $type === 'form' && $anchor === ''; $number++) {
+                $candidate = $number === 1 ? 'form' : 'form-'.$number;
+                $anchor = isset($anchors[$candidate]) || isset($formAnchors[$candidate]) ? '' : $candidate;
+            }
+
+            if ($anchor !== '') {
+                $anchors[$anchor] = true;
+            }
+
+            $data['anchor'] = $anchor;
+            $data['tone'] = in_array($data['tone'] ?? null, self::TONES, true) ? $data['tone'] : 'light';
+            $data['menu_title'] = ! in_array($type, self::ONCE, true) && is_string($data['menu_title'] ?? null) ? trim($data['menu_title']) : '';
+            $blocks[] = ['type' => $type, 'data' => $data];
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * Пункты меню шапки: блоки с заполненным «Пунктом меню» и якорем.
+     *
+     * @return list<array{title: string, anchor: string}>
+     */
+    public function menu(): array
+    {
+        $items = [];
+
+        foreach ($this->visibleBlocks() as $block) {
+            if ($block['data']['menu_title'] !== '' && $block['data']['anchor'] !== '') {
+                $items[] = ['title' => $block['data']['menu_title'], 'anchor' => $block['data']['anchor']];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * Темы заявки кнопок, которые есть на странице: заданная в блоке («Тема заявки») или, если не задана, название карточки
+     * преимущества и `Тариф «название»` у тарифа. Кнопка считается, если у неё есть подпись и она ведёт к форме (пустая ссылка,
+     * когда форма на странице есть) или на якорь: так её рисует шаблон, и только с такой кнопкой тема доходит до формы. Тему из
+     * адреса (`?topic=`) страница показывает, только если она из этого списка: чужой текст в ссылке не превращается в слова сайта.
+     *
+     * @return list<string>
+     */
+    public function topics(): array
+    {
+        $topics = [];
+        $hasForm = $this->formAnchor() !== null;
+        $text = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+        $leadsToForm = fn (mixed $label, mixed $url): bool => $text($label) !== ''
+            && ($text($url) === '' ? $hasForm : preg_match('~^#[a-z][a-z0-9-]*$~D', $text($url)) === 1);
+
+        foreach ($this->visibleBlocks() as $block) {
+            $data = $block['data'];
+
+            // Кнопки блока из трёх полей: `{префикс}_label`, `{префикс}_url`, `{префикс}_topic`.
+            foreach ($data as $key => $value) {
+                $prefix = str_ends_with((string) $key, '_topic') ? substr((string) $key, 0, -6) : null;
+
+                if ($prefix !== null && $leadsToForm($data[$prefix.'_label'] ?? null, $data[$prefix.'_url'] ?? null)) {
+                    $topics[] = $text($value);
+                }
+            }
+
+            // Карточки преимуществ и тарифы: кнопка в строке, тема по умолчанию — название.
+            [$list, $name] = match ($block['type']) {
+                'benefits' => ['rows', 'title'],
+                'pricing' => ['plans', 'name'],
+                default => [null, null],
+            };
+
+            foreach ($list !== null && is_array($data[$list] ?? null) ? $data[$list] : [] as $row) {
+                if (! is_array($row) || $text($row[$name] ?? null) === '' || ! $leadsToForm($row['btn_label'] ?? null, $row['btn_url'] ?? null)) {
+                    continue;
+                }
+
+                $default = $name === 'name' ? 'Тариф «'.$text($row['name']).'»' : $text($row['title']);
+                $topics[] = $text($row['btn_topic'] ?? null) !== '' ? $text($row['btn_topic']) : $default;
+            }
+        }
+
+        return array_values(array_unique(array_filter($topics, fn (string $topic): bool => $topic !== '')));
+    }
+
+    /**
+     * Якорь первого блока «Форма» (к нему ведут кнопки без своей ссылки) или null, если формы на лендинге нет.
+     */
+    public function formAnchor(): ?string
+    {
+        foreach ($this->visibleBlocks() as $block) {
+            if ($block['type'] === 'form' && $block['data']['anchor'] !== '') {
+                return $block['data']['anchor'];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Якорь, если это латиница в нижнем регистре, цифры и дефис (первая буква, до 40 знаков).
+     */
+    private function anchorOf(mixed $value): ?string
+    {
+        return is_string($value) && preg_match('~^[a-z][a-z0-9-]{0,39}$~D', $value) === 1 ? $value : null;
+    }
+}

@@ -77,7 +77,7 @@ class LeadResource extends Resource
             Textarea::make('message', __('fastleo::leads.message'))->rows(4)->hideInList(),
             Text::make('source', __('fastleo::leads.source'))->maxLength(500)->readonly()->hideInList(),
             Text::make('site', __('fastleo::leads.site'))->readonly()->searchable(),
-            Text::make('form', __('fastleo::leads.form'))->readonly()->hideInList(),
+            Text::make('form', __('fastleo::leads.form'))->readonly(),
             Enum::make('status', __('fastleo::leads.status'))->enum(LeadStatus::class)->badges()->default(LeadStatus::New->value)->sortable(),
         ];
     }

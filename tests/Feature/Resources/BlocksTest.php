@@ -5,10 +5,14 @@ declare(strict_types=1);
 use Fastleo\Fastleo;
 use Fastleo\Fields\Block;
 use Fastleo\Fields\Blocks;
+use Fastleo\Fields\Email;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Text;
 use Fastleo\Files\GenerateImageVariants;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\ViewErrorBag;
 use Workbench\App\Models\Page;
 
 beforeEach(function (): void {
@@ -103,6 +107,54 @@ it('shows the saved blocks in the form, after an error and on the record page', 
         ->assertDontSee('name="content[0][type]"', false);
 
     $this->get(route('fastleo.resources.show', ['site-pages', $page->id]))->assertOk()->assertSee('Лучшие цены города.');
+});
+
+it('shows the title of a block in the header of the block, next to its type', function (): void {
+    $page = Page::factory()->create();
+
+    $html = (string) $this->get(route('fastleo.resources.edit', ['site-pages', $page->id]))->assertOk()->getContent();
+
+    expect($html)->toContain('data-block-hint')
+        // У блока «Цитата» заголовка нет: подпись берётся из первого простого текстового поля («Автор»).
+        ->toContain('content[1][quote][author]')
+        ->toContain('x-init="hint = $el.querySelector(')
+        ->toContain('x-on:input="if ($event.target.name ===');
+});
+
+it('takes the grey label of a block from the field title, then name, then the first plain text field, and never from a subclass of Text', function (): void {
+    $field = Blocks::make('content', 'Содержимое')->blocks([
+        Block::make('titled', 'С заголовком')->fields([Text::make('name', 'Имя'), Text::make('title', 'Заголовок')]),
+        Block::make('named', 'С названием')->fields([Text::make('subtitle', 'Подзаголовок'), Text::make('name', 'Название')]),
+        Block::make('plain', 'Простой')->fields([Email::make('mail', 'Почта'), Text::make('headline', 'Шапка')]),
+        Block::make('none', 'Без подписи')->fields([Email::make('mail2', 'Почта'), RichText::make('body', 'Текст')]),
+    ]);
+    view()->share('errors', new ViewErrorBag());
+    $header = fn (string $type): string => view('fastleo::fields.blocks-block', [
+        'field' => $field, 'type' => $type, 'key' => '0', 'item' => null, 'path' => 'content', 'name' => 'content', 'id' => 'field-content', 'writable' => true, 'errors' => new ViewErrorBag(),
+    ])->render();
+
+    // Что подписывает блок, видно по x-init: он читает значение именно этого поля.
+    $label = fn (string $type): string => preg_match('~x-init="([^"]*)"~', $header($type), $match) === 1 ? $match[1] : '';
+
+    expect($label('titled'))->toContain('content[0][titled][title]')->not->toContain('[titled][name]')
+        ->and($label('named'))->toContain('content[0][named][name]')->not->toContain('[named][subtitle]')
+        ->and($label('plain'))->toContain('content[0][plain][headline]')->not->toContain('[plain][mail]')
+        ->and($label('none'))->toBe('')
+        // «+» в шапке называет свой блок: одинаковых кнопок для чтения с экрана не бывает.
+        ->and($header('titled'))->toContain('x-bind:aria-label=');
+});
+
+it('puts a button into the header of every block to add a new block right after it, but not on the record page', function (): void {
+    $page = Page::factory()->create();
+
+    $html = (string) $this->get(route('fastleo.resources.edit', ['site-pages', $page->id]))->assertOk()->getContent();
+
+    // Два сохранённых блока и по одному шаблону на каждый тип в меню: у каждого есть своя кнопка «+».
+    expect(substr_count($html, 'data-block-insert'))->toBeGreaterThanOrEqual(count($page->content) + 1)
+        ->and($html)->toContain('openMenu($el, $el.closest(\'[data-block]\'))')
+        ->and($html)->toContain('data-block-add');
+
+    $this->get(route('fastleo.resources.show', ['site-pages', $page->id]))->assertOk()->assertDontSee('data-block-insert', false);
 });
 
 it('renders the blocks with the templates of the site and skips the rest', function (): void {

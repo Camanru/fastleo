@@ -1,0 +1,39 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+    $menu = is_array($landingContext['menu'] ?? null) ? $landingContext['menu'] : [];
+    $phoneDigits = preg_replace('/\D/', '', $s($phone ?? null));
+    $toneName = in_array($tone ?? null, ['light', 'muted', 'dark', 'accent'], true) ? $tone : 'light';
+@endphp
+<header class="landing-header landing-tone-{{ $toneName }}">
+    <a href="{{ url('/') }}" class="landing-brand">
+        @if ($s($logo ?? null) !== '')
+            {{-- Название рядом с логотипом уже читается: у картинки пустой alt, чтобы ссылку не озвучивали дважды. --}}
+            <x-fastleo::picture :src="$logo" :alt="$s($brand ?? null) !== '' ? '' : 'Логотип'" />
+        @endif
+        @if ($s($brand ?? null) !== '')
+            <span>{{ $s($brand ?? null) }}</span>
+        @endif
+    </a>
+
+    @if ($menu !== [])
+        {{-- Меню без JavaScript: на узком экране раскрывается стандартным <details>. --}}
+        <nav class="landing-nav" aria-label="Разделы страницы">
+            <details>
+                <summary>Меню</summary>
+                <ul>
+                    @foreach ($menu as $item)
+                        @if (is_array($item) && is_string($item['anchor'] ?? null) && is_string($item['title'] ?? null))
+                            <li><a href="#{{ $item['anchor'] }}">{{ $item['title'] }}</a></li>
+                        @endif
+                    @endforeach
+                </ul>
+            </details>
+        </nav>
+    @endif
+
+    @if (strlen((string) $phoneDigits) >= 5)
+        <a href="tel:{{ '+' === substr($s($phone ?? null), 0, 1) ? '+' : '' }}{{ $phoneDigits }}" class="landing-phone">{{ $s($phone ?? null) }}</a>
+    @endif
+
+    @include('landing.partials.button', ['label' => $primary_label ?? '', 'url' => $primary_url ?? '', 'topic' => $primary_topic ?? '', 'class' => 'landing-btn landing-btn--primary'])
+</header>

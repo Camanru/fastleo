@@ -8,11 +8,12 @@ use Fastleo\Auth\RoleMatrix;
 use Fastleo\Fastleo;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Symfony\Component\Finder\Finder;
 
 /**
  * Очистка кеша сайта кнопкой на дашборде: кеш приложения (`cache:clear`), скомпилированные шаблоны (`view:clear`)
- * и список разделов fastleo (`fastleo:clear`). Кеши конфигурации, маршрутов и событий не трогаются: `optimize:clear`
+ * и список разделов fastleo (то же, что `fastleo:clear`, но без вызова команды: в веб-запросе команды пакета не зарегистрированы). Кеши конфигурации, маршрутов и событий не трогаются: `optimize:clear`
  * убрал бы их с боевого сайта до следующего деплоя и замедлил бы его (на сервере без `.env` — ещё и уронил бы).
  * Размер освобождаемого места считается заранее.
  *
@@ -77,13 +78,27 @@ final class CacheCleaner
     {
         $size = self::size();
 
-        foreach (['cache:clear', 'view:clear', 'fastleo:clear'] as $command) {
+        // Команды пакета (`fastleo:clear`) регистрируются только в консоли, а кнопка работает в веб-запросе: список разделов чистится напрямую.
+        foreach (['cache:clear', 'view:clear'] as $command) {
             Artisan::call($command);
         }
+
+        self::forgetResources();
 
         Cache::forget(self::SIZE_KEY);
 
         return $size;
+    }
+
+    /**
+     * Забыть кеш списка разделов (`bootstrap/cache/fastleo.php`) и кеш настроек: то же, что делает `fastleo:clear`.
+     */
+    public static function forgetResources(): void
+    {
+        File::delete(Fastleo::resources()->cachePath());
+        Fastleo::resources()->flush();
+
+        SettingsStore::forgetCached();
     }
 
     /**

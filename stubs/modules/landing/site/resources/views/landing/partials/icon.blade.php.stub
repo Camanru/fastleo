@@ -1,0 +1,4 @@
+{{-- Иконка карточки по имени из списка блока: неизвестного имени в наборе нет (его могли убрать при обновлении) — иконка не выводится, страница не падает. --}}
+@if (is_string($name ?? null) && \Fastleo\Support\Icons::exists($name))
+    <x-fastleo::icon :name="$name" class="landing-icon" />
+@endif

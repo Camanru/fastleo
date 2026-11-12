@@ -1,0 +1,9 @@
+{{--
+    Начало секции блока: <section id="якорь" class="landing-section landing-section--тип landing-tone-фон">.
+    Получает $anchor и $tone из полей блока (в модели они уже проверены, здесь — ещё раз) и $type от <x-fastleo::blocks>.
+--}}
+@php
+    $anchorId = is_string($anchor ?? null) && preg_match('~^[a-z][a-z0-9-]{0,39}$~D', $anchor) === 1 ? $anchor : '';
+    $toneName = in_array($tone ?? null, ['light', 'muted', 'dark', 'accent'], true) ? $tone : 'light';
+@endphp
+<section @if ($anchorId !== '') id="{{ $anchorId }}" @endif class="landing-section landing-section--{{ $type }} landing-tone-{{ $toneName }}">

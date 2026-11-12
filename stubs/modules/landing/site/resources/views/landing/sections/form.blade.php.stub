@@ -1,0 +1,36 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+    // Тема из ссылки кнопки относится к первой форме страницы (к ней и ведут кнопки), остальные подписаны своим заголовком.
+    $topicText = ($landingContext['form'] ?? null) === ($anchor ?? null) ? $s($landingContext['topic'] ?? null) : '';
+    $formName = $topicText !== '' ? $topicText : ($s($title ?? null) !== '' ? $s($title) : null);
+    $consentUrlSafe = preg_match('~^(#[a-z][a-z0-9-]*$|/(?![/\\\\\x00-\x20])|(?i:https?)://[^/\\\\\x00-\x20?#])~D', $s($consent_url ?? null)) === 1;
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    @if ($s($text ?? null) !== '')
+        <p class="landing-lead">{{ $s($text) }}</p>
+    @endif
+    {{-- Форма заявки — встроенная <x-fastleo::lead-form>: она работает, когда заявки включены в config/fastleo.php (leads.resource). --}}
+    @if (\Illuminate\Support\Facades\Route::has('fastleo-leads.store'))
+        @if ($topicText !== '')
+            <p class="landing-topic">Тема: {{ $topicText }}</p>
+        @endif
+        <x-fastleo::lead-form
+            :anchor="$anchor ?? null"
+            :form-name="$formName"
+            :with-email="filter_var($with_email ?? false, FILTER_VALIDATE_BOOLEAN)"
+            :with-message="filter_var($with_message ?? true, FILTER_VALIDATE_BOOLEAN)"
+            :button="$s($button ?? null) !== '' ? $s($button) : null"
+            :sent="$s($sent ?? null) !== '' ? $s($sent) : null"
+        />
+        @if ($s($consent ?? null) !== '')
+            <p class="landing-consent">
+                @if ($consentUrlSafe)
+                    <a href="{{ $s($consent_url) }}"@if (str_starts_with(strtolower($s($consent_url)), 'http')) rel="noopener noreferrer nofollow"@endif>{{ $s($consent) }}</a>
+                @else
+                    {{ $s($consent) }}
+                @endif
+            </p>
+        @endif
+    @endif
+@include('landing.partials.close')

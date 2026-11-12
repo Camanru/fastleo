@@ -21,7 +21,7 @@ final class LeadController extends Controller
     public function store(StoreLeadRequest $request): RedirectResponse
     {
         if (! $request->isBot() && $request->isOutOfTime()) {
-            return back()->withInput()->withErrors(['form_token' => __('fastleo::leads.form_too_fast', [], Fastleo::LOCALE)]);
+            return $this->backToForm($request)->withInput()->withErrors(['form_token' => __('fastleo::leads.form_too_fast', [], Fastleo::LOCALE)], $request->bag());
         }
 
         if (! $request->isBot()) {
@@ -34,12 +34,23 @@ final class LeadController extends Controller
                 'message' => $data['message'] ?? null,
                 'status' => LeadStatus::New,
                 'source' => $this->sourcePath($request),
+                'form' => $request->formName(),
             ]);
 
             LeadNotifier::send($lead);
         }
 
-        return back()->with('lead_sent', true);
+        return $this->backToForm($request)->with('lead_sent', true)->with('lead_sent_anchor', $request->anchor());
+    }
+
+    /**
+     * Назад на страницу с формой, а у формы с якорем — к ней самой (`#form-{якорь}`).
+     */
+    private function backToForm(StoreLeadRequest $request): RedirectResponse
+    {
+        $anchor = $request->anchor();
+
+        return $anchor === null ? back() : back()->withFragment('form-'.$anchor);
     }
 
     /**

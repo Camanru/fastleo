@@ -158,7 +158,7 @@ Blocks::make('blocks', 'Блоки страницы')->blocks([
 <div class="content">{!! $body ?? '' !!}</div>
 ```
 
-Главную найдите по адресу, например `Page::where('slug', 'glavnaya')->firstOrFail()`. Для лендинга со своими шаблонами блоков передайте папку: `<x-fastleo::blocks :blocks="$page->blocks" prefix="landing.blocks" />` → `resources/views/landing/blocks/{тип}.blade.php`. Подробнее — [конструктор страниц](../blocks.md), [вывод блоков на сайте](../blocks.md#вывод-на-сайте).
+Главную найдите по адресу, например `Page::where('slug', 'glavnaya')->firstOrFail()`. Лендинг из блоков (первый экран, тарифы, отзывы, форма заявки) на «/» или на своём адресе — готовый модуль `php artisan fastleo:module landing` ([лендинг](../modules.md#лендинг)). Для своих шаблонов блоков передайте папку: `<x-fastleo::blocks :blocks="$page->blocks" prefix="landing.blocks" />` → `resources/views/landing/blocks/{тип}.blade.php`. Подробнее — [конструктор страниц](../blocks.md), [вывод блоков на сайте](../blocks.md#вывод-на-сайте).
 
 ### Как сделать редактируемый текст на главной, если это не список записей?
 

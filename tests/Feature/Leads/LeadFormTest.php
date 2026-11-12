@@ -6,6 +6,7 @@ use Fastleo\Fastleo;
 use Fastleo\Leads\FormToken;
 use Fastleo\Leads\Lead;
 use Fastleo\Leads\LeadNotifier;
+use Fastleo\Leads\Leads;
 use Fastleo\Leads\LeadStatus;
 use Fastleo\Leads\StoreLeadRequest;
 use Fastleo\Notifications\MessageNotification;
@@ -133,6 +134,84 @@ describe('the site form', function (): void {
         session()->setId($this->sessionId);
 
         expect(Crypt::decryptString(FormToken::make()))->not->toBe(Crypt::decryptString(FormToken::make()));
+    });
+
+    describe('several forms on one page', function (): void {
+        it('takes the name of the form and the anchor from the hidden fields and goes back to that form', function (): void {
+            $this->withHeader('Referer', 'https://site.test/?topic=Тариф')
+                ->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form_anchor' => 'hero', 'form' => "  Тариф\n  Бизнес ", 'form_token' => leadToken()])
+                ->assertRedirect('https://site.test/?topic=Тариф#form-hero')
+                ->assertSessionHas('lead_sent', true)
+                ->assertSessionHas('lead_sent_anchor', 'hero');
+
+            expect(Lead::query()->sole()->form)->toBe('Тариф Бизнес');
+        });
+
+        it('cuts the name of the form to a hundred characters and leaves it empty without one', function (): void {
+            $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form' => str_repeat('я', 150), 'form_token' => leadToken()])->assertRedirect();
+            $this->post('/leads', ['name' => 'Пётр', 'phone' => '+7 900 000-00-00', 'form' => '   ', 'form_token' => leadToken()])->assertRedirect();
+
+            expect(Lead::query()->where('name', 'Иван')->sole()->form)->toBe(str_repeat('я', 100))
+                ->and(Lead::query()->where('name', 'Пётр')->sole()->form)->toBeNull();
+        });
+
+        it('cuts invisible and direction-changing characters out of the name of the form', function (): void {
+            $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form' => "Тариф\u{202E}\u{200B} Бизнес\u{2028}\n(PRO)\t", 'form_token' => leadToken()])->assertRedirect();
+
+            expect(Lead::query()->sole()->form)->toBe('Тариф Бизнес (PRO)')
+                ->and(Leads::formName(['x']))->toBeNull()
+                ->and(Leads::formName(" \u{200B} "))->toBeNull();
+        });
+
+        it('refuses a name of the form that is far too long instead of keeping it in the session', function (): void {
+            $this->post('/leads', ['name' => '', 'phone' => '+7 900 000-00-00', 'form' => str_repeat('я', 501), 'form_token' => leadToken()])->assertSessionHasErrors(['form']);
+        });
+
+        it('rejects a name of the form with a NUL byte', function (): void {
+            $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form' => "а\0б", 'form_token' => leadToken()])->assertSessionHasErrors(['form']);
+        });
+
+        it('drops a broken anchor: no fragment, no anchor in the session', function (string $anchor): void {
+            $this->withHeader('Referer', 'https://site.test/')
+                ->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form_anchor' => $anchor, 'form_token' => leadToken()])
+                ->assertRedirect('https://site.test/')
+                ->assertSessionMissing('lead_sent_anchor');
+        })->with(["end\nx", 'Верх', '1a', 'a b', 'a#b', str_repeat('a', 41)]);
+
+        it('brings the visitor back to the form and keeps the errors in the bag of that form', function (): void {
+            $this->withHeader('Referer', 'https://site.test/')
+                ->post('/leads', ['name' => '', 'phone' => 'abc', 'form_anchor' => 'final', '_error_bag' => 'evil', 'form_token' => leadToken()])
+                ->assertRedirect('https://site.test/#form-final')
+                ->assertSessionHasErrorsIn('lead_final', ['name', 'phone'])
+                ->assertSessionHasInput('form_anchor', 'final');
+
+            expect(session('errors')->hasBag('default'))->toBeFalse()
+                ->and(session('errors')->hasBag('evil'))->toBeFalse();
+        });
+
+        it('keeps the error of the email of a form with an anchor in the bag of that form, and takes no anchor that is not a string', function (): void {
+            $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'email' => 'не почта', 'form_anchor' => 'hero', 'form_token' => leadToken()])
+                ->assertSessionHasErrorsIn('lead_hero', ['email']);
+
+            $this->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form_anchor' => ['x'], 'form_token' => leadToken()])
+                ->assertSessionMissing('lead_sent_anchor');
+        });
+
+        it('brings the visitor back to the form when it was sent too fast', function (): void {
+            $this->withHeader('Referer', 'https://site.test/')
+                ->post('/leads', ['name' => 'Иван', 'phone' => '+7 900 000-00-00', 'form_anchor' => 'hero', 'form_token' => leadToken(1)])
+                ->assertRedirect('https://site.test/#form-hero')
+                ->assertSessionHasErrorsIn('lead_hero', ['form_token']);
+        });
+
+        it('thanks a bot for the form it filled in as well, with the fragment, and saves nothing', function (): void {
+            $this->withHeader('Referer', 'https://site.test/')
+                ->post('/leads', ['name' => 'Бот', 'phone' => '+7 900 000-00-00', 'form_anchor' => 'hero', 'leave_empty' => 'x', 'form_token' => leadToken()])
+                ->assertRedirect('https://site.test/#form-hero')
+                ->assertSessionHas('lead_sent_anchor', 'hero');
+
+            expect(Lead::query()->count())->toBe(0);
+        });
     });
 
     it('stops one address after five leads in ten minutes', function (): void {

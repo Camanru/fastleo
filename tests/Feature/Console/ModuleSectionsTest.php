@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\Storage;
  * Модули «Меню сайта», «Отзывы», «Портфолио», «Вопросы и ответы», «Услуги», «Прайс-лист», «Команда», «Филиалы», «Лицензии и сертификаты», «Партнёры»: код копируется в сайт и поднимается по-настоящему.
  */
 const SECTION_MODULES = [
+    'landing' => ['table' => 'landing_pages', 'slug' => 'landing', 'resource' => 'LandingPageResource', 'model' => 'LandingPage', 'store' => ['title' => 'Студия', 'url' => '/', 'is_published' => '1']],
     'menu' => ['table' => 'menu_items', 'slug' => 'menu-items', 'resource' => 'MenuItemResource', 'model' => 'MenuItem', 'store' => ['title' => 'Контакты', 'url' => '/contacts', 'location' => 'header', 'is_published' => '1']],
     'reviews' => ['table' => 'reviews', 'slug' => 'reviews', 'resource' => 'ReviewResource', 'model' => 'Review', 'store' => ['author' => 'Анна', 'rating' => '5', 'body' => 'Спасибо!', 'is_published' => '1']],
     'portfolio' => ['table' => 'portfolio_items', 'slug' => 'portfolio', 'resource' => 'PortfolioResource', 'model' => 'PortfolioItem', 'store' => ['title' => 'Работа', 'slug' => 'rabota', 'is_published' => '1']],
@@ -73,6 +74,13 @@ function bootCopiedSection(object $test, string $name): void
     $test->artisan('fastleo:module', ['modules' => [$name], '--no-interaction' => true])->assertSuccessful();
     $test->artisan('migrate', ['--path' => $test->sandbox.'/database/migrations', '--realpath' => true])->assertSuccessful();
 
+    // Класс-спутник раздела (типы блоков лендинга) должен быть загружен раньше самого раздела.
+    foreach (['LandingBlocks'] as $companion) {
+        if (File::exists($test->sandbox.'/app/Fastleo/'.$companion.'.php') && ! class_exists('App\\FastleoSections\\'.$companion, false)) {
+            require $test->sandbox.'/app/Fastleo/'.$companion.'.php';
+        }
+    }
+
     foreach (['app/Models/'.$module['model'] => 'App\\FastleoSections\\Models\\'.$module['model'], 'app/Fastleo/'.$module['resource'] => 'App\\FastleoSections\\'.$module['resource'], 'database/factories/'.$module['model'].'Factory' => 'Database\\Factories\\'.$module['model'].'Factory'] as $file => $class) {
         if (! class_exists($class, false)) {
             require $test->sandbox.'/'.$file.'.php';
@@ -83,7 +91,7 @@ function bootCopiedSection(object $test, string $name): void
 }
 
 it('is in the list of modules with its own tables', function (): void {
-    expect(array_keys(Modules::all()))->toBe(['contacts', 'pages', 'news', 'menu', 'reviews', 'portfolio', 'faq', 'services', 'prices', 'team', 'branches', 'certificates', 'partners', 'shop'])
+    expect(array_keys(Modules::all()))->toBe(['contacts', 'pages', 'landing', 'news', 'menu', 'reviews', 'portfolio', 'faq', 'services', 'prices', 'team', 'branches', 'certificates', 'partners', 'shop'])
         ->and(Modules::find('menu')->tables)->toBe(['menu_items'])
         ->and(Modules::find('faq')->tables)->toBe(['faq_items']);
 });
@@ -243,7 +251,7 @@ it('puts the sections of the older modules in the top of the menu, without a gro
     $stubs = glob(dirname(__DIR__, 3).'/stubs/modules/*/fastleo/*Resource.php.stub');
     $company = ['services', 'prices', 'team', 'branches', 'certificates', 'partners'];
 
-    expect($stubs)->toHaveCount(16);
+    expect($stubs)->toHaveCount(17);
 
     foreach ($stubs as $stub) {
         $module = basename(dirname($stub, 2));

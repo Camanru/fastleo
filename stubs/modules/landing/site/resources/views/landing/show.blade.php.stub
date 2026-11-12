@@ -1,0 +1,9 @@
+@extends('landing.layout')
+
+@section('seo')
+    <x-fastleo::seo :model="$page" :title="$page->title" />
+@endsection
+
+@section('content')
+    <x-fastleo::blocks :blocks="$blocks" prefix="landing.sections" />
+@endsection

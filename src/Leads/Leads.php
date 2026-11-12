@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Fastleo\Leads;
 
+use Illuminate\Support\Str;
+
 /**
  * Включены ли встроенные «Заявки» (`fastleo.leads`): раздел, форма сайта и приём по API.
  *
@@ -51,6 +53,39 @@ final class Leads
         $class = is_string($value) && $value !== '' ? $value : null;
 
         return $class;
+    }
+
+    /**
+     * Якорь формы на странице (`<x-fastleo::lead-form anchor="hero" />`): латиница в нижнем регистре, цифры и дефис, первая буква,
+     * до 40 знаков. Из него строятся `id` формы, набор ошибок и фрагмент адреса возврата, поэтому всё остальное отбрасывается.
+     *
+     * ```php
+     * Leads::anchor('hero');      // 'hero'
+     * Leads::anchor("a\nb");      // null
+     * ```
+     */
+    public static function anchor(mixed $value): ?string
+    {
+        return is_string($value) && preg_match('~^[a-z][a-z0-9-]{0,39}$~D', $value) === 1 ? $value : null;
+    }
+
+    /**
+     * Название формы или тема заявки для поля «Форма»: одна строка до 100 знаков без управляющих и невидимых символов
+     * (в том числе знаков смены направления письма); пусто или не строка — `null`.
+     *
+     * ```php
+     * Leads::formName("  Тариф\n Бизнес ");   // 'Тариф Бизнес'
+     * ```
+     */
+    public static function formName(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $name = Str::of((string) preg_replace('/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u', ' ', $value))->squish()->limit(100, '')->toString();
+
+        return $name === '' ? null : $name;
     }
 
     /**

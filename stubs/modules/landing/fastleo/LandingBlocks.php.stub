@@ -1,0 +1,271 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use Fastleo\Fields\Block;
+use Fastleo\Fields\Email;
+use Fastleo\Fields\Field;
+use Fastleo\Fields\Gallery;
+use Fastleo\Fields\Image;
+use Fastleo\Fields\Number;
+use Fastleo\Fields\Repeater;
+use Fastleo\Fields\RichText;
+use Fastleo\Fields\Select;
+use Fastleo\Fields\Tel;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Textarea;
+use Fastleo\Fields\Toggle;
+use Fastleo\Fields\Video;
+use Fastleo\Layout\Layout;
+use Fastleo\Layout\Section;
+
+/**
+ * Типы блоков лендинга: что можно добавить на страницу и из каких полей состоит каждый блок.
+ * Шаблон блока на сайте — `resources/views/landing/sections/{тип}.blade.php`; он получает поля блока переменными.
+ *
+ * Чтобы добавить свой тип, допишите `Block::make('имя', 'Подпись')` в `all()` и положите шаблон `landing/sections/имя.blade.php`.
+ * Повторяющиеся поля (общие, заголовок, кнопка) собирают методы ниже: они каждый раз создают новые поля, а не отдают одни и те же.
+ * Чем больше блоков и полей в повторителях, тем больше полей отправляет форма: если поднимаете `max()` у блоков или повторителей,
+ * проверьте `php artisan fastleo:doctor` (предупреждение про `max_input_vars` PHP).
+ */
+final class LandingBlocks
+{
+    /** Ссылка кнопки: якорь на странице, адрес сайта или http(s); `javascript:` и `//чужой-сайт` не проходят. */
+    private const string LINK = 'regex:~^(#[a-z][a-z0-9-]*$|/(?![/\\\\\x00-\x20])|(?i:https?)://[^/\\\\\x00-\x20?#])~D';
+
+    /** Иконки блока «Преимущества» (Lucide). */
+    private const array ICONS = [
+        'check' => 'Галочка', 'badge-check' => 'Знак качества', 'shield-check' => 'Надёжность', 'lock' => 'Замок', 'zap' => 'Скорость',
+        'rocket' => 'Запуск', 'clock' => 'Время', 'calendar-check' => 'Сроки', 'clipboard-check' => 'Чек-лист', 'target' => 'Цель',
+        'trending-up' => 'Рост', 'star' => 'Звезда', 'award' => 'Награда', 'thumbs-up' => 'Одобрение', 'heart' => 'Забота',
+        'sparkles' => 'Результат', 'gift' => 'Подарок', 'wallet' => 'Цена', 'truck' => 'Доставка', 'wrench' => 'Инструмент',
+        'users' => 'Команда', 'handshake' => 'Договорённость', 'headphones' => 'Поддержка', 'phone' => 'Звонок',
+    ];
+
+    /**
+     * Все типы блоков в порядке меню «Добавить блок».
+     *
+     * @return list<Block>
+     */
+    public static function all(): array
+    {
+        return [
+            Block::make('header', 'Шапка')->icon('panel-top')->fields([
+                Image::make('logo', 'Логотип')->directory('landing'),
+                Text::make('brand', 'Название')->maxLength(60),
+                Tel::make('phone', 'Телефон'),
+                ...self::button('primary', 'Кнопка'),
+                ...self::common(withAnchor: false),
+            ]),
+            Block::make('hero', 'Первый экран')->icon('rocket')->fields([
+                Text::make('eyebrow', 'Надпись над заголовком')->maxLength(100),
+                Text::make('title', 'Заголовок')->required()->maxLength(150),
+                Textarea::make('subtitle', 'Подзаголовок')->rows(2)->maxLength(300),
+                Text::make('accent', 'Акцентная строка')->maxLength(150)->help('Выводится под подзаголовком отдельной строкой.'),
+                Repeater::make('bullets', 'Короткие пункты')->fields([Text::make('text', 'Пункт')->required()->maxLength(120)])->max(5),
+                ...self::button('primary', 'Основная кнопка'),
+                ...self::button('second', 'Вторая кнопка'),
+                Text::make('note', 'Мелкий текст под кнопкой')->maxLength(120),
+                Image::make('image', 'Картинка')->directory('landing'),
+                Select::make('image_position', 'Где картинка')->options(['right' => 'Справа от текста', 'background' => 'Фоном', 'below' => 'Под текстом'])->default('right'),
+                ...self::common(),
+            ]),
+            Block::make('text', 'Текст')->icon('text')->fields([
+                ...self::heading(),
+                RichText::make('body', 'Текст')->required(),
+                ...self::common(),
+            ]),
+            Block::make('about', 'О компании')->icon('building')->fields([
+                ...self::heading(),
+                RichText::make('body', 'Текст')->required(),
+                Image::make('image', 'Картинка')->directory('landing'),
+                Select::make('image_position', 'Где картинка')->options(['right' => 'Справа от текста', 'left' => 'Слева от текста'])->default('right'),
+                ...self::common(),
+            ]),
+            Block::make('benefits', 'Преимущества')->icon('badge-check')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Карточки')->fields([
+                    Select::make('icon', 'Иконка')->options(self::ICONS),
+                    Text::make('title', 'Название')->required()->maxLength(120),
+                    Textarea::make('text', 'Текст')->rows(2)->maxLength(300),
+                    ...self::button('btn', 'Кнопка карточки'),
+                ])->max(4),
+                Text::make('outro', 'Итоговая фраза под карточками')->maxLength(255),
+                ...self::common(),
+            ]),
+            Block::make('steps', 'Этапы работы')->icon('list-ordered')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Этапы')->fields([
+                    Text::make('title', 'Название')->required()->maxLength(120),
+                    Textarea::make('text', 'Текст')->rows(2)->maxLength(300),
+                ])->max(8),
+                ...self::button('primary', 'Кнопка после этапов'),
+                ...self::common(),
+            ]),
+            Block::make('numbers', 'Цифры и факты')->icon('chart-no-axes-column')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Цифры')->fields([
+                    Text::make('value', 'Цифра')->required()->maxLength(30)->help('«12 лет», «80+», «99,9 %».'),
+                    Text::make('label', 'Подпись')->maxLength(120),
+                ])->max(6),
+                ...self::common(),
+            ]),
+            Block::make('highlight', 'Крупная цифра')->icon('badge-percent')->fields([
+                Text::make('eyebrow', 'Надпись над цифрой')->maxLength(100),
+                Text::make('value', 'Цифра или слово')->required()->maxLength(30)->help('Выводится очень крупно: «99,9 %», «14 дней».'),
+                Text::make('title', 'Заголовок')->maxLength(150),
+                Text::make('muted', 'Приглушённая часть заголовка')->maxLength(150),
+                Textarea::make('note', 'Примечание')->rows(2)->maxLength(300),
+                Repeater::make('rows', 'Карточки')->fields([
+                    Text::make('title', 'Название')->required()->maxLength(120),
+                    Textarea::make('text', 'Текст')->rows(2)->maxLength(300),
+                ])->max(3),
+                ...self::common(),
+            ]),
+            Block::make('pricing', 'Тарифы')->icon('credit-card')->fields([
+                ...self::heading(),
+                Repeater::make('plans', 'Тарифы')->fields([
+                    Text::make('name', 'Название')->required()->maxLength(60),
+                    Text::make('price', 'Цена')->maxLength(40)->help('Строкой, как увидят посетители: «от 5 000 ₽/мес».'),
+                    Textarea::make('features', 'Что входит')->rows(4)->maxLength(600)->help('По пункту в строке.'),
+                    Toggle::make('featured', 'Выделить'),
+                    ...self::button('btn', 'Кнопка тарифа'),
+                ])->max(4),
+                ...self::common(),
+            ]),
+            Block::make('gallery', 'Галерея')->icon('images')->fields([
+                ...self::heading(),
+                Gallery::make('photos', 'Фотографии')->directory('landing')->max(24),
+                ...self::common(),
+            ]),
+            Block::make('reviews', 'Отзывы')->icon('message-square-quote')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Отзывы')->fields([
+                    Text::make('author', 'Автор')->required()->maxLength(80),
+                    Text::make('role', 'Должность или город')->maxLength(100),
+                    Textarea::make('text', 'Отзыв')->required()->rows(3)->maxLength(600),
+                    Image::make('photo', 'Фото')->directory('landing'),
+                    Number::make('rating', 'Оценка')->integer()->min(1)->max(5),
+                ])->max(5),
+                ...self::common(),
+            ]),
+            Block::make('team', 'Команда')->icon('users')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Сотрудники')->fields([
+                    Image::make('photo', 'Фото')->directory('landing'),
+                    Text::make('name', 'Имя')->required()->maxLength(80),
+                    Text::make('role', 'Должность')->maxLength(100),
+                ])->max(6),
+                ...self::common(),
+            ]),
+            Block::make('logos', 'Клиенты и партнёры')->icon('handshake')->fields([
+                ...self::heading(),
+                Gallery::make('logos', 'Логотипы')->directory('landing')->max(18),
+                ...self::common(),
+            ]),
+            Block::make('faq', 'Вопросы и ответы')->icon('circle-help')->fields([
+                ...self::heading(),
+                Repeater::make('rows', 'Вопросы')->fields([
+                    Text::make('question', 'Вопрос')->required()->maxLength(200),
+                    Textarea::make('answer', 'Ответ')->required()->rows(3)->maxLength(1500),
+                ])->max(10),
+                ...self::common(),
+            ]),
+            Block::make('video', 'Видео')->icon('play')->fields([
+                ...self::heading(),
+                Video::make('video', 'Ссылка на видео')->required()->help('YouTube, Rutube или VK Видео.'),
+                Text::make('caption', 'Подпись')->maxLength(150),
+                ...self::common(),
+            ]),
+            Block::make('cta', 'Призыв')->icon('megaphone')->fields([
+                ...self::heading(),
+                ...self::button('primary', 'Кнопка'),
+                ...self::common(),
+            ]),
+            Block::make('form', 'Форма заявки')->icon('send')->fields([
+                ...self::heading(),
+                Textarea::make('text', 'Текст над формой')->rows(2)->maxLength(300),
+                Text::make('button', 'Подпись кнопки')->maxLength(40),
+                Toggle::make('with_email', 'Спрашивать почту'),
+                Toggle::make('with_message', 'Спрашивать сообщение')->default(true),
+                Text::make('consent', 'Согласие под формой')->maxLength(200)->help('Например: «Нажимая кнопку, вы соглашаетесь с политикой конфиденциальности».'),
+                Text::make('consent_url', 'Ссылка на политику')->maxLength(255)->rules(['nullable', self::LINK]),
+                Text::make('sent', 'Текст после отправки')->maxLength(150),
+                ...self::common(),
+            ]),
+            Block::make('contacts', 'Контакты')->icon('map-pin')->fields([
+                ...self::heading(),
+                Tel::make('phone', 'Телефон'),
+                Email::make('email', 'Почта')->maxLength(150),
+                Text::make('address', 'Адрес')->maxLength(255),
+                Textarea::make('hours', 'Часы работы')->rows(3)->maxLength(500),
+                Number::make('latitude', 'Широта')->min(-90)->max(90)->help('Необязательно, вместе с долготой: ссылка «Показать на карте» откроет точку; без них — поиск по адресу.'),
+                Number::make('longitude', 'Долгота')->min(-180)->max(180),
+                ...self::common(),
+            ]),
+            Block::make('footer', 'Подвал')->icon('panel-bottom')->fields([
+                Text::make('copyright', 'Копирайт')->maxLength(150),
+                Repeater::make('links', 'Ссылки')->fields([
+                    Text::make('title', 'Название')->required()->maxLength(60),
+                    Text::make('url', 'Ссылка')->required()->maxLength(255)->rules([self::LINK]),
+                ])->max(8),
+                Text::make('policy_title', 'Политика конфиденциальности')->maxLength(60),
+                Text::make('policy_url', 'Ссылка на политику')->maxLength(255)->rules(['nullable', self::LINK]),
+                ...self::common(withAnchor: false),
+            ]),
+        ];
+    }
+
+    /**
+     * Общие поля любого блока в свёрнутой секции: якорь, пункт меню, фон и «Скрыть». У шапки и подвала якоря нет:
+     * они не секции страницы, а `<header>` и `<footer>`, ссылка «#якорь» на них не ведёт.
+     *
+     * @return list<Field|Layout>
+     */
+    private static function common(bool $withAnchor = true): array
+    {
+        return [
+            Section::make('Оформление блока', [
+                ...($withAnchor ? [
+                    Text::make('anchor', 'Якорь')->maxLength(40)->rules(['nullable', 'regex:~^[a-z][a-z0-9-]*$~D'])
+                        ->help('Латиница в нижнем регистре, цифры и дефис, с буквы: «pricing». По нему на блок ведёт ссылка «#pricing»; у блока «Форма» без якоря он «form».'),
+                    Text::make('menu_title', 'Пункт меню в шапке')->maxLength(30)->help('Заполните вместе с якорем: пункт появится в меню шапки.'),
+                ] : []),
+                Select::make('tone', 'Фон')->options(['light' => 'Светлый', 'muted' => 'Серый', 'dark' => 'Тёмный', 'accent' => 'Акцентный'])->default('light'),
+                Toggle::make('is_hidden', 'Скрыть блок')->help('Блок остаётся в панели, но на сайте его нет.'),
+            ])->collapsed(),
+        ];
+    }
+
+    /**
+     * Заголовок блока: надпись над ним, сам заголовок и пояснение.
+     *
+     * @return list<Field>
+     */
+    private static function heading(): array
+    {
+        return [
+            Text::make('eyebrow', 'Надпись над заголовком')->maxLength(100),
+            Text::make('title', 'Заголовок')->maxLength(150),
+            Text::make('lead', 'Пояснение под заголовком')->maxLength(300),
+        ];
+    }
+
+    /**
+     * Кнопка из трёх полей `{префикс}_label`, `{префикс}_url`, `{префикс}_topic`. Нет ссылки — кнопка ведёт к форме лендинга,
+     * а «Тема» (по умолчанию название карточки или тарифа) показывается над формой и попадает в поле «Форма» заявки.
+     *
+     * @return list<Field>
+     */
+    private static function button(string $prefix, string $label): array
+    {
+        return [
+            Text::make($prefix.'_label', $label.': подпись')->maxLength(40),
+            Text::make($prefix.'_url', $label.': ссылка')->maxLength(255)->rules(['nullable', self::LINK])
+                ->help('Пусто — к форме на этой странице. Или «#pricing», «/contacts», «https://…».'),
+            Text::make($prefix.'_topic', $label.': тема заявки')->maxLength(100)->help('Только для кнопки к форме: попадёт в заявку («Тариф Бизнес»).'),
+        ];
+    }
+}

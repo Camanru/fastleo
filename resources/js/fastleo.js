@@ -857,6 +857,8 @@ Alpine.data('fastleoImport', ({ url, state }) => ({
 const dropdownMenu = () => ({
     menu: false,
     style: '',
+    // Элемент, у которого открыто меню, если это не x-ref="button" (блоки: «+» в шапке каждого блока).
+    anchor: null,
 
     toggle() {
         this.menu = !this.menu;
@@ -870,7 +872,7 @@ const dropdownMenu = () => ({
             return;
         }
 
-        const rect = this.$refs.button.getBoundingClientRect();
+        const rect = (this.anchor ?? this.$refs.button).getBoundingClientRect();
         // Меню с x-ref="menu" не уходит за левый край экрана (телефон).
         const width = this.$refs.menu?.offsetWidth ?? 0;
         const right = Math.max(8, Math.min(window.innerWidth - rect.right, window.innerWidth - width - 8));
@@ -2584,10 +2586,13 @@ Alpine.data('fastleoCombobox', (config) => ({
  * Порядок блоков в форме = порядок отправки = порядок сохранения.
  */
 Alpine.data('fastleoBlocks', ({ min, max, sortable, placeholder = '__KEY__' }) => ({
+    ...dropdownMenu(),
     min,
     max,
     count: 0,
     created: 0,
+    // Блок, после которого вставится новый (null — в конец списка), и кнопка, у которой открыто меню типов.
+    after: null,
 
     init() {
         this.count = this.$refs.list.children.length;
@@ -2609,19 +2614,49 @@ Alpine.data('fastleoBlocks', ({ min, max, sortable, placeholder = '__KEY__' }) =
         }
     },
 
+    // Меню типов блока у кнопки: «Добавить блок» под списком — в конец, «+» в шапке блока — сразу после него.
+    openMenu(button, after = null) {
+        const same = this.menu && this.anchor === button;
+
+        this.anchor = button;
+        this.after = after;
+        this.menu = false;
+
+        if (!same) {
+            this.toggle();
+            // Фокус на первый тип блока: с клавиатуры меню, открытое «+» из шапки, иначе не достать (оно в конце списка).
+            this.$nextTick(() => this.$refs.menu?.querySelector('[role=menuitem]')?.focus());
+        }
+    },
+
     add(type = null) {
         const key = `new-${Date.now()}-${++this.created}`;
         const template = type === null ? this.$refs.template : this.$refs[`template-${type}`];
-        this.$refs.list.insertAdjacentHTML('beforeend', template.innerHTML.replaceAll(placeholder, key));
+        const html = template.innerHTML.replaceAll(placeholder, key);
+
+        // Блок, после которого открывали меню, могли удалить: тогда новый блок идёт в конец.
+        const anchored = this.after?.isConnected === true;
+
+        if (anchored) {
+            this.after.insertAdjacentHTML('afterend', html);
+        } else {
+            this.$refs.list.insertAdjacentHTML('beforeend', html);
+        }
+
+        const block = anchored ? this.after.nextElementSibling : this.$refs.list.lastElementChild;
+        this.after = null;
         this.count++;
         this.changed();
-        this.$nextTick(() => this.$refs.list.lastElementChild?.querySelector('input:not([type=hidden]), textarea, select')?.focus());
+        this.$nextTick(() => block?.querySelector('input:not([type=hidden]), textarea, select')?.focus());
     },
 
     remove(button) {
         const block = button.closest('[data-block]');
 
         if (block !== null) {
+            // Меню закрывается при любом удалении блока: Alpine не считает кликом снаружи клик по уже убранному элементу,
+            // а открытое меню осталось бы висеть на старых координатах.
+            this.menu = false;
             block.remove();
             this.count--;
         }

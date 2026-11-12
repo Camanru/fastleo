@@ -1,0 +1,20 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+    $safeLink = fn (string $url): bool => preg_match('~^(#[a-z][a-z0-9-]*$|/(?![/\\\\\x00-\x20])|(?i:https?)://[^/\\\\\x00-\x20?#])~D', $url) === 1;
+    $toneName = in_array($tone ?? null, ['light', 'muted', 'dark', 'accent'], true) ? $tone : 'light';
+@endphp
+<footer class="landing-footer landing-tone-{{ $toneName }}">
+    @if ($s($copyright ?? null) !== '')
+        <p>{{ $s($copyright ?? null) }}</p>
+    @endif
+    <ul>
+        @foreach (is_array($links ?? null) ? $links : [] as $link)
+            @if (is_array($link) && $s($link['title'] ?? null) !== '' && $safeLink($s($link['url'] ?? null)))
+                <li><a href="{{ $s($link['url']) }}"@if (str_starts_with(strtolower($s($link['url'])), 'http')) rel="noopener noreferrer nofollow"@endif>{{ $s($link['title']) }}</a></li>
+            @endif
+        @endforeach
+        @if ($s($policy_title ?? null) !== '' && $safeLink($s($policy_url ?? null)))
+            <li><a href="{{ $s($policy_url) }}"@if (str_starts_with(strtolower($s($policy_url)), 'http')) rel="noopener noreferrer nofollow"@endif>{{ $s($policy_title) }}</a></li>
+        @endif
+    </ul>
+</footer>

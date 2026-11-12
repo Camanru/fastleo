@@ -1,0 +1,106 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ namespace }};
+
+use {{ appNamespace }}\Models\LandingPage;
+use {{ appNamespace }}\Models\Page;
+use Closure;
+use Fastleo\Fields\Blocks;
+use Fastleo\Fields\Seo;
+use Fastleo\Fields\Text;
+use Fastleo\Fields\Toggle;
+use Fastleo\Resource;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\Rule;
+
+/**
+ * Раздел «Лендинг»: длинные страницы сайта из блоков (первый экран, преимущества, этапы, тарифы, отзывы, вопросы, форма заявки…).
+ * У каждого лендинга свой адрес: «/» — главная, «/promo» — своя страница. Типы блоков — `LandingBlocks`. Показ на сайте — публичная
+ * часть модуля (`LandingController`, `resources/views/landing`), если вы поставили её при установке.
+ */
+final class LandingPageResource extends Resource
+{
+    protected static string $model = LandingPage::class;
+
+    /** Формат адреса: «/» или «/» и один сегмент (латиница в нижнем регистре, цифры, дефис). */
+    private const string ADDRESS = '~^/([a-z0-9]+(-[a-z0-9]+)*)?$~D';
+
+    protected static ?string $slug = 'landing';
+
+    protected static ?string $label = 'Лендинг';
+
+    protected static ?string $singular = 'Лендинг';
+
+    protected static string $icon = 'rocket';
+
+    protected static int $position = 15;
+
+    /** Содержимое лендинга — блоки: выгружать в таблицу нечего. */
+    protected static bool $exportable = false;
+
+    /**
+     * Поля лендинга.
+     */
+    public function fields(): array
+    {
+        return [
+            Text::make('title', 'Название')->required()->maxLength(255)->searchable()->sortable()->help('Для панели и заголовка страницы в поиске, если не заполнен SEO.'),
+            Text::make('url', 'Адрес')->required()->maxLength(100)->searchable()->sortable()->default('/')->help('«/» — главная страница сайта, «/promo» — своя страница. Латиница в нижнем регистре, цифры и дефис, один сегмент; у каждого лендинга адрес свой.')->rules(fn (?Model $record): array => [
+                'regex:'.self::ADDRESS,
+                Rule::unique('landing_pages', 'url')->ignore($record),
+                $this->notTakenBySite($record),
+            ]),
+            Toggle::make('is_published', 'Показывать на сайте')->default(true)->quickToggle(),
+            Blocks::make('content', 'Блоки')->blocks(LandingBlocks::all())->max(16),
+            Seo::make('seo')->directory('landing'),
+        ];
+    }
+
+    /**
+     * Адрес не должен совпадать с тем, что сайт уже отдаёт по этому адресу, иначе страница не показалась бы или перекрыла чужую:
+     * с файлом или папкой в `public/` (`/storage`, `/build`: веб-сервер отвечает раньше PHP), с корневой страницей модуля «Страницы»
+     * (лендинг выиграл бы у неё молча; главная «Страниц» живёт на «/» и слаг не занимает) и с маршрутом другого раздела
+     * (`/news`, `/shop`, вход в панель: они открываются раньше лендинга). Запасной маршрут (его занимает «Страницы») и сам маршрут
+     * лендинга не мешают. Панель, открытая на корне домена (`fastleo.path` пустой), занимает свои адреса, в том числе «/», всегда;
+     * чужие маршруты сайта проверяются, только когда есть публичная часть модуля (маршрут `site.landing.show`). Адрес, который у
+     * записи уже сохранён, не проверяется: сайт мог получить такой маршрут позже, а запись от этого не должна перестать сохраняться.
+     * Адрес неверного формата пропускается: об этом уже скажет правило формата.
+     */
+    private function notTakenBySite(?Model $record): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($record): void {
+            if (! is_string($value) || preg_match(self::ADDRESS, $value) !== 1 || $record?->getAttribute('url') === $value) {
+                return;
+            }
+
+            $segment = ltrim($value, '/');
+
+            if ($segment !== '' && file_exists(public_path($segment))) {
+                $fail('Этот адрес занят файлом или папкой сайта.');
+
+                return;
+            }
+
+            if ($segment !== '' && class_exists(Page::class) && Schema::hasTable(new Page()->getTable()) && rescue(fn (): bool => Page::query()->whereNull('parent_id')->where('is_home', false)->where('slug', $segment)->exists(), false, false)) {
+                $fail('Этот адрес занят страницей сайта.');
+
+                return;
+            }
+
+            $route = rescue(fn () => Route::getRoutes()->match(Request::create($value)), report: false);
+
+            if ($route === null || $route->isFallback || $route->getName() === 'site.landing.show') {
+                return;
+            }
+
+            if (Route::has('site.landing.show') || str_starts_with((string) $route->getName(), 'fastleo.')) {
+                $fail('Этот адрес занят другим разделом сайта.');
+            }
+        };
+    }
+}

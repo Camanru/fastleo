@@ -1,0 +1,80 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ appNamespace }}\Http\Controllers;
+
+use {{ appNamespace }}\Models\LandingPage;
+use Illuminate\Http\Request;
+use Illuminate\Routing\Controller;
+use Illuminate\Routing\Route as RouteDefinition;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+
+/**
+ * Лендинги сайта: адрес «/» (главная) и адреса из одного сегмента («/promo»). Нет опубликованного лендинга с таким адресом —
+ * дальше отвечает запасной маршрут сайта (например, «Страницы»), а если его нет, то 404.
+ */
+class LandingController extends Controller
+{
+    /**
+     * Страница лендинга по адресу запроса. Тема заявки из ссылки кнопки (`/?topic=Тариф+Бизнес`) показывается над формой и попадает в заявку, если такую тему задаёт кнопка этой страницы.
+     * Блоки получают из общих данных `$landingContext`: якорь формы, тему и пункты меню шапки.
+     */
+    public function show(Request $request): mixed
+    {
+        $page = LandingPage::findByUrl('/'.ltrim($request->decodedPath(), '/'));
+
+        if ($page === null) {
+            return $this->fallback($request);
+        }
+
+        // «Лишний» слэш в конце и двойной слэш — тот же лендинг по другому адресу: посетителя ведёт на настоящий.
+        if (rawurldecode($request->getPathInfo()) !== $page->url) {
+            return redirect($page->url.($request->getQueryString() !== null ? '?'.$request->getQueryString() : ''), 301);
+        }
+
+        // Тема из адреса показывается, только если такую тему задаёт кнопка этой страницы.
+        $topic = $this->topic($request);
+
+        view()->share('landingContext', [
+            'form' => $page->formAnchor(),
+            'topic' => in_array($topic, array_map($this->clean(...), $page->topics()), true) ? $topic : '',
+            'menu' => $page->menu(),
+        ]);
+
+        return view('landing.show', ['page' => $page, 'blocks' => $page->visibleBlocks()]);
+    }
+
+    /**
+     * Адрес не лендинга: его отдаёт запасной маршрут сайта (`Route::fallback`), без него — 404. Лендинг занимает адреса раньше
+     * запасного маршрута, поэтому без этого шага «Страницы» не открыли бы свои адреса из одного сегмента. Запасной маршрут
+     * выполняется без собственных middleware (работают только middleware маршрута лендинга, группа `web`): не вешайте на него `auth`.
+     */
+    private function fallback(Request $request): mixed
+    {
+        $fallback = array_find(Route::getRoutes()->getRoutes(), fn (RouteDefinition $route): bool => $route->isFallback);
+
+        abort_if($fallback === null, 404);
+
+        return $fallback->bind($request)->run();
+    }
+
+    /**
+     * Тема из адреса: одна строка без управляющих символов, до 100 знаков; нет или не строка — пусто.
+     */
+    private function topic(Request $request): string
+    {
+        $topic = $request->query('topic');
+
+        return is_string($topic) ? $this->clean($topic) : '';
+    }
+
+    /**
+     * Управляющие и невидимые символы (в том числе смена направления письма U+202E) заменяются пробелом; одна строка до 100 знаков.
+     */
+    private function clean(string $topic): string
+    {
+        return Str::of((string) preg_replace('/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u', ' ', $topic))->squish()->limit(100, '')->toString();
+    }
+}

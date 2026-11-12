@@ -1,0 +1,76 @@
+<?php
+
+declare(strict_types=1);
+
+use {{ appNamespace }}\Models\LandingPage;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+
+uses(RefreshDatabase::class);
+
+it('shows the published landing at the root and answers 404 without one', function (): void {
+    $this->get('/')->assertNotFound();
+
+    $landing = LandingPage::factory()->create(['title' => 'Скрытый', 'is_published' => false]);
+
+    $this->get('/')->assertNotFound();
+
+    $landing->update(['title' => 'Студия', 'is_published' => true, 'content' => [['type' => 'text', 'data' => ['title' => 'О нас', 'body' => '<p>Текст</p>']]]]);
+
+    $this->get('/')->assertOk()->assertSee('О нас')->assertSee('<p>Текст</p>', false);
+});
+
+it('shows a landing at its own address and leaves other addresses to the rest of the site', function (): void {
+    LandingPage::factory()->create(['title' => 'Главная', 'content' => [['type' => 'text', 'data' => ['title' => 'Главный']]]]);
+    LandingPage::factory()->create(['title' => 'Акция', 'url' => '/promo', 'content' => [['type' => 'text', 'data' => ['title' => 'Акционный']]]]);
+    LandingPage::factory()->create(['title' => 'Закрыто', 'url' => '/closed', 'is_published' => false]);
+
+    $this->get('/promo')->assertOk()->assertSee('Акционный')->assertDontSee('Главный');
+    $this->get('/')->assertOk()->assertSee('Главный')->assertDontSee('Акционный');
+    $this->get('/closed')->assertNotFound();
+    $this->get('/missing')->assertNotFound();
+});
+
+it('draws the menu of the header from the anchors of the blocks and keeps a hidden block out', function (): void {
+    LandingPage::factory()->create(['content' => [
+        ['type' => 'header', 'data' => ['brand' => 'Север']],
+        ['type' => 'text', 'data' => ['anchor' => 'about', 'menu_title' => 'О нас', 'title' => 'О нас']],
+        ['type' => 'text', 'data' => ['anchor' => 'secret', 'menu_title' => 'Скрытое', 'title' => 'Секрет', 'is_hidden' => true]],
+    ]]);
+
+    $this->get('/')->assertOk()->assertSee('<a href="#about">О нас</a>', false)->assertSee('id="about"', false)->assertDontSee('Скрытое')->assertDontSee('Секрет');
+});
+
+it('keeps unsafe values of the fields out of the page', function (): void {
+    LandingPage::factory()->create(['content' => [
+        ['type' => 'hero', 'data' => ['title' => '<script>alert(1)</script>', 'primary_label' => 'Ссылка', 'primary_url' => 'javascript:alert(2)', 'tone' => '" onclick="x']],
+    ]]);
+
+    $this->get('/')->assertOk()
+        ->assertDontSee('<script>alert(1)</script>', false)
+        ->assertDontSee('javascript:', false)
+        ->assertDontSee('onclick', false);
+});
+
+it('sends a slash at the end of the address to the real address of the landing', function (): void {
+    LandingPage::factory()->create(['title' => 'Акция', 'url' => '/promo']);
+
+    // Тестовый клиент (`$this->get`) убирает слэш в конце адреса сам, поэтому запрос идёт напрямую.
+    $response = $this->app->handle(Request::create('/promo/?utm=x'));
+
+    expect($response->getStatusCode())->toBe(301)->and($response->headers->get('Location'))->toBe(url('/promo?utm=x'));
+});
+
+it('does not shadow a single-segment address of the site that is registered after the landing route', function (): void {
+    $routes = Route::getRoutes()->getRoutes();
+    $position = array_search('site.landing.show', array_map(fn ($route): ?string => $route->getName(), $routes), true);
+    $shadowed = array_values(array_map(
+        fn ($route): string => $route->uri(),
+        array_filter(array_slice($routes, (int) $position + 1), fn ($route): bool => in_array('GET', $route->methods(), true) && ! $route->isFallback && preg_match('~^[a-z0-9-]+$~', $route->uri()) === 1),
+    ));
+
+    // Адреса из файлов маршрутов, которые грузятся после routes/web.php (`then:`, свой RouteServiceProvider), лендинг закрывает:
+    // перенесите их в routes/web.php выше блока лендинга.
+    expect($position)->not->toBeFalse()->and($shadowed)->toBe([]);
+});

@@ -1,0 +1,18 @@
+@php
+    $s = fn (mixed $value): string => is_string($value) ? trim($value) : '';
+@endphp
+@include('landing.partials.open', ['anchor' => $anchor ?? null, 'tone' => $tone ?? null])
+    @include('landing.partials.heading')
+    <ol class="landing-steps">
+        @foreach (is_array($rows ?? null) ? $rows : [] as $row)
+            @continue(! is_array($row) || $s($row['title'] ?? null) === '')
+            <li>
+                <h3>{{ $s($row['title']) }}</h3>
+                @if ($s($row['text'] ?? null) !== '')
+                    <p>{{ $s($row['text']) }}</p>
+                @endif
+            </li>
+        @endforeach
+    </ol>
+    @include('landing.partials.button', ['label' => $primary_label ?? '', 'url' => $primary_url ?? '', 'topic' => $primary_topic ?? '', 'class' => 'landing-btn landing-btn--primary'])
+@include('landing.partials.close')

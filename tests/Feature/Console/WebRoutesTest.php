@@ -249,3 +249,71 @@ it('writes a file that works whatever is already imported at its top and whateve
     $this->get('/bracket-ok')->assertOk();
     $this->get('/faq-ok')->assertOk();
 });
+
+it('recognises a block whose class names Pint shortened, does not write it twice and inserts new routes above it', function (): void {
+    $web = new WebRoutes();
+    $landing = "\\Illuminate\\Support\\Facades\\Route::get('/{landing?}', [\\App\\Http\\Controllers\\LandingController::class, 'show'])->name('site.landing.show');";
+    // Так файл выглядит после `pint` с пресетом Laravel: импорты наверху, имена сокращены.
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\nuse App\\Http\\Controllers\\LandingController;\nuse Illuminate\\Support\\Facades\\Route;\n\nRoute::get('/', fn () => 'моя главная');\n\nRoute::get('/{landing?}', [LandingController::class, 'show'])->name('site.landing.show');\n");
+
+    expect($web->has($landing))->toBeTrue()
+        ->and($web->has(str_replace('landing', 'other', $landing)))->toBeFalse()
+        ->and($web->append(['landing' => $landing], false, [$landing])['appended'])->toBe([]);
+
+    $web->append(['news' => newsBlock()], false, [$landing]);
+
+    $routes = File::get($this->sandbox.'/routes/web.php');
+
+    expect(strpos($routes, newsBlock()))->toBeLessThan(strpos($routes, "Route::get('/{landing?}'"))
+        ->and(substr_count($routes, 'site.landing.show'))->toBe(1);
+});
+
+it('does not take a commented out block for an installed one', function (): void {
+    $web = new WebRoutes();
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\n// ".newsBlock()."\n# ".newsBlock('/hash')."\n/* ".newsBlock('/multi')." */\n");
+
+    expect($web->has(newsBlock()))->toBeFalse()
+        ->and($web->has(newsBlock('/hash')))->toBeFalse()
+        ->and($web->has(newsBlock('/multi')))->toBeFalse()
+        ->and($web->append(['news' => newsBlock()], false)['appended'])->toBe(['news'])
+        ->and(File::get($this->sandbox.'/routes/web.php'))->toContain("\n".newsBlock()."\n");
+});
+
+it('inserts new routes above the whole group of the site when the catch-all block sits inside that group', function (): void {
+    $web = new WebRoutes();
+    $fallback = newsBlock('/pages-fallback');
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\nRoute::get('/', fn () => 'главная');\n\nRoute::middleware('auth')->group(function (): void {\n    ".$fallback."\n});\n\nRoute::get('/after', fn () => 'после');\n");
+
+    $web->append(['news' => newsBlock()], false, [$fallback]);
+
+    $routes = File::get($this->sandbox.'/routes/web.php');
+
+    expect(strpos($routes, newsBlock()))->toBeLessThan(strpos($routes, "Route::middleware('auth')"))
+        ->and(strpos($routes, "Route::get('/', fn"))->toBeLessThan(strpos($routes, newsBlock()))
+        ->and($routes)->toContain(newsBlock()."\n\nRoute::middleware('auth')->group(function (): void {\n    ".$fallback."\n});")
+        ->and(substr_count($routes, newsBlock()))->toBe(1);
+});
+
+it('inserts new routes before the fallback block of a file written in one line, not before the opening tag', function (): void {
+    $web = new WebRoutes();
+    $fallback = newsBlock('/pages-fallback');
+    File::put($this->sandbox.'/routes/web.php', '<?php '.$fallback);
+
+    $web->append(['news' => newsBlock()], false, [$fallback]);
+
+    $routes = File::get($this->sandbox.'/routes/web.php');
+
+    expect($routes)->toStartWith('<?php')
+        ->and(strpos($routes, newsBlock()))->toBeLessThan(strpos($routes, $fallback))
+        ->and(substr_count($routes, $fallback))->toBe(1);
+});
+
+it('recognises a block of several lines after the site added a blank line or the indent of a group', function (): void {
+    $web = new WebRoutes();
+    $block = newsBlock()."\n".newsBlock('/news-more');
+    File::put($this->sandbox.'/routes/web.php', "<?php\n\nRoute::middleware('web')->group(function (): void {\n    ".newsBlock()."\n\n    ".newsBlock('/news-more')."\n});\n");
+
+    expect($web->has($block))->toBeTrue()
+        ->and($web->append(['news' => $block], false)['appended'])->toBe([])
+        ->and($web->has(newsBlock('/other')))->toBeFalse();
+});
