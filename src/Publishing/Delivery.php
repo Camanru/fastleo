@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Fastleo\Publishing;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * Доставка публикации в один канал.
@@ -28,8 +28,8 @@ use Illuminate\Support\Carbon;
  * @property array<string, string|list<string>>|null $message_ids
  * @property list<string>|null $media_tokens
  * @property string|null $error
- * @property Carbon|null $started_at
- * @property Carbon|null $sent_at
+ * @property CarbonInterface|null $started_at
+ * @property CarbonInterface|null $sent_at
  * @property-read Publication $publication
  * @property-read Channel $channel
  */

@@ -201,15 +201,24 @@ final class TelegramBot extends Bot
     }
 
     /**
-     * `deleteMessages`: все сообщения поста разом (поэтому `$deleted` не нужен). Telegram удаляет только сообщения моложе 48 часов.
+     * Удаляет сообщения поста по одному (`deleteMessage`): отказ по любому из них (например, сообщению больше 48 часов)
+     * возвращается как ошибка. Сообщение, которого в канале уже нет (удалили вручную), считается удалённым.
      */
     #[Override]
     public function deletePost(string $chatId, array $messageIds, ?Closure $deleted = null): void
     {
-        $ids = array_map(intval(...), self::allIds($messageIds));
+        foreach (self::allIds($messageIds) as $id) {
+            try {
+                $this->call('deleteMessage', ['chat_id' => $chatId, 'message_id' => (int) $id]);
+            } catch (MessengerFailed $exception) {
+                if (! str_contains($exception->getMessage(), 'message to delete not found')) {
+                    throw $exception;
+                }
+            }
 
-        if ($ids !== []) {
-            $this->call('deleteMessages', ['chat_id' => $chatId, 'message_ids' => $ids]);
+            if ($deleted instanceof Closure) {
+                $deleted($id);
+            }
         }
     }
 

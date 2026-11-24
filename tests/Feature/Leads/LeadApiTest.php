@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Fastleo;
 use Fastleo\Leads\Lead;
@@ -13,6 +14,7 @@ use Fastleo\Leads\LeadStatus;
 use Fastleo\Notifications\MessageNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
@@ -228,6 +230,25 @@ describe('the key', function (): void {
         sendLead(['message' => 'и ещё'])->assertCreated();
 
         expect($this->key->fresh()->last_used_at?->gt($first))->toBeTrue();
+    });
+});
+
+describe('immutable dates', function (): void {
+    it('still writes the time of use at most once a minute when the site uses CarbonImmutable', function (): void {
+        Date::use(CarbonImmutable::class);
+
+        try {
+            sendLead()->assertCreated();
+            $first = $this->key->fresh()->last_used_at;
+
+            $this->travel(30)->seconds();
+            sendLead(['message' => 'ещё'])->assertCreated();
+
+            expect($first)->toBeInstanceOf(CarbonImmutable::class)
+                ->and($this->key->fresh()->last_used_at?->equalTo($first))->toBeTrue();
+        } finally {
+            Date::useDefault();
+        }
     });
 });
 

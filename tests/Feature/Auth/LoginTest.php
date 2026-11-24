@@ -155,6 +155,25 @@ it('signs the admin back in from the remember cookie after the session expires',
     $response->assertOk();
 });
 
+it('ends a session opened by the remember cookie on the login page once the password changes', function (): void {
+    $admin = admin(['email' => 'admin@example.com']);
+    $name = Fastleo::guard()->getRecallerName();
+    $cookie = login(['email' => 'admin@example.com', 'password' => 'password', 'remember' => '1'])->getCookie($name);
+    Auth::forgetGuards();
+    $this->flushSession();
+
+    // Сеанс создан по cookie на форме входа: через `AuthenticateSession` запрос не проходил.
+    $this->withCookie($name, $cookie->getValue())->get(route('fastleo.login'))->assertRedirect();
+    $parked = session()->all();
+    expect($parked)->toHaveKey('password_hash_fastleo');
+
+    $admin->forceFill(['password' => Hash::make('new-secret-123')])->save();
+    Auth::forgetGuards();
+    $this->flushSession();
+    $this->withUnencryptedCookies([$name => ''])->withSession($parked)->get(route('fastleo.dashboard'))->assertRedirect(route('fastleo.login'));
+    $this->assertGuest(Fastleo::GUARD);
+});
+
 it('redirects to the page the admin opened before signing in', function (): void {
     admin(['email' => 'admin@example.com']);
     $this->get(route('fastleo.dashboard').'?tab=1');

@@ -1,4 +1,5 @@
-{{-- KeyValue: строки «название — значение»; добавить, удалить, перетащить. После ошибки — строки из old(). --}}
+{{-- KeyValue: строки «название — значение»; добавить, удалить, перетащить. После ошибки — строки из old().
+     Метка ключа новой строки своя (`__PAIR__`): она не совпадает с меткой `__KEY__` блока `HasMany`, внутри которого может стоять поле. --}}
 @php
     $writable = $field->isWritable();
     $old = old($path);
@@ -8,7 +9,7 @@
 @endphp
 <x-fastleo::field :field="$field" :id="$id" :path="$path">
     <div
-        x-data="fastleoBlocks({ min: 0, max: @js($field->getMax()), sortable: @js($writable) })"
+        x-data="fastleoBlocks({ min: 0, max: @js($field->getMax()), sortable: @js($writable), placeholder: '__PAIR__' })"
         data-blocks="{{ $path }}"
         class="flex flex-col gap-2"
     >
@@ -28,7 +29,7 @@
         </div>
         @if ($writable)
             <template x-ref="template">
-                @include('fastleo::fields.key-value-row', ['key' => '__KEY__', 'pair' => ['key' => '', 'value' => '']])
+                @include('fastleo::fields.key-value-row', ['key' => '__PAIR__', 'pair' => ['key' => '', 'value' => '']])
             </template>
             <div>
                 <x-fastleo::button variant="dashed" icon="plus" x-show="max === null || count < max" x-on:click="add()" data-block-add>

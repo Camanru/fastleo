@@ -193,7 +193,7 @@ Schedule::command('leads:import-missed-calls')->everyTenMinutes()->withoutOverla
 $calls = Http::withToken((string) fastleo_setting('telephony.token'))->timeout(10)->retry(2, 500)->get(config('services.telephony.url').'/lost-calls', ['minutes' => 10])->throw()->json();
 ```
 
-Токен сервиса удобно хранить в [настройках](settings.md) полем `Secret`: пользователь меняет его в панели, в исходном коде страницы токена нет. Не записывайте токены в код и не коммитьте. Планировщику нужен cron `* * * * * php artisan schedule:run` ([installation.md](installation.md)).
+Токен сервиса удобно хранить в [настройках](settings.md): поле `Text`, а его имя — в методе `encrypted()` страницы (значение лежит в базе зашифрованным; поле `Secret` на страницах настроек не работает). Пользователь меняет токен в панели, в коде сайта его нет. Не записывайте токены в код и не коммитьте. Планировщику нужен cron `* * * * * php artisan schedule:run` ([installation.md](installation.md)).
 
 ## Файлы заявки
 
@@ -207,7 +207,7 @@ HasMany::make('attachments', 'Файлы')->fields([File::make('path', 'Файл
 
 ## Выгрузка с данными из связанных таблиц
 
-В выгрузке продаж нужны клиент, телефон и машина. Посчитайте их в `query()` раздела вариантов и покажите [вычисляемыми столбцами](list.md#вычисляемые-столбцы) — они попадают в xlsx/csv:
+В выгрузке продаж нужны клиент, телефон и машина. Посчитайте их в `query()` раздела вариантов и покажите [вычисляемыми столбцами](list.md#вычисляемые-столбцы) — они попадают в выгрузку csv:
 
 ```php
 public function query(Builder $query): Builder

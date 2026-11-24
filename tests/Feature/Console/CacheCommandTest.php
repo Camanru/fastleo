@@ -47,6 +47,22 @@ it('caches the resource list and serves it from the cache', function (): void {
     expect(Fastleo::resources()->all())->toHaveKeys(['articles', 'categories', 'feedback', 'users']);
 });
 
+it('keeps the Roles section out of the cache, so that switching the roles off still removes it', function (): void {
+    useRoles();
+    Fastleo::resources()->flush();
+
+    $this->artisan('fastleo:cache')->assertSuccessful();
+
+    expect(require Fastleo::resources()->cachePath())->not->toContain(config('fastleo.roles.resource'))
+        ->and(Fastleo::resources()->classes())->toContain(config('fastleo.roles.resource'));
+    $this->artisan('fastleo:doctor')->doesntExpectOutputToContain('fastleo:cache');
+
+    config(['fastleo.roles.enabled' => false]);
+    Fastleo::resources()->flush();
+
+    expect(Fastleo::resources()->classes())->not->toContain(config('fastleo.roles.resource'));
+});
+
 it('does not cache a broken resource description', function (): void {
     useFixtureResources('Registry/Duplicate');
 

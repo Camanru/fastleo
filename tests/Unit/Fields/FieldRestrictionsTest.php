@@ -55,6 +55,14 @@ it('keeps a password out of the export', function (): void {
         ->and(Text::make('title')->isExportable())->toBeTrue();
 });
 
+it('reads the saved false of a boolean column as the option 0, not as nothing chosen', function (): void {
+    $field = Select::make('is_published')->options([1 => 'Да', 0 => 'Нет']);
+
+    expect($field->hydrate(new Article(['title' => 'x', 'is_published' => false])))->toBe('0')
+        ->and($field->hydrate(new Article(['title' => 'x', 'is_published' => true])))->toBe('1')
+        ->and($field->exportValue(new Article(['title' => 'x', 'is_published' => false])))->toBe('Нет');
+});
+
 it('takes the name of a case of an enum without values', function (): void {
     expect(Select::make('priority')->default(PlainPriority::High)->formValue(null))->toBe('High')
         ->and(Select::make('priority')->hydrate(new Article(['title' => 'x'])))->toBeNull();
@@ -126,3 +134,16 @@ it('formats a block with a custom closure instead of its own table', function (F
     'repeater' => fn (): Repeater => Repeater::make('items')->fields([Text::make('a')]),
     'has many' => fn (): HasMany => HasMany::make('links')->fields([Text::make('title')])->forModel(Article::class),
 ]);
+
+it('refuses to search or sort by a relation that has no column of its own', function (Closure $field): void {
+    expect($field)->toThrow(LogicException::class, 'нельзя искать и сортировать');
+})->with([
+    'many to many, search' => [fn (): BelongsToMany => BelongsToMany::make('tags')->searchable()],
+    'many to many, sort' => [fn (): BelongsToMany => BelongsToMany::make('tags')->sortable()],
+    'nested, search' => [fn (): HasMany => HasMany::make('links')->searchable()],
+    'nested, sort' => [fn (): HasMany => HasMany::make('links')->sortable()],
+]);
+
+it('lets a relation be told not to be searched or sorted', function (): void {
+    expect(BelongsToMany::make('tags')->searchable(false)->sortable(false)->isSearchable())->toBeFalse();
+});

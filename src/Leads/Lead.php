@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Fastleo\Leads;
 
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 /**
  * Заявка: с формы сайта (`POST /leads`) или с другого сайта по API (`POST /api/leads`). Статус и отметку «просмотрено»
@@ -22,9 +22,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $site
  * @property string|null $form
  * @property LeadStatus $status
- * @property Carbon|null $read_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonInterface|null $read_at
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
  */
 #[Fillable(['name', 'phone', 'email', 'message', 'source', 'site', 'form', 'status'])]
 #[Table(name: 'fastleo_leads')]

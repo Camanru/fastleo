@@ -85,11 +85,27 @@ describe('remove', function (): void {
 
         channelAction($publication, 'remove-channels')->assertSessionHas('fastleo.success', 'Пост удалён из каналов.');
 
-        Http::assertSent(fn (HttpRequest $request): bool => str_ends_with($request->url(), '/deleteMessages') && collect($request['message_ids'])->sort()->values()->all() === [1, 2, 3]);
+        Http::assertSentCount(3);
+        Http::assertSent(fn (HttpRequest $request): bool => str_ends_with($request->url(), '/deleteMessage') && $request['message_id'] === 3);
         expect($publication->refresh()->status)->toBe('removed')->and(Delivery::query()->sole()->status)->toBe('removed');
 
         $this->delete(route('fastleo.resources.destroy', ['publications', $publication->id]))->assertRedirect();
         expect(Publication::query()->count())->toBe(0);
+    });
+
+    it('reports a Telegram post that is too old to delete, and takes a message that is already gone as deleted', function (): void {
+        // Порядок сообщений зависит от СУБД (MySQL хранит ключи JSON в своём порядке): ответ выбирается по номеру сообщения.
+        Http::fake(['api.telegram.org/*' => fn (HttpRequest $request) => $request['message_id'] === 1
+            ? Http::response(['ok' => false, 'description' => 'Bad Request: message to delete not found'], 400)
+            : Http::response(['ok' => false, 'description' => "Bad Request: message can't be deleted for everyone"], 400)]);
+        $publication = sentPublication(publishingChannel(), ['layout' => 'album+text', 'message_ids' => ['album' => ['1'], 'text' => '3']]);
+
+        channelAction($publication, 'remove-channels')->assertSessionHas('fastleo.error');
+
+        $delivery = Delivery::query()->sole();
+        expect($delivery->status)->toBe('sent')
+            ->and($delivery->error)->toContain("can't be deleted")
+            ->and(collect($delivery->message_ids)->flatten()->all())->toContain('3');
     });
 
     it('forgets the messages of a Max post that are already deleted, so that a retry goes on from the failed one', function (): void {

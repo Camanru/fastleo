@@ -268,11 +268,21 @@ final class ResourceQuery
         $query->where(function (Builder $where) use ($fields, $search): void {
             foreach ($fields as $field) {
                 $column = $where->qualifyColumn($field->name);
+                $callback = $field->searchCallback();
 
                 // Многоязычное поле — поиск по каждому языку (JSON-путь колонки).
                 foreach ($field->isTranslatable() ? array_map(fn (string $locale): string => $column.'->'.$locale, Fastleo::locales()) : [$column] as $target) {
-                    ContainsExpression::where($where, $target, $search, 'or');
+                    if ($callback instanceof Closure) {
+                        $where->orWhere(fn (Builder $group): mixed => $callback($group, $search, $target));
+                    } else {
+                        ContainsExpression::where($where, $target, $search, 'or');
+                    }
                 }
+            }
+
+            // Хуки ничего не добавили (например, строка слишком короткая): поиск ничего не находит, а не показывает всё.
+            if ($where->getQuery()->wheres === []) {
+                $where->whereRaw('1 = 0');
             }
         });
     }

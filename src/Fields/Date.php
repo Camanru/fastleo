@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Override;
 use Throwable;
 
 /**
- * Дата без времени. Колонка `date`, в модели — каст `'date'` (необязательно).
+ * Дата без времени. Колонка `date`, в модели — каст `'date:Y-m-d'` (необязательно; не `'date'` — он пишет в колонку и время).
  *
  * Вводится календарём браузера, хранится как `ГГГГ-ММ-ДД`, в списке — `ДД.ММ.ГГГГ`.
  *
@@ -73,7 +73,7 @@ class Date extends Field
     /**
      * Значение атрибута в Carbon или null, если это не дата.
      */
-    protected static function toCarbon(mixed $value, ?string $timezone = null): ?Carbon
+    protected static function toCarbon(mixed $value, ?string $timezone = null): ?CarbonInterface
     {
         if ($value instanceof DateTimeInterface) {
             return \Illuminate\Support\Facades\Date::instance($value);

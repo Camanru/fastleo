@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Fastleo\Fields;
 
+use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Override;
 
 /**
@@ -131,7 +131,7 @@ class DateTime extends Date
     /**
      * Значение атрибута (в поясе сайта) → Carbon в поясе панели.
      */
-    private function inAdminTimezone(mixed $value): ?Carbon
+    private function inAdminTimezone(mixed $value): ?CarbonInterface
     {
         return self::toCarbon($value, Fastleo::appTimezone())?->setTimezone(Fastleo::timezone());
     }

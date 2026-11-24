@@ -148,8 +148,10 @@ final readonly class Exporter
 
     /**
      * Ключи записей запроса в порядке списка (поиск, фильтры, сортировка, корзина), без повторов, если запрос
-     * ресурса соединяет таблицы. Сортировка по столбцу, который запрос ресурса задаёт сам через `select()` с
-     * псевдонимом, здесь не работает: читается только ключ.
+     * ресурса соединяет таблицы.
+     *
+     * Читается только ключ и столбцы с псевдонимом (подзапросы `withCount()`, `select('… as …')`): по ним может идти
+     * сортировка. Остальные столбцы запроса (`articles.*`) здесь не нужны и убираются.
      *
      * @param  Builder<Model>  $query
      * @return list<int|string>
@@ -157,8 +159,15 @@ final readonly class Exporter
     private function keys(Builder $query): array
     {
         $keys = [];
+        $ordered = clone $query;
+        $base = $ordered->getQuery();
+        $keyName = $query->getModel()->getQualifiedKeyName();
 
-        foreach ((clone $query)->pluck($query->getModel()->getQualifiedKeyName()) as $key) {
+        if ($base->columns !== null) {
+            $base->columns = [$keyName, ...array_filter($base->columns, fn (mixed $column): bool => ! is_string($column) || stripos($column, ' as ') !== false)];
+        }
+
+        foreach ($ordered->pluck($keyName) as $key) {
             if (is_int($key) || is_string($key)) {
                 $keys[$key] = $key;
             }

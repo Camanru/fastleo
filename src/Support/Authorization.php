@@ -124,7 +124,8 @@ final class Authorization
 
         $group = RoleMatrix::GROUPS[$ability] ?? 'update';
 
-        return $indexOnly || in_array('*', $closed, true) || in_array($ability, $closed, true) || in_array($group, $closed, true);
+        // Запрет просмотра закрывает раздел целиком, как в матрице ролей.
+        return $indexOnly || in_array('*', $closed, true) || in_array('view', $closed, true) || in_array($ability, $closed, true) || in_array($group, $closed, true);
     }
 
     /**

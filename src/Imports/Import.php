@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace Fastleo\Imports;
 
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -29,8 +29,8 @@ use Illuminate\Support\Facades\Storage;
  * @property list<array{row: int, message: string}>|null $errors
  * @property list<string>|null $unknown_columns
  * @property string|null $message
- * @property Carbon|null $finished_at
- * @property Carbon|null $created_at
+ * @property CarbonInterface|null $finished_at
+ * @property CarbonInterface|null $created_at
  */
 #[Fillable(['user_id', 'resource', 'file_name', 'path', 'status', 'processed', 'created', 'updated', 'skipped', 'errors', 'unknown_columns', 'message', 'finished_at'])]
 #[Table(name: 'fastleo_imports')]

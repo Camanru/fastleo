@@ -10,6 +10,7 @@ use Fastleo\Support\InlineEdit;
 use Fastleo\Support\JsonItem;
 use Fastleo\Support\QueryColumn;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -91,6 +92,9 @@ abstract class Field
 
     /** Поле участвует в поиске по списку. */
     protected bool $searchable = false;
+
+    /** Своё условие поиска по полю (`searchUsing()`); без него — поиск подстроки. */
+    protected ?Closure $searchUsing = null;
 
     /** Значение приходит из `query()` ресурса (`withCount`, `withSum`, подзапрос), в базу не пишется. */
     protected bool $fromQuery = false;
@@ -693,6 +697,48 @@ abstract class Field
         $this->searchable = $searchable;
 
         return $this;
+    }
+
+    /**
+     * Своё условие поиска по полю вместо поиска подстроки; поле становится `searchable()`.
+     *
+     * Хук получает запрос (отдельная группа условий: можно писать `where`, `orWhere`, `whereHas`), введённую строку и
+     * квалифицированную колонку; у переводимого поля — по одному вызову на язык с путём `колонка->язык`. Хук работает
+     * в списке, связанных таблицах, экспорте, поиске Ctrl+K и MCP; у скрытого для администратора поля не вызывается.
+     * Стандартный поиск внутри хука — `ContainsExpression::where($query, $column, $term)`.
+     *
+     * ```php
+     * // телефон хранится цифрами (79001234567), а ищут «8 (900) 123-45-67»
+     * Tel::make('phone')->searchUsing(function (Builder $query, string $term, string $column): void {
+     *     $digits = preg_replace('/\D/', '', $term) ?? '';
+     *     $digits = str_starts_with($digits, '8') ? '7'.substr($digits, 1) : $digits;
+     *
+     *     strlen($digits) >= 4
+     *         ? $query->where($column, 'like', '%'.$digits.'%')
+     *         : ContainsExpression::where($query, $column, $term);
+     * });
+     * ```
+     *
+     * @param  Closure(Builder<Model>, string, string): mixed  $callback
+     *
+     * @throws LogicException поле нельзя искать (связь «многие ко многим», вложенная таблица, `fromQuery()`, `computed()`)
+     */
+    public function searchUsing(Closure $callback): static
+    {
+        $this->searchable();
+        $this->searchUsing = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Своё условие поиска или `null`, если поле не искомое либо ищется как подстрока.
+     *
+     * @return (Closure(Builder<Model>, string, string): mixed)|null
+     */
+    public function searchCallback(): ?Closure
+    {
+        return $this->searchable ? $this->searchUsing : null;
     }
 
     /**

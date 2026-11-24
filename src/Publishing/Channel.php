@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Publishing;
 
 use BackedEnum;
+use Carbon\CarbonInterface;
 use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Messengers\Bot;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Carbon;
 
 /**
  * Канал Telegram или Max, куда публикуются записи сайта (раздел «Каналы»). Токен бота хранится зашифрованным
@@ -26,8 +26,8 @@ use Illuminate\Support\Carbon;
  * @property string $token
  * @property string $chat_id
  * @property bool $enabled
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
  */
 #[Fillable(['name', 'messenger', 'token', 'chat_id', 'enabled'])]
 #[Hidden(['token'])]

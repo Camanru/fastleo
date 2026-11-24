@@ -4,6 +4,30 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); ver
 
 The panel interface is in Russian: button, menu and section names are given here in English translation. Links to `docs/` lead to documentation written in Russian.
 
+## [4.10.4] — 2026-11-24
+
+### Added
+
+- **`Field::searchUsing()`**: a field can replace the "contains the string" search with its own condition ([docs/list.md](docs/list.md#своё-условие-поиска-searchusing)). Typical cases: a phone stored as digits (`79001234567`) found by `8 (900) 123-45-67`, or a search through a relation (`whereHas`). It works in the list, related tables, export, Ctrl+K and MCP.
+
+### Security
+
+- **A session opened by the "Remember me" cookie no longer survives a password change.** A request with a valid remember cookie to the login page created a session without the password hash; kept alive, that session passed after the password was changed or reset, after "Log out other devices" and after two-factor protection was turned on. The password hash is now written to the session at every sign-in to the panel, also by the cookie.
+- **`$ownerOnly = ['view']` closes the whole section**, as a role without the view permission does. Before, the list and the record page answered 403, but the edit form opened for everybody and the record could be changed or deleted. Sections that listed `'view'` to hide only the list and the export should list `'export'` or use `$ownerOnlyIndex`.
+
+### Fixed
+
+- **Dates with `Date::use(CarbonImmutable::class)`:** the Date, DateTime and Time fields no longer fail with a `TypeError`; they accept any `CarbonInterface`.
+- **Lead API keys with `CarbonImmutable`:** the "last used" time was written on every request instead of once a minute.
+- **A `KeyValue` field inside a new block of a `HasMany` field kept only the last added pair.** The rows of a new block got one and the same field name.
+- **A `Select` on a boolean column showed a saved "No" as nothing chosen**, and saving the form wrote `NULL` (a dash in the list and an empty cell in the export). A saved `false` is now the option `0`.
+- **A failing cache of the site no longer stops the scheduler or the saving of records.** The listeners of the package (the scheduler mark, the site map reset) let an exception of the cache store through: `schedule:run` ran no task at all, and with the site map on every save of any model failed.
+- **The export of a section whose `query()` adds columns (`withCount()`, `select()`) read every record with all its columns into memory** to get the order of the keys. Only the key and the computed columns are read now.
+- **"Remove from channels" reports a Telegram post that could not be deleted.** The messages of a post are deleted one by one: the batch request answered with success for a post older than 48 hours and the panel showed "Removed" while the post stayed in the channel. A message that is already gone from the channel counts as deleted.
+- **`fastleo:cache` no longer writes the "Roles" section into the cache.** With roles on, `fastleo:doctor` warned about a stale cache after every `php artisan optimize`, and the section stayed in the panel after the roles were switched off until the cache was rebuilt.
+- **`searchable()` and `sortable()` on a `BelongsToMany`, `HasMany` or `HasOne` field are a description error** with a clear message. Before, the list of the section failed with a database error: there is no column with the name of the relation.
+- **Documentation:** a token on a settings page is a `Text` field listed in `encrypted()` (a `Secret` field does not work there); a `computed()` column is not shown on the record page; the rules of a `quickToggle()` see the current values of the plain fields of the record; the export keeps the order by a computed column.
+
 ## [4.10.3] — 2026-11-12
 
 ### Added

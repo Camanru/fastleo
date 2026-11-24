@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Leads;
 
+use Carbon\CarbonInterface;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +12,6 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 /**
@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
  * @property string $token
  * @property string $token_hash
  * @property bool $is_active
- * @property Carbon|null $last_used_at
+ * @property CarbonInterface|null $last_used_at
  * @property string|null $note
  * @property-read string $visible_token
  * @property-read string $intake_url
@@ -83,7 +83,7 @@ final class LeadApiKey extends Model
      */
     public function touchUsed(): void
     {
-        if ($this->last_used_at instanceof Carbon && $this->last_used_at->gt(now()->subMinute())) {
+        if ($this->last_used_at?->gt(now()->subMinute()) === true) {
             return;
         }
 

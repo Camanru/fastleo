@@ -6,6 +6,8 @@ use Fastleo\Fastleo;
 use Fastleo\Fields\BelongsTo;
 use Fastleo\Fields\Number;
 use Fastleo\Fields\Text;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Workbench\App\Models\Article;
 use Workbench\App\Models\Category;
 
@@ -50,6 +52,19 @@ describe('showing', function (): void {
 });
 
 describe('default order', function (): void {
+    it('reads only the key and the computed columns to order the export, not every column of the section', function (): void {
+        Category::factory()->create();
+        $queries = [];
+        DB::listen(function (QueryExecuted $query) use (&$queries): void {
+            $queries[] = $query->sql;
+        });
+
+        $this->get(route('fastleo.resources.export', ['resource' => 'ordered-categories', 'format' => 'csv']))->streamedContent();
+
+        $keys = collect($queries)->first(fn (string $sql): bool => str_contains($sql, 'order by') && str_contains($sql, 'articles_count') && ! str_contains($sql, ' in ('));
+        expect($keys)->toBeString()->not->toContain('.*');
+    });
+
     it('puts the default order by the computed column to the list, the export and the search', function (): void {
         $this->get(route('fastleo.resources.index', 'ordered-categories'))
             ->assertOk()

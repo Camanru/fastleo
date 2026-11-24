@@ -6,6 +6,7 @@ namespace Fastleo\Fields;
 
 use Fastleo\Fastleo;
 use Fastleo\Fields\Concerns\QueriesRelatedRecords;
+use Fastleo\Fields\Concerns\RefusesSearchAndSort;
 use Fastleo\Fields\Concerns\TracksSeenKeys;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Illuminate\Contracts\Support\Htmlable;
@@ -27,6 +28,7 @@ use Override;
 class BelongsToMany extends Field implements SearchesOptions
 {
     use QueriesRelatedRecords;
+    use RefusesSearchAndSort;
     use TracksSeenKeys;
 
     /** Больше связей за одно сохранение не принимается: каждая проверяется запросом к базе. */

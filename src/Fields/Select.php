@@ -483,10 +483,14 @@ class Select extends Field implements SearchesOptions
     }
 
     /**
-     * Значение варианта строкой: enum — его value, число — строкой.
+     * Значение варианта строкой: enum — его value, число — строкой, булево — `'1'` и `'0'`.
      */
     private function scalar(mixed $value): ?string
     {
+        if (is_bool($value)) {
+            return $value ? '1' : '0';
+        }
+
         if ($value instanceof BackedEnum) {
             return (string) $value->value;
         }

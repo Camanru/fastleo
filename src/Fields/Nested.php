@@ -6,6 +6,7 @@ namespace Fastleo\Fields;
 
 use Closure;
 use Fastleo\Fastleo;
+use Fastleo\Fields\Concerns\RefusesSearchAndSort;
 use Fastleo\Fields\Contracts\SearchesOptions;
 use Fastleo\Layout\Layout;
 use Fastleo\Support\FormSchema;
@@ -28,6 +29,8 @@ use Override;
  */
 abstract class Nested extends Field
 {
+    use RefusesSearchAndSort;
+
     /** Вложенные блоки не показываются в таблице списка. */
     protected bool $showInList = false;
 

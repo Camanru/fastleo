@@ -68,7 +68,7 @@ Gate::define('manageFastleoFiles', fn (User $user) => $user->is_owner);
 | `Фото товара.JPG` | `foto-tovara.jpg` |
 | `Прайс (2026).pdf` | `prays-2026.pdf` |
 | `shell.php.txt` | `shell-php.txt` — точки внутри имени заменяются, чтобы сервер не принял файл за скрипт |
-| второй `foto-vracha.jpg` | `foto-vracha-1.jpg` — существующий файл не перезаписывается |
+| второй `photo.jpg` | `photo-1.jpg` — существующий файл не перезаписывается |
 
 Имена папок — так же: `Новости 2026` → `novosti-2026`.
 

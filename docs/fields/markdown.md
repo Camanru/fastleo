@@ -24,7 +24,7 @@ Markdown::make('body', 'Текст статьи')->rows(15);
 {!! \Fastleo\Fields\Markdown::render($article->body) !!}
 ```
 
-`null` и пустая строка дают пустой результат. То же вручную — `Str::markdown($text, ['html_input' => 'escape', 'allow_unsafe_links' => false])`.
+`null` и пустая строка дают пустой результат. Почти то же вручную — `Str::markdown($text, ['html_input' => 'escape', 'allow_unsafe_links' => false, 'max_nesting_level' => 50])`.
 
 | Метод | Что делает |
 |---|---|

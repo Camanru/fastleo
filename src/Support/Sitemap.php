@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
+use Throwable;
 use XMLWriter;
 
 /**
@@ -134,10 +135,15 @@ final class Sitemap
             return;
         }
 
-        $models = Cache::get(self::MODELS_KEY);
+        // Слушатель срабатывает на сохранение любой модели сайта: сбой кеша не должен отменять запись.
+        try {
+            $models = Cache::get(self::MODELS_KEY);
 
-        if (is_array($models) && in_array($model::class, $models, true)) {
-            Cache::forget(self::CACHE_KEY);
+            if (is_array($models) && in_array($model::class, $models, true)) {
+                Cache::forget(self::CACHE_KEY);
+            }
+        } catch (Throwable) {
+            // Карта обновится сама, когда истечёт срок её кеша.
         }
     }
 

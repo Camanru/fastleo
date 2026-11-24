@@ -298,3 +298,11 @@ describe('cache', function (): void {
         $this->get('/sitemap-3.xml')->assertNotFound();
     });
 });
+
+it('does not stop a record from being saved when the cache of the site is down', function (): void {
+    config(['fastleo.sitemap.enabled' => true, 'cache.default' => 'store-that-does-not-exist']);
+
+    $article = Article::factory()->create();
+
+    expect($article->exists)->toBeTrue();
+});

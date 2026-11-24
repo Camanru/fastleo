@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo;
 
 use Fastleo\Auth\LoginHistory;
+use Fastleo\Auth\SessionPasswordHash;
 use Fastleo\Auth\UserCleanup;
 use Fastleo\Closing\SiteClosing;
 use Fastleo\Console\CacheCommand;
@@ -138,6 +139,7 @@ final class FastleoServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom($this->packagePath('database/migrations'));
 
         Event::listen(Login::class, [LoginHistory::class, 'handle']);
+        Event::listen(Login::class, [SessionPasswordHash::class, 'handle']);
         Event::listen(CommandStarting::class, function (CommandStarting $event): void {
             if ($event->command === 'schedule:run') {
                 SchedulerPulse::beat();

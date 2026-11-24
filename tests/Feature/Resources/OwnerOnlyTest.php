@@ -235,6 +235,21 @@ describe('what a section closes to the others', function (): void {
         $this->get(route('fastleo.resources.index', 'articles'))->assertOk();
     });
 
+    it('closes the whole section with the group view: a record is not read through the edit form', function (): void {
+        ArticleResource::$ownerOnly = ['view'];
+        $article = Article::factory()->create();
+
+        $this->get(route('fastleo.resources.index', 'articles'))->assertForbidden();
+        $this->get(route('fastleo.resources.edit', ['articles', $article]))->assertForbidden();
+        $this->put(route('fastleo.resources.update', ['articles', $article]), ['title' => 'Changed'])->assertForbidden();
+        $this->delete(route('fastleo.resources.destroy', ['articles', $article]))->assertForbidden();
+        $this->get(route('fastleo.resources.create', 'articles'))->assertForbidden();
+        expect($article->refresh()->exists)->toBeTrue();
+
+        signInAs($this, $this->owner);
+        $this->get(route('fastleo.resources.edit', ['articles', $article]))->assertOk();
+    });
+
     it('closes the shared list but not a table of the section on the page of another record', function (): void {
         ArticleResource::$ownerOnlyIndex = true;
         $resource = new ArticleResource();

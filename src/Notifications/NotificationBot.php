@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace Fastleo\Notifications;
 
+use Carbon\CarbonInterface;
 use Fastleo\Messengers\Bot;
 use Fastleo\Messengers\Messenger;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 
 /**
  * Бот, который отправляет уведомления `notifyAdmins()` пользователям в Telegram или Max (раздел «Боты уведомлений»).
@@ -22,8 +22,8 @@ use Illuminate\Support\Carbon;
  * @property string $token
  * @property list<string> $recipients
  * @property bool $enabled
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
  */
 #[Fillable(['name', 'messenger', 'token', 'recipients', 'enabled'])]
 #[Hidden(['token'])]

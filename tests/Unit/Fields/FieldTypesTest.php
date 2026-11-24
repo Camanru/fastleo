@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Fastleo\Fields\Checkbox;
 use Fastleo\Fields\Color;
@@ -204,6 +205,26 @@ describe('dates and times', function (): void {
             ->and($field->display($record))->toBe('08.03.2026 12:30')
             ->and($field->dehydrate('2026-03-08T12:30'))->toBe('2026-03-08 09:30:00')
             ->and($field->dehydrate(''))->toBeNull();
+    });
+
+    it('works when the site switched its dates to CarbonImmutable', function (): void {
+        config(['app.timezone' => 'UTC', 'fastleo.timezone' => 'Europe/Moscow']);
+        Illuminate\Support\Facades\Date::use(CarbonImmutable::class);
+
+        try {
+            $record = new Article(['published_on' => '2026-03-08']);
+            $record->setRawAttributes(['starts_at' => '2026-03-08 09:30:00']);
+            $record->setAttribute('published_on', new CarbonImmutable('2026-03-08'));
+            $field = DateTime::make('starts_at');
+
+            expect(Date::make('published_on')->hydrate($record))->toBe('2026-03-08')
+                ->and(Date::make('published_on')->display($record))->toBe('08.03.2026')
+                ->and($field->hydrate($record))->toBe('2026-03-08T12:30')
+                ->and($field->display($record))->toBe('08.03.2026 12:30')
+                ->and($field->dehydrate('2026-03-08T12:30'))->toBe('2026-03-08 09:30:00');
+        } finally {
+            Illuminate\Support\Facades\Date::useDefault();
+        }
     });
 
     it('falls back to the site time zone for an unknown admin time zone', function (): void {

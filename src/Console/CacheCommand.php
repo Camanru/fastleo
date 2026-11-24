@@ -41,7 +41,9 @@ final class CacheCommand extends Command
         $registry->all();
         $registry->settings();
         $registry->pages();
-        $classes = array_values(array_diff($registry->classes(), ResourceRegistry::RUNTIME, $registry->builtIn()));
+        // Раздел «Роли» добавляется при каждом запросе по `fastleo.roles.enabled` и в кеш не входит.
+        $roles = config('fastleo.roles.resource');
+        $classes = array_values(array_diff($registry->classes(), ResourceRegistry::RUNTIME, $registry->builtIn(), is_string($roles) ? [$roles] : []));
         // Через временный файл и rename: запрос, который читает кеш в этот миг, не увидит недописанный файл.
         $temporary = $registry->cachePath().'.'.getmypid().'.tmp';
         File::put($temporary, '<?php return '.var_export($classes, true).';'.PHP_EOL);

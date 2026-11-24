@@ -39,6 +39,6 @@ Password::defaults(fn () => Password::min(12)->letters()->numbers());
 
 Общие методы — [README](README.md#общие-методы).
 
-Внутри вложенных блоков ([HasMany](has-many.md), [HasOne](has-one.md)) поле Password не работает — ошибка описания.
+Внутри вложенных блоков ([HasMany](has-many.md), [HasOne](has-one.md)), элементов [Repeater](repeater.md) и [Blocks](../blocks.md), мини-форм [действий](../actions.md) и на [страницах настроек](../settings.md) поле Password не работает — ошибка описания.
 
 ← [Все поля](README.md)

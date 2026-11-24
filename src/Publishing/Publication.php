@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Fastleo\Publishing;
 
+use Carbon\CarbonInterface;
 use Closure;
 use Fastleo\Fastleo;
 use Fastleo\Files\FileStore;
@@ -14,7 +15,6 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Throwable;
@@ -36,9 +36,9 @@ use Throwable;
  * @property string|null $source_id
  * @property string|null $user_id
  * @property string $status
- * @property Carbon|null $scheduled_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
+ * @property CarbonInterface|null $scheduled_at
+ * @property CarbonInterface|null $created_at
+ * @property CarbonInterface|null $updated_at
  * @property-read Collection<int, Delivery> $deliveries
  */
 #[Fillable(['text', 'images', 'button_label', 'button_url', 'channel_ids', 'source_resource', 'source_id', 'user_id', 'status', 'scheduled_at'])]

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Fastleo\Support;
 
 use Illuminate\Support\Facades\Cache;
+use Throwable;
 
 /**
  * «Пульс» планировщика Laravel: метка времени последнего запуска `schedule:run` в кеше приложения.
@@ -20,10 +21,16 @@ final class SchedulerPulse
 
     /**
      * Записать запуск (вызывается из события консоли при старте `schedule:run`).
+     *
+     * Сбой кеша не пробрасывается: слушатель срабатывает до `schedule:run`, и исключение остановило бы все задачи сайта.
      */
     public static function beat(): void
     {
-        Cache::put(self::KEY, now()->getTimestamp(), 86400);
+        try {
+            Cache::put(self::KEY, now()->getTimestamp(), 86400);
+        } catch (Throwable) {
+            // Метки не будет — дашборд и `fastleo:doctor` скажут, что планировщик не запускался.
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ use Fastleo\Health\HealthResult;
 use Fastleo\Support\CacheCleaner;
 use Fastleo\Support\SchedulerPulse;
 use Fastleo\Support\ServerReport;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Queue\Failed\FailedJobProviderInterface;
 use Illuminate\Queue\Failed\NullFailedJobProvider;
@@ -18,6 +19,8 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Symfony\Component\Console\Exception\CommandNotFoundException;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\NullOutput;
 use Workbench\App\Models\User;
 
 beforeEach(function (): void {
@@ -550,4 +553,13 @@ describe('clearing the cache', function (): void {
         $this->post(route('fastleo.dashboard.clear-cache'))->assertRedirect(route('fastleo.login'));
         expect(file_exists($this->sandbox.'/views/a.php'))->toBeTrue();
     });
+});
+
+it('lets the scheduler of the site run when the cache of the site is down', function (): void {
+    config(['cache.default' => 'store-that-does-not-exist']);
+
+    // Сбой кеша в слушателе `CommandStarting` не пробрасывается.
+    event(new CommandStarting('schedule:run', new ArrayInput([]), new NullOutput()));
+
+    expect(SchedulerPulse::lastRun(...))->toThrow(InvalidArgumentException::class);
 });

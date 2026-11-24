@@ -8,7 +8,6 @@ use DateTimeInterface;
 use Fastleo\Fastleo;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 use Override;
 

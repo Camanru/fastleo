@@ -140,6 +140,15 @@ it('shows the pairs in the form and on the record page', function (): void {
     $this->get(route('fastleo.resources.show', ['site-pages', $page->id]))->assertOk()->assertSee('120 м²');
 });
 
+it('marks the key of a new pair with its own mark, which a new block around the field does not replace', function (): void {
+    // Метка строки пары отличается от метки `__KEY__` блока `HasMany`, внутри которого может стоять поле.
+    $this->get(route('fastleo.resources.create', 'site-pages'))
+        ->assertOk()
+        ->assertSee('name="specs[__PAIR__][key]"', false)
+        ->assertSee("placeholder: '__PAIR__'", false)
+        ->assertDontSee('name="specs[__KEY__][key]"', false);
+});
+
 it('needs the array cast of the column', function (string $field): void {
     $record = new Article();
     $instance = $field === 'repeater' ? Repeater::make('excerpt')->fields([Text::make('a')]) : KeyValue::make('excerpt');
